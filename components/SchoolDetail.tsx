@@ -307,7 +307,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
         ))}
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-[600px]">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-[600px] max-w-full">
         <div className="p-8 md:p-12">
           {activeTab === 'indicadores' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
@@ -516,7 +516,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
 
                 {isAddingRh && (
                   <div className="p-8 border border-slate-200 rounded-2xl bg-white shadow-sm animate-fade-in">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-3 gap-6 mb-8">
                       {['nome', 'email', 'telefone'].map(f => (
                         <div key={f} className="space-y-2">
                           <label className="block text-xs font-bold text-slate-500 uppercase">{f}</label>

@@ -192,7 +192,7 @@ export const SchoolList: React.FC<SchoolListProps> = ({ escolas, onSelectEscola,
 
   if (isRegistering) {
     return (
-      <div className="max-w-4xl mx-auto space-y-8 animate-fade-in relative font-sans pb-20">
+      <div className="max-w-5xl 2xl:max-w-6xl mx-auto space-y-8 animate-fade-in relative font-sans pb-20">
 
         {/* Header */}
         <div className="bg-slate-900 rounded-2xl p-8 shadow-2xl relative overflow-hidden">
@@ -307,7 +307,7 @@ export const SchoolList: React.FC<SchoolListProps> = ({ escolas, onSelectEscola,
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-5 gap-10">
         {filteredEscolas.map((escola) => (
           <div key={escola.id} onClick={() => onSelectEscola(escola.id)} className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer group flex flex-col overflow-hidden">
             <div className="p-6 pb-4 border-b border-slate-50">

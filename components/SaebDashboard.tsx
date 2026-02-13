@@ -234,7 +234,7 @@ export const SaebDashboard: React.FC<SaebDashboardProps> = ({ escolas = [] }) =>
 
     const renderGeral = () => (
         <div className="space-y-8 animate-fade-in relative">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-4 gap-6">
                 {[
                     { label: 'Participação SAEB', val: Math.round((analysisData.totalAval / (analysisData.totalPrev || 1)) * 100) + '%', icon: Users, color: 'bg-slate-900', iconColor: 'text-brand-orange', p: 'Aproveitamento', count: analysisData.totalAval },
                     { label: 'Nota SAEB Média', val: analysisData.notaSaebMedia, icon: Target, color: 'bg-slate-900', iconColor: 'text-brand-orange', p: 'Escala', count: analysisData.totalAval },
@@ -257,7 +257,7 @@ export const SaebDashboard: React.FC<SaebDashboardProps> = ({ escolas = [] }) =>
                 ))}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 2xl:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
                     <div className="flex items-center gap-3 mb-8 border-b border-slate-100 pb-4">
                         <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
@@ -458,7 +458,7 @@ export const SaebDashboard: React.FC<SaebDashboardProps> = ({ escolas = [] }) =>
             </div>
 
             {showFilters && (
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-8">
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-7 gap-4 mb-8">
                     {[
                         { label: 'Unidade', val: selectedEscola, set: setSelectedEscola, opts: filterOptions.escolas },
                         { label: 'Ano', val: selectedYear, set: (v: any) => setSelectedYear(Number(v)), opts: filterOptions.years },

@@ -123,12 +123,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
             <h3 className="font-bold text-slate-800 text-lg">Ranking IDEB por Escola</h3>
           </div>
-          <div className="h-72">
+          <div className="h-72 overflow-hidden">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartDataIdeb} layout="vertical" margin={{ left: 10, right: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                 <XAxis type="number" domain={[0, 7]} tick={{ fontSize: 11, fontWeight: 500 }} stroke="#64748b" />
-                <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 11, fontWeight: 500 }} stroke="#64748b" />
+                <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 11, fontWeight: 500 }} stroke="#64748b" />
                 <Tooltip
                   cursor={{ fill: '#fff7ed' }}
                   contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', color: '#1e293b', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
@@ -147,7 +147,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
             <h3 className="font-bold text-slate-800 text-lg">Situação das Metas</h3>
           </div>
-          <div className="h-72 w-full relative">
+          <div className="h-72 w-full relative overflow-hidden">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie

@@ -8,6 +8,10 @@ export default {
   ],
   theme: {
     extend: {
+      screens: {
+        '2xl': '1536px',
+        '3xl': '2200px',
+      },
       colors: {
         brand: {
           black: '#0f172a',

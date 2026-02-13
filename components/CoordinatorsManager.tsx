@@ -58,7 +58,7 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
     const metasAtrasadas = escolasVinculadas.flatMap(escola => escola.planoAcao.filter(meta => meta.status === StatusMeta.ATRASADO).map(meta => ({ ...meta, escolaNome: escola.nome })));
 
     return (
-      <div className="max-w-5xl mx-auto space-y-6 animate-fade-in">
+      <div className="max-w-5xl 2xl:max-w-6xl mx-auto space-y-6 animate-fade-in">
         {/* Header */}
         <div className="relative overflow-hidden bg-slate-900 rounded-2xl p-6 md:p-8 shadow-2xl">
           <div className="absolute top-0 right-0 w-72 h-72 bg-orange-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
@@ -177,7 +177,7 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
 
   if (isEditing && formData) {
     return (
-      <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
+      <div className="max-w-5xl 2xl:max-w-6xl mx-auto space-y-6 animate-fade-in">
         {/* Header */}
         <div className="relative overflow-hidden bg-slate-900 rounded-2xl p-6 shadow-2xl">
           <div className="absolute top-0 right-0 w-72 h-72 bg-orange-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />

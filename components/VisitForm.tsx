@@ -107,7 +107,7 @@ export const VisitForm: React.FC<VisitFormProps> = ({ escolas, coordenadores, on
   );
 
   return (
-    <div className="max-w-5xl mx-auto pb-20 animate-fade-in relative font-sans">
+    <div className="max-w-5xl 2xl:max-w-6xl mx-auto pb-20 animate-fade-in relative font-sans">
 
       {/* Modern Header */}
       <div className="bg-slate-900 rounded-2xl p-8 mb-8 shadow-2xl relative overflow-hidden">

@@ -5,6 +5,23 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    font-size: 16px;
+    overflow-x: hidden;
+  }
+
+  @media (min-width: 2200px) {
+    html {
+      font-size: 17px;
+    }
+  }
+
+  @media (min-width: 3200px) {
+    html {
+      font-size: 19px;
+    }
+  }
+
   body {
     @apply bg-brand-light text-brand-black antialiased selection:bg-brand-orange selection:text-white;
     font-family: 'Inter', system-ui, sans-serif;
@@ -121,4 +138,115 @@
 
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-brand-orange;
+}
+
+/* ===== PRINT STYLES ===== */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm 15mm 12mm 15mm;
+  }
+
+  /* Hide everything except the print report */
+  body * {
+    visibility: hidden !important;
+  }
+
+  #print-report,
+  #print-report * {
+    visibility: visible !important;
+  }
+
+  #print-report {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: white !important;
+    color: #1e293b !important;
+    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif !important;
+    font-size: 11pt !important;
+    line-height: 1.5 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Force hide UI elements */
+  nav,
+  aside,
+  header,
+  button,
+  .print\\:hidden,
+  [class*="sidebar"],
+  [class*="Sidebar"],
+  ::-webkit-scrollbar {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Reset backgrounds and shadows */
+  #print-report *:not(.print-keep-bg) {
+    box-shadow: none !important;
+  }
+
+  /* Page break controls */
+  .print-page-break {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+
+  .print-avoid-break {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Tables in print */
+  #print-report table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  #print-report th,
+  #print-report td {
+    padding: 6pt 8pt !important;
+    border: 0.5pt solid #cbd5e1 !important;
+    text-align: left !important;
+    font-size: 9pt !important;
+  }
+
+  #print-report thead th {
+    background-color: #f1f5f9 !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    font-size: 7pt !important;
+    letter-spacing: 0.05em !important;
+  }
+
+  /* Signature block spacing */
+  .print-signatures {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin-top: 40pt !important;
+  }
+
+  /* Footer */
+  .print-footer {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    text-align: center !important;
+    font-size: 7pt !important;
+    color: #94a3b8 !important;
+    border-top: 0.5pt solid #e2e8f0 !important;
+    padding-top: 4pt !important;
+  }
+
+  /* No links in print */
+  a {
+    text-decoration: none !important;
+    color: inherit !important;
+  }
 }

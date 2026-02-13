@@ -53,7 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
 
     useEffect(() => {
         const handleResize = () => {
-            if (window.innerWidth < 1024) {
+            if (window.innerWidth < 768) {
                 setIsCollapsed(true);
             } else {
                 setIsCollapsed(false);

@@ -187,7 +187,6 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
                </div>
             </div>
          </div>
-         <style>{`@media print { body * { visibility: hidden; } #print-area, #print-area * { visibility: visible; } #print-area { position: absolute; left: 0; top: 0; width: 100%; border: none !important; } }`}</style>
       </div>
    );
 };
