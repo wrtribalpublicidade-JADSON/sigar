@@ -345,6 +345,18 @@ export const SchoolList: React.FC<SchoolListProps> = ({ escolas, onSelectEscola,
         icon={Trash2}
         variant="danger"
       />
+
+      <ConfirmModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={handleConfirmSave}
+        title={editingSchoolId ? 'Confirmar Edição' : 'Confirmar Cadastro'}
+        message={editingSchoolId ? 'Deseja salvar as alterações realizadas nesta escola?' : 'Deseja cadastrar esta nova unidade escolar?'}
+        icon={Save}
+        variant="success"
+        confirmText="Salvar"
+        cancelText="Cancelar"
+      />
     </div>
   );
 };
