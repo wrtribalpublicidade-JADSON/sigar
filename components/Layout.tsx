@@ -1,0 +1,47 @@
+import React from 'react';
+import { ViewState } from '../types';
+import { Sidebar } from './layout/Sidebar';
+
+interface LayoutProps {
+  children: React.ReactNode;
+  currentView: ViewState;
+  onChangeView: (view: ViewState) => void;
+  onLogout: () => void;
+  isAdmin: boolean;
+  userName: string | null;
+  userEmail: string | null;
+}
+
+export const Layout: React.FC<LayoutProps> = ({
+  children,
+  currentView,
+  onChangeView,
+  onLogout,
+  isAdmin,
+  userName,
+  userEmail
+}) => {
+  return (
+    <div className="min-h-screen bg-brand-light flex flex-col md:flex-row">
+      {/* Sidebar */}
+      <Sidebar
+        currentView={currentView}
+        onNavigate={onChangeView}
+        onLogout={onLogout}
+        userName={userName}
+        userEmail={userEmail}
+      />
+
+      {/* Main Content */}
+      <main className="flex-1 p-4 md:p-12 pt-20 md:pt-12 overflow-y-auto min-h-screen selection:bg-brand-orange selection:text-white">
+        <div className="max-w-[1600px] mx-auto animate-fade-in relative z-10">
+          {children}
+        </div>
+
+        {/* Subtle Decorative Grid Base */}
+        <div className="fixed inset-0 pointer-events-none opacity-[0.03] z-0"
+          style={{ backgroundImage: 'radial-gradient(#0f172a 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
+      </main>
+    </div>
+  );
+};
