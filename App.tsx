@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
 import { SchoolList } from './components/SchoolList';
@@ -42,6 +42,8 @@ export default function App() {
 
   // App Data State
   const [escolas, setEscolas] = useState<Escola[]>([]);
+  const escolasRef = useRef(escolas);
+  useEffect(() => { escolasRef.current = escolas; }, [escolas]);
   const [visitas, setVisitas] = useState<Visita[]>([]);
   const [coordenadores, setCoordenadores] = useState<Coordenador[]>([]);
 
@@ -256,12 +258,18 @@ export default function App() {
 
   const handleUpdateEscola = async (updatedEscola: Escola) => {
     if (isDemoMode) {
-      setEscolas(escolas.map(e => e.id === updatedEscola.id ? updatedEscola : e));
+      setEscolas(prev => prev.map(e => e.id === updatedEscola.id ? updatedEscola : e));
       showNotification('success', 'Alteração simulada com sucesso (Modo Demo).');
       return;
     }
 
     try {
+      // Snapshot current state to detect which child data actually changed
+      const currentEscola = escolasRef.current.find(e => e.id === updatedEscola.id);
+      const planoChanged = !currentEscola || currentEscola.planoAcao !== updatedEscola.planoAcao;
+      const rhChanged = !currentEscola || currentEscola.recursosHumanos !== updatedEscola.recursosHumanos;
+      const acompChanged = !currentEscola || currentEscola.acompanhamentoMensal !== updatedEscola.acompanhamentoMensal;
+
       const { error } = await supabase.from('escolas').update({
         nome: updatedEscola.nome,
         gestor: updatedEscola.gestor,
@@ -275,65 +283,71 @@ export default function App() {
 
       if (error) throw error;
 
-      // --- Metas de Ação: sync via upsert + selective delete ---
-      const currentMetaIds = updatedEscola.planoAcao.map(m => m.id);
-      const { data: existingMetas } = await supabase.from('metas_acao').select('id').eq('escola_id', updatedEscola.id);
-      const metaIdsToDelete = (existingMetas || []).map((m: any) => m.id).filter((id: string) => !currentMetaIds.includes(id));
-      if (metaIdsToDelete.length > 0) {
-        await supabase.from('metas_acao').delete().in('id', metaIdsToDelete);
-      }
-      if (updatedEscola.planoAcao.length > 0) {
-        await supabase.from('metas_acao').upsert(updatedEscola.planoAcao.map(m => ({
-          id: m.id,
-          escola_id: updatedEscola.id,
-          descricao: m.descricao,
-          prazo: m.prazo,
-          status: m.status,
-          responsavel: m.responsavel
-        })));
-      }
-
-      // --- Recursos Humanos: sync via upsert + selective delete ---
-      const currentRhIds = updatedEscola.recursosHumanos.map(r => r.id);
-      const { data: existingRh } = await supabase.from('recursos_humanos').select('id').eq('escola_id', updatedEscola.id);
-      const rhIdsToDelete = (existingRh || []).map((r: any) => r.id).filter((id: string) => !currentRhIds.includes(id));
-      if (rhIdsToDelete.length > 0) {
-        await supabase.from('recursos_humanos').delete().in('id', rhIdsToDelete);
-      }
-      if (updatedEscola.recursosHumanos.length > 0) {
-        await supabase.from('recursos_humanos').upsert(updatedEscola.recursosHumanos.map(r => ({
-          id: r.id,
-          escola_id: updatedEscola.id,
-          funcao: r.funcao,
-          nome: r.nome,
-          telefone: r.telefone,
-          email: r.email,
-          data_nomeacao: r.dataNomeacao,
-          tipo_vinculo: r.tipoVinculo,
-          etapa_atuacao: r.etapaAtuacao,
-          componente_curricular: r.componenteCurricular
-        })));
+      // --- Metas de Ação: only sync if changed ---
+      if (planoChanged) {
+        const currentMetaIds = updatedEscola.planoAcao.map(m => m.id);
+        const { data: existingMetas } = await supabase.from('metas_acao').select('id').eq('escola_id', updatedEscola.id);
+        const metaIdsToDelete = (existingMetas || []).map((m: any) => m.id).filter((id: string) => !currentMetaIds.includes(id));
+        if (metaIdsToDelete.length > 0) {
+          await supabase.from('metas_acao').delete().in('id', metaIdsToDelete);
+        }
+        if (updatedEscola.planoAcao.length > 0) {
+          await supabase.from('metas_acao').upsert(updatedEscola.planoAcao.map(m => ({
+            id: m.id,
+            escola_id: updatedEscola.id,
+            descricao: m.descricao,
+            prazo: m.prazo,
+            status: m.status,
+            responsavel: m.responsavel
+          })));
+        }
       }
 
-      // --- Acompanhamento Mensal: sync via upsert + selective delete ---
-      const currentAcompIds = updatedEscola.acompanhamentoMensal.map(a => a.id);
-      const { data: existingAcomp } = await supabase.from('acompanhamento_mensal').select('id').eq('escola_id', updatedEscola.id);
-      const acompIdsToDelete = (existingAcomp || []).map((a: any) => a.id).filter((id: string) => !currentAcompIds.includes(id));
-      if (acompIdsToDelete.length > 0) {
-        await supabase.from('acompanhamento_mensal').delete().in('id', acompIdsToDelete);
-      }
-      if (updatedEscola.acompanhamentoMensal.length > 0) {
-        await supabase.from('acompanhamento_mensal').upsert(updatedEscola.acompanhamentoMensal.map(a => ({
-          id: a.id,
-          escola_id: updatedEscola.id,
-          pergunta: a.pergunta,
-          categoria: a.categoria,
-          resposta: a.resposta,
-          observacao: a.observacao
-        })));
+      // --- Recursos Humanos: only sync if changed ---
+      if (rhChanged) {
+        const currentRhIds = updatedEscola.recursosHumanos.map(r => r.id);
+        const { data: existingRh } = await supabase.from('recursos_humanos').select('id').eq('escola_id', updatedEscola.id);
+        const rhIdsToDelete = (existingRh || []).map((r: any) => r.id).filter((id: string) => !currentRhIds.includes(id));
+        if (rhIdsToDelete.length > 0) {
+          await supabase.from('recursos_humanos').delete().in('id', rhIdsToDelete);
+        }
+        if (updatedEscola.recursosHumanos.length > 0) {
+          await supabase.from('recursos_humanos').upsert(updatedEscola.recursosHumanos.map(r => ({
+            id: r.id,
+            escola_id: updatedEscola.id,
+            funcao: r.funcao,
+            nome: r.nome,
+            telefone: r.telefone,
+            email: r.email,
+            data_nomeacao: r.dataNomeacao,
+            tipo_vinculo: r.tipoVinculo,
+            etapa_atuacao: r.etapaAtuacao,
+            componente_curricular: r.componenteCurricular
+          })));
+        }
       }
 
-      setEscolas(escolas.map(e => e.id === updatedEscola.id ? updatedEscola : e));
+      // --- Acompanhamento Mensal: only sync if changed ---
+      if (acompChanged) {
+        const currentAcompIds = updatedEscola.acompanhamentoMensal.map(a => a.id);
+        const { data: existingAcomp } = await supabase.from('acompanhamento_mensal').select('id').eq('escola_id', updatedEscola.id);
+        const acompIdsToDelete = (existingAcomp || []).map((a: any) => a.id).filter((id: string) => !currentAcompIds.includes(id));
+        if (acompIdsToDelete.length > 0) {
+          await supabase.from('acompanhamento_mensal').delete().in('id', acompIdsToDelete);
+        }
+        if (updatedEscola.acompanhamentoMensal.length > 0) {
+          await supabase.from('acompanhamento_mensal').upsert(updatedEscola.acompanhamentoMensal.map(a => ({
+            id: a.id,
+            escola_id: updatedEscola.id,
+            pergunta: a.pergunta,
+            categoria: a.categoria,
+            resposta: a.resposta,
+            observacao: a.observacao
+          })));
+        }
+      }
+
+      setEscolas(prev => prev.map(e => e.id === updatedEscola.id ? updatedEscola : e));
       showNotification('success', 'Dados atualizados com sucesso!');
     } catch (error) {
       console.error(error);
@@ -343,7 +357,7 @@ export default function App() {
 
   const handleSaveSchool = async (newSchool: Escola) => {
     if (isDemoMode) {
-      setEscolas([...escolas, newSchool]);
+      setEscolas(prev => [...prev, newSchool]);
       showNotification('success', 'Escola adicionada (Modo Demo).');
       return;
     }
@@ -374,7 +388,7 @@ export default function App() {
         })));
       }
 
-      setEscolas([...escolas, newSchool]);
+      setEscolas(prev => [...prev, newSchool]);
       showNotification('success', 'Escola cadastrada com sucesso!');
     } catch (error) {
       console.error(error);

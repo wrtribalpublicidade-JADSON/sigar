@@ -558,8 +558,10 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                           <label className="block text-xs font-bold text-slate-500 uppercase">Etapa de Atuação</label>
                           <select value={rhForm.etapaAtuacao || ''} onChange={e => setRhForm({ ...rhForm, etapaAtuacao: e.target.value as any, componenteCurricular: '' })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all">
                             <option value="">Selecione a etapa...</option>
+                            <option value="Educação Infantil">Educação Infantil</option>
                             <option value="Anos Iniciais">Anos Iniciais</option>
                             <option value="Anos Finais">Anos Finais</option>
+                            <option value="EJA">EJA</option>
                             <option value="Sala de Recurso">Sala de Recurso</option>
                             <option value="Outros">Outros</option>
                           </select>
