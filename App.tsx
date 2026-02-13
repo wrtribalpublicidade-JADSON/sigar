@@ -289,10 +289,11 @@ export default function App() {
         const { data: existingMetas } = await supabase.from('metas_acao').select('id').eq('escola_id', updatedEscola.id);
         const metaIdsToDelete = (existingMetas || []).map((m: any) => m.id).filter((id: string) => !currentMetaIds.includes(id));
         if (metaIdsToDelete.length > 0) {
-          await supabase.from('metas_acao').delete().in('id', metaIdsToDelete);
+          const { error: delErr } = await supabase.from('metas_acao').delete().in('id', metaIdsToDelete);
+          if (delErr) throw delErr;
         }
         if (updatedEscola.planoAcao.length > 0) {
-          await supabase.from('metas_acao').upsert(updatedEscola.planoAcao.map(m => ({
+          const { error: upsertErr } = await supabase.from('metas_acao').upsert(updatedEscola.planoAcao.map(m => ({
             id: m.id,
             escola_id: updatedEscola.id,
             descricao: m.descricao,
@@ -300,6 +301,7 @@ export default function App() {
             status: m.status,
             responsavel: m.responsavel
           })));
+          if (upsertErr) throw upsertErr;
         }
       }
 
@@ -309,10 +311,11 @@ export default function App() {
         const { data: existingRh } = await supabase.from('recursos_humanos').select('id').eq('escola_id', updatedEscola.id);
         const rhIdsToDelete = (existingRh || []).map((r: any) => r.id).filter((id: string) => !currentRhIds.includes(id));
         if (rhIdsToDelete.length > 0) {
-          await supabase.from('recursos_humanos').delete().in('id', rhIdsToDelete);
+          const { error: delErr } = await supabase.from('recursos_humanos').delete().in('id', rhIdsToDelete);
+          if (delErr) throw delErr;
         }
         if (updatedEscola.recursosHumanos.length > 0) {
-          await supabase.from('recursos_humanos').upsert(updatedEscola.recursosHumanos.map(r => ({
+          const { error: upsertErr } = await supabase.from('recursos_humanos').upsert(updatedEscola.recursosHumanos.map(r => ({
             id: r.id,
             escola_id: updatedEscola.id,
             funcao: r.funcao,
@@ -324,6 +327,7 @@ export default function App() {
             etapa_atuacao: r.etapaAtuacao,
             componente_curricular: r.componenteCurricular
           })));
+          if (upsertErr) throw upsertErr;
         }
       }
 
@@ -333,10 +337,11 @@ export default function App() {
         const { data: existingAcomp } = await supabase.from('acompanhamento_mensal').select('id').eq('escola_id', updatedEscola.id);
         const acompIdsToDelete = (existingAcomp || []).map((a: any) => a.id).filter((id: string) => !currentAcompIds.includes(id));
         if (acompIdsToDelete.length > 0) {
-          await supabase.from('acompanhamento_mensal').delete().in('id', acompIdsToDelete);
+          const { error: delErr } = await supabase.from('acompanhamento_mensal').delete().in('id', acompIdsToDelete);
+          if (delErr) throw delErr;
         }
         if (updatedEscola.acompanhamentoMensal.length > 0) {
-          await supabase.from('acompanhamento_mensal').upsert(updatedEscola.acompanhamentoMensal.map(a => ({
+          const { error: upsertErr } = await supabase.from('acompanhamento_mensal').upsert(updatedEscola.acompanhamentoMensal.map(a => ({
             id: a.id,
             escola_id: updatedEscola.id,
             pergunta: a.pergunta,
@@ -344,14 +349,15 @@ export default function App() {
             resposta: a.resposta,
             observacao: a.observacao
           })));
+          if (upsertErr) throw upsertErr;
         }
       }
 
       setEscolas(prev => prev.map(e => e.id === updatedEscola.id ? updatedEscola : e));
       showNotification('success', 'Dados atualizados com sucesso!');
-    } catch (error) {
-      console.error(error);
-      showNotification('error', 'Erro ao salvar informações.');
+    } catch (error: any) {
+      console.error('Erro ao salvar:', error);
+      showNotification('error', `Erro ao salvar: ${error?.message || 'Falha na operação.'}`);
     }
   };
 
