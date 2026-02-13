@@ -652,8 +652,8 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
               <div className="space-y-8 animate-fade-in">
                 <div className="flex justify-between items-center pb-6 border-b border-slate-100">
                   <div>
-                    <h3 className="text-2xl font-bold text-slate-800">Plano Tático de Ação</h3>
-                    <p className="text-sm text-slate-500 mt-1">Metas e ações estratégicas para 2024</p>
+                    <h3 className="text-2xl font-bold text-slate-800">Plano de Ação</h3>
+                    <p className="text-sm text-slate-500 mt-1">Gestão de metas e prazos para melhoria dos indicadores.</p>
                   </div>
                   {!isEditingMeta && <button onClick={() => { setMetaForm({ id: '', descricao: '', prazo: '', status: StatusMeta.NAO_INICIADO, responsavel: '' }); setIsEditingMeta(true); }} className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2"><Target size={18} /> Nova Meta</button>}
                 </div>
@@ -665,7 +665,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Descrição da Meta</label>
                         <input type="text" value={metaForm.descricao} onChange={e => setMetaForm({ ...metaForm, descricao: e.target.value })} className="w-full text-lg font-medium text-slate-800 border-b border-slate-200 py-2 focus:border-orange-500 focus:outline-none placeholder-slate-300" placeholder="Descreva a meta..." />
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                         <div>
                           <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Prazo</label>
                           <input type="date" value={metaForm.prazo} onChange={e => setMetaForm({ ...metaForm, prazo: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" />
@@ -673,6 +673,15 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                         <div>
                           <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Responsável</label>
                           <input type="text" value={metaForm.responsavel} onChange={e => setMetaForm({ ...metaForm, responsavel: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Nome do responsável" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Status</label>
+                          <select value={metaForm.status} onChange={e => setMetaForm({ ...metaForm, status: e.target.value as StatusMeta })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20">
+                            <option value={StatusMeta.NAO_INICIADO}>{StatusMeta.NAO_INICIADO}</option>
+                            <option value={StatusMeta.EM_ANDAMENTO}>{StatusMeta.EM_ANDAMENTO}</option>
+                            <option value={StatusMeta.CONCLUIDO}>{StatusMeta.CONCLUIDO}</option>
+                            <option value={StatusMeta.ATRASADO}>{StatusMeta.ATRASADO}</option>
+                          </select>
                         </div>
                       </div>
                       <div className="flex gap-3 pt-4">
@@ -688,7 +697,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                     <div key={meta.id} className="p-6 border border-slate-100 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row justify-between items-center gap-6 group">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
-                          <span className={`px-3 py-1 text-xs font-bold uppercase rounded-full ${meta.status === StatusMeta.CONCLUIDO ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{meta.status}</span>
+                          <span className={`px-3 py-1 text-xs font-bold uppercase rounded-full ${meta.status === StatusMeta.CONCLUIDO ? 'bg-emerald-100 text-emerald-700' : meta.status === StatusMeta.EM_ANDAMENTO ? 'bg-blue-100 text-blue-700' : meta.status === StatusMeta.ATRASADO ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'}`}>{meta.status}</span>
                           <span className="text-xs font-medium text-slate-400 flex items-center gap-1"><Clock size={12} /> {meta.prazo}</span>
                         </div>
                         <h4 className="text-lg font-bold text-slate-900 leading-tight">{meta.descricao}</h4>
