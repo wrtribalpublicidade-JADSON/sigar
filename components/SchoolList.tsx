@@ -267,6 +267,18 @@ export const SchoolList: React.FC<SchoolListProps> = ({ escolas, onSelectEscola,
             </button>
           </div>
         </form>
+
+        <ConfirmModal
+          isOpen={showConfirmModal}
+          onClose={() => setShowConfirmModal(false)}
+          onConfirm={handleConfirmSave}
+          title={editingSchoolId ? 'Confirmar Edição' : 'Confirmar Cadastro'}
+          message={editingSchoolId ? 'Deseja salvar as alterações realizadas nesta escola?' : 'Deseja cadastrar esta nova unidade escolar?'}
+          icon={Save}
+          variant="success"
+          confirmText="Salvar"
+          cancelText="Cancelar"
+        />
       </div>
     );
   }
@@ -344,18 +356,6 @@ export const SchoolList: React.FC<SchoolListProps> = ({ escolas, onSelectEscola,
         message="This operation will irreversibly expunge the unit and all associated data logs from the system core."
         icon={Trash2}
         variant="danger"
-      />
-
-      <ConfirmModal
-        isOpen={showConfirmModal}
-        onClose={() => setShowConfirmModal(false)}
-        onConfirm={handleConfirmSave}
-        title={editingSchoolId ? 'Confirmar Edição' : 'Confirmar Cadastro'}
-        message={editingSchoolId ? 'Deseja salvar as alterações realizadas nesta escola?' : 'Deseja cadastrar esta nova unidade escolar?'}
-        icon={Save}
-        variant="success"
-        confirmText="Salvar"
-        cancelText="Cancelar"
       />
     </div>
   );
