@@ -275,9 +275,16 @@ export default function App() {
 
       if (error) throw error;
 
-      await supabase.from('metas_acao').delete().eq('escola_id', updatedEscola.id);
+      // --- Metas de Ação: sync via upsert + selective delete ---
+      const currentMetaIds = updatedEscola.planoAcao.map(m => m.id);
+      const { data: existingMetas } = await supabase.from('metas_acao').select('id').eq('escola_id', updatedEscola.id);
+      const metaIdsToDelete = (existingMetas || []).map((m: any) => m.id).filter((id: string) => !currentMetaIds.includes(id));
+      if (metaIdsToDelete.length > 0) {
+        await supabase.from('metas_acao').delete().in('id', metaIdsToDelete);
+      }
       if (updatedEscola.planoAcao.length > 0) {
-        await supabase.from('metas_acao').insert(updatedEscola.planoAcao.map(m => ({
+        await supabase.from('metas_acao').upsert(updatedEscola.planoAcao.map(m => ({
+          id: m.id,
           escola_id: updatedEscola.id,
           descricao: m.descricao,
           prazo: m.prazo,
@@ -286,10 +293,16 @@ export default function App() {
         })));
       }
 
-      await supabase.from('recursos_humanos').delete().eq('escola_id', updatedEscola.id);
+      // --- Recursos Humanos: sync via upsert + selective delete ---
+      const currentRhIds = updatedEscola.recursosHumanos.map(r => r.id);
+      const { data: existingRh } = await supabase.from('recursos_humanos').select('id').eq('escola_id', updatedEscola.id);
+      const rhIdsToDelete = (existingRh || []).map((r: any) => r.id).filter((id: string) => !currentRhIds.includes(id));
+      if (rhIdsToDelete.length > 0) {
+        await supabase.from('recursos_humanos').delete().in('id', rhIdsToDelete);
+      }
       if (updatedEscola.recursosHumanos.length > 0) {
-        // Fix: Access componenteCurricular instead of componente_curricular on type RecursoHumano
-        await supabase.from('recursos_humanos').insert(updatedEscola.recursosHumanos.map(r => ({
+        await supabase.from('recursos_humanos').upsert(updatedEscola.recursosHumanos.map(r => ({
+          id: r.id,
           escola_id: updatedEscola.id,
           funcao: r.funcao,
           nome: r.nome,
@@ -302,9 +315,16 @@ export default function App() {
         })));
       }
 
-      await supabase.from('acompanhamento_mensal').delete().eq('escola_id', updatedEscola.id);
+      // --- Acompanhamento Mensal: sync via upsert + selective delete ---
+      const currentAcompIds = updatedEscola.acompanhamentoMensal.map(a => a.id);
+      const { data: existingAcomp } = await supabase.from('acompanhamento_mensal').select('id').eq('escola_id', updatedEscola.id);
+      const acompIdsToDelete = (existingAcomp || []).map((a: any) => a.id).filter((id: string) => !currentAcompIds.includes(id));
+      if (acompIdsToDelete.length > 0) {
+        await supabase.from('acompanhamento_mensal').delete().in('id', acompIdsToDelete);
+      }
       if (updatedEscola.acompanhamentoMensal.length > 0) {
-        await supabase.from('acompanhamento_mensal').insert(updatedEscola.acompanhamentoMensal.map(a => ({
+        await supabase.from('acompanhamento_mensal').upsert(updatedEscola.acompanhamentoMensal.map(a => ({
+          id: a.id,
           escola_id: updatedEscola.id,
           pergunta: a.pergunta,
           categoria: a.categoria,
@@ -345,6 +365,7 @@ export default function App() {
 
       if (newSchool.acompanhamentoMensal.length > 0) {
         await supabase.from('acompanhamento_mensal').insert(newSchool.acompanhamentoMensal.map(a => ({
+          id: a.id,
           escola_id: newSchool.id,
           pergunta: a.pergunta,
           categoria: a.categoria,
