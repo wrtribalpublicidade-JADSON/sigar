@@ -335,6 +335,18 @@ export const SchoolList: React.FC<SchoolListProps> = ({ escolas, onSelectEscola,
                   <p className="text-sm font-semibold text-slate-700 truncate">{escola.gestor}</p>
                 </div>
               </div>
+              {(escola.recursosHumanos?.length > 0) && (
+                <div className="flex items-center gap-3 text-xs font-medium text-slate-500 mt-1">
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                    {escola.recursosHumanos.filter(r => r.tipoVinculo === 'Efetivo').length} Efetivos
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-orange-500 inline-block"></span>
+                    {escola.recursosHumanos.filter(r => r.tipoVinculo === 'Contratado').length} Contratados
+                  </span>
+                </div>
+              )}
               <div className="flex items-center justify-between mt-2 pt-2">
                 <span className="text-xs font-medium text-slate-500">{calcTotalAlunos(escola)} alunos</span>
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity transform translate-y-2 group-hover:translate-y-0 duration-200">
