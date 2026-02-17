@@ -39,7 +39,7 @@ export const SaebModal: React.FC<SaebModalProps> = ({
         ano: new Date().getFullYear(),
         tipoAvaliacao: 'SAEB' as const,
         componenteCurricular: 'Língua Portuguesa' as 'Língua Portuguesa' | 'Matemática',
-        anoSerie: '2º ANO' as '2º ANO' | '5º ANO' | '9º ANO',
+        anoSerie: '5º ANO' as any, // Allow legacy 2º ANO if needed during edit
         estudantesAvaliados: 0,
         estudantesPrevistos: 0,
         proficienciaLp: 0,
@@ -93,7 +93,7 @@ export const SaebModal: React.FC<SaebModalProps> = ({
                 ano: new Date().getFullYear(),
                 tipoAvaliacao: 'SAEB',
                 componenteCurricular: 'Língua Portuguesa',
-                anoSerie: '2º ANO',
+                anoSerie: '5º ANO',
                 estudantesAvaliados: 0,
                 estudantesPrevistos: 0,
                 proficienciaLp: 0,
@@ -254,18 +254,16 @@ export const SaebModal: React.FC<SaebModalProps> = ({
 
                             <div className="space-y-3">
                                 <label className="text-[11px] font-black text-slate-500 uppercase block tracking-tighter">Ano / Série</label>
-                                <div className="grid grid-cols-3 gap-2">
-                                    {(['2º ANO', '5º ANO', '9º ANO'] as const).map((ano) => (
-                                        <button
-                                            key={ano}
-                                            type="button"
-                                            onClick={() => setFormData(prev => ({ ...prev, anoSerie: ano }))}
-                                            className={`py-4 rounded-xl text-sm font-black transition-all border-2 ${formData.anoSerie === ano ? 'bg-orange-600 border-orange-600 text-white shadow-lg' : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-orange-200'}`}
-                                        >
-                                            {ano}
-                                        </button>
-                                    ))}
-                                </div>
+                                {(['5º ANO', '9º ANO'] as const).map((ano) => (
+                                    <button
+                                        key={ano}
+                                        type="button"
+                                        onClick={() => setFormData(prev => ({ ...prev, anoSerie: ano }))}
+                                        className={`py-4 rounded-xl text-sm font-black transition-all border-2 ${formData.anoSerie === ano ? 'bg-orange-600 border-orange-600 text-white shadow-lg' : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-orange-200'}`}
+                                    >
+                                        {ano}
+                                    </button>
+                                ))}
                             </div>
                         </div>
                     </div>

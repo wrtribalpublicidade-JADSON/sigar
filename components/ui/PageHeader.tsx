@@ -17,6 +17,7 @@ interface PageHeaderProps {
     actions?: ActionButton[];
     onBack?: () => void;
     backgroundImage?: string;
+    rightContent?: React.ReactNode;
 }
 
 export const PageHeader: React.FC<PageHeaderProps> = ({
@@ -27,14 +28,15 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
     badgeColor = 'orange',
     actions = [],
     onBack,
+    rightContent,
 }) => {
     return (
-        <div className="relative overflow-hidden bg-slate-900 rounded-2xl p-6 md:p-8 shadow-2xl animate-fade-in mb-8 max-w-full">
+        <div className="relative overflow-hidden bg-slate-900 rounded-2xl p-4 md:p-6 shadow-2xl animate-fade-in mb-8 max-w-full">
             {/* Orbital Effects */}
             <div className="absolute top-0 right-0 w-72 h-72 bg-orange-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
             <div className="absolute bottom-0 left-0 w-48 h-48 bg-orange-500/10 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2" />
 
-            <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div className="flex items-start gap-4">
                     {onBack && (
                         <button
@@ -70,7 +72,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
                                 key={idx}
                                 onClick={action.onClick}
                                 className={`
-                  flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl transition font-semibold shadow-lg
+                  flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl transition font-semibold shadow-lg
                   ${action.variant === 'primary' || !action.variant
                                         ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white hover:from-orange-600 hover:to-orange-700 shadow-orange-500/20'
                                         : action.variant === 'secondary'
@@ -85,7 +87,9 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
                         ))}
                     </div>
                 )}
+                {rightContent}
             </div>
         </div>
+
     );
 };

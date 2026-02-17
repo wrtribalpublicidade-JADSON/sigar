@@ -22,7 +22,7 @@ export const Layout: React.FC<LayoutProps> = ({
   userEmail
 }) => {
   return (
-    <div className="min-h-screen bg-brand-light flex flex-col md:flex-row overflow-x-hidden">
+    <div className="h-screen bg-brand-light flex flex-col md:flex-row overflow-hidden">
       {/* Sidebar */}
       <Sidebar
         currentView={currentView}
@@ -33,7 +33,7 @@ export const Layout: React.FC<LayoutProps> = ({
       />
 
       {/* Main Content */}
-      <main className="flex-1 p-4 md:p-8 lg:p-12 3xl:p-16 pt-20 md:pt-12 overflow-y-auto overflow-x-hidden min-h-screen selection:bg-brand-orange selection:text-white">
+      <main className="flex-1 p-4 md:p-8 lg:p-12 3xl:p-16 pt-20 md:pt-12 overflow-y-auto h-full selection:bg-brand-orange selection:text-white">
         <div className="max-w-[1600px] 2xl:max-w-[1900px] 3xl:max-w-[2400px] mx-auto animate-fade-in relative z-10">
           {children}
         </div>

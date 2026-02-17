@@ -10,7 +10,7 @@ import {
     TrendingUp, Award, Users, Filter, Calendar, MapPin,
     ClipboardCheck, LayoutDashboard, GraduationCap, School, BookOpen, UserX,
     Map as MapIcon, UserCheck, Layers, Target, Activity, History as HistoryIcon,
-    ClipboardList, Search
+    ClipboardList, Search, BarChart3
 } from 'lucide-react';
 
 interface SaebDashboardProps {
@@ -433,10 +433,10 @@ export const SaebDashboard: React.FC<SaebDashboardProps> = ({ escolas = [] }) =>
     return (
         <div className="space-y-8 pb-20 animate-fade-in relative">
             <PageHeader
-                title="Análise SAEB"
-                subtitle="Monitoramento Nacional de Educação (Nji)"
-                icon={ClipboardList}
-                badgeText="Monitoramento de Aprendizado"
+                title="Sistema de Avaliação da Educação Básica"
+                subtitle="Resultados e Metas por Escola"
+                icon={BarChart3}
+                badgeText="AVALIAÇÃO EXTERNA"
                 actions={[]}
             />
 

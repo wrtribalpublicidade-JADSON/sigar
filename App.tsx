@@ -625,7 +625,7 @@ export default function App() {
         );
       case 'NOVA_VISITA':
         return (
-          <div className="space-y-12">
+          <div className="space-y-2">
             <VisitForm
               escolas={escolas}
               coordenadores={coordenadores}
@@ -637,10 +637,10 @@ export default function App() {
               visitToEdit={selectedVisit}
             />
 
-            <div className="max-w-4xl mx-auto space-y-6 pb-12">
+            <div className="w-full space-y-6 pb-12">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-slate-200">
                 <div>
-                  <h3 className="text-xl font-bold text-slate-800">Registros de Visitas</h3>
+                  <h3 className="text-xl font-bold text-slate-800 uppercase tracking-tight">REGISTROS DE VISITAS</h3>
                   <p className="text-sm text-slate-500 mt-1">Histórico completo de acompanhamento</p>
                 </div>
               </div>

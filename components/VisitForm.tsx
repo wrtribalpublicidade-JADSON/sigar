@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Escola, Visita, TopicoPauta, EncaminhamentoVisita, Coordenador } from '../types';
 import { ArrowLeft, Save, Plus, Trash2, Edit2, List, CheckSquare, Calendar, Clock, CheckCircle2, ClipboardList, ChevronRight, User, AlertCircle, Printer, X } from 'lucide-react';
 import { PrintableVisitReport } from './PrintableVisitReport';
+import { PageHeader } from './ui/PageHeader';
 
 interface VisitFormProps {
   escolas: Escola[];
@@ -107,45 +108,30 @@ export const VisitForm: React.FC<VisitFormProps> = ({ escolas, coordenadores, on
   );
 
   return (
-    <div className="max-w-5xl 2xl:max-w-6xl mx-auto pb-20 animate-fade-in relative font-sans">
+    <div className="w-full pb-20 animate-fade-in relative font-sans">
 
       {/* Modern Header */}
-      <div className="bg-slate-900 rounded-2xl p-8 mb-8 shadow-2xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-orange-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
-
-        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-5">
-            <button onClick={onCancel} className="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-xl flex items-center justify-center text-white transition-all backdrop-blur-sm">
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <div className="w-14 h-14 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl shadow-lg flex items-center justify-center text-white">
-              <ClipboardList className="w-7 h-7" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-white tracking-tight">{visitToEdit ? 'Editar Visita Técnica' : 'Nova Visita Técnica'}</h2>
-              <p className="text-slate-400 text-sm font-medium mt-1">
-                {selectedEscola ? `Registro para ${selectedEscola.nome}` : 'Planejamento e Acompanhamento Pedagógico'}
-              </p>
-            </div>
-          </div>
-
-          {/* Stepper (Desktop) */}
+      {/* Modern Header */}
+      <PageHeader
+        title={visitToEdit ? 'Editar Visita Técnica' : 'Nova Visita Técnica'}
+        subtitle={selectedEscola && selectedEscola.nome ? `Registro para ${selectedEscola.nome}` : 'Planejamento e Acompanhamento Pedagógico'}
+        icon={ClipboardList}
+        onBack={onCancel}
+        rightContent={
           <div className="hidden md:flex items-center gap-4 relative">
-            {/* Line connector */}
             <div className="absolute top-5 left-0 w-full h-0.5 bg-slate-800 -z-10" />
             <StepIndicator num={1} label="Planejamento" icon={Calendar} />
             <StepIndicator num={2} label="Pauta" icon={List} />
             <StepIndicator num={3} label="Diretrizes" icon={CheckSquare} />
             <StepIndicator num={4} label="Finalizar" icon={Save} />
           </div>
-        </div>
-      </div>
+        }
+      />
 
       <form onSubmit={handleSubmit}>
         {step === 1 && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-6">
+          <div className="w-full space-y-6">
+            <div className="space-y-6">
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 space-y-6">
                 <div>
                   <h3 className="text-lg font-bold text-slate-800 mb-4 border-b border-slate-100 pb-3">Dados Iniciais</h3>
@@ -193,8 +179,8 @@ export const VisitForm: React.FC<VisitFormProps> = ({ escolas, coordenadores, on
 
                 <div>
                   <h3 className="text-lg font-bold text-slate-800 mb-4 border-b border-slate-100 pb-3 mt-4">Matriz de Observação</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {['Planejamento', 'Sala de Aula', 'Infraestrutura', 'Gestão Escolar', 'Frequência', 'Avaliação Externa', 'Alimentação Escolar', 'Conselho de Classe', 'Alfabetização', 'Matrículas', 'Formação de Professores'].map(item => (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {['Planejamento', 'Sala de Aula', 'Infraestrutura', 'Gestão Escolar', 'Frequência', 'Avaliação Externa', 'Alimentação Escolar', 'Conselho de Classe', 'Alfabetização', 'Matrículas', 'Formação de Professores', 'Outros'].map(item => (
                       <label key={item} className={`cursor-pointer px-4 py-3 rounded-xl border flex items-center gap-3 transition-all ${formData.foco.includes(item) ? 'bg-slate-900 border-slate-900 text-white shadow-lg' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}>
                         <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 ${formData.foco.includes(item) ? 'bg-orange-500 border-orange-500' : 'bg-white border-slate-300'}`}>
                           {formData.foco.includes(item) && <CheckSquare className="w-3 h-3 text-white" strokeWidth={3} />}
@@ -219,24 +205,7 @@ export const VisitForm: React.FC<VisitFormProps> = ({ escolas, coordenadores, on
               </div>
             </div>
 
-            <div className="hidden lg:block space-y-6">
-              <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 text-white shadow-xl">
-                <h3 className="text-lg font-bold mb-2">Instruções</h3>
-                <p className="text-slate-300 text-sm leading-relaxed mb-6">
-                  Preencha os dados com atenção. O registro de visita técnica é um documento oficial que compõe o histórico da unidade escolar.
-                </p>
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 bg-white/5 p-3 rounded-lg border border-white/10">
-                    <div className="w-8 h-8 rounded-full bg-orange-500/20 text-orange-400 flex items-center justify-center font-bold text-xs">01</div>
-                    <p className="text-xs font-medium text-slate-300">Selecione a unidade e a data da intervenção.</p>
-                  </div>
-                  <div className="flex items-center gap-3 bg-white/5 p-3 rounded-lg border border-white/10">
-                    <div className="w-8 h-8 rounded-full bg-orange-500/20 text-orange-400 flex items-center justify-center font-bold text-xs">02</div>
-                    <p className="text-xs font-medium text-slate-300">Defina os focos de observação prioritários.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
+
           </div>
         )}
 

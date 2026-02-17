@@ -105,6 +105,7 @@ export interface DadosEducacionais {
   registrosCNCA?: RegistroCNCA[]; // Persistência via JSON
   registrosSEAMA?: RegistroSEAMA[]; // Persistência via JSON
   registrosSAEB?: RegistroSAEB[]; // Persistência via JSON
+  registrosIDEB?: RegistroIDEB[]; // Persistência via JSON
 }
 
 export interface MetaAcao {
@@ -253,6 +254,17 @@ export interface RegistroSAEB {
   notaPadronizadaLp?: number;
   notaPadronizadaMat?: number;
   notaSaeb?: number;
+  dataRegistro: string;
+  responsavel: string;
+}
+
+// Interface para Registro de IDEB
+export interface RegistroIDEB {
+  id: string;
+  escolaId: string;
+  ano: number;
+  anosIniciais: number; // Nota 5º Ano
+  anosFinais: number; // Nota 9º Ano
   dataRegistro: string;
   responsavel: string;
 }

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PageHeader } from './ui/PageHeader';
-import { Escola, RegistroFluenciaPARC, RegistroCNCA, RegistroSEAMA, RegistroSAEB } from '../types';
+import { Escola, RegistroFluenciaPARC, RegistroCNCA, RegistroSEAMA, RegistroSAEB, RegistroIDEB } from '../types';
 import {
     BarChart3,
     Users,
@@ -22,6 +22,7 @@ import { FluenciaParcModal } from './modals/FluenciaParcModal';
 import { CncaModal } from './modals/CncaModal';
 import { SeamaModal } from './modals/SeamaModal';
 import { SaebModal } from './modals/SaebModal';
+import { IdebModal } from './modals/IdebModal';
 
 interface IndicatorsPanelProps {
     escolas: Escola[];
@@ -49,6 +50,8 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, onUpd
     const [showSeamaModal, setShowSeamaModal] = useState(false);
     const [selectedSchoolForSaeb, setSelectedSchoolForSaeb] = useState<Escola | null>(null);
     const [showSaebModal, setShowSaebModal] = useState(false);
+    const [selectedSchoolForIdeb, setSelectedSchoolForIdeb] = useState<Escola | null>(null);
+    const [showIdebModal, setShowIdebModal] = useState(false);
 
     const tabs: { id: TabType; label: string; icon: React.FC<{ className?: string; strokeWidth?: number }> }[] = [
         { id: 'CENSO', label: 'Censo Escolar', icon: Users },
@@ -84,6 +87,9 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, onUpd
         } else if (activeTab === 'SAEB') {
             setSelectedSchoolForSaeb(escola);
             setShowSaebModal(true);
+        } else if (activeTab === 'IDEB') {
+            setSelectedSchoolForIdeb(escola);
+            setShowIdebModal(true);
         }
     };
 
@@ -217,6 +223,43 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, onUpd
         setSelectedSchoolForSaeb(escolaAtualizada);
     };
 
+    const handleSaveIdeb = (registro: Omit<RegistroIDEB, 'id' | 'escolaId' | 'dataRegistro' | 'responsavel'> & { id?: string }) => {
+        if (!selectedSchoolForIdeb) return;
+        let novosRegistros = [...(selectedSchoolForIdeb.dadosEducacionais.registrosIDEB || [])];
+        if (registro.id) {
+            novosRegistros = novosRegistros.map(r => r.id === registro.id ? { ...r, ...registro, id: r.id, escolaId: r.escolaId, dataRegistro: new Date().toISOString(), responsavel: r.responsavel } as RegistroIDEB : r);
+        } else {
+            const novoRegistro: RegistroIDEB = { ...(registro as any), id: generateUUID(), escolaId: selectedSchoolForIdeb.id, dataRegistro: new Date().toISOString(), responsavel: 'Coordenador Regional' };
+            novosRegistros.push(novoRegistro);
+        }
+
+        // Update main IDEB Indicator with the latest Anos Iniciais (or highest of both)
+        const calculateIdebScore = (regs: RegistroIDEB[]) => {
+            if (regs.length === 0) return 0;
+            const latest = [...regs].sort((a, b) => b.ano - a.ano)[0];
+            return Number(Math.max(latest.anosIniciais, latest.anosFinais).toFixed(1));
+        };
+
+        const escolaAtualizada: Escola = { ...selectedSchoolForIdeb, dadosEducacionais: { ...selectedSchoolForIdeb.dadosEducacionais, registrosIDEB: novosRegistros, avaliacoesExternas: { ...selectedSchoolForIdeb.dadosEducacionais.avaliacoesExternas, ideb: calculateIdebScore(novosRegistros) } } };
+        onUpdateEscola(escolaAtualizada);
+        setSelectedSchoolForIdeb(escolaAtualizada);
+    };
+
+    const handleDeleteIdeb = (id: string) => {
+        if (!selectedSchoolForIdeb) return;
+        const novosRegistros = (selectedSchoolForIdeb.dadosEducacionais.registrosIDEB || []).filter((r: RegistroIDEB) => r.id !== id);
+
+        const calculateIdebScore = (regs: RegistroIDEB[]) => {
+            if (regs.length === 0) return 0;
+            const latest = [...regs].sort((a, b) => b.ano - a.ano)[0];
+            return Number(Math.max(latest.anosIniciais, latest.anosFinais).toFixed(1));
+        };
+
+        const escolaAtualizada: Escola = { ...selectedSchoolForIdeb, dadosEducacionais: { ...selectedSchoolForIdeb.dadosEducacionais, registrosIDEB: novosRegistros, avaliacoesExternas: { ...selectedSchoolForIdeb.dadosEducacionais.avaliacoesExternas, ideb: calculateIdebScore(novosRegistros) } } };
+        onUpdateEscola(escolaAtualizada);
+        setSelectedSchoolForIdeb(escolaAtualizada);
+    };
+
     const renderTabContent = () => {
         return (
             <div className="overflow-x-auto bg-white">
@@ -264,13 +307,13 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, onUpd
                         {filteredEscolas.map((escola) => (
                             <tr
                                 key={escola.id}
-                                className={`group hover:bg-slate-50 transition-all font-mono text-xs uppercase ${(activeTab === 'PARC' || activeTab === 'CNCA' || activeTab === 'SEAMA' || activeTab === 'SAEB') ? 'cursor-pointer' : ''}`}
+                                className={`group hover:bg-slate-50 transition-all font-mono text-xs uppercase ${(activeTab === 'PARC' || activeTab === 'CNCA' || activeTab === 'SEAMA' || activeTab === 'SAEB' || activeTab === 'IDEB') ? 'cursor-pointer' : ''}`}
                                 onClick={() => handleSchoolClick(escola)}
                             >
                                 <td className="px-8 py-5">
                                     <div className="flex flex-col">
                                         <span className="font-black text-brand-black text-sm">{escola.nome}</span>
-                                        {(activeTab === 'PARC' || activeTab === 'CNCA' || activeTab === 'SEAMA' || activeTab === 'SAEB') && (
+                                        {(activeTab === 'PARC' || activeTab === 'CNCA' || activeTab === 'SEAMA' || activeTab === 'SAEB' || activeTab === 'IDEB') && (
                                             <span className="text-[8px] font-black text-brand-orange mt-1 flex items-center gap-1 group-hover:translate-x-1 transition-all uppercase tracking-widest">
                                                 Inserir Dados <ChevronRight className="w-2 h-2" strokeWidth={4} />
                                             </span>
@@ -305,9 +348,30 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, onUpd
                                 )}
                                 {activeTab === 'IDEB' && (
                                     <td className="px-4 py-5 text-center">
-                                        <span className={`inline-flex px-3 py-1 font-black text-xs border-2 border-brand-black ${escola.dadosEducacionais.avaliacoesExternas.ideb >= 4.5 ? 'bg-brand-acid text-brand-black shadow-sharp-sm' : 'bg-brand-signal text-white'}`}>
-                                            {(escola.dadosEducacionais?.avaliacoesExternas?.ideb || 0)}
-                                        </span>
+                                        <div className="flex flex-col items-center gap-1">
+                                            {(() => {
+                                                const regs = escola.dadosEducacionais?.registrosIDEB || [];
+                                                const latest = [...regs].sort((a, b) => b.ano - a.ano)[0];
+                                                if (!latest) return <span className="text-slate-300">-</span>;
+                                                return (
+                                                    <>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[9px] text-slate-400 font-bold w-4 text-right">AI</span>
+                                                            <span className={`inline-flex px-2 py-0.5 font-black text-xs border rounded ${latest.anosIniciais >= 4.5 ? 'bg-green-100 text-green-700 border-green-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                                                                {latest.anosIniciais > 0 ? latest.anosIniciais.toFixed(1) : '-'}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[9px] text-slate-400 font-bold w-4 text-right">AF</span>
+                                                            <span className={`inline-flex px-2 py-0.5 font-black text-xs border rounded ${latest.anosFinais >= 4.5 ? 'bg-green-100 text-green-700 border-green-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                                                                {latest.anosFinais > 0 ? latest.anosFinais.toFixed(1) : '-'}
+                                                            </span>
+                                                        </div>
+                                                        <span className="text-[8px] text-slate-400 mt-1 font-bold">{latest.ano}</span>
+                                                    </>
+                                                );
+                                            })()}
+                                        </div>
                                     </td>
                                 )}
                                 {activeTab === 'SEAMA' && (
@@ -451,6 +515,16 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, onUpd
                     escola={selectedSchoolForSaeb}
                     onSave={handleSaveSaeb}
                     onDelete={handleDeleteSaeb}
+                />
+            )}
+
+            {selectedSchoolForIdeb && (
+                <IdebModal
+                    isOpen={showIdebModal}
+                    onClose={() => { setShowIdebModal(false); setSelectedSchoolForIdeb(null); }}
+                    escola={selectedSchoolForIdeb}
+                    onSave={handleSaveIdeb}
+                    onDelete={handleDeleteIdeb}
                 />
             )}
         </div>

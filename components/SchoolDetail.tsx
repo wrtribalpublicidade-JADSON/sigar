@@ -35,7 +35,7 @@ const COLORS = {
 };
 
 export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadores = [], historicoVisitas, onBack, onUpdate, onUpdateVisitStatus }) => {
-  const [activeTab, setActiveTab] = useState<'indicadores' | 'plano' | 'visitas' | 'cadastro' | 'turmas' | 'rh' | 'acompanhamento'>('indicadores');
+  const [activeTab, setActiveTab] = useState<'plano' | 'visitas' | 'turmas' | 'rh' | 'acompanhamento'>('acompanhamento');
   const [selectedVisitForPrint, setSelectedVisitForPrint] = useState<Visita | null>(null);
   const [formData, setFormData] = useState<DadosEducacionais>(escola.dadosEducacionais);
 
@@ -289,9 +289,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
 
       <div className="flex flex-wrap gap-2 p-1 bg-slate-100 rounded-xl mb-6">
         {[
-          { id: 'indicadores', icon: TrendingUp, label: 'Analytics' },
           { id: 'acompanhamento', icon: ClipboardCheck, label: 'Monitoramento' },
-          { id: 'cadastro', icon: FileText, label: 'Dados' },
           { id: 'turmas', icon: CheckSquare, label: 'Turmas' },
           { id: 'rh', icon: Briefcase, label: 'Recursos Humanos' },
           { id: 'plano', icon: Target, label: 'Plano de Ação' },
@@ -309,52 +307,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-[600px] max-w-full">
         <div className="p-8 md:p-12">
-          {activeTab === 'indicadores' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
-              <div className="space-y-6">
-                <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
-                  <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                    <Activity size={20} className="text-orange-600" />
-                  </div>
-                  <h3 className="text-lg font-bold text-slate-800">Desempenho Institucional (%)</h3>
-                </div>
-                <div className="h-80 bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={indicatorsData} layout="vertical" margin={{ left: 40, right: 40 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                      <XAxis type="number" domain={[0, 100]} hide />
-                      <YAxis dataKey="name" type="category" tick={{ fontSize: 12, fontWeight: 500, fill: '#64748b' }} width={80} axisLine={false} tickLine={false} />
-                      <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                      <Bar dataKey="value" barSize={24} radius={[0, 4, 4, 0]}>
-                        {indicatorsData.map((e, i) => <Cell key={i} fill={e.fill === COLORS.dark ? '#1e293b' : e.fill === COLORS.brand ? '#f97316' : '#94a3b8'} />)}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-              <div className="space-y-6">
-                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Resumo Métrico</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-6 bg-slate-900 rounded-2xl shadow-lg relative overflow-hidden group">
-                    {/* Decorative circle */}
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-110 transition-transform" />
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Fluência SAMAHC</p>
-                    <p className="text-4xl font-black text-white mt-1">{escola.indicadores.fluenciaLeitora}%</p>
-                  </div>
-                  <div className="p-6 bg-white border border-slate-200 rounded-2xl shadow-sm">
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Frequência Média</p>
-                    <p className="text-4xl font-black text-slate-800 mt-1">{escola.indicadores.frequenciaMedia}%</p>
-                  </div>
-                </div>
-                <div className="p-6 bg-orange-50 border border-orange-100 rounded-2xl relative overflow-hidden">
-                  <p className="text-xs font-bold text-orange-600 uppercase tracking-wider mb-3">Segmentos Ativos</p>
-                  <div className="flex flex-wrap gap-2">
-                    {escola.segmentos.map(s => <span key={s} className="px-3 py-1 bg-white text-orange-700 rounded-lg text-xs font-bold shadow-sm">{s}</span>)}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+
 
           {
             activeTab === 'acompanhamento' && (
@@ -451,34 +404,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
           }
 
           {
-            activeTab === 'cadastro' && (
-              <div className="space-y-8 animate-fade-in">
-                <div className="flex justify-between items-center border-b border-slate-100 pb-6">
-                  <h3 className="text-2xl font-bold text-slate-800">Núcleo de Indicadores Sistêmicos</h3>
-                  <button onClick={handleSaveIndicators} className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-all">Sincronizar Dados</button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {[
-                    { label: 'Matrícula Infantil', val: formData.matricula.infantil, sec: 'matricula', field: 'infantil' },
-                    { label: 'Matrícula Anos Iniciais', val: formData.matricula.anosIniciais, sec: 'matricula', field: 'anosIniciais' },
-                    { label: 'Matrícula Anos Finais', val: formData.matricula.anosFinais, sec: 'matricula', field: 'anosFinais' },
-                    { label: 'Matrícula EJA', val: formData.matricula.eja, sec: 'matricula', field: 'eja' },
-                    { label: 'Resultado IDEB', val: formData.avaliacoesExternas.ideb, sec: 'avaliacoesExternas', field: 'ideb' },
-                    { label: 'Resultado SAEB', val: formData.avaliacoesExternas.saeb, sec: 'avaliacoesExternas', field: 'saeb' }
-                  ].map(f => (
-                    <div key={f.label} className="p-6 bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md transition-all group relative">
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">{f.label}</label>
-                      <div className="flex items-center gap-3">
-                        <input type="number" step="0.1" value={f.val} onChange={e => handleInputChange(f.sec as any, f.field, e.target.value)} className="w-full text-3xl font-bold bg-transparent border-none focus:ring-0 text-slate-800 group-hover:text-orange-600 transition-colors p-0 placeholder-slate-300" />
-                        <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:text-orange-500 transition-colors">
-                          <Edit size={14} />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )
+
           }
 
           {
@@ -718,37 +644,46 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
 
           {
             activeTab === 'visitas' && (
-              <div className="space-y-8 animate-fade-in">
-                <div className="bg-slate-50 rounded-2xl p-8 border border-slate-200 flex items-center gap-6">
-                  <div className="w-14 h-14 bg-white rounded-2xl shadow-sm flex items-center justify-center text-orange-500"><History size={28} /></div>
-                  <div>
-                    <h3 className="text-xl font-bold text-slate-800">Histórico de Visitas</h3>
-                    <p className="text-sm text-slate-500 mt-1">Registro cronológico de auditorias e acompanhamentos</p>
-                  </div>
+              <div className="space-y-6 animate-fade-in">
+                <div className="border-b border-slate-100 pb-4">
+                  <h3 className="text-xl font-bold text-slate-800 uppercase tracking-tight">REGISTROS DE VISITAS</h3>
+                  <p className="text-sm text-slate-500 mt-1">Histórico completo de acompanhamento</p>
                 </div>
-                <div className="grid grid-cols-1 gap-4">
+
+                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                  <div className="bg-slate-900 px-6 py-4">
+                    <div className="grid grid-cols-12 gap-4 text-xs font-bold text-white uppercase tracking-wider items-center">
+                      <div className="col-span-5">Escola / Data</div>
+                      <div className="col-span-3 text-center">Tipo</div>
+                      <div className="col-span-2 text-center">Status</div>
+                      <div className="col-span-2 text-right">Ações</div>
+                    </div>
+                  </div>
+
                   {historicoVisitas.length === 0 ? (
-                    <div className="p-20 text-center bg-white border border-dashed border-slate-300 rounded-2xl text-slate-400">
-                      <History className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                      <p>Nenhum registro de visita encontrado.</p>
+                    <div className="p-12 text-center text-slate-400">
+                      <p className="font-medium text-sm">Nenhuma visita registrada até o momento.</p>
                     </div>
                   ) : (
-                    historicoVisitas.map(visita => (
-                      <div key={visita.id} className="p-6 border border-slate-100 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all flex gap-6 group">
-                        <div className="flex flex-col items-center gap-1 pt-2 shrink-0">
-                          <div className="w-14 h-14 bg-slate-900 rounded-xl flex items-center justify-center text-white font-bold text-lg leading-none shadow-lg">
-                            <div className="text-center">
-                              <span className="block text-xl">{visita.data.split('/')[0]}</span>
-                              <span className="block text-[10px] font-normal uppercase opacity-70">{visita.data.split('/')[1]}</span>
-                            </div>
+                    <div className="divide-y divide-slate-100">
+                      {historicoVisitas.map(visita => (
+                        <div key={visita.id} className="px-6 py-4 grid grid-cols-12 gap-4 items-center hover:bg-slate-50 transition-colors group text-sm">
+                          <div className="col-span-5">
+                            <div className="font-bold text-slate-800">{new Date(visita.data + 'T12:00:00').toLocaleDateString()}</div>
+                            <div className="text-xs text-slate-500 mt-0.5">{escola.nome}</div>
                           </div>
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-3">
-                              <span className={`px-3 py-1 rounded-full text-xs font-bold ${visita.status === 'Realizada' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{visita.status}</span>
-                              <span className="text-xs font-medium text-slate-500 uppercase tracking-wide flex items-center gap-1"><Target size={12} /> {visita.tipo}</span>
-                            </div>
+                          <div className="col-span-3 text-center">
+                            <span className={`inline-flex px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide ${visita.tipo === 'Emergencial' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'}`}>
+                              {visita.tipo}
+                            </span>
+                          </div>
+                          <div className="col-span-2 text-center">
+                            <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${visita.status === 'Realizada' ? 'bg-emerald-100 text-emerald-700' : visita.status === 'Planejada' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${visita.status === 'Realizada' ? 'bg-emerald-500' : visita.status === 'Planejada' ? 'bg-blue-500' : 'bg-orange-500'}`} />
+                              {visita.status}
+                            </span>
+                          </div>
+                          <div className="col-span-2 flex justify-end gap-2">
                             <button
                               onClick={() => handlePrint(visita)}
                               className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold flex items-center gap-2 transition-all opacity-0 group-hover:opacity-100"
@@ -756,15 +691,9 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                               <Printer size={14} /> Relatório
                             </button>
                           </div>
-                          <h4 className="text-lg font-bold text-slate-800 mb-3">Foco: {visita.foco.join(', ')}</h4>
-                          {visita.encaminhamentos && (
-                            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                              <p className="text-sm text-slate-600 leading-relaxed italic">"{visita.encaminhamentos}"</p>
-                            </div>
-                          )}
                         </div>
-                      </div>
-                    ))
+                      ))}
+                    </div>
                   )}
 
                   {selectedVisitForPrint && (

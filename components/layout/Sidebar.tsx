@@ -76,7 +76,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
         { icon: GraduationCap, label: 'Análise SEAMA', view: 'ANALISE_SEAMA' as ViewState },
         { icon: ClipboardList, label: 'Análise SAEB', view: 'ANALISE_SAEB' as ViewState },
         { icon: ClipboardCheck, label: 'Análise CNCA/PNRA', view: 'ANALISE_CNCA_PNRA' as ViewState },
-        { icon: BarChart3, label: 'Analytics', view: 'INDICADORES' as ViewState },
+        { icon: BarChart3, label: 'Indicadores', view: 'INDICADORES' as ViewState },
     ];
 
     const SidebarContent = () => (
