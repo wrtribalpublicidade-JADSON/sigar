@@ -24,8 +24,8 @@ export default {
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
-        tech: ['JetBrains Mono', 'monospace'],
+        mono: ['Inter', 'system-ui', 'sans-serif'],
+        tech: ['Inter', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
         'sharp': '6px 6px 0px #0f172a',
