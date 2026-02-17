@@ -265,7 +265,7 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, onUpd
             <div className="overflow-x-auto bg-white">
                 <table className="w-full text-left border-collapse">
                     <thead className="bg-slate-50 border-b-2 border-brand-black">
-                        <tr className="font-mono text-[9px] font-black text-brand-grey uppercase tracking-widest">
+                        <tr className="text-[9px] font-black text-brand-grey uppercase tracking-widest">
                             <th className="px-8 py-5">Unidade Escolar</th>
                             {activeTab === 'CENSO' && (
                                 <>
@@ -307,7 +307,7 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, onUpd
                         {filteredEscolas.map((escola) => (
                             <tr
                                 key={escola.id}
-                                className={`group hover:bg-slate-50 transition-all font-mono text-xs uppercase ${(activeTab === 'PARC' || activeTab === 'CNCA' || activeTab === 'SEAMA' || activeTab === 'SAEB' || activeTab === 'IDEB') ? 'cursor-pointer' : ''}`}
+                                className={`group hover:bg-slate-50 transition-all text-xs uppercase ${(activeTab === 'PARC' || activeTab === 'CNCA' || activeTab === 'SEAMA' || activeTab === 'SAEB' || activeTab === 'IDEB') ? 'cursor-pointer' : ''}`}
                                 onClick={() => handleSchoolClick(escola)}
                             >
                                 <td className="px-8 py-5">

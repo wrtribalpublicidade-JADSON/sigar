@@ -241,17 +241,17 @@ export const SeamaDashboard: React.FC<SeamaDashboardProps> = ({ escolas = [] }) 
 
     const renderGeral = () => (
         <div className="space-y-8 animate-fade-in relative">
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-4 gap-6">
                 {[
-                    { label: 'Participação SEAMA', val: Math.round((analysisData.totalAval / (analysisData.totalPrev || 1)) * 100) + '%', icon: Users, color: 'bg-slate-900', iconColor: 'text-brand-orange', p: 'Partic.', count: analysisData.totalAval },
-                    { label: 'Média Proficiência', val: analysisData.proficienciaMedia, icon: GraduationCap, color: 'bg-slate-900', iconColor: 'text-brand-orange', p: 'Escala', count: analysisData.totalAval },
-                    { label: 'Proficiência (Adeq+Avan)', val: analysisData.proficiencia + '%', icon: Award, color: 'bg-brand-acid', iconColor: 'text-brand-black', p: 'Níveis', count: analysisData.adeCount + analysisData.avaCount },
-                    { label: 'Ab. Básico (Alerta)', val: analysisData.aba + '%', icon: UserX, color: 'bg-brand-signal', iconColor: 'text-white', p: 'Crítico', count: analysisData.abaCount },
+                    { label: 'Participação SEAMA', val: Math.round((analysisData.totalAval / (analysisData.totalPrev || 1)) * 100) + '%', icon: Users, color: 'bg-slate-900', iconColor: 'text-brand-orange', count: analysisData.totalAval },
+                    { label: 'Média Proficiência', val: analysisData.proficienciaMedia, icon: GraduationCap, color: 'bg-slate-900', iconColor: 'text-brand-orange', count: analysisData.totalAval },
+                    { label: 'Proficiência (Adeq+Avan)', val: analysisData.proficiencia + '%', icon: Award, color: 'bg-brand-acid', iconColor: 'text-brand-black', count: analysisData.adeCount + analysisData.avaCount },
+                    { label: 'Ab. Básico (Alerta)', val: analysisData.aba + '%', icon: UserX, color: 'bg-brand-signal', iconColor: 'text-white', count: analysisData.abaCount },
                 ].map((k, i) => (
                     <div key={i} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 relative overflow-hidden group hover:shadow-lg transition-all duration-300">
-                        <span className="absolute top-4 right-4 text-xs font-bold px-2 py-1 bg-slate-100 text-slate-600 rounded-lg">{k.p}</span>
                         {k.count !== undefined && (
-                            <span className="absolute top-4 left-4 text-[10px] font-bold text-slate-400 uppercase tracking-tighter bg-slate-50 px-2 py-0.5 rounded border border-slate-100">
+                            <span className="absolute top-4 right-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-100 px-2 py-1 rounded-lg">
                                 {k.count} Alunos
                             </span>
                         )}

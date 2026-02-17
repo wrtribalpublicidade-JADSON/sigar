@@ -16,7 +16,7 @@ export const FormInput: React.FC<FormInputProps> = ({
     return (
         <div className="w-full space-y-1.5">
             {label && (
-                <label className="block font-mono text-[10px] font-black uppercase tracking-[0.2em] text-brand-black">
+                <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-brand-black">
                     {label}
                 </label>
             )}
@@ -31,10 +31,10 @@ export const FormInput: React.FC<FormInputProps> = ({
                 {...props}
             />
             {error && (
-                <p className="font-mono text-[9px] font-bold uppercase text-brand-signal px-1 italic">{error}</p>
+                <p className="text-[9px] font-bold uppercase text-brand-signal px-1 italic">{error}</p>
             )}
             {helperText && !error && (
-                <p className="font-mono text-[9px] font-bold uppercase text-brand-grey px-1">{helperText}</p>
+                <p className="text-[9px] font-bold uppercase text-brand-grey px-1">{helperText}</p>
             )}
         </div>
     );
@@ -56,7 +56,7 @@ export const FormSelect: React.FC<FormSelectProps> = ({
     return (
         <div className="w-full space-y-1.5">
             {label && (
-                <label className="block font-mono text-[10px] font-black uppercase tracking-[0.2em] text-brand-black">
+                <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-brand-black">
                     {label}
                 </label>
             )}
@@ -82,7 +82,7 @@ export const FormSelect: React.FC<FormSelectProps> = ({
                 </div>
             </div>
             {error && (
-                <p className="font-mono text-[9px] font-bold uppercase text-brand-signal px-1 italic">{error}</p>
+                <p className="text-[9px] font-bold uppercase text-brand-signal px-1 italic">{error}</p>
             )}
         </div>
     );
@@ -102,7 +102,7 @@ export const FormTextarea: React.FC<FormTextareaProps> = ({
     return (
         <div className="w-full space-y-1.5">
             {label && (
-                <label className="block font-mono text-[10px] font-black uppercase tracking-[0.2em] text-brand-black">
+                <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-brand-black">
                     {label}
                 </label>
             )}
@@ -117,7 +117,7 @@ export const FormTextarea: React.FC<FormTextareaProps> = ({
                 {...props}
             />
             {error && (
-                <p className="font-mono text-[9px] font-bold uppercase text-brand-signal px-1 italic">{error}</p>
+                <p className="text-[9px] font-bold uppercase text-brand-signal px-1 italic">{error}</p>
             )}
         </div>
     );
@@ -151,7 +151,7 @@ export const FormCheckbox: React.FC<FormCheckboxProps> = ({
                     </svg>
                 </div>
             </div>
-            <span className="font-mono text-[10px] font-black uppercase tracking-wider text-brand-black">{label}</span>
+            <span className="text-[10px] font-black uppercase tracking-wider text-brand-black">{label}</span>
         </label>
     );
 };

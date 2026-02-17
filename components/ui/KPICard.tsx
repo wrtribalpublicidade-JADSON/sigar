@@ -42,7 +42,7 @@ export const KPICard: React.FC<KPICardProps> = ({
                     {value}
                 </h3>
                 {sublabel && (
-                    <p className="text-xs font-mono text-gray-500 mt-2 border-t border-gray-200 pt-2">{sublabel}</p>
+                    <p className="text-xs text-gray-500 mt-2 border-t border-gray-200 pt-2">{sublabel}</p>
                 )}
             </div>
         </div>

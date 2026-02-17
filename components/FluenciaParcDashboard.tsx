@@ -240,15 +240,14 @@ export const FluenciaParcDashboard: React.FC<FluenciaParcDashboardProps> = ({ es
         <div className="space-y-8 animate-fade-in relative">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-4 gap-6">
                 {[
-                    { label: 'Participação PARC', val: analysisData.kpis.pPart.toFixed(1) + '%', icon: Users, color: 'bg-slate-900', iconColor: 'text-brand-orange', p: 'Aproveitamento', count: analysisData.kpis.pres },
-                    { label: 'Leitores Fluentes', val: analysisData.kpis.pFlu.toFixed(1) + '%', icon: GraduationCap, color: 'bg-brand-acid', iconColor: 'text-brand-black', p: 'LEIT_FLU', count: analysisData.kpis.flu },
-                    { label: 'Leitores Iniciantes', val: analysisData.kpis.pIni.toFixed(1) + '%', icon: BookOpen, color: 'bg-brand-orange', iconColor: 'text-white', p: 'LEIT_INI', count: analysisData.kpis.ini },
-                    { label: 'Pré-Leitores', val: analysisData.kpis.pPre.toFixed(1) + '%', icon: UserX, color: 'bg-brand-signal', iconColor: 'text-white', p: 'PRE_LEIT', count: analysisData.kpis.totalPre }
+                    { label: 'Participação PARC', val: analysisData.kpis.pPart.toFixed(1) + '%', icon: Users, color: 'bg-slate-900', iconColor: 'text-brand-orange', count: analysisData.kpis.pres },
+                    { label: 'Leitores Fluentes', val: analysisData.kpis.pFlu.toFixed(1) + '%', icon: GraduationCap, color: 'bg-brand-acid', iconColor: 'text-brand-black', count: analysisData.kpis.flu },
+                    { label: 'Leitores Iniciantes', val: analysisData.kpis.pIni.toFixed(1) + '%', icon: BookOpen, color: 'bg-brand-orange', iconColor: 'text-white', count: analysisData.kpis.ini },
+                    { label: 'Pré-Leitores', val: analysisData.kpis.pPre.toFixed(1) + '%', icon: UserX, color: 'bg-brand-signal', iconColor: 'text-white', count: analysisData.kpis.totalPre }
                 ].map((k, i) => (
                     <div key={i} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 relative overflow-hidden group hover:shadow-lg transition-all duration-300">
-                        <span className="absolute top-4 right-4 text-xs font-bold px-2 py-1 bg-slate-100 text-slate-600 rounded-lg">{k.p}</span>
                         {k.count !== undefined && (
-                            <span className="absolute top-4 left-4 text-[10px] font-bold text-slate-400 uppercase tracking-tighter bg-slate-50 px-2 py-0.5 rounded border border-slate-100">
+                            <span className="absolute top-4 right-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-100 px-2 py-1 rounded-lg">
                                 {k.count} Alunos
                             </span>
                         )}
@@ -321,7 +320,7 @@ export const FluenciaParcDashboard: React.FC<FluenciaParcDashboardProps> = ({ es
                         <TrendingUp className="w-10 h-10 text-brand-orange" strokeWidth={3} />
                         <div>
                             <h3 className="text-xl font-black uppercase tracking-tighter">Curva de Aprendizado / Fluência</h3>
-                            <p className="font-mono text-[9px] text-brand-grey font-black uppercase tracking-widest mt-1">Comparativo entre entrada, monitoramento e saída</p>
+                            <p className="text-[9px] text-brand-grey font-black uppercase tracking-widest mt-1">Comparativo entre entrada, monitoramento e saída</p>
                         </div>
                     </div>
                     <div className="h-96">
@@ -346,7 +345,7 @@ export const FluenciaParcDashboard: React.FC<FluenciaParcDashboardProps> = ({ es
                     <div className="bg-slate-900 p-8 text-white h-full">
                         <h4 className="font-black uppercase tracking-widest text-sm text-brand-orange mb-8">Delta de Evolução / Fluência</h4>
                         <div className="flex justify-between items-center bg-white/5 p-6 border-2 border-white/10 shadow-sharp-white">
-                            <span className="font-mono text-[10px] font-black uppercase text-brand-grey">Crescimento Líquido</span>
+                            <span className="text-[10px] font-black uppercase text-brand-grey">Crescimento Líquido</span>
                             <span className={`text-4xl font-black ${evolutionAnalysis.deltaFlu >= 0 ? 'text-brand-acid' : 'text-brand-signal'}`}>
                                 {evolutionAnalysis.deltaFlu > 0 ? '+' : ''}{evolutionAnalysis.deltaFlu.toFixed(1)}%
                             </span>
@@ -355,7 +354,7 @@ export const FluenciaParcDashboard: React.FC<FluenciaParcDashboardProps> = ({ es
                 </div>
                 <div className="card-technical p-1 overflow-hidden">
                     <div className="bg-white h-full">
-                        <table className="w-full text-left font-mono text-xs uppercase">
+                        <table className="w-full text-left text-xs uppercase">
                             <thead className="bg-slate-50 border-b-2 border-brand-black">
                                 <tr className="font-black text-brand-grey">
                                     <th className="px-8 py-5">Period</th>
@@ -391,7 +390,7 @@ export const FluenciaParcDashboard: React.FC<FluenciaParcDashboardProps> = ({ es
                 <div className="overflow-x-auto bg-white">
                     <table className="w-full text-left border-collapse">
                         <thead className="bg-slate-50 border-b-2 border-brand-black">
-                            <tr className="font-mono text-[9px] font-black text-brand-grey uppercase tracking-widest">
+                            <tr className="text-[9px] font-black text-brand-grey uppercase tracking-widest">
                                 <th className="px-8 py-5">Unidade / Turma</th>
                                 <th className="px-6 py-5 text-center">POP</th>
                                 <th className="px-6 py-4 text-center bg-brand-acid/10">Fluente</th>
@@ -402,7 +401,7 @@ export const FluenciaParcDashboard: React.FC<FluenciaParcDashboardProps> = ({ es
                         </thead>
                         <tbody className="divide-y divide-brand-black/10">
                             {classAnalysis.map((c, i) => (
-                                <tr key={i} className="group hover:bg-slate-50 transition-all font-mono text-xs uppercase">
+                                <tr key={i} className="group hover:bg-slate-50 transition-all text-xs uppercase">
                                     <td className="px-8 py-6 font-black">
                                         <div className="text-brand-black text-sm mb-1 line-clamp-1">{c.turma}</div>
                                         <div className="text-brand-grey text-[9px]">{c.escola}</div>

@@ -172,6 +172,13 @@ export const VisitForm: React.FC<VisitFormProps> = ({ escolas, coordenadores, on
                             {formData.tipo === tipo && <div className="w-2.5 h-2.5 rounded-full bg-orange-500" />}
                           </div>
                         </div>
+                        <input
+                          type="radio"
+                          name="tipoVisita"
+                          className="hidden"
+                          checked={formData.tipo === tipo}
+                          onChange={() => setFormData({ ...formData, tipo: tipo as any })}
+                        />
                       </label>
                     ))}
                   </div>

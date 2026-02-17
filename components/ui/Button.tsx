@@ -54,7 +54,7 @@ export const Button: React.FC<ButtonProps> = ({
             ) : Icon && iconPosition === 'left' ? (
                 <Icon className={iconSize[size]} strokeWidth={3} />
             ) : null}
-            <span className="font-mono">{children}</span>
+            <span>{children}</span>
             {!isLoading && Icon && iconPosition === 'right' && <Icon className={iconSize[size]} strokeWidth={3} />}
         </button>
     );

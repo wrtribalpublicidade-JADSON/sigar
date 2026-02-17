@@ -23,7 +23,7 @@ interface TableHeadProps {
 
 export const TableHead: React.FC<TableHeadProps> = ({ children }) => {
     return (
-        <thead className="bg-slate-900 text-white uppercase font-mono text-[10px] font-black tracking-[0.2em] border-b-2 border-brand-black sticky top-0 z-20">
+        <thead className="bg-slate-900 text-white uppercase text-[10px] font-black tracking-[0.2em] border-b-2 border-brand-black sticky top-0 z-20">
             {children}
         </thead>
     );
@@ -137,7 +137,7 @@ export const TableEmpty: React.FC<TableEmptyProps> = ({ icon, message }) => {
             <td colSpan={100} className="px-6 py-20 text-center">
                 <div className="flex flex-col items-center justify-center text-brand-grey">
                     {icon && <div className="mb-4 text-slate-300 animate-float">{icon}</div>}
-                    <p className="font-mono text-[10px] font-black uppercase tracking-widest">{message}</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest">{message}</p>
                 </div>
             </td>
         </tr>
