@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     LayoutDashboard, School, Users, FileText,
-    ChevronLeft, ChevronRight, Menu, X, LogOut, PlusCircle, BarChart3, TrendingUp, ClipboardCheck, GraduationCap, ClipboardList
+    ChevronLeft, ChevronRight, Menu, X, LogOut, PlusCircle, BarChart3, TrendingUp, ClipboardCheck, GraduationCap, ClipboardList, Bell
 } from 'lucide-react';
 import { ViewState } from '../../types';
 
@@ -11,6 +11,7 @@ interface SidebarProps {
     onLogout: () => void;
     userName: string | null;
     userEmail: string | null;
+    hasNotifications?: boolean;
 }
 
 interface NavItemProps {
@@ -21,9 +22,10 @@ interface NavItemProps {
     isCollapsed: boolean;
     onClick: () => void;
     isHighlighted?: boolean;
+    hasNotification?: boolean;
 }
 
-const NavItem: React.FC<NavItemProps> = ({ icon: Icon, label, isActive, isCollapsed, onClick, isHighlighted }) => (
+const NavItem: React.FC<NavItemProps> = ({ icon: Icon, label, isActive, isCollapsed, onClick, isHighlighted, hasNotification }) => (
     <button
         onClick={onClick}
         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group relative
@@ -38,16 +40,24 @@ const NavItem: React.FC<NavItemProps> = ({ icon: Icon, label, isActive, isCollap
         {isActive && (
             <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-white rounded-r-full" />
         )}
-        <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-white' : isHighlighted ? 'text-brand-orange' : 'text-slate-400 group-hover:text-brand-orange'} transition-colors`} strokeWidth={isActive ? 2.5 : 2} />
+        <div className="relative">
+            <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-white' : isHighlighted ? 'text-brand-orange' : 'text-slate-400 group-hover:text-brand-orange'} transition-colors`} strokeWidth={isActive ? 2.5 : 2} />
+            {hasNotification && (
+                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse" />
+            )}
+        </div>
         {!isCollapsed && (
-            <span className={`text-[13px] font-semibold tracking-tight ${isActive ? 'text-white' : 'text-inherit'}`}>
+            <span className={`text-[13px] font-semibold tracking-tight ${isActive ? 'text-white' : 'text-inherit'} flex-1 text-left`}>
                 {label}
             </span>
+        )}
+        {!isCollapsed && hasNotification && (
+            <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
         )}
     </button>
 );
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, userName, userEmail }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, userName, userEmail, hasNotifications }) => {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [isMobileOpen, setIsMobileOpen] = useState(false);
 
@@ -77,6 +87,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
         { icon: ClipboardList, label: 'Análise SAEB', view: 'ANALISE_SAEB' as ViewState },
         { icon: ClipboardCheck, label: 'Análise CNCA/PNRA', view: 'ANALISE_CNCA_PNRA' as ViewState },
         { icon: BarChart3, label: 'Indicadores', view: 'INDICADORES' as ViewState },
+        { icon: Bell, label: 'Notificações', view: 'NOTIFICACOES' as ViewState, isHighlighted: true, hasNotification: hasNotifications },
     ];
 
     const SidebarContent = () => (
@@ -125,6 +136,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
                                 isActive={currentView === item.view}
                                 isCollapsed={isCollapsed}
                                 onClick={() => { onNavigate(item.view); setIsMobileOpen(false); }}
+                                hasNotification={(item as any).hasNotification}
                             />
                         ))}
                     </div>

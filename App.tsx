@@ -14,6 +14,7 @@ import { FluenciaParcDashboard } from './components/FluenciaParcDashboard';
 import { CncaPnraDashboard } from './components/CncaPnraDashboard';
 import { SeamaDashboard } from './components/SeamaDashboard';
 import { SaebDashboard } from './components/SaebDashboard';
+import { NotificationsPanel } from './components/NotificationsPanel';
 import { LoginPage } from './components/LoginPage';
 import { Preloader } from './components/ui/Preloader';
 import { ViewState, Escola, Visita, Coordenador } from './types';
@@ -783,6 +784,16 @@ export default function App() {
             escolas={escolas}
           />
         );
+      case 'NOTIFICACOES':
+        return (
+          <NotificationsPanel
+            escolas={escolas}
+            onNavigateToSchool={(id) => {
+              setSelectedEscolaId(id);
+              setCurrentView('DETALHE_ESCOLA');
+            }}
+          />
+        );
       default:
         return <div>Página não encontrada</div>;
     }
@@ -796,6 +807,9 @@ export default function App() {
     return <LoginPage onLogin={() => { }} onDemoLogin={handleDemoLogin} />;
   }
 
+  // Calculate notification status
+  const hasNotifications = true;
+
   return (
     <Layout
       currentView={currentView}
@@ -804,6 +818,7 @@ export default function App() {
       isAdmin={isAdmin}
       userName={userName}
       userEmail={userEmail}
+      hasNotifications={hasNotifications}
     >
       {isDemoMode && (
         <div className="bg-amber-100 border-l-4 border-amber-500 text-amber-700 p-3 mb-6 flex justify-between items-center rounded-r-md shadow-sm animate-fade-in">

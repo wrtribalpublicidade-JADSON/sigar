@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PageHeader } from './ui/PageHeader';
-import { Escola, RegistroFluenciaPARC, RegistroCNCA, RegistroSEAMA, RegistroSAEB, RegistroIDEB } from '../types';
+import { Escola, RegistroFluenciaPARC, RegistroCNCA, RegistroSEAMA, RegistroSAEB, RegistroIDEB, Segmento } from '../types';
 import {
     BarChart3,
     Users,
@@ -64,9 +64,13 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, onUpd
         { id: 'EI', label: 'Relatório EI', icon: LineChart },
     ];
 
-    const filteredEscolas = escolas.filter(escola =>
-        escola.nome.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredEscolas = escolas.filter(escola => {
+        const matchesSearch = escola.nome.toLowerCase().includes(searchTerm.toLowerCase());
+        if (activeTab === 'EI') {
+            return matchesSearch && escola.segmentos.includes(Segmento.INFANTIL);
+        }
+        return matchesSearch;
+    });
 
     const handleExport = () => {
         let dataToExport: any[] = [];
@@ -320,13 +324,16 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, onUpd
                                         )}
                                     </div>
                                 </td>
-                                {activeTab === 'CENSO' && (
-                                    <>
-                                        <td className="px-4 py-5 text-center font-black text-brand-black">{escola.dadosEducacionais?.censoEscolar?.matriculaTotal || 0}</td>
-                                        <td className="px-4 py-5 text-center">{escola.dadosEducacionais?.censoEscolar?.docentes || 0}</td>
-                                        <td className="px-4 py-5 text-center">{escola.dadosEducacionais?.censoEscolar?.turmas || 0}</td>
-                                    </>
-                                )}
+                                {activeTab === 'CENSO' && (() => {
+                                    const stats = calculateCensoStats(escola);
+                                    return (
+                                        <>
+                                            <td className="px-4 py-5 text-center font-black text-brand-black">{stats.matricula}</td>
+                                            <td className="px-4 py-5 text-center">{stats.docentes}</td>
+                                            <td className="px-4 py-5 text-center">{stats.turmas}</td>
+                                        </>
+                                    );
+                                })()}
                                 {activeTab === 'SAMAHC' && (
                                     <td className="px-4 py-5 text-center font-black text-brand-orange text-sm">
                                         {samahcSubTab === 'SEAMA' && (escola.dadosEducacionais?.dadosSamahc?.simuladoSeama || 0)}
@@ -417,6 +424,52 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, onUpd
                 </table>
             </div>
         );
+    };
+
+
+    const calculateCensoStats = (escola: Escola) => {
+        let matricula = 0;
+        let turmas = 0;
+        const det = escola.dadosEducacionais?.matriculaDetalhada;
+
+        if (det) {
+            // Helper to sum counts
+            const sumNivel = (nivel: any) => {
+                if (!nivel) return;
+                matricula += (nivel.alunos?.integral || 0) + (nivel.alunos?.manha || 0) + (nivel.alunos?.tarde || 0) + (nivel.alunos?.noite || 0);
+                turmas += (nivel.turmas?.integral || 0) + (nivel.turmas?.manha || 0) + (nivel.turmas?.tarde || 0) + (nivel.turmas?.noite || 0);
+            };
+
+            // Sum keys for Infantil
+            if (det.infantil) Object.values(det.infantil).forEach(sumNivel);
+            // Sum keys for Fundamental
+            if (det.fundamental) Object.values(det.fundamental).forEach(sumNivel);
+        }
+
+        // Fallbacks
+        if (matricula === 0 && escola.dadosEducacionais?.matricula) {
+            const m = escola.dadosEducacionais.matricula;
+            matricula = (m.infantil || 0) + (m.anosIniciais || 0) + (m.anosFinais || 0) + (m.eja || 0);
+        }
+        if (matricula === 0) matricula = escola.alunosMatriculados || 0;
+
+        if (turmas === 0 && escola.dadosEducacionais?.turmas) {
+            const t = escola.dadosEducacionais.turmas;
+            turmas = (t.manha || 0) + (t.tarde || 0) + (t.noite || 0);
+        }
+
+        // Docentes count
+        const docentes = (escola.recursosHumanos || []).filter(rh =>
+            rh.funcao.toLowerCase().includes('professor') ||
+            rh.funcao.toLowerCase().includes('docente')
+        ).length;
+
+        // If no explicit 'docente' role found but there are RH entries, maybe check if they are allocated to classes?
+        // User said "informado em recursos humanos e turmas".
+        // If 0, fallback to censoEscolar.docentes just in case
+        const finalDocentes = docentes > 0 ? docentes : (escola.dadosEducacionais?.censoEscolar?.docentes || 0);
+
+        return { matricula, turmas, docentes: finalDocentes };
     };
 
     return (

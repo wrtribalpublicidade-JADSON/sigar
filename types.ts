@@ -308,4 +308,6 @@ export interface Visita {
   status: 'Planejada' | 'Realizada' | 'Relatório Pendente';
 }
 
-export type ViewState = 'DASHBOARD' | 'LISTA_ESCOLAS' | 'DETALHE_ESCOLA' | 'NOVA_VISITA' | 'COORDENADORES' | 'RELATORIOS' | 'INDICADORES' | 'ANALISE_PARC' | 'ANALISE_CNCA_PNRA' | 'ANALISE_SEAMA' | 'ANALISE_SAEB';
+export type ViewState = 'DASHBOARD' | 'LISTA_ESCOLAS' | 'DETALHE_ESCOLA' | 'NOVA_VISITA' | 'COORDENADORES' | 'RELATORIOS' | 'INDICADORES' | 'ANALISE_PARC' | 'ANALISE_CNCA_PNRA' | 'ANALISE_SEAMA' | 'ANALISE_SAEB' | 'NOTIFICACOES';
+
+export type PendencyType = 'MATRICULA' | 'TURMAS' | 'RH' | 'MONITORAMENTO' | 'PLANO_ACAO';
