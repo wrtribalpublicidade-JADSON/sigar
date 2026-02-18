@@ -10,6 +10,7 @@ interface LayoutProps {
   isAdmin: boolean;
   userName: string | null;
   userEmail: string | null;
+  notificationCount?: number;
 }
 
 export const Layout: React.FC<LayoutProps> = ({
@@ -19,7 +20,8 @@ export const Layout: React.FC<LayoutProps> = ({
   onLogout,
   isAdmin,
   userName,
-  userEmail
+  userEmail,
+  notificationCount = 0
 }) => {
   return (
     <div className="h-screen bg-brand-light flex flex-col md:flex-row overflow-hidden">
@@ -31,6 +33,7 @@ export const Layout: React.FC<LayoutProps> = ({
         userName={userName}
         userEmail={userEmail}
         isAdmin={isAdmin}
+        notificationCount={notificationCount}
       />
 
       {/* Main Content */}

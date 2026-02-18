@@ -12,6 +12,7 @@ interface SidebarProps {
     userName: string | null;
     userEmail: string | null;
     hasNotifications?: boolean;
+    notificationCount?: number;
     isAdmin?: boolean;
 }
 
@@ -43,19 +44,29 @@ const NavItem: React.FC<NavItemProps> = ({ icon: Icon, label, isActive, isCollap
         )}
         <div className="relative">
             <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-white' : isHighlighted ? 'text-brand-orange' : 'text-slate-400 group-hover:text-brand-orange'} transition-colors`} strokeWidth={isActive ? 2.5 : 2} />
+            {hasNotification && (
+                <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
+                </span>
+            )}
         </div>
         {!isCollapsed && (
-            <span className={`text-[13px] font-semibold tracking-tight ${isActive ? 'text-white' : 'text-inherit'} flex-1 text-left`}>
-                {label}
-            </span>
-        )}
-        {!isCollapsed && hasNotification && (
-            <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+            <div className="flex-1 flex justify-between items-center min-w-0">
+                <span className={`text-[13px] font-semibold tracking-tight ${isActive ? 'text-white' : 'text-inherit'} text-left truncate`}>
+                    {label}
+                </span>
+                {hasNotification && (
+                    <span className="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-2">
+                        !
+                    </span>
+                )}
+            </div>
         )}
     </button>
 );
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, userName, userEmail, isAdmin }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, userName, userEmail, isAdmin, notificationCount = 0 }) => {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [isMobileOpen, setIsMobileOpen] = useState(false);
 
@@ -85,7 +96,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
         { icon: ClipboardList, label: 'Análise SAEB', view: 'ANALISE_SAEB' as ViewState },
         { icon: ClipboardCheck, label: 'Análise CNCA/PNRA', view: 'ANALISE_CNCA_PNRA' as ViewState },
         { icon: BarChart3, label: 'Indicadores', view: 'INDICADORES' as ViewState },
-        { icon: Bell, label: 'Notificações', view: 'NOTIFICACOES' as ViewState, isHighlighted: true },
+        { icon: Bell, label: 'Notificações', view: 'NOTIFICACOES' as ViewState, isHighlighted: true, hasNotification: notificationCount > 0 },
     ];
 
     if (isAdmin) {

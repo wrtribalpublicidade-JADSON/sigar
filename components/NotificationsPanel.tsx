@@ -20,7 +20,7 @@ interface SchoolPendency {
     pendencies: {
         type: PendencyType;
         label: string;
-        severity: 'high' | 'medium' | 'low';
+        severity: 'critical' | 'warning';
     }[];
 }
 
@@ -104,8 +104,8 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ escolas,
                                 <h3 className="font-black text-slate-800 line-clamp-2 min-h-[3rem]">
                                     {escola.nome}
                                 </h3>
-                                {(escola.recursosHumanos?.length === 0) && (
-                                    <span className="bg-red-100 text-red-700 text-[9px] px-2 py-1 rounded font-bold uppercase">Crítico</span>
+                                {(pendencies.some(p => p.severity === 'critical')) && (
+                                    <span className="bg-rose-100 text-rose-700 text-[9px] px-2 py-1 rounded font-bold uppercase">Crítico</span>
                                 )}
                             </div>
 

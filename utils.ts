@@ -85,58 +85,47 @@ const countTotalStudents = (detalhada: any): number => {
 };
 
 export const checkSchoolPendencies = (escola: Escola) => {
-  const pendencies: { type: PendencyType; label: string; severity: 'high' | 'medium' | 'low' }[] = [];
+  const pendencies: { type: PendencyType; label: string; severity: 'critical' | 'warning' }[] = [];
 
   if (!escola) return [];
 
   try {
     // 1. Matrícula Total
-    const totalAlunosDetalhado = escola.dadosEducacionais?.matriculaDetalhada
-      ? countTotalStudents(escola.dadosEducacionais.matriculaDetalhada)
-      : 0;
-
-    const hasMatricula = (escola.alunosMatriculados || 0) > 0 || totalAlunosDetalhado > 0;
+    // Check main field first, then calculate detail if needed (though structure suggests censoEscolar is the source of truth for total)
+    const hasMatricula = (escola.dadosEducacionais?.censoEscolar?.matriculaTotal || 0) > 0;
 
     if (!hasMatricula) {
-      pendencies.push({ type: 'MATRICULA', label: 'Matrícula Total não informada', severity: 'high' });
+      pendencies.push({ type: 'MATRICULA', label: 'Matrícula total não informada', severity: 'critical' });
     }
 
     // 2. Turmas
-    const turmas = escola.dadosEducacionais?.turmas || {};
-    // Note: Top-level turmas object does NOT have 'integral' in the current type definition
-    const totalTurmas = (Number(turmas.manha) || 0) +
-      (Number(turmas.tarde) || 0) +
-      (Number(turmas.noite) || 0);
-
-    const hasTurmas = totalTurmas > 0;
+    const hasTurmas = (escola.dadosEducacionais?.censoEscolar?.turmas || 0) > 0;
 
     if (!hasTurmas) {
-      pendencies.push({ type: 'TURMAS', label: 'Quantitativo de Turmas pendente', severity: 'high' });
+      pendencies.push({ type: 'TURMAS', label: 'Quantitativo de turmas pendente', severity: 'critical' });
     }
 
     // 3. Recursos Humanos
     if (!escola.recursosHumanos || !Array.isArray(escola.recursosHumanos) || escola.recursosHumanos.length === 0) {
-      pendencies.push({ type: 'RH', label: 'Quadro de RH não preenchido', severity: 'high' });
+      pendencies.push({ type: 'RH', label: 'Quadro de RH não preenchido', severity: 'warning' });
     }
 
     // 4. Plano de Ação
+    // Check if empty OR all items are 'Não Iniciado'
     const planoAcao = Array.isArray(escola.planoAcao) ? escola.planoAcao : [];
-    const atrasadas = planoAcao.filter(m => m && m.status === StatusMeta.ATRASADO).length;
+    const hasStartedPlan = planoAcao.some(meta => meta.status !== StatusMeta.NAO_INICIADO);
 
-    if (atrasadas > 0) {
-      pendencies.push({ type: 'PLANO_ACAO', label: `${atrasadas} metas do Plano de Ação em atraso`, severity: 'medium' });
-    } else if (planoAcao.length === 0) {
-      pendencies.push({ type: 'PLANO_ACAO', label: 'Plano de Ação não iniciado', severity: 'medium' });
+    if (planoAcao.length === 0 || !hasStartedPlan) {
+      pendencies.push({ type: 'PLANO_ACAO', label: 'Plano de Ação não iniciado', severity: 'warning' });
     }
 
     // 5. Monitoramento (Acompanhamento Mensal)
     if (!escola.acompanhamentoMensal || !Array.isArray(escola.acompanhamentoMensal) || escola.acompanhamentoMensal.length === 0) {
-      pendencies.push({ type: 'MONITORAMENTO', label: 'Monitoramento não iniciado', severity: 'low' });
+      pendencies.push({ type: 'MONITORAMENTO', label: 'Monitoramento mensal não iniciado', severity: 'warning' });
     }
 
   } catch (error) {
     console.warn(`Error checking pendencies for school ${escola.id}:`, error);
-    // Return empty pendencies on error to prevent crash
     return [];
   }
 

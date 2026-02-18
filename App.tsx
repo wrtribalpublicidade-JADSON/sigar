@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
 import { SchoolList } from './components/SchoolList';
@@ -24,8 +24,7 @@ import { Preloader } from './components/ui/Preloader';
 import { ViewState, Escola, Visita, Coordenador } from './types';
 import { supabase } from './services/supabase';
 import { useNotification } from './context/NotificationContext';
-import { generateUUID } from './utils';
-// import { checkSchoolPendencies } from './utils';
+import { generateUUID, checkSchoolPendencies } from './utils';
 import { ESCOLAS_MOCK, VISITAS_MOCK, COORDENADORES_MOCK } from './constants';
 import { logAccess, logAudit } from './services/logService';
 import { AuditLogDashboard } from './components/AuditLogDashboard';
@@ -80,12 +79,15 @@ export default function App() {
         nome: c.nome,
         contato: c.contato,
         regiao: c.regiao,
+        funcao: c.funcao, // Map function from DB
         escolasIds: c.coordenador_escolas?.map((ce: any) => ce.escola_id) || []
       })) || [];
 
       let linkedSchoolIds: string[] = [];
+      let currentUserCoord: Coordenador | undefined;
+
       if (!isUserAdmin) {
-        const currentUserCoord = mappedCoords.find(c => c.contato.toLowerCase() === currentEmail?.toLowerCase());
+        currentUserCoord = mappedCoords.find(c => c.contato.toLowerCase() === currentEmail?.toLowerCase());
         if (currentUserCoord) {
           linkedSchoolIds = currentUserCoord.escolasIds;
         } else {
@@ -822,9 +824,32 @@ export default function App() {
     }
   };
 
+  // Determine the effective user context for the dashboard
+  const effectiveUser = useMemo(() => {
+    return coordenadores.find(c => c.contato === userEmail);
+  }, [coordenadores, userEmail]);
+
+  // Calculate global notifications (pendencies) for the current user
+  const notificationCount = useMemo(() => {
+    if (!effectiveUser) return 0;
+    try {
+      const userSchools = escolas.filter(e => effectiveUser.escolasIds.includes(e.id));
+      let total = 0;
+      userSchools.forEach(escola => {
+        total += checkSchoolPendencies(escola).length;
+      });
+      return total;
+    } catch (error) {
+      console.error("Error calculating notifications:", error);
+      return 0;
+    }
+  }, [effectiveUser, escolas]);
+
   if (isLoadingAuth) {
     return <Preloader message="Autenticando sessão..." />;
   }
+
+
 
   if (!isAuthenticated) {
     return <LoginPage onLogin={() => { }} onDemoLogin={handleDemoLogin} />;
@@ -838,6 +863,7 @@ export default function App() {
       isAdmin={isAdmin}
       userName={userName}
       userEmail={userEmail}
+      notificationCount={notificationCount}
     >
       {isDemoMode && (
         <div className="bg-amber-100 border-l-4 border-amber-500 text-amber-700 p-3 mb-6 flex justify-between items-center rounded-r-md shadow-sm animate-fade-in">
@@ -859,8 +885,17 @@ export default function App() {
           escolas={escolas}
           visitas={visitas}
           coordenadores={coordenadores}
+          currentUser={effectiveUser}
           onNavigateToEscolas={() => setCurrentView('LISTA_ESCOLAS')}
-          onNavigateToVisitas={() => setCurrentView('NOVA_VISITA')}
+          onNavigateToVisitas={() => {
+            setCurrentView('NOVA_VISITA');
+            setSelectedVisit(null);
+          }}
+          onNavigateToDetail={(id) => {
+            setSelectedEscolaId(id);
+            setCurrentView('DETALHE_ESCOLA');
+          }}
+          onNavigateToNotifications={() => setCurrentView('NOTIFICACOES')}
         />
       ) : (
         renderContent()
