@@ -42,9 +42,6 @@ const NavItem: React.FC<NavItemProps> = ({ icon: Icon, label, isActive, isCollap
         )}
         <div className="relative">
             <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-white' : isHighlighted ? 'text-brand-orange' : 'text-slate-400 group-hover:text-brand-orange'} transition-colors`} strokeWidth={isActive ? 2.5 : 2} />
-            {hasNotification && (
-                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse" />
-            )}
         </div>
         {!isCollapsed && (
             <span className={`text-[13px] font-semibold tracking-tight ${isActive ? 'text-white' : 'text-inherit'} flex-1 text-left`}>
@@ -57,7 +54,7 @@ const NavItem: React.FC<NavItemProps> = ({ icon: Icon, label, isActive, isCollap
     </button>
 );
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, userName, userEmail, hasNotifications }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, userName, userEmail }) => {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [isMobileOpen, setIsMobileOpen] = useState(false);
 
@@ -87,7 +84,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
         { icon: ClipboardList, label: 'Análise SAEB', view: 'ANALISE_SAEB' as ViewState },
         { icon: ClipboardCheck, label: 'Análise CNCA/PNRA', view: 'ANALISE_CNCA_PNRA' as ViewState },
         { icon: BarChart3, label: 'Indicadores', view: 'INDICADORES' as ViewState },
-        { icon: Bell, label: 'Notificações', view: 'NOTIFICACOES' as ViewState, isHighlighted: true, hasNotification: hasNotifications },
+        { icon: Bell, label: 'Notificações', view: 'NOTIFICACOES' as ViewState, isHighlighted: true },
     ];
 
     const SidebarContent = () => (

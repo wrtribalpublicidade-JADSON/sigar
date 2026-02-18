@@ -6,7 +6,10 @@ import { SchoolList } from './components/SchoolList';
 import { SchoolDetail } from './components/SchoolDetail';
 import { VisitForm } from './components/VisitForm';
 import { PrintableVisitReport } from './components/PrintableVisitReport';
-import { Printer, Trash2, Edit, Search } from 'lucide-react';
+import {
+  LayoutDashboard, School, Users, FileText,
+  LogOut, PlusCircle, BarChart3, TrendingUp
+} from 'lucide-react';
 import { CoordinatorsManager } from './components/CoordinatorsManager';
 import { ReportsModule } from './components/ReportsModule';
 import { IndicatorsPanel } from './components/IndicatorsPanel';
@@ -20,7 +23,7 @@ import { Preloader } from './components/ui/Preloader';
 import { ViewState, Escola, Visita, Coordenador } from './types';
 import { supabase } from './services/supabase';
 import { useNotification } from './context/NotificationContext';
-import { generateUUID, checkSchoolPendencies } from './utils';
+import { generateUUID } from './utils';
 // import { checkSchoolPendencies } from './utils';
 import { ESCOLAS_MOCK, VISITAS_MOCK, COORDENADORES_MOCK } from './constants';
 
@@ -592,16 +595,6 @@ export default function App() {
 
   const renderContent = () => {
     switch (currentView) {
-      case 'DASHBOARD':
-        return (
-          <Dashboard
-            escolas={escolas}
-            visitas={visitas}
-            coordenadores={coordenadores}
-            onNavigateToEscolas={() => setCurrentView('LISTA_ESCOLAS')}
-            onNavigateToVisitas={() => setCurrentView('NOVA_VISITA')}
-          />
-        );
       case 'LISTA_ESCOLAS':
         return (
           <SchoolList
@@ -808,21 +801,6 @@ export default function App() {
     return <LoginPage onLogin={() => { }} onDemoLogin={handleDemoLogin} />;
   }
 
-  // Calculate notification status
-  // Disabled to prevent White Screen crash per user request
-  const hasNotifications = false;
-  /*
-  const hasNotifications = React.useMemo(() => {
-    if (!escolas || escolas.length === 0) return false;
-
-    // Check if ANY school has ANY pendency using the safe shared utility
-    return escolas.some(escola => {
-      const pendencies = checkSchoolPendencies(escola);
-      return pendencies.length > 0;
-    });
-  }, [escolas]);
-  */
-
   return (
     <Layout
       currentView={currentView}
@@ -831,7 +809,6 @@ export default function App() {
       isAdmin={isAdmin}
       userName={userName}
       userEmail={userEmail}
-      hasNotifications={hasNotifications}
     >
       {isDemoMode && (
         <div className="bg-amber-100 border-l-4 border-amber-500 text-amber-700 p-3 mb-6 flex justify-between items-center rounded-r-md shadow-sm animate-fade-in">
@@ -847,7 +824,18 @@ export default function App() {
           </button>
         </div>
       )}
-      {renderContent()}
-    </Layout>
+
+      {currentView === 'DASHBOARD' ? (
+        <Dashboard
+          escolas={escolas}
+          visitas={visitas}
+          coordenadores={coordenadores}
+          onNavigateToEscolas={() => setCurrentView('LISTA_ESCOLAS')}
+          onNavigateToVisitas={() => setCurrentView('NOVA_VISITA')}
+        />
+      ) : (
+        renderContent()
+      )}
+    </Layout >
   );
 }

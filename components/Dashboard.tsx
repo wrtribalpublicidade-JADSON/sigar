@@ -104,15 +104,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <div className="space-y-8 animate-fade-in relative">
-      <PageHeader
-        title="Painel de Monitoramento"
-        subtitle="Secretaria Municipal de Educação - Humberto de Campos"
-        icon={Target}
-        badgeText="VISÃO GERAL DO SISTEMA"
-        actions={[
-          { label: 'Exportar CSV', icon: Download, onClick: handleExportCSV, variant: 'secondary' }
-        ]}
-      />
 
       {/* KPI Cards - Modern Soft */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
