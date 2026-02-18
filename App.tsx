@@ -831,11 +831,19 @@ export default function App() {
 
   // Calculate global notifications (pendencies) for the current user
   const notificationCount = useMemo(() => {
-    if (!effectiveUser) return 0;
+    if (isDemoMode) return 5; // Force pendencies for Demo Mode to show alerts
+
+    // If admin, check ALL schools (matching NotificationsPanel behavior)
+    // If not admin, check only assigned schools
+    const targetSchools = isAdmin
+      ? escolas
+      : (effectiveUser ? escolas.filter(e => effectiveUser.escolasIds.includes(e.id)) : []);
+
+    if (targetSchools.length === 0) return 0;
+
     try {
-      const userSchools = escolas.filter(e => effectiveUser.escolasIds.includes(e.id));
       let total = 0;
-      userSchools.forEach(escola => {
+      targetSchools.forEach(escola => {
         total += checkSchoolPendencies(escola).length;
       });
       return total;
@@ -843,7 +851,7 @@ export default function App() {
       console.error("Error calculating notifications:", error);
       return 0;
     }
-  }, [effectiveUser, escolas]);
+  }, [effectiveUser, escolas, isAdmin, isDemoMode]);
 
   if (isLoadingAuth) {
     return <Preloader message="Autenticando sessão..." />;
@@ -896,6 +904,7 @@ export default function App() {
             setCurrentView('DETALHE_ESCOLA');
           }}
           onNavigateToNotifications={() => setCurrentView('NOTIFICACOES')}
+          notificationCount={notificationCount}
         />
       ) : (
         renderContent()

@@ -21,6 +21,7 @@ interface DashboardProps {
   onNavigateToVisitas: () => void;
   onNavigateToDetail?: (id: string) => void;
   onNavigateToNotifications: () => void;
+  notificationCount?: number;
 }
 
 // Helper: Format Date
@@ -37,7 +38,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onNavigateToEscolas,
   onNavigateToVisitas,
   onNavigateToDetail,
-  onNavigateToNotifications
+  onNavigateToNotifications,
+  notificationCount
 }) => {
   // --- Cálculos ---
   const stats = useMemo(() => {
@@ -63,18 +65,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
     const avgFrequencia = escolas.length > 0 ? (escolas.reduce((acc, e) => acc + e.indicadores.frequenciaMedia, 0) / escolas.length).toFixed(0) : '0';
 
-    // Calculate total pendencies for current user
-    let totalPendencies = 0;
-    if (currentUser) {
-      const userSchools = escolas.filter(e => currentUser.escolasIds.includes(e.id));
-      userSchools.forEach(escola => {
-        totalPendencies += checkSchoolPendencies(escola).length;
-      });
-    }
+    return { totalAlunos, metasAtrasadas, visitasRealizadas, avgIdebAI, avgIdebAF, avgFrequencia };
+  }, [escolas, visitas]);
 
-    return { totalAlunos, metasAtrasadas, visitasRealizadas, avgIdebAI, avgIdebAF, avgFrequencia, totalPendencies };
-  }, [escolas, visitas, currentUser]);
-
+  // Use prop if available, otherwise default to 0 (or internal calc if we really wanted fallback, but prop is better for sync)
+  const activePendencies = notificationCount || 0;
 
 
   // --- Dados de Gráficos ---
@@ -140,11 +135,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
   ];
 
 
-
   return (
     <div className="space-y-8 animate-fade-in relative">
       {/* Dynamic Pendency Alert */}
-      {stats.totalPendencies > 0 && (
+      {activePendencies > 0 && (
         <div className="bg-rose-50 border-l-4 border-rose-500 rounded-r-xl p-4 shadow-sm animate-pulse-slow flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-start gap-4">
             <div className="p-2 bg-rose-100 rounded-full shrink-0">
@@ -153,7 +147,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div>
               <h3 className="font-bold text-rose-800 text-lg">Atenção Necessária</h3>
               <p className="text-rose-700 font-medium">
-                Você possui <span className="font-black text-rose-900">{stats.totalPendencies}</span> pendência(s) ativa(s) que requer(em) sua atenção imediata.
+                Você possui <span className="font-black text-rose-900">{activePendencies}</span> pendência(s) ativa(s) que requer(em) sua atenção imediata.
               </p>
             </div>
           </div>
@@ -177,7 +171,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
           />
         </div>
       )}
-
 
 
       {/* Pending Alerts System */}
