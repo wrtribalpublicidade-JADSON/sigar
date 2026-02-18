@@ -8,7 +8,8 @@ import { VisitForm } from './components/VisitForm';
 import { PrintableVisitReport } from './components/PrintableVisitReport';
 import {
   LayoutDashboard, School, Users, FileText,
-  LogOut, PlusCircle, BarChart3, TrendingUp
+  LogOut, PlusCircle, BarChart3, TrendingUp,
+  Edit, Trash2, Printer
 } from 'lucide-react';
 import { CoordinatorsManager } from './components/CoordinatorsManager';
 import { ReportsModule } from './components/ReportsModule';
@@ -26,6 +27,8 @@ import { useNotification } from './context/NotificationContext';
 import { generateUUID } from './utils';
 // import { checkSchoolPendencies } from './utils';
 import { ESCOLAS_MOCK, VISITAS_MOCK, COORDENADORES_MOCK } from './constants';
+import { logAccess, logAudit } from './services/logService';
+import { AuditLogDashboard } from './components/AuditLogDashboard';
 
 const ADMIN_EMAIL = 'jadsoncsilv@gmail.com';
 
@@ -215,6 +218,9 @@ export default function App() {
         setIsAuthenticated(true);
         setIsDemoMode(false);
         fetchData(false, email);
+        if (event === 'SIGNED_IN') {
+          logAccess('LOGIN', 'SUCCESS', session.user.id, email);
+        }
       } else {
         setIsAuthenticated(false);
         setUserEmail(null);
@@ -245,6 +251,7 @@ export default function App() {
       setIsAdmin(false);
     } else {
       try {
+        await logAccess('LOGOUT', 'SUCCESS', undefined, userEmail || undefined);
         await supabase.auth.signOut();
       } catch (err) {
         console.error("Error signing out:", err);
@@ -285,6 +292,11 @@ export default function App() {
         indicadores: updatedEscola.indicadores,
         dados_educacionais: updatedEscola.dadosEducacionais
       }).eq('id', updatedEscola.id);
+
+      await logAudit('UPDATE', 'ESCOLA', updatedEscola.id, {
+        old: currentEscola,
+        new: updatedEscola
+      });
 
       if (error) throw error;
 
@@ -386,6 +398,8 @@ export default function App() {
         dados_educacionais: newSchool.dadosEducacionais
       });
 
+      await logAudit('CREATE', 'ESCOLA', newSchool.id, newSchool);
+
       if (error) throw error;
 
       if (newSchool.acompanhamentoMensal.length > 0) {
@@ -418,6 +432,8 @@ export default function App() {
     try {
       const { error } = await supabase.from('escolas').delete().eq('id', id);
       if (error) throw error;
+
+      await logAudit('DELETE', 'ESCOLA', id, {});
 
       setEscolas(escolas.filter(e => e.id !== id));
       setVisitas(visitas.filter(v => v.escolaId !== id));
@@ -460,6 +476,8 @@ export default function App() {
         status: newVisit.status
       });
 
+      await logAudit(isEditing ? 'UPDATE' : 'CREATE', 'VISITA', visitId, newVisit);
+
       if (error) throw error;
 
       if (isEditing) {
@@ -488,6 +506,7 @@ export default function App() {
     try {
       const { error } = await supabase.from('visitas').delete().eq('id', id);
       if (error) throw error;
+      await logAudit('DELETE', 'VISITA', id, {});
       setVisitas(visitas.filter(v => v.id !== id));
       showNotification('success', 'Registro de visita excluído com sucesso.');
     } catch (error) {
@@ -539,6 +558,8 @@ export default function App() {
           regiao: coord.regiao
         }).eq('id', coord.id);
 
+        await logAudit('UPDATE', 'COORDENADOR', coord.id, coord);
+
         if (error) throw error;
 
         await supabase.from('coordenador_escolas').delete().eq('coordenador_id', coord.id);
@@ -558,6 +579,8 @@ export default function App() {
           contato: coord.contato,
           regiao: coord.regiao
         });
+
+        await logAudit('CREATE', 'COORDENADOR', newId, coord);
 
         if (error) throw error;
 
@@ -586,6 +609,7 @@ export default function App() {
     try {
       const { error } = await supabase.from('coordenadores').delete().eq('id', id);
       if (error) throw error;
+      await logAudit('DELETE', 'COORDENADOR', id, {});
       setCoordenadores(coordenadores.filter(c => c.id !== id));
       showNotification('success', 'Coordenador removido.');
     } catch (error) {
@@ -788,6 +812,11 @@ export default function App() {
             }}
           />
         );
+      case 'AUDIT_LOGS':
+        if (!isAdmin) return <div>Acesso restrito.</div>;
+        return (
+          <AuditLogDashboard onBack={() => setCurrentView('DASHBOARD')} />
+        )
       default:
         return <div>Página não encontrada</div>;
     }

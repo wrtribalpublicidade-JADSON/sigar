@@ -30,6 +30,7 @@ export const Layout: React.FC<LayoutProps> = ({
         onLogout={onLogout}
         userName={userName}
         userEmail={userEmail}
+        isAdmin={isAdmin}
       />
 
       {/* Main Content */}

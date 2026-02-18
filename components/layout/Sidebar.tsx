@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     LayoutDashboard, School, Users, FileText,
-    ChevronLeft, ChevronRight, Menu, X, LogOut, PlusCircle, BarChart3, TrendingUp, ClipboardCheck, GraduationCap, ClipboardList, Bell
+    ChevronLeft, ChevronRight, Menu, X, LogOut, PlusCircle, BarChart3, TrendingUp, ClipboardCheck, GraduationCap, ClipboardList, Bell, Shield
 } from 'lucide-react';
 import { ViewState } from '../../types';
 
@@ -12,6 +12,7 @@ interface SidebarProps {
     userName: string | null;
     userEmail: string | null;
     hasNotifications?: boolean;
+    isAdmin?: boolean;
 }
 
 interface NavItemProps {
@@ -28,7 +29,7 @@ interface NavItemProps {
 const NavItem: React.FC<NavItemProps> = ({ icon: Icon, label, isActive, isCollapsed, onClick, isHighlighted, hasNotification }) => (
     <button
         onClick={onClick}
-        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group relative
+        className={`w-full flex items-center gap-3 px-4 py-1.5 rounded-xl transition-all duration-200 group relative
       ${isActive
                 ? 'bg-brand-orange text-white shadow-lg shadow-brand-orange/20'
                 : isHighlighted
@@ -54,7 +55,7 @@ const NavItem: React.FC<NavItemProps> = ({ icon: Icon, label, isActive, isCollap
     </button>
 );
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, userName, userEmail }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, userName, userEmail, isAdmin }) => {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [isMobileOpen, setIsMobileOpen] = useState(false);
 
@@ -86,6 +87,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
         { icon: BarChart3, label: 'Indicadores', view: 'INDICADORES' as ViewState },
         { icon: Bell, label: 'Notificações', view: 'NOTIFICACOES' as ViewState, isHighlighted: true },
     ];
+
+    if (isAdmin) {
+        managementNavItems.push({ icon: Shield, label: 'Auditoria', view: 'AUDIT_LOGS' as ViewState });
+    }
 
     const SidebarContent = () => (
         <div className="flex flex-col h-full bg-white">

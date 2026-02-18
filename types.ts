@@ -308,6 +308,29 @@ export interface Visita {
   status: 'Planejada' | 'Realizada' | 'Relatório Pendente';
 }
 
-export type ViewState = 'DASHBOARD' | 'LISTA_ESCOLAS' | 'DETALHE_ESCOLA' | 'NOVA_VISITA' | 'COORDENADORES' | 'RELATORIOS' | 'INDICADORES' | 'ANALISE_PARC' | 'ANALISE_CNCA_PNRA' | 'ANALISE_SEAMA' | 'ANALISE_SAEB' | 'NOTIFICACOES';
+export type ViewState = 'DASHBOARD' | 'LISTA_ESCOLAS' | 'DETALHE_ESCOLA' | 'NOVA_VISITA' | 'COORDENADORES' | 'RELATORIOS' | 'INDICADORES' | 'ANALISE_PARC' | 'ANALISE_CNCA_PNRA' | 'ANALISE_SEAMA' | 'ANALISE_SAEB' | 'NOTIFICACOES' | 'AUDIT_LOGS';
 
 export type PendencyType = 'MATRICULA' | 'TURMAS' | 'RH' | 'MONITORAMENTO' | 'PLANO_ACAO';
+
+// Interfaces for Logs
+export interface AccessLog {
+  id: string;
+  user_id?: string;
+  user_email?: string;
+  action: 'LOGIN' | 'LOGOUT';
+  status: 'SUCCESS' | 'FAILURE';
+  ip_address?: string;
+  user_agent?: string;
+  created_at: string;
+}
+
+export interface AuditLog {
+  id: string;
+  user_id?: string;
+  user_email?: string;
+  action: 'CREATE' | 'UPDATE' | 'DELETE';
+  module: string;
+  record_id?: string;
+  details?: any;
+  created_at: string;
+}
