@@ -127,25 +127,25 @@ export const CncaModal: React.FC<CncaModalProps> = ({
         <Modal isOpen={isOpen} onClose={onClose} size="4xl" showCloseButton={false}>
             <div className="overflow-hidden bg-white rounded-2xl">
                 {/* Header Premium */}
-                <div className="relative overflow-hidden bg-slate-900 px-6 py-8 leading-tight">
+                <div className="relative overflow-hidden bg-slate-900 px-5 py-5 leading-tight">
                     <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
                     <div className="relative z-10 flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <div className="w-14 h-14 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/20">
-                                <Target className="w-7 h-7 text-white" />
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/20">
+                                <Target className="w-5 h-5 text-white" />
                             </div>
                             <div>
-                                <h2 className="text-2xl font-black text-white tracking-tight">Cadastro de Informações CNCA/PNRA</h2>
-                                <p className="text-orange-400 font-bold text-sm uppercase tracking-widest mt-0.5">{escola.nome}</p>
+                                <h2 className="text-xl font-black text-white tracking-tight">Cadastro CNCA/PNRA</h2>
+                                <p className="text-orange-400 font-bold text-xs uppercase tracking-widest mt-0.5">{escola.nome}</p>
                             </div>
                         </div>
-                        <button onClick={onClose} className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition-all">
-                            <X className="w-6 h-6" />
+                        <button onClick={onClose} className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-all">
+                            <X className="w-5 h-5" />
                         </button>
                     </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-8 space-y-8 max-h-[75vh] overflow-y-auto custom-scrollbar shadow-inner bg-slate-50/10">
+                <form onSubmit={handleSubmit} className="p-5 space-y-5 max-h-[75vh] overflow-y-auto custom-scrollbar shadow-inner bg-slate-50/10">
                     {error && (
                         <div className="bg-rose-50 border-2 border-rose-100 p-4 rounded-2xl flex items-center gap-3 animate-shake">
                             <div className="w-10 h-10 bg-rose-500 rounded-xl flex items-center justify-center shrink-0">
@@ -159,33 +159,33 @@ export const CncaModal: React.FC<CncaModalProps> = ({
                     )}
 
                     {/* Identificação e Visão Geral */}
-                    <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-8">
+                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-5">
                         <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                            <Calendar className="w-5 h-5 text-orange-500" />
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Identificação da Avaliação</h3>
+                            <Calendar className="w-4 h-4 text-orange-500" />
+                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Identificação da Avaliação</h3>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-3">
-                                <label className="text-[11px] font-black text-slate-500 uppercase block tracking-tighter">Ano de Referência</label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase block tracking-tight">Ano de Referência</label>
                                 <input
                                     type="number"
                                     name="ano"
                                     required
                                     value={formData.ano}
                                     onChange={handleChange}
-                                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-4 text-lg font-black text-slate-900 focus:ring-4 focus:ring-orange-500/10 focus:border-orange-500 transition-all outline-none shadow-sm"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-800 focus:ring-4 focus:ring-orange-500/10 focus:border-orange-500 transition-all outline-none shadow-sm"
                                 />
                             </div>
 
-                            <div className="space-y-3">
-                                <label className="text-[11px] font-black text-slate-500 uppercase block tracking-tighter">Tipo de Avaliação</label>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase block tracking-tight">Tipo de Avaliação</label>
                                 <select
                                     name="tipoAvaliacao"
                                     required
                                     value={formData.tipoAvaliacao}
                                     onChange={handleChange}
-                                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-4 text-lg font-black text-slate-900 focus:ring-4 focus:ring-orange-500/10 focus:border-orange-500 transition-all outline-none shadow-sm appearance-none cursor-pointer"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-800 focus:ring-4 focus:ring-orange-500/10 focus:border-orange-500 transition-all outline-none shadow-sm appearance-none cursor-pointer"
                                 >
                                     <option value="Diagnóstica">Diagnóstica</option>
                                     <option value="Formativa">Formativa</option>
@@ -193,43 +193,43 @@ export const CncaModal: React.FC<CncaModalProps> = ({
                                 </select>
                             </div>
 
-                            <div className="space-y-3">
-                                <label className="text-[11px] font-black text-slate-500 uppercase block tracking-tighter">Componente Curricular</label>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase block tracking-tight">Componente Curricular</label>
                                 <select
                                     name="componenteCurricular"
                                     required
                                     value={formData.componenteCurricular}
                                     onChange={handleChange}
-                                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-4 text-lg font-black text-slate-900 focus:ring-4 focus:ring-orange-500/10 focus:border-orange-500 transition-all outline-none shadow-sm appearance-none cursor-pointer"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-800 focus:ring-4 focus:ring-orange-500/10 focus:border-orange-500 transition-all outline-none shadow-sm appearance-none cursor-pointer"
                                 >
                                     <option value="Língua Portuguesa">Língua Portuguesa</option>
                                     <option value="Matemática">Matemática</option>
                                 </select>
                             </div>
 
-                            <div className="space-y-3">
-                                <label className="text-[11px] font-black text-slate-500 uppercase block tracking-tighter">Tipo de Turma</label>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase block tracking-tight">Tipo de Turma</label>
                                 <select
                                     name="tipoTurma"
                                     required
                                     value={formData.tipoTurma}
                                     onChange={handleChange}
-                                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-4 text-lg font-black text-slate-900 focus:ring-4 focus:ring-orange-500/10 focus:border-orange-500 transition-all outline-none shadow-sm appearance-none cursor-pointer"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-800 focus:ring-4 focus:ring-orange-500/10 focus:border-orange-500 transition-all outline-none shadow-sm appearance-none cursor-pointer"
                                 >
                                     <option value="Regular">Regular</option>
                                     <option value="Multiseriada">Multiseriada</option>
                                 </select>
                             </div>
 
-                            <div className="space-y-3 md:col-span-2">
-                                <label className="text-[11px] font-black text-slate-500 uppercase block tracking-tighter">Ano / Série</label>
+                            <div className="space-y-2 md:col-span-2">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase block tracking-tight">Ano / Série</label>
                                 <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-2">
                                     {(['1º ANO', '2º ANO', '3º ANO', '4º ANO', '5º ANO', '6º ANO', '7º ANO', '8º ANO', '9º ANO'] as const).map((ano) => (
                                         <button
                                             key={ano}
                                             type="button"
                                             onClick={() => setFormData(prev => ({ ...prev, anoSerie: ano }))}
-                                            className={`py-3 rounded-xl text-xs font-black transition-all border-2 ${formData.anoSerie === ano ? 'bg-orange-600 border-orange-600 text-white shadow-lg' : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-orange-200'}`}
+                                            className={`py-2 rounded-lg text-[10px] font-black transition-all border ${formData.anoSerie === ano ? 'bg-orange-600 border-orange-600 text-white shadow-md' : 'bg-slate-50 border-slate-200 text-slate-400 hover:border-orange-200'}`}
                                         >
                                             {ano}
                                         </button>
@@ -240,15 +240,15 @@ export const CncaModal: React.FC<CncaModalProps> = ({
                     </div>
 
                     {/* Dados Quantitativos */}
-                    <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-8">
+                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-5">
                         <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                            <Users className="w-5 h-5 text-orange-500" />
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Participantes e Cobertura</h3>
+                            <Users className="w-4 h-4 text-orange-500" />
+                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Participantes e Cobertura</h3>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-3 font-semibold">
-                                <label className="text-[11px] font-black text-slate-500 uppercase block tracking-tighter">Estudantes Previstos</label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2 font-semibold">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase block tracking-tight">Estudantes Previstos</label>
                                 <input
                                     type="number"
                                     name="estudantesPrevistos"
@@ -256,12 +256,12 @@ export const CncaModal: React.FC<CncaModalProps> = ({
                                     required
                                     value={formData.estudantesPrevistos}
                                     onChange={handleChange}
-                                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-4 text-2xl font-black text-slate-700 focus:border-orange-500 outline-none transition-all shadow-inner"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-xl font-black text-slate-700 focus:border-orange-500 outline-none transition-all shadow-inner"
                                 />
                             </div>
 
-                            <div className="space-y-3 font-semibold">
-                                <label className="text-[11px] font-black text-slate-500 uppercase block tracking-tighter">Estudantes Avaliados</label>
+                            <div className="space-y-2 font-semibold">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase block tracking-tight">Estudantes Avaliados</label>
                                 <input
                                     type="number"
                                     name="estudantesAvaliados"
@@ -269,22 +269,22 @@ export const CncaModal: React.FC<CncaModalProps> = ({
                                     required
                                     value={formData.estudantesAvaliados}
                                     onChange={handleChange}
-                                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-4 text-2xl font-black text-blue-600 focus:border-blue-500 outline-none transition-all shadow-inner"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-xl font-black text-blue-600 focus:border-blue-500 outline-none transition-all shadow-inner"
                                 />
                             </div>
                         </div>
                     </div>
 
                     {/* Desempenho e Níveis */}
-                    <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-8">
+                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-5">
                         <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                            <Activity className="w-5 h-5 text-orange-500" />
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Métricas de Aprendizado (%)</h3>
+                            <Activity className="w-4 h-4 text-orange-500" />
+                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Métricas de Aprendizado (%)</h3>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                            <div className="space-y-3">
-                                <label className="text-[11px] font-black text-rose-600 uppercase block text-center tracking-tighter">Defasagem (%)</label>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-rose-600 uppercase block text-center tracking-tight">Defasagem (%)</label>
                                 <input
                                     type="number"
                                     name="defasagem"
@@ -293,12 +293,12 @@ export const CncaModal: React.FC<CncaModalProps> = ({
                                     required
                                     value={formData.defasagem}
                                     onChange={handleChange}
-                                    className="w-full bg-rose-50 border-2 border-rose-100 rounded-2xl px-4 py-5 text-3xl font-black text-rose-600 focus:border-rose-400 outline-none text-center transition-all shadow-inner"
+                                    className="w-full bg-rose-50 border border-rose-100 rounded-xl px-3 py-3 text-2xl font-black text-rose-600 focus:border-rose-400 outline-none text-center transition-all shadow-inner"
                                 />
                             </div>
 
-                            <div className="space-y-3">
-                                <label className="text-[11px] font-black text-orange-600 uppercase block text-center tracking-tighter">I. Intermediário (%)</label>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-orange-600 uppercase block text-center tracking-tight">I. Intermediário (%)</label>
                                 <input
                                     type="number"
                                     name="aprendizadoIntermediario"
@@ -307,12 +307,12 @@ export const CncaModal: React.FC<CncaModalProps> = ({
                                     required
                                     value={formData.aprendizadoIntermediario}
                                     onChange={handleChange}
-                                    className="w-full bg-orange-50 border-2 border-orange-100 rounded-2xl px-4 py-5 text-3xl font-black text-orange-600 focus:border-orange-400 outline-none text-center transition-all shadow-inner"
+                                    className="w-full bg-orange-50 border border-orange-100 rounded-xl px-3 py-3 text-2xl font-black text-orange-600 focus:border-orange-400 outline-none text-center transition-all shadow-inner"
                                 />
                             </div>
 
-                            <div className="space-y-3">
-                                <label className="text-[11px] font-black text-emerald-600 uppercase block text-center tracking-tighter">Adequado (%)</label>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-emerald-600 uppercase block text-center tracking-tight">Adequado (%)</label>
                                 <input
                                     type="number"
                                     name="aprendizadoAdequado"
@@ -321,7 +321,7 @@ export const CncaModal: React.FC<CncaModalProps> = ({
                                     required
                                     value={formData.aprendizadoAdequado}
                                     onChange={handleChange}
-                                    className="w-full bg-emerald-50 border-2 border-emerald-100 rounded-2xl px-4 py-5 text-3xl font-black text-emerald-600 focus:border-emerald-400 outline-none text-center transition-all shadow-inner"
+                                    className="w-full bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-3 text-2xl font-black text-emerald-600 focus:border-emerald-400 outline-none text-center transition-all shadow-inner"
                                 />
                             </div>
                         </div>

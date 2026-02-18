@@ -21,20 +21,20 @@ export const Button: React.FC<ButtonProps> = ({
     disabled,
     ...props
 }) => {
-    const baseStyles = 'inline-flex items-center justify-center font-black uppercase tracking-widest transition-all duration-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed border-2 border-brand-black active:translate-x-0.5 active:translate-y-0.5 active:shadow-none';
+    const baseStyles = 'inline-flex items-center justify-center font-bold uppercase tracking-wide transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl active:scale-[0.98]';
 
     const variantStyles = {
-        primary: 'bg-brand-orange text-white shadow-sharp-sm hover:shadow-sharp',
-        secondary: 'bg-white text-brand-black shadow-sharp-sm hover:bg-slate-50',
-        ghost: 'bg-transparent text-slate-600 border-transparent hover:bg-slate-50',
-        danger: 'bg-brand-signal text-white shadow-sharp-sm hover:shadow-sharp',
-        success: 'bg-brand-acid text-brand-black shadow-sharp-sm hover:shadow-sharp',
+        primary: 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40 hover:-translate-y-0.5 focus:ring-orange-500 border border-transparent',
+        secondary: 'bg-white text-slate-600 border border-slate-200 shadow-sm hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300 focus:ring-slate-200',
+        ghost: 'bg-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-700 focus:ring-slate-200 border border-transparent',
+        danger: 'bg-gradient-to-r from-rose-500 to-rose-600 text-white shadow-lg shadow-rose-500/25 hover:shadow-rose-500/40 hover:-translate-y-0.5 focus:ring-rose-500 border border-transparent',
+        success: 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:-translate-y-0.5 focus:ring-emerald-500 border border-transparent',
     };
 
     const sizeStyles = {
-        sm: 'px-3 py-1.5 text-[9px] gap-1.5',
-        md: 'px-5 py-2.5 text-[10px] gap-2',
-        lg: 'px-8 py-3.5 text-xs gap-3',
+        sm: 'px-3 py-1.5 text-[10px] gap-1.5',
+        md: 'px-6 py-2.5 text-[11px] gap-2',
+        lg: 'px-8 py-3.5 text-xs gap-2.5',
     };
 
     const iconSize = {

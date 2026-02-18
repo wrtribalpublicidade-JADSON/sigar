@@ -202,25 +202,25 @@ export const SaebModal: React.FC<SaebModalProps> = ({
     return (
         <Modal isOpen={isOpen} onClose={onClose} size="4xl" showCloseButton={false}>
             <div className="overflow-hidden bg-white rounded-2xl">
-                <div className="relative overflow-hidden bg-slate-900 px-6 py-8 leading-tight">
+                <div className="relative overflow-hidden bg-slate-900 px-5 py-5 leading-tight">
                     <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
                     <div className="relative z-10 flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <div className="w-14 h-14 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/20">
-                                <Award className="w-7 h-7 text-white" />
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/20">
+                                <Award className="w-5 h-5 text-white" />
                             </div>
                             <div>
-                                <h2 className="text-2xl font-black text-white tracking-tight">Cadastro de Informações SAEB</h2>
-                                <p className="text-orange-400 font-bold text-sm uppercase tracking-widest mt-0.5">{escola.nome}</p>
+                                <h2 className="text-xl font-black text-white tracking-tight">Cadastro SAEB</h2>
+                                <p className="text-orange-400 font-bold text-xs uppercase tracking-widest mt-0.5">{escola.nome}</p>
                             </div>
                         </div>
-                        <button onClick={onClose} className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition-all">
-                            <X className="w-6 h-6" />
+                        <button onClick={onClose} className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-all">
+                            <X className="w-5 h-5" />
                         </button>
                     </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-8 space-y-8 max-h-[75vh] overflow-y-auto custom-scrollbar shadow-inner bg-slate-50/10">
+                <form onSubmit={handleSubmit} className="p-5 space-y-5 max-h-[75vh] overflow-y-auto custom-scrollbar shadow-inner bg-slate-50/10">
                     {error && (
                         <div className="bg-rose-50 border-2 border-rose-100 p-4 rounded-2xl flex items-center gap-3 animate-shake">
                             <div className="w-10 h-10 bg-rose-500 rounded-xl flex items-center justify-center shrink-0">
@@ -233,50 +233,52 @@ export const SaebModal: React.FC<SaebModalProps> = ({
                         </div>
                     )}
 
-                    <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-8">
+                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-5">
                         <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                            <Calendar className="w-5 h-5 text-orange-500" />
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Identificação da Avaliação</h3>
+                            <Calendar className="w-4 h-4 text-orange-500" />
+                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Identificação da Avaliação</h3>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-3">
-                                <label className="text-[11px] font-black text-slate-500 uppercase block tracking-tighter">Ano de Referência</label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase block tracking-tight">Ano de Referência</label>
                                 <input
                                     type="number"
                                     name="ano"
                                     required
                                     value={formData.ano}
                                     onChange={handleChange}
-                                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-4 text-lg font-black text-slate-900 focus:ring-4 focus:ring-orange-500/10 focus:border-orange-500 transition-all outline-none shadow-sm"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-800 focus:ring-4 focus:ring-orange-500/10 focus:border-orange-500 transition-all outline-none shadow-sm"
                                 />
                             </div>
 
-                            <div className="space-y-3">
-                                <label className="text-[11px] font-black text-slate-500 uppercase block tracking-tighter">Ano / Série</label>
-                                {(['5º ANO', '9º ANO'] as const).map((ano) => (
-                                    <button
-                                        key={ano}
-                                        type="button"
-                                        onClick={() => setFormData(prev => ({ ...prev, anoSerie: ano }))}
-                                        className={`py-4 rounded-xl text-sm font-black transition-all border-2 ${formData.anoSerie === ano ? 'bg-orange-600 border-orange-600 text-white shadow-lg' : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-orange-200'}`}
-                                    >
-                                        {ano}
-                                    </button>
-                                ))}
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase block tracking-tight">Ano / Série</label>
+                                <div className="flex gap-2">
+                                    {(['5º ANO', '9º ANO'] as const).map((ano) => (
+                                        <button
+                                            key={ano}
+                                            type="button"
+                                            onClick={() => setFormData(prev => ({ ...prev, anoSerie: ano }))}
+                                            className={`flex-1 py-2.5 rounded-lg text-xs font-black transition-all border ${formData.anoSerie === ano ? 'bg-orange-600 border-orange-600 text-white shadow-md' : 'bg-slate-50 border-slate-200 text-slate-400 hover:border-orange-200'}`}
+                                        >
+                                            {ano}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-8">
+                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-5">
                         <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                            <Activity className="w-5 h-5 text-orange-500" />
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Resultados SAEB</h3>
+                            <Activity className="w-4 h-4 text-orange-500" />
+                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Resultados SAEB</h3>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-3">
-                                <label className="text-[11px] font-black text-slate-500 uppercase block tracking-tighter">Proficiência Média Língua Portuguesa</label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase block tracking-tight">Proficiência Média Língua Portuguesa</label>
                                 <input
                                     type="number"
                                     step="0.01"
@@ -284,12 +286,12 @@ export const SaebModal: React.FC<SaebModalProps> = ({
                                     required
                                     value={formData.proficienciaLp}
                                     onChange={handleChange}
-                                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-4 text-lg font-black text-slate-900 focus:border-orange-500 outline-none transition-all shadow-sm"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-black text-slate-900 focus:border-orange-500 outline-none transition-all shadow-sm"
                                 />
                             </div>
 
-                            <div className="space-y-3">
-                                <label className="text-[11px] font-black text-slate-500 uppercase block tracking-tighter">Proficiência Média Matemática</label>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase block tracking-tight">Proficiência Média Matemática</label>
                                 <input
                                     type="number"
                                     step="0.01"
@@ -297,12 +299,12 @@ export const SaebModal: React.FC<SaebModalProps> = ({
                                     required
                                     value={formData.proficienciaMat}
                                     onChange={handleChange}
-                                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-4 text-lg font-black text-slate-900 focus:border-orange-500 outline-none transition-all shadow-sm"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-black text-slate-900 focus:border-orange-500 outline-none transition-all shadow-sm"
                                 />
                             </div>
 
-                            <div className="space-y-3">
-                                <label className="text-[11px] font-black text-slate-500 uppercase block tracking-tighter flex justify-between">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase block tracking-tight flex justify-between">
                                     Nota Padronizada LP
                                     <span className="text-[9px] bg-indigo-100 text-indigo-600 px-1.5 rounded-md">Automático</span>
                                 </label>
@@ -312,12 +314,12 @@ export const SaebModal: React.FC<SaebModalProps> = ({
                                     name="notaPadronizadaLp"
                                     readOnly
                                     value={formData.notaPadronizadaLp}
-                                    className="w-full bg-slate-100 border-2 border-slate-200 rounded-2xl px-4 py-4 text-lg font-black text-slate-500 cursor-not-allowed outline-none transition-all shadow-sm"
+                                    className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-black text-slate-500 cursor-not-allowed outline-none transition-all shadow-sm"
                                 />
                             </div>
 
-                            <div className="space-y-3">
-                                <label className="text-[11px] font-black text-slate-500 uppercase block tracking-tighter flex justify-between">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase block tracking-tight flex justify-between">
                                     Nota Padronizada Matemática
                                     <span className="text-[9px] bg-indigo-100 text-indigo-600 px-1.5 rounded-md">Automático</span>
                                 </label>
@@ -327,12 +329,12 @@ export const SaebModal: React.FC<SaebModalProps> = ({
                                     name="notaPadronizadaMat"
                                     readOnly
                                     value={formData.notaPadronizadaMat}
-                                    className="w-full bg-slate-100 border-2 border-slate-200 rounded-2xl px-4 py-4 text-lg font-black text-slate-500 cursor-not-allowed outline-none transition-all shadow-sm"
+                                    className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-black text-slate-500 cursor-not-allowed outline-none transition-all shadow-sm"
                                 />
                             </div>
 
-                            <div className="space-y-3 md:col-span-2">
-                                <label className="text-[11px] font-black text-orange-600 uppercase block tracking-tighter flex justify-between">
+                            <div className="space-y-2 md:col-span-2">
+                                <label className="text-[10px] font-bold text-orange-600 uppercase block tracking-tight flex justify-between">
                                     Resultado SAEB (Nji)
                                     <span className="text-[9px] bg-orange-100 text-orange-600 px-1.5 rounded-md">Média das Notas Padronizadas</span>
                                 </label>
@@ -342,40 +344,40 @@ export const SaebModal: React.FC<SaebModalProps> = ({
                                     name="notaSaeb"
                                     readOnly
                                     value={formData.notaSaeb}
-                                    className="w-full bg-orange-50 border-2 border-orange-200 rounded-2xl px-4 py-4 text-3xl font-black text-orange-700 cursor-not-allowed outline-none transition-all shadow-md"
+                                    className="w-full bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 text-2xl font-black text-orange-700 cursor-not-allowed outline-none transition-all shadow-md"
                                 />
                             </div>
                         </div>
                     </div>
 
-                    <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-8">
+                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-5">
                         <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                            <Users className="w-5 h-5 text-orange-500" />
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Participação</h3>
+                            <Users className="w-4 h-4 text-orange-500" />
+                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Participação</h3>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-3">
-                                <label className="text-[11px] font-black text-slate-500 uppercase block tracking-tighter">Estudantes Previstos</label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase block tracking-tight">Estudantes Previstos</label>
                                 <input
                                     type="number"
                                     name="estudantesPrevistos"
                                     required
                                     value={formData.estudantesPrevistos}
                                     onChange={handleChange}
-                                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-4 text-lg font-black text-slate-900 focus:border-orange-500 outline-none transition-all shadow-sm"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-black text-slate-900 focus:border-orange-500 outline-none transition-all shadow-sm"
                                 />
                             </div>
 
-                            <div className="space-y-3">
-                                <label className="text-[11px] font-black text-slate-500 uppercase block tracking-tighter">Estudantes Avaliados</label>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase block tracking-tight">Estudantes Avaliados</label>
                                 <input
                                     type="number"
                                     name="estudantesAvaliados"
                                     required
                                     value={formData.estudantesAvaliados}
                                     onChange={handleChange}
-                                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-4 text-lg font-black text-slate-900 focus:border-orange-500 outline-none transition-all shadow-sm"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-black text-slate-900 focus:border-orange-500 outline-none transition-all shadow-sm"
                                 />
                             </div>
                         </div>

@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, Save, Trash2, Plus, TrendingUp } from 'lucide-react';
 import { Escola, RegistroIDEB } from '../../types';
+import { X, Save, Trash2, Plus, TrendingUp, ClipboardCheck } from 'lucide-react';
+import { Button } from '../ui/Button';
 
 interface IdebModalProps {
     isOpen: boolean;
@@ -61,14 +62,14 @@ export const IdebModal: React.FC<IdebModalProps> = ({ isOpen, onClose, escola, o
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
                 {/* Header */}
-                <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <div className="bg-slate-50 px-5 py-3 border-b border-slate-100 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center">
-                            <TrendingUp className="w-5 h-5 text-orange-600" />
+                        <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+                            <TrendingUp className="w-4 h-4 text-orange-600" />
                         </div>
                         <div>
-                            <h2 className="text-lg font-bold text-slate-800">Histórico IDEB</h2>
-                            <p className="text-sm text-slate-500">{escola.nome}</p>
+                            <h2 className="text-base font-bold text-slate-800">Histórico IDEB</h2>
+                            <p className="text-xs text-slate-500">{escola.nome}</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-lg transition-colors text-slate-500">
@@ -76,10 +77,10 @@ export const IdebModal: React.FC<IdebModalProps> = ({ isOpen, onClose, escola, o
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6">
+                <div className="flex-1 overflow-y-auto p-5">
                     {/* Form */}
-                    <form onSubmit={handleSubmit} className="bg-slate-50 p-6 rounded-xl border border-slate-200 mb-8">
-                        <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-4 flex items-center gap-2">
+                    <form onSubmit={handleSubmit} className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-5">
+                        <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wide mb-3 flex items-center gap-2">
                             {editingId ? 'Editar Registro' : 'Novo Registro'}
                         </h3>
 
@@ -130,21 +131,29 @@ export const IdebModal: React.FC<IdebModalProps> = ({ isOpen, onClose, escola, o
 
                         <div className="flex justify-end gap-2">
                             {editingId && (
-                                <button
+                                <Button
                                     type="button"
                                     onClick={handleCancelEdit}
-                                    className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-200 rounded-lg transition-colors"
+                                    variant="secondary"
+                                    size="sm"
                                 >
                                     Cancelar
-                                </button>
+                                </Button>
                             )}
-                            <button
+                            <Button
                                 type="submit"
-                                className="px-4 py-2 text-sm font-bold text-white bg-orange-600 hover:bg-orange-700 rounded-lg transition-colors flex items-center gap-2"
+                                variant="success" // Or primary, depending on consistency. Saeb uses success. Let's use primary for orange since Ideb header is orange-ish/main theme? Usually save is success. But IdebModal hardcoded orange-600.
+                                // Actually, let's stick to 'primary' (orange) or 'success' (green).
+                                // The raw button was bg-orange-600. So variant="primary" (orange gradient) is the best match.
+                                // Wait, the user prompt showed a GREEN button "SALVAR INFORMAÇÕES".
+                                // The other modals use variant="success" (emerald gradient now).
+                                // If I use variant="primary" it will be orange.
+                                // Ideb is an indicator. Maybe keep orange?
+                                // Let's use variant="primary" to match the orange theme of the clean button I replaced.
+                                icon={Save}
                             >
-                                <Save className="w-4 h-4" />
                                 {editingId ? 'Atualizar' : 'Salvar Registro'}
-                            </button>
+                            </Button>
                         </div>
                     </form>
 
