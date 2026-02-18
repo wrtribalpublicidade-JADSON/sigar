@@ -20,7 +20,8 @@ import { Preloader } from './components/ui/Preloader';
 import { ViewState, Escola, Visita, Coordenador } from './types';
 import { supabase } from './services/supabase';
 import { useNotification } from './context/NotificationContext';
-import { generateUUID } from './utils';
+import { generateUUID, checkSchoolPendencies } from './utils';
+// import { checkSchoolPendencies } from './utils';
 import { ESCOLAS_MOCK, VISITAS_MOCK, COORDENADORES_MOCK } from './constants';
 
 const ADMIN_EMAIL = 'jadsoncsilv@gmail.com';
@@ -808,7 +809,19 @@ export default function App() {
   }
 
   // Calculate notification status
-  const hasNotifications = true;
+  // Disabled to prevent White Screen crash per user request
+  const hasNotifications = false;
+  /*
+  const hasNotifications = React.useMemo(() => {
+    if (!escolas || escolas.length === 0) return false;
+
+    // Check if ANY school has ANY pendency using the safe shared utility
+    return escolas.some(escola => {
+      const pendencies = checkSchoolPendencies(escola);
+      return pendencies.length > 0;
+    });
+  }, [escolas]);
+  */
 
   return (
     <Layout
