@@ -237,15 +237,15 @@ export const FluenciaParcDashboard: React.FC<FluenciaParcDashboardProps> = ({ es
     }, [filteredRecords]);
 
     const renderGeral = () => (
-        <div className="space-y-8 animate-fade-in relative">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-4 gap-6">
+        <div className="space-y-6 animate-fade-in relative">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-4 gap-4">
                 {[
                     { label: 'Participação PARC', val: analysisData.kpis.pPart.toFixed(1) + '%', icon: Users, color: 'bg-slate-900', iconColor: 'text-brand-orange', count: analysisData.kpis.pres },
                     { label: 'Leitores Fluentes', val: analysisData.kpis.pFlu.toFixed(1) + '%', icon: GraduationCap, color: 'bg-brand-acid', iconColor: 'text-brand-black', count: analysisData.kpis.flu },
                     { label: 'Leitores Iniciantes', val: analysisData.kpis.pIni.toFixed(1) + '%', icon: BookOpen, color: 'bg-brand-orange', iconColor: 'text-white', count: analysisData.kpis.ini },
                     { label: 'Pré-Leitores', val: analysisData.kpis.pPre.toFixed(1) + '%', icon: UserX, color: 'bg-brand-signal', iconColor: 'text-white', count: analysisData.kpis.totalPre }
                 ].map((k, i) => (
-                    <div key={i} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 relative overflow-hidden group hover:shadow-lg transition-all duration-300">
+                    <div key={i} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 relative overflow-hidden group hover:shadow-lg transition-all duration-300">
                         {k.count !== undefined && (
                             <span className="absolute top-4 right-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-100 px-2 py-1 rounded-lg">
                                 {k.count} Alunos
@@ -260,15 +260,15 @@ export const FluenciaParcDashboard: React.FC<FluenciaParcDashboardProps> = ({ es
                 ))}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 2xl:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-                    <div className="flex items-center gap-3 mb-8 border-b border-slate-100 pb-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 2xl:grid-cols-3 gap-5">
+                <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+                    <div className="flex items-center gap-3 mb-6 border-b border-slate-100 pb-3">
                         <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
                             <Activity className="w-5 h-5 text-slate-600" />
                         </div>
                         <h3 className="font-bold text-slate-800 text-lg">Distribuição por Unidade (Volume Bruto)</h3>
                     </div>
-                    <div className="h-80">
+                    <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={chartData.volume}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -284,8 +284,8 @@ export const FluenciaParcDashboard: React.FC<FluenciaParcDashboardProps> = ({ es
                     </div>
                 </div>
 
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col items-center justify-center relative">
-                    <h3 className="font-bold text-slate-800 text-lg mb-8 w-full text-center">Status de Fluência / Global</h3>
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col items-center justify-center relative">
+                    <h3 className="font-bold text-slate-800 text-lg mb-6 w-full text-center">Status de Fluência / Global</h3>
                     <div className="h-64 w-full relative">
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
@@ -313,17 +313,17 @@ export const FluenciaParcDashboard: React.FC<FluenciaParcDashboardProps> = ({ es
     );
 
     const renderEvolucao = () => (
-        <div className="space-y-8 animate-fade-in relative">
+        <div className="space-y-6 animate-fade-in relative">
             <div className="card-technical p-1">
-                <div className="bg-white p-8">
-                    <div className="flex items-center gap-4 mb-10 text-brand-black">
-                        <TrendingUp className="w-10 h-10 text-brand-orange" strokeWidth={3} />
+                <div className="bg-white p-6">
+                    <div className="flex items-center gap-4 mb-6 text-brand-black">
+                        <TrendingUp className="w-8 h-8 text-brand-orange" strokeWidth={3} />
                         <div>
                             <h3 className="text-xl font-black uppercase tracking-tighter">Curva de Aprendizado / Fluência</h3>
                             <p className="text-[9px] text-brand-grey font-black uppercase tracking-widest mt-1">Comparativo entre entrada, monitoramento e saída</p>
                         </div>
                     </div>
-                    <div className="h-96">
+                    <div className="h-72">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={evolutionAnalysis.timelineData}>
                                 <CartesianGrid strokeDasharray="0" vertical={false} stroke="rgba(0,0,0,0.1)" />
@@ -340,13 +340,13 @@ export const FluenciaParcDashboard: React.FC<FluenciaParcDashboardProps> = ({ es
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="card-technical p-1">
-                    <div className="bg-slate-900 p-8 text-white h-full">
-                        <h4 className="font-black uppercase tracking-widest text-sm text-brand-orange mb-8">Delta de Evolução / Fluência</h4>
-                        <div className="flex justify-between items-center bg-white/5 p-6 border-2 border-white/10 shadow-sharp-white">
+                    <div className="bg-slate-900 p-6 text-white h-full">
+                        <h4 className="font-black uppercase tracking-widest text-sm text-brand-orange mb-6">Delta de Evolução / Fluência</h4>
+                        <div className="flex justify-between items-center bg-white/5 p-5 border-2 border-white/10 shadow-sharp-white">
                             <span className="text-[10px] font-black uppercase text-brand-grey">Crescimento Líquido</span>
-                            <span className={`text-4xl font-black ${evolutionAnalysis.deltaFlu >= 0 ? 'text-brand-acid' : 'text-brand-signal'}`}>
+                            <span className={`text-3xl font-black ${evolutionAnalysis.deltaFlu >= 0 ? 'text-brand-acid' : 'text-brand-signal'}`}>
                                 {evolutionAnalysis.deltaFlu > 0 ? '+' : ''}{evolutionAnalysis.deltaFlu.toFixed(1)}%
                             </span>
                         </div>
@@ -357,17 +357,17 @@ export const FluenciaParcDashboard: React.FC<FluenciaParcDashboardProps> = ({ es
                         <table className="w-full text-left text-xs uppercase">
                             <thead className="bg-slate-50 border-b-2 border-brand-black">
                                 <tr className="font-black text-brand-grey">
-                                    <th className="px-8 py-5">Period</th>
-                                    <th className="px-8 py-5 text-center bg-brand-orange/5">Alfabetizado</th>
-                                    <th className="px-8 py-5 text-right">Volume</th>
+                                    <th className="px-6 py-3">Period</th>
+                                    <th className="px-6 py-3 text-center bg-brand-orange/5">Alfabetizado</th>
+                                    <th className="px-6 py-3 text-right">Volume</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-brand-black/10">
                                 {evolutionAnalysis.timelineData.map((d, i) => (
                                     <tr key={i} className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-8 py-4 font-black">{d.display}</td>
-                                        <td className="px-8 py-4 text-center text-brand-orange font-black">{d.half}%</td>
-                                        <td className="px-8 py-4 text-right text-brand-grey">{d.total} PRS</td>
+                                        <td className="px-6 py-3 font-black">{d.display}</td>
+                                        <td className="px-6 py-3 text-center text-brand-orange font-black">{d.half}%</td>
+                                        <td className="px-6 py-3 text-right text-brand-grey">{d.total} PRS</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -379,7 +379,7 @@ export const FluenciaParcDashboard: React.FC<FluenciaParcDashboardProps> = ({ es
     );
 
     const renderTurmas = () => (
-        <div className="space-y-8 animate-fade-in relative">
+        <div className="space-y-6 animate-fade-in relative">
             <div className="card-technical p-1 overflow-hidden">
                 <div className="bg-slate-900 p-6 flex items-center justify-between border-b-2 border-brand-black">
                     <div className="flex items-center gap-3 text-white uppercase font-black tracking-widest text-sm">
@@ -391,26 +391,26 @@ export const FluenciaParcDashboard: React.FC<FluenciaParcDashboardProps> = ({ es
                     <table className="w-full text-left border-collapse">
                         <thead className="bg-slate-50 border-b-2 border-brand-black">
                             <tr className="text-[9px] font-black text-brand-grey uppercase tracking-widest">
-                                <th className="px-8 py-5">Unidade / Turma</th>
-                                <th className="px-6 py-5 text-center">POP</th>
-                                <th className="px-6 py-4 text-center bg-brand-acid/10">Fluente</th>
-                                <th className="px-6 py-4 text-center bg-brand-orange/10">Iniciante</th>
-                                <th className="px-6 py-4 text-center">Pré-Leitor</th>
-                                <th className="px-8 py-5 text-right bg-slate-900 text-white">Score Alfabet.</th>
+                                <th className="px-6 py-4">Unidade / Turma</th>
+                                <th className="px-4 py-4 text-center">POP</th>
+                                <th className="px-4 py-3 text-center bg-brand-acid/10">Fluente</th>
+                                <th className="px-4 py-3 text-center bg-brand-orange/10">Iniciante</th>
+                                <th className="px-4 py-3 text-center">Pré-Leitor</th>
+                                <th className="px-6 py-4 text-right bg-slate-900 text-white">Score Alfabet.</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-brand-black/10">
                             {classAnalysis.map((c, i) => (
                                 <tr key={i} className="group hover:bg-slate-50 transition-all text-xs uppercase">
-                                    <td className="px-8 py-6 font-black">
+                                    <td className="px-6 py-4 font-black">
                                         <div className="text-brand-black text-sm mb-1 line-clamp-1">{c.turma}</div>
                                         <div className="text-brand-grey text-[9px]">{c.escola}</div>
                                     </td>
-                                    <td className="px-6 py-6 text-center">{c.total}</td>
-                                    <td className="px-6 py-6 text-center font-black text-brand-acid">{c.pFlu}%</td>
-                                    <td className="px-6 py-6 text-center font-black text-brand-orange">{c.pIni}%</td>
-                                    <td className="px-6 py-6 text-center text-brand-grey">{c.pPre}%</td>
-                                    <td className="px-8 py-6 text-right bg-slate-900/5 font-black text-sm">{c.pAlfabet}%</td>
+                                    <td className="px-4 py-4 text-center">{c.total}</td>
+                                    <td className="px-4 py-4 text-center font-black text-brand-acid">{c.pFlu}%</td>
+                                    <td className="px-4 py-4 text-center font-black text-brand-orange">{c.pIni}%</td>
+                                    <td className="px-4 py-4 text-center text-brand-grey">{c.pPre}%</td>
+                                    <td className="px-6 py-4 text-right bg-slate-900/5 font-black text-sm">{c.pAlfabet}%</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -421,7 +421,7 @@ export const FluenciaParcDashboard: React.FC<FluenciaParcDashboardProps> = ({ es
     );
 
     return (
-        <div className="space-y-8 pb-20 animate-fade-in relative">
+        <div className="space-y-6 pb-12 animate-fade-in relative">
             <PageHeader
                 title="Análise PARC"
                 subtitle="Monitoramento de Fluência Leitora"
@@ -430,7 +430,7 @@ export const FluenciaParcDashboard: React.FC<FluenciaParcDashboardProps> = ({ es
                 actions={[]}
             />
 
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-2 mb-8 flex flex-wrap gap-2">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-6 flex flex-wrap gap-2">
                 {[
                     { id: 'GERAL', label: 'VISÃO GERAL', icon: Target },
                     { id: 'EVOLUCAO', label: 'EVOLUÇÃO', icon: HistoryIcon },
@@ -448,7 +448,7 @@ export const FluenciaParcDashboard: React.FC<FluenciaParcDashboardProps> = ({ es
             </div>
 
             {showFilters && (
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 2xl:grid-cols-7 gap-4 mb-8">
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 2xl:grid-cols-7 gap-3 mb-6">
                     {[
                         { label: 'Unidade', val: selectedEscola, set: setSelectedEscola, opts: filterOptions.escolas },
                         { label: 'Ano', val: selectedYear, set: (v: any) => setSelectedYear(Number(v)), opts: filterOptions.years },
@@ -472,7 +472,7 @@ export const FluenciaParcDashboard: React.FC<FluenciaParcDashboardProps> = ({ es
             )
             }
 
-            <div className="mt-12">
+            <div className="mt-8">
                 {activeTab === 'GERAL' && renderGeral()}
                 {activeTab === 'EVOLUCAO' && renderEvolucao()}
                 {activeTab === 'TURMAS' && renderTurmas()}

@@ -60,7 +60,7 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
     return (
       <div className="max-w-5xl 2xl:max-w-6xl mx-auto space-y-6 animate-fade-in">
         {/* Header */}
-        <div className="relative overflow-hidden bg-slate-900 rounded-2xl p-6 md:p-8 shadow-2xl">
+        <div className="relative overflow-hidden bg-slate-900 rounded-2xl p-4 md:p-5 shadow-2xl">
           <div className="absolute top-0 right-0 w-72 h-72 bg-orange-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
           <div className="relative z-10 flex items-center gap-4">
             <button onClick={() => setViewSummaryCoord(null)} className="p-2 bg-white/10 border border-white/20 rounded-xl hover:bg-white/20 transition text-white">
@@ -78,7 +78,7 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
 
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center gap-4">
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center gap-4">
             <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl flex items-center justify-center">
               <SchoolIcon className="w-6 h-6 text-orange-400" />
             </div>
@@ -87,7 +87,7 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
               <p className="text-3xl font-black text-slate-800">{escolasVinculadas.length}</p>
             </div>
           </div>
-          <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center gap-4">
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center gap-4">
             <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center">
               <AlertTriangle className="w-6 h-6 text-white" />
             </div>
@@ -96,7 +96,7 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
               <p className="text-3xl font-black text-red-600">{metasAtrasadas.length}</p>
             </div>
           </div>
-          <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center gap-4">
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center gap-4">
             <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
               <MapPin className="w-6 h-6 text-white" />
             </div>
@@ -109,7 +109,7 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
 
         {/* Indicators Card */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center gap-3">
+          <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-3">
             <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
               <TrendingUp className="w-4 h-4 text-orange-400" />
             </div>
@@ -154,7 +154,7 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
         {/* Delayed Goals */}
         {metasAtrasadas.length > 0 && (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-red-100 bg-red-50 flex items-center gap-3">
+            <div className="px-4 py-3 border-b border-red-100 bg-red-50 flex items-center gap-3">
               <div className="w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center">
                 <AlertTriangle className="w-4 h-4 text-white" />
               </div>
@@ -267,7 +267,7 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
   return (
     <div className="space-y-6 animate-fade-in relative">
       {/* Header */}
-      <div className="relative overflow-hidden bg-slate-900 rounded-2xl p-6 md:p-8 shadow-2xl">
+      <div className="relative overflow-hidden bg-slate-900 rounded-2xl p-4 md:p-5 shadow-2xl">
         <div className="absolute top-0 right-0 w-72 h-72 bg-orange-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-orange-500/10 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2" />
 

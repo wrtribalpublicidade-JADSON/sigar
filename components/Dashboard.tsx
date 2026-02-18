@@ -106,7 +106,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     <div className="space-y-8 animate-fade-in relative">
 
       {/* KPI Cards - Modern Soft */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {[
           { label: 'Total de Escolas', val: escolas.length, icon: School, color: 'bg-slate-900', iconColor: 'text-orange-400' },
           { label: 'IDEB Médio (5º Ano)', val: stats.avgIdebAI, icon: TrendingUp, color: 'bg-emerald-500', iconColor: 'text-white' },
@@ -114,29 +114,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
           { label: 'Metas Atrasadas', val: stats.metasAtrasadas, icon: AlertTriangle, color: 'bg-red-500', iconColor: 'text-white' },
           { label: 'Visitas Realizadas', val: stats.visitasRealizadas, icon: CheckCircle, color: 'bg-slate-900', iconColor: 'text-emerald-400' },
         ].map((kpi, idx) => (
-          <div key={idx} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 relative overflow-hidden group hover:shadow-lg transition-all duration-300">
+          <div key={idx} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 relative overflow-hidden group hover:shadow-md transition-all duration-300">
             <div className="flex items-center justify-between mb-4">
-              <div className={`w-12 h-12 ${kpi.color} rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300`}>
-                <kpi.icon className={`w-6 h-6 ${kpi.iconColor}`} />
+              <div className={`w-10 h-10 ${kpi.color} rounded-lg flex items-center justify-center shadow-md group-hover:scale-110 transition-transform duration-300`}>
+                <kpi.icon className={`w-5 h-5 ${kpi.iconColor}`} />
               </div>
             </div>
-            <p className="text-4xl font-black text-slate-800 tracking-tight">{kpi.val}</p>
+            <p className="text-3xl font-black text-slate-800 tracking-tight">{kpi.val}</p>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-2">{kpi.label}</p>
           </div>
         ))}
       </div>
 
       {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* IDEB Chart - Anos Iniciais */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
           <div className="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
             <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
               <TrendingUp className="w-5 h-5 text-orange-600" />
             </div>
             <h3 className="font-bold text-slate-800 text-lg">Ranking IDEB - 5º Ano (AI)</h3>
           </div>
-          <div className="h-96 overflow-hidden">
+          <div className="h-72 overflow-hidden">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartDataAI} layout="vertical" margin={{ left: 10, right: 30, top: 10, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
@@ -153,14 +153,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         {/* IDEB Chart - Anos Finais */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
           <div className="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
             <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
               <TrendingUp className="w-5 h-5 text-blue-600" />
             </div>
             <h3 className="font-bold text-slate-800 text-lg">Ranking IDEB - 9º Ano (AF)</h3>
           </div>
-          <div className="h-96 overflow-hidden">
+          <div className="h-72 overflow-hidden">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartDataAF} layout="vertical" margin={{ left: 10, right: 30, top: 10, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
@@ -179,7 +179,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* Quick Actions & Activity */}
       {/* Recent Activity */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
         <div className="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
           <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
             <ClipboardList className="w-5 h-5 text-slate-600" />

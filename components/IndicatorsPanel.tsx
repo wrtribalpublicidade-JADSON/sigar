@@ -270,16 +270,16 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, onUpd
                 <table className="w-full text-left border-collapse">
                     <thead className="bg-slate-50 border-b-2 border-brand-black">
                         <tr className="text-[9px] font-black text-brand-grey uppercase tracking-widest">
-                            <th className="px-8 py-5">Unidade Escolar</th>
+                            <th className="px-6 py-4">Unidade Escolar</th>
                             {activeTab === 'CENSO' && (
                                 <>
-                                    <th className="px-4 py-5 text-center">Matrícula Total</th>
-                                    <th className="px-4 py-5 text-center">Docentes</th>
-                                    <th className="px-4 py-5 text-center">Turmas</th>
+                                    <th className="px-4 py-4 text-center">Matrícula Total</th>
+                                    <th className="px-4 py-4 text-center">Docentes</th>
+                                    <th className="px-4 py-4 text-center">Turmas</th>
                                 </>
                             )}
                             {activeTab === 'SAMAHC' && (
-                                <th className="px-4 py-5 text-center bg-brand-orange/5">
+                                <th className="px-4 py-4 text-center bg-brand-orange/5">
                                     {samahcSubTab === 'SEAMA' && 'Simulado SEAMA'}
                                     {samahcSubTab === 'SAEB' && 'Simulado SAEB'}
                                     {samahcSubTab === 'FLUENCIA' && 'Fluência (%)'}
@@ -287,24 +287,24 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, onUpd
                                     {samahcSubTab === 'MATEMATICA' && 'Matemática'}
                                 </th>
                             )}
-                            {activeTab === 'PARC' && <th className="px-4 py-5 text-center bg-brand-orange/5 text-brand-orange">Último PARC (%)</th>}
-                            {activeTab === 'SAEB' && <th className="px-4 py-5 text-center">SAEB Score</th>}
-                            {activeTab === 'IDEB' && <th className="px-4 py-5 text-center">IDEB Rank</th>}
+                            {activeTab === 'PARC' && <th className="px-4 py-4 text-center bg-brand-orange/5 text-brand-orange">Último PARC (%)</th>}
+                            {activeTab === 'SAEB' && <th className="px-4 py-4 text-center">SAEB Score</th>}
+                            {activeTab === 'IDEB' && <th className="px-4 py-4 text-center">IDEB Rank</th>}
                             {activeTab === 'SEAMA' && (
                                 <>
-                                    <th className="px-4 py-5 text-center text-slate-900 bg-slate-100/30">Língua Portuguesa</th>
-                                    <th className="px-4 py-5 text-center text-slate-900 bg-slate-100/30">Matemática</th>
-                                    <th className="px-4 py-5 text-center bg-slate-900 text-white">Média Geral</th>
+                                    <th className="px-4 py-4 text-center text-slate-900 bg-slate-100/30">Língua Portuguesa</th>
+                                    <th className="px-4 py-4 text-center text-slate-900 bg-slate-100/30">Matemática</th>
+                                    <th className="px-4 py-4 text-center bg-slate-900 text-white">Média Geral</th>
                                 </>
                             )}
                             {activeTab === 'CNCA' && (
                                 <>
-                                    <th className="px-4 py-5 text-center">Diagnóstica (%)</th>
-                                    <th className="px-4 py-5 text-center">Formativa (%)</th>
-                                    <th className="px-4 py-5 text-center bg-brand-acid/10">Somativa (%)</th>
+                                    <th className="px-4 py-4 text-center">Diagnóstica (%)</th>
+                                    <th className="px-4 py-4 text-center">Formativa (%)</th>
+                                    <th className="px-4 py-4 text-center bg-brand-acid/10">Somativa (%)</th>
                                 </>
                             )}
-                            {activeTab === 'EI' && <th className="px-4 py-5 text-center text-brand-acid bg-slate-900">Desenv. EI (%)</th>}
+                            {activeTab === 'EI' && <th className="px-4 py-4 text-center text-brand-acid bg-slate-900">Desenv. EI (%)</th>}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-brand-black/10">
@@ -314,7 +314,7 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, onUpd
                                 className={`group hover:bg-slate-50 transition-all text-xs uppercase ${(activeTab === 'PARC' || activeTab === 'CNCA' || activeTab === 'SEAMA' || activeTab === 'SAEB' || activeTab === 'IDEB') ? 'cursor-pointer' : ''}`}
                                 onClick={() => handleSchoolClick(escola)}
                             >
-                                <td className="px-8 py-5">
+                                <td className="px-6 py-4">
                                     <div className="flex flex-col">
                                         <span className="font-black text-brand-black text-sm">{escola.nome}</span>
                                         {(activeTab === 'PARC' || activeTab === 'CNCA' || activeTab === 'SEAMA' || activeTab === 'SAEB' || activeTab === 'IDEB') && (
@@ -328,9 +328,9 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, onUpd
                                     const stats = calculateCensoStats(escola);
                                     return (
                                         <>
-                                            <td className="px-4 py-5 text-center font-black text-brand-black">{stats.matricula}</td>
-                                            <td className="px-4 py-5 text-center">{stats.docentes}</td>
-                                            <td className="px-4 py-5 text-center">{stats.turmas}</td>
+                                            <td className="px-4 py-4 text-center font-black text-brand-black">{stats.matricula}</td>
+                                            <td className="px-4 py-4 text-center">{stats.docentes}</td>
+                                            <td className="px-4 py-4 text-center">{stats.turmas}</td>
                                         </>
                                     );
                                 })()}
@@ -473,7 +473,7 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, onUpd
     };
 
     return (
-        <div className="space-y-8 pb-20 animate-fade-in relative">
+        <div className="space-y-6 pb-12 animate-fade-in relative">
             <PageHeader
                 title="Matriz de Indicadores"
                 subtitle="Monitoramento Institucional e Desempenho"
@@ -519,7 +519,7 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, onUpd
                                 <button
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
-                                    className={`flex items-center gap-2 px-6 py-4 text-sm font-bold whitespace-nowrap transition-all border-b-2 ${isActive ? 'border-orange-500 text-orange-600 bg-orange-50/10' : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100'}`}
+                                    className={`flex items-center gap-2 px-5 py-3 text-sm font-bold whitespace-nowrap transition-all border-b-2 ${isActive ? 'border-orange-500 text-orange-600 bg-orange-50/10' : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100'}`}
                                 >
                                     <Icon className={`w-4 h-4 ${isActive ? 'text-orange-500' : 'text-slate-400'}`} />
                                     <span>{tab.label}</span>

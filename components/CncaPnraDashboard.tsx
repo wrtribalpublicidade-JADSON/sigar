@@ -260,15 +260,15 @@ export const CncaPnraDashboard: React.FC<CncaPnraDashboardProps> = ({ escolas = 
     }, [filteredRecords]);
 
     const renderGeral = () => (
-        <div className="space-y-8 animate-fade-in relative">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-4 gap-6">
+        <div className="space-y-6 animate-fade-in relative">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-4 gap-4">
                 {[
                     { label: 'Participação', val: Math.round((analysisData.kpis.totalAval / (analysisData.kpis.totalPrev || 1)) * 100) + '%', icon: Users, color: 'bg-slate-900', iconColor: 'text-brand-orange', count: analysisData.kpis.totalAval },
                     { label: 'Aprendizado Adequado', val: analysisData.kpis.ade + '%', icon: GraduationCap, color: 'bg-brand-acid', iconColor: 'text-brand-black', count: analysisData.kpis.adeCount },
                     { label: 'I. Intermediário', val: analysisData.kpis.int + '%', icon: BookOpen, color: 'bg-brand-orange', iconColor: 'text-white', count: analysisData.kpis.intCount },
                     { label: 'Defasagem', val: analysisData.kpis.def + '%', icon: UserX, color: 'bg-brand-signal', iconColor: 'text-white', count: analysisData.kpis.defCount }
                 ].map((k, i) => (
-                    <div key={i} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 relative overflow-hidden group hover:shadow-lg transition-all duration-300">
+                    <div key={i} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 relative overflow-hidden group hover:shadow-lg transition-all duration-300">
                         {k.count !== undefined && (
                             <span className="absolute top-4 right-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-100 px-2 py-1 rounded-lg">
                                 {k.count} Alunos
@@ -283,15 +283,15 @@ export const CncaPnraDashboard: React.FC<CncaPnraDashboardProps> = ({ escolas = 
                 ))}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 2xl:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-                    <div className="flex items-center gap-3 mb-8 border-b border-slate-100 pb-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 2xl:grid-cols-3 gap-5">
+                <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+                    <div className="flex items-center gap-3 mb-6 border-b border-slate-100 pb-3">
                         <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
                             <Activity className="w-5 h-5 text-slate-600" />
                         </div>
                         <h3 className="font-bold text-slate-800 text-lg">Desempenho Médio por Escola (%)</h3>
                     </div>
-                    <div className="h-80">
+                    <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={chartData.volume}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -307,8 +307,8 @@ export const CncaPnraDashboard: React.FC<CncaPnraDashboardProps> = ({ escolas = 
                     </div>
                 </div>
 
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col items-center justify-center relative">
-                    <h3 className="font-bold text-slate-800 text-lg mb-8 w-full text-center">Composição de Aprendizado</h3>
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col items-center justify-center relative">
+                    <h3 className="font-bold text-slate-800 text-lg mb-6 w-full text-center">Composição de Aprendizado</h3>
                     <div className="h-64 w-full relative">
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
@@ -344,23 +344,23 @@ export const CncaPnraDashboard: React.FC<CncaPnraDashboardProps> = ({ escolas = 
                     <table className="w-full text-left border-collapse">
                         <thead className="bg-slate-50 border-b-2 border-brand-black">
                             <tr className="text-[10px] font-black uppercase tracking-widest text-brand-grey">
-                                <th className="px-8 py-4">Pos</th>
-                                <th className="px-8 py-4 text-left">Unidade Escolar</th>
-                                <th className="px-6 py-4 text-center bg-brand-orange/10">Adequado</th>
-                                <th className="px-6 py-4 text-center">Intermediário</th>
-                                <th className="px-4 py-4 text-center">Defasagem</th>
-                                <th className="px-8 py-4 text-right">Particip.</th>
+                                <th className="px-6 py-3">Pos</th>
+                                <th className="px-6 py-3 text-left">Unidade Escolar</th>
+                                <th className="px-4 py-3 text-center bg-brand-orange/10">Adequado</th>
+                                <th className="px-4 py-3 text-center">Intermediário</th>
+                                <th className="px-4 py-3 text-center">Defasagem</th>
+                                <th className="px-6 py-3 text-right">Particip.</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-brand-black/10">
                             {ranking.map((s, idx) => (
                                 <tr key={idx} className="group hover:bg-slate-50 transition-all text-xs uppercase">
-                                    <td className="px-8 py-5"><span className={`inline-flex w-8 h-8 items-center justify-center font-black border-2 border-brand-black ${idx === 0 ? 'bg-brand-acid text-brand-black' : idx === 1 ? 'bg-slate-200' : idx === 2 ? 'bg-brand-orange text-white' : 'bg-white'}`}>{idx + 1}</span></td>
-                                    <td className="px-8 py-5 font-black text-brand-black">{s.name}</td>
-                                    <td className="px-6 py-5 text-center bg-brand-orange/[0.02] text-sm font-black text-brand-orange">{s.ade}%</td>
-                                    <td className="px-6 py-5 text-center">{s.int}%</td>
-                                    <td className="px-4 py-5 text-center text-brand-signal">{s.def}%</td>
-                                    <td className="px-8 py-5 text-right text-brand-grey font-bold">{s.aval} / {s.prev}</td>
+                                    <td className="px-6 py-4"><span className={`inline-flex w-8 h-8 items-center justify-center font-black border-2 border-brand-black ${idx === 0 ? 'bg-brand-acid text-brand-black' : idx === 1 ? 'bg-slate-200' : idx === 2 ? 'bg-brand-orange text-white' : 'bg-white'}`}>{idx + 1}</span></td>
+                                    <td className="px-6 py-4 font-black text-brand-black">{s.name}</td>
+                                    <td className="px-4 py-4 text-center bg-brand-orange/[0.02] text-sm font-black text-brand-orange">{s.ade}%</td>
+                                    <td className="px-4 py-4 text-center">{s.int}%</td>
+                                    <td className="px-4 py-4 text-center text-brand-signal">{s.def}%</td>
+                                    <td className="px-6 py-4 text-right text-brand-grey font-bold">{s.aval} / {s.prev}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -371,17 +371,17 @@ export const CncaPnraDashboard: React.FC<CncaPnraDashboardProps> = ({ escolas = 
     );
 
     const renderEvolucao = () => (
-        <div className="space-y-8 animate-fade-in relative">
+        <div className="space-y-6 animate-fade-in relative">
             <div className="card-technical p-1">
-                <div className="bg-white p-8">
-                    <div className="flex items-center gap-4 mb-10 text-brand-black">
-                        <TrendingUp className="w-10 h-10 text-brand-orange" strokeWidth={3} />
+                <div className="bg-white p-6">
+                    <div className="flex items-center gap-4 mb-6 text-brand-black">
+                        <TrendingUp className="w-8 h-8 text-brand-orange" strokeWidth={3} />
                         <div>
                             <h3 className="text-xl font-black uppercase tracking-tighter">Tendência Histórica de Aprendizado</h3>
                             <p className="text-[9px] text-brand-grey font-black uppercase tracking-widest mt-1">Diagnóstica ➔ Formativa ➔ Somativa</p>
                         </div>
                     </div>
-                    <div className="h-96">
+                    <div className="h-72">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={evolutionAnalysis.timelineData}>
                                 <CartesianGrid strokeDasharray="0" vertical={false} stroke="rgba(0,0,0,0.1)" />
@@ -401,7 +401,7 @@ export const CncaPnraDashboard: React.FC<CncaPnraDashboardProps> = ({ escolas = 
     );
 
     const renderTurmas = () => (
-        <div className="space-y-8 animate-fade-in relative">
+        <div className="space-y-6 animate-fade-in relative">
             <div className="card-technical p-1 overflow-hidden">
                 <div className="bg-slate-900 p-6 flex items-center justify-between border-b-2 border-brand-black">
                     <div className="flex items-center gap-3 text-white uppercase font-black tracking-widest text-sm">
@@ -413,26 +413,26 @@ export const CncaPnraDashboard: React.FC<CncaPnraDashboardProps> = ({ escolas = 
                     <table className="w-full text-left border-collapse">
                         <thead className="bg-slate-50 border-b-2 border-brand-black">
                             <tr className="text-[9px] font-black text-brand-grey uppercase tracking-widest">
-                                <th className="px-8 py-5">Unidade / Turma / Componente</th>
-                                <th className="px-6 py-5 text-center">PRS</th>
-                                <th className="px-6 py-4 text-center bg-brand-acid/10">Adequado</th>
-                                <th className="px-6 py-4 text-center bg-brand-orange/10">Interméd.</th>
-                                <th className="px-6 py-4 text-center">Defasagem</th>
-                                <th className="px-8 py-5 text-right bg-slate-900 text-white">Indice</th>
+                                <th className="px-6 py-4">Unidade / Turma / Componente</th>
+                                <th className="px-4 py-4 text-center">PRS</th>
+                                <th className="px-4 py-3 text-center bg-brand-acid/10">Adequado</th>
+                                <th className="px-4 py-3 text-center bg-brand-orange/10">Interméd.</th>
+                                <th className="px-4 py-3 text-center">Defasagem</th>
+                                <th className="px-6 py-4 text-right bg-slate-900 text-white">Indice</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-brand-black/10">
                             {classAnalysis.map((c, i) => (
                                 <tr key={i} className="group hover:bg-slate-50 transition-all text-xs uppercase">
-                                    <td className="px-8 py-6 font-black">
+                                    <td className="px-6 py-4 font-black">
                                         <div className="text-brand-black text-sm mb-1">{c.label}</div>
                                         <div className="text-brand-grey text-[9px]">{c.escola}</div>
                                     </td>
-                                    <td className="px-6 py-6 text-center">{c.aval}</td>
-                                    <td className="px-6 py-6 text-center font-black text-brand-acid">{c.pAde}%</td>
-                                    <td className="px-6 py-6 text-center font-black text-brand-orange">{c.pInt}%</td>
-                                    <td className="px-6 py-6 text-center text-brand-grey">{c.pDef}%</td>
-                                    <td className="px-8 py-6 text-right font-black text-sm">{c.pAde}%</td>
+                                    <td className="px-4 py-4 text-center">{c.aval}</td>
+                                    <td className="px-4 py-4 text-center font-black text-brand-acid">{c.pAde}%</td>
+                                    <td className="px-4 py-4 text-center font-black text-brand-orange">{c.pInt}%</td>
+                                    <td className="px-4 py-4 text-center text-brand-grey">{c.pDef}%</td>
+                                    <td className="px-6 py-4 text-right font-black text-sm">{c.pAde}%</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -445,7 +445,7 @@ export const CncaPnraDashboard: React.FC<CncaPnraDashboardProps> = ({ escolas = 
     const donut = chartData.donut;
 
     return (
-        <div className="space-y-8 pb-20 animate-fade-in relative">
+        <div className="space-y-6 pb-12 animate-fade-in relative">
             <PageHeader
                 title="Análise CNCA"
                 subtitle="Monitoramento Institucional Qualitativo"
@@ -454,7 +454,7 @@ export const CncaPnraDashboard: React.FC<CncaPnraDashboardProps> = ({ escolas = 
                 actions={[]}
             />
 
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-2 mb-8 flex flex-wrap gap-2">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-6 flex flex-wrap gap-2">
                 {[
                     { id: 'GERAL', label: 'VISÃO GERAL', icon: Target },
                     { id: 'EVOLUCAO', label: 'EVOLUÇÃO', icon: HistoryIcon },
@@ -472,7 +472,7 @@ export const CncaPnraDashboard: React.FC<CncaPnraDashboardProps> = ({ escolas = 
             </div>
 
             {showFilters && (
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-8 gap-4 mb-8">
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-8 gap-3 mb-6">
                     {[
                         { label: 'Unidade', val: selectedEscola, set: setSelectedEscola, opts: filterOptions.escolas },
                         { label: 'Ano', val: selectedYear, set: (v: any) => setSelectedYear(Number(v)), opts: filterOptions.years },
@@ -497,7 +497,7 @@ export const CncaPnraDashboard: React.FC<CncaPnraDashboardProps> = ({ escolas = 
             )
             }
 
-            <div className="mt-12">
+            <div className="mt-8">
                 {activeTab === 'GERAL' && renderGeral()}
                 {activeTab === 'EVOLUCAO' && renderEvolucao()}
                 {activeTab === 'TURMAS' && renderTurmas()}

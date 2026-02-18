@@ -247,7 +247,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
   };
 
   return (
-    <div className="space-y-8 animate-fade-in pb-20 relative">
+    <div className="space-y-6 animate-fade-in pb-12 relative">
       <PageHeader
         title={escola.nome}
         subtitle="Unidade Escolar do Sistema Municipal"
@@ -257,9 +257,9 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
         onBack={onBack}
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+          <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center">
             <Users size={24} />
           </div>
           <div>
@@ -267,8 +267,8 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
             <p className="font-bold text-slate-800">{escola.gestor}</p>
           </div>
         </div>
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center">
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+          <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center">
             <MapPin size={24} />
           </div>
           <div>
@@ -276,8 +276,8 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
             <p className="font-bold text-slate-800">{escola.localizacao}</p>
           </div>
         </div>
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+          <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
             <Activity size={24} />
           </div>
           <div>
@@ -298,21 +298,21 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`px-4 py-2 text-sm font-bold flex items-center gap-2 rounded-lg transition-all ${activeTab === tab.id ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500 hover:bg-white/50 hover:text-slate-700'}`}
+            className={`px-3 py-1.5 text-xs font-bold flex items-center gap-2 rounded-lg transition-all ${activeTab === tab.id ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500 hover:bg-white/50 hover:text-slate-700'}`}
           >
             <tab.icon className="w-4 h-4" /> {tab.label}
           </button>
         ))}
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-[600px] max-w-full">
-        <div className="p-8 md:p-12">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-[400px] max-w-full">
+        <div className="p-5 md:p-6">
 
 
           {
             activeTab === 'acompanhamento' && (
-              <div className="space-y-8 animate-fade-in">
-                <div className="flex justify-between items-center pb-6 border-b border-slate-100">
+              <div className="space-y-6 animate-fade-in">
+                <div className="flex justify-between items-center pb-5 border-b border-slate-100">
                   <div>
                     <h3 className="text-xl font-bold text-slate-800">Checklist de Verificação</h3>
                     <p className="text-sm text-slate-500 mt-1">Status: Monitoramento Mensal</p>
@@ -321,7 +321,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                     <Save size={18} /> Salvar Registros
                   </button>
                 </div>
-                <div className="grid gap-6">
+                <div className="grid gap-5">
                   {['Gestão', 'Financeiro'].map(cat => {
                     const itens = localAcompanhamento.filter(i => i.categoria === cat);
                     return (
@@ -355,7 +355,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
 
           {
             activeTab === 'turmas' && (
-              <div className="space-y-8 animate-fade-in">
+              <div className="space-y-6 animate-fade-in">
                 <div className="flex justify-between items-start mb-2">
                   <div>
                     <h3 className="text-2xl font-bold text-slate-800">Alunos por Turmas</h3>
@@ -363,7 +363,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                   </div>
                   <button onClick={handleSaveIndicators} className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2"><Save size={18} /> Salvar Dados</button>
                 </div>
-                <div className="space-y-10">
+                <div className="space-y-8">
                   {['infantil', 'fundamental'].map(seg => (
                     <div key={seg} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
                       <div className="bg-gradient-to-r from-slate-800 to-slate-900 px-6 py-4 text-center">

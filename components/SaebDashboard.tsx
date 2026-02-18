@@ -233,15 +233,15 @@ export const SaebDashboard: React.FC<SaebDashboardProps> = ({ escolas = [] }) =>
     }, [allRecords, selectedPolo, selectedEscola, selectedComponente, selectedSerie]);
 
     const renderGeral = () => (
-        <div className="space-y-8 animate-fade-in relative">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-4 gap-6">
+        <div className="space-y-6 animate-fade-in relative">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-4 gap-4">
                 {[
                     { label: 'Participação SAEB', val: Math.round((analysisData.totalAval / (analysisData.totalPrev || 1)) * 100) + '%', icon: Users, color: 'bg-slate-900', iconColor: 'text-brand-orange', count: analysisData.totalAval },
                     { label: 'Nota SAEB Média', val: analysisData.notaSaebMedia, icon: Target, color: 'bg-slate-900', iconColor: 'text-brand-orange', count: analysisData.totalAval },
                     { label: 'Proficiência (Pro+Ava)', val: analysisData.proficiencia + '%', icon: Award, color: 'bg-brand-acid', iconColor: 'text-brand-black', count: analysisData.proCount + analysisData.avaCount },
                     { label: 'Insuficiente (Alerta)', val: analysisData.ins + '%', icon: UserX, color: 'bg-brand-signal', iconColor: 'text-white', count: analysisData.insCount },
                 ].map((k, i) => (
-                    <div key={i} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 relative overflow-hidden group hover:shadow-lg transition-all duration-300">
+                    <div key={i} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 relative overflow-hidden group hover:shadow-lg transition-all duration-300">
                         {k.count !== undefined && (
                             <span className="absolute top-4 right-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-100 px-2 py-1 rounded-lg">
                                 {k.count} Alunos
@@ -256,15 +256,15 @@ export const SaebDashboard: React.FC<SaebDashboardProps> = ({ escolas = [] }) =>
                 ))}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 2xl:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 2xl:grid-cols-3 gap-5">
+                <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
                     <div className="flex items-center gap-3 mb-8 border-b border-slate-100 pb-4">
                         <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
                             <Activity className="w-5 h-5 text-slate-600" />
                         </div>
                         <h3 className="font-bold text-slate-800 text-lg">Distribuição SAEB por Unidade (%)</h3>
                     </div>
-                    <div className="h-80">
+                    <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={chartData.barData.slice(0, 10)}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -281,7 +281,7 @@ export const SaebDashboard: React.FC<SaebDashboardProps> = ({ escolas = [] }) =>
                     </div>
                 </div>
 
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col items-center justify-center relative">
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col items-center justify-center relative">
                     <h3 className="font-bold text-slate-800 text-lg mb-8 w-full text-center">Composição Nacional SAEB</h3>
                     <div className="h-64 w-full relative">
                         <ResponsiveContainer width="100%" height="100%">
@@ -310,8 +310,8 @@ export const SaebDashboard: React.FC<SaebDashboardProps> = ({ escolas = [] }) =>
     );
 
     const renderEvolucao = () => (
-        <div className="space-y-8 animate-fade-in relative">
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+        <div className="space-y-6 animate-fade-in relative">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
                 <div className="flex items-center gap-4 mb-10">
                     <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center">
                         <TrendingUp className="w-6 h-6 text-orange-500" />
@@ -321,7 +321,7 @@ export const SaebDashboard: React.FC<SaebDashboardProps> = ({ escolas = [] }) =>
                         <p className="text-xs text-slate-400 font-medium uppercase tracking-wider mt-1">Comparativo entre edições do SAEB</p>
                     </div>
                 </div>
-                <div className="h-96 w-full">
+                <div className="h-72 w-full">
                     <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={evolutionData}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -337,7 +337,7 @@ export const SaebDashboard: React.FC<SaebDashboardProps> = ({ escolas = [] }) =>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="bg-slate-50 p-6 flex items-center gap-3 border-b border-slate-100">
+                <div className="bg-slate-50 p-4 flex items-center gap-3 border-b border-slate-100">
                     <Target className="w-5 h-5 text-orange-500" />
                     <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide">Matriz Cronológica SAEB</h3>
                 </div>
@@ -345,23 +345,23 @@ export const SaebDashboard: React.FC<SaebDashboardProps> = ({ escolas = [] }) =>
                     <table className="w-full text-left">
                         <thead className="bg-slate-50 border-b border-slate-200">
                             <tr className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                <th className="px-8 py-4 text-center">Edição</th>
-                                <th className="px-8 py-4 text-center text-slate-700">Nota Média</th>
-                                <th className="px-8 py-4 text-center text-slate-700">Avançado</th>
-                                <th className="px-8 py-4 text-center text-slate-700">Proficiente</th>
-                                <th className="px-8 py-4 text-center text-red-500">Insuficiente</th>
-                                <th className="px-8 py-4 text-right">% Proficiência</th>
+                                <th className="px-6 py-3 text-center">Edição</th>
+                                <th className="px-6 py-3 text-center text-slate-700">Nota Média</th>
+                                <th className="px-6 py-3 text-center text-slate-700">Avançado</th>
+                                <th className="px-6 py-3 text-center text-slate-700">Proficiente</th>
+                                <th className="px-6 py-3 text-center text-red-500">Insuficiente</th>
+                                <th className="px-6 py-3 text-right">% Proficiência</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {evolutionData.map((d, idx) => (
                                 <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                                    <td className="px-8 py-4 font-bold text-slate-700 text-center">{d.year}</td>
-                                    <td className="px-8 py-4 text-center font-bold text-orange-500 bg-orange-50/50 text-sm">{d.notaSaebMedia}</td>
-                                    <td className="px-8 py-4 text-center text-xs font-medium text-slate-600">{d.avançado}%</td>
-                                    <td className="px-8 py-4 text-center text-xs font-medium text-slate-600">{d.proficiente}%</td>
-                                    <td className="px-8 py-4 text-center text-xs font-medium text-red-500">{d.insuficiente}%</td>
-                                    <td className="px-8 py-4 text-right">
+                                    <td className="px-6 py-3 font-bold text-slate-700 text-center">{d.year}</td>
+                                    <td className="px-6 py-3 text-center font-bold text-orange-500 bg-orange-50/50 text-sm">{d.notaSaebMedia}</td>
+                                    <td className="px-6 py-3 text-center text-xs font-medium text-slate-600">{d.avançado}%</td>
+                                    <td className="px-6 py-3 text-center text-xs font-medium text-slate-600">{d.proficiente}%</td>
+                                    <td className="px-6 py-3 text-center text-xs font-medium text-red-500">{d.insuficiente}%</td>
+                                    <td className="px-6 py-3 text-right">
                                         <span className="font-bold text-slate-800 text-sm">{d.proficiencia}%</span>
                                     </td>
                                 </tr>
@@ -374,9 +374,9 @@ export const SaebDashboard: React.FC<SaebDashboardProps> = ({ escolas = [] }) =>
     );
 
     const renderRanking = () => (
-        <div className="space-y-8 animate-fade-in relative">
+        <div className="space-y-6 animate-fade-in relative">
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="bg-slate-50 p-6 flex items-center justify-between border-b border-slate-100">
+                <div className="bg-slate-50 p-4 flex items-center justify-between border-b border-slate-100">
                     <div className="flex items-center gap-3">
                         <Award className="w-6 h-6 text-orange-500" />
                         <div className="text-slate-800 uppercase font-bold text-sm">
@@ -388,33 +388,33 @@ export const SaebDashboard: React.FC<SaebDashboardProps> = ({ escolas = [] }) =>
                     <table className="w-full text-left border-collapse">
                         <thead className="bg-slate-50 border-b border-slate-200">
                             <tr className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                <th className="px-8 py-4">Pos</th>
-                                <th className="px-8 py-4 text-left">Unidade</th>
-                                <th className="px-6 py-4 text-center bg-orange-50/50 text-slate-700">Score SAEB</th>
-                                <th className="px-6 py-4 text-center text-slate-700">Pad. LP</th>
-                                <th className="px-6 py-4 text-center text-slate-700">Pad. MAT</th>
-                                <th className="px-6 py-4 text-center text-slate-700">Prof %</th>
-                                <th className="px-8 py-4 text-right">Status Part.</th>
+                                <th className="px-6 py-3">Pos</th>
+                                <th className="px-6 py-3 text-left">Unidade</th>
+                                <th className="px-4 py-3 text-center bg-orange-50/50 text-slate-700">Score SAEB</th>
+                                <th className="px-4 py-3 text-center text-slate-700">Pad. LP</th>
+                                <th className="px-4 py-3 text-center text-slate-700">Pad. MAT</th>
+                                <th className="px-4 py-3 text-center text-slate-700">Prof %</th>
+                                <th className="px-6 py-3 text-right">Status Part.</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {ranking.map((s, idx) => (
                                 <tr key={idx} className="group hover:bg-slate-50 transition-all duration-200">
-                                    <td className="px-8 py-4">
+                                    <td className="px-6 py-3">
                                         <span className={`inline-flex w-8 h-8 items-center justify-center font-bold text-xs rounded-full ${idx === 0 ? 'bg-yellow-100 text-yellow-700' : idx === 1 ? 'bg-slate-100 text-slate-600' : idx === 2 ? 'bg-orange-100 text-orange-700' : 'bg-slate-50 text-slate-500'}`}>
                                             {idx + 1}
                                         </span>
                                     </td>
-                                    <td className="px-8 py-4">
+                                    <td className="px-6 py-3">
                                         <div className="font-medium text-slate-800 text-sm group-hover:text-orange-600 transition-colors">{s.name}</div>
                                     </td>
-                                    <td className="px-6 py-4 text-center bg-orange-50/30">
+                                    <td className="px-4 py-3 text-center bg-orange-50/30">
                                         <span className="text-lg font-bold text-orange-500">{s.geralMedia}</span>
                                     </td>
-                                    <td className="px-6 py-4 text-center text-xs font-medium text-slate-500 group-hover:text-slate-800">{s.lpMedia}</td>
-                                    <td className="px-6 py-4 text-center text-xs font-medium text-slate-500 group-hover:text-slate-800">{s.matMedia}</td>
-                                    <td className="px-6 py-4 text-center font-bold text-slate-600">{s.totalProf}%</td>
-                                    <td className="px-8 py-4 text-right">
+                                    <td className="px-4 py-3 text-center text-xs font-medium text-slate-500 group-hover:text-slate-800">{s.lpMedia}</td>
+                                    <td className="px-4 py-3 text-center text-xs font-medium text-slate-500 group-hover:text-slate-800">{s.matMedia}</td>
+                                    <td className="px-4 py-3 text-center font-bold text-slate-600">{s.totalProf}%</td>
+                                    <td className="px-6 py-3 text-right">
                                         <div className="flex flex-col items-end">
                                             <span className="font-bold text-slate-700">{s.aval} / {s.prev}</span>
                                             <span className="text-[10px] font-bold text-slate-400 mt-0.5">{Math.round((s.aval / (s.prev || 1)) * 100)}% Presença</span>
@@ -430,7 +430,7 @@ export const SaebDashboard: React.FC<SaebDashboardProps> = ({ escolas = [] }) =>
     );
 
     return (
-        <div className="space-y-8 pb-20 animate-fade-in relative">
+        <div className="space-y-6 pb-12 animate-fade-in relative">
             <PageHeader
                 title="Sistema de Avaliação da Educação Básica"
                 subtitle="Resultados e Metas por Escola"
@@ -439,7 +439,7 @@ export const SaebDashboard: React.FC<SaebDashboardProps> = ({ escolas = [] }) =>
                 actions={[]}
             />
 
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-2 mb-8 flex flex-wrap gap-2">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-6 flex flex-wrap gap-2">
                 {[
                     { id: 'GERAL', label: 'VISÃO GERAL', icon: Target },
                     { id: 'EVOLUCAO', label: 'EVOLUÇÃO', icon: HistoryIcon },
@@ -457,7 +457,7 @@ export const SaebDashboard: React.FC<SaebDashboardProps> = ({ escolas = [] }) =>
             </div>
 
             {showFilters && (
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-7 gap-4 mb-8">
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-7 gap-3 mb-6">
                     {[
                         { label: 'Unidade', val: selectedEscola, set: setSelectedEscola, opts: filterOptions.escolas },
                         { label: 'Ano', val: selectedYear, set: (v: any) => setSelectedYear(Number(v)), opts: filterOptions.years },
@@ -481,7 +481,7 @@ export const SaebDashboard: React.FC<SaebDashboardProps> = ({ escolas = [] }) =>
             )
             }
 
-            <div className="mt-12">
+            <div className="mt-8">
                 {activeTab === 'GERAL' && renderGeral()}
                 {activeTab === 'EVOLUCAO' && renderEvolucao()}
                 {activeTab === 'RANKING' && renderRanking()}

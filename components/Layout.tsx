@@ -34,7 +34,7 @@ export const Layout: React.FC<LayoutProps> = ({
       />
 
       {/* Main Content */}
-      <main className="flex-1 p-4 md:p-8 lg:p-12 3xl:p-16 pt-20 md:pt-12 overflow-y-auto h-full selection:bg-brand-orange selection:text-white">
+      <main className="flex-1 p-4 md:p-6 lg:p-8 pt-16 md:pt-6 overflow-y-auto h-full selection:bg-brand-orange selection:text-white">
         <div className="max-w-[1600px] 2xl:max-w-[1900px] 3xl:max-w-[2400px] mx-auto animate-fade-in relative z-10">
           {children}
         </div>

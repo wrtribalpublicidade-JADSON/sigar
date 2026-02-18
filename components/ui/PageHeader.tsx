@@ -31,7 +31,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
     rightContent,
 }) => {
     return (
-        <div className="relative overflow-hidden bg-slate-900 rounded-2xl p-4 md:p-6 shadow-2xl animate-fade-in mb-8 max-w-full">
+        <div className="relative overflow-hidden bg-slate-900 rounded-2xl p-4 md:p-5 shadow-2xl animate-fade-in mb-6 max-w-full">
             {/* Orbital Effects */}
             <div className="absolute top-0 right-0 w-72 h-72 bg-orange-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
             <div className="absolute bottom-0 left-0 w-48 h-48 bg-orange-500/10 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2" />
@@ -60,7 +60,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
                                 </span>
                             )}
                         </div>
-                        <h2 className="text-3xl 3xl:text-4xl font-black text-white leading-tight">{title}</h2>
+                        <h2 className="text-2xl 3xl:text-3xl font-black text-white leading-tight">{title}</h2>
                         {subtitle && <p className="text-slate-400 text-sm mt-1">{subtitle}</p>}
                     </div>
                 </div>
