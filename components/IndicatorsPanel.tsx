@@ -292,9 +292,12 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, onUpd
                             {activeTab === 'IDEB' && <th className="px-4 py-4 text-center">IDEB Rank</th>}
                             {activeTab === 'SEAMA' && (
                                 <>
-                                    <th className="px-4 py-4 text-center text-slate-900 bg-slate-100/30">Língua Portuguesa</th>
-                                    <th className="px-4 py-4 text-center text-slate-900 bg-slate-100/30">Matemática</th>
-                                    <th className="px-4 py-4 text-center bg-slate-900 text-white">Média Geral</th>
+                                    <th className="px-2 py-4 text-center bg-indigo-50/50 text-indigo-900 border-r border-indigo-100">2º LP</th>
+                                    <th className="px-2 py-4 text-center bg-indigo-50/50 text-indigo-900 border-r border-slate-200">2º MAT</th>
+                                    <th className="px-2 py-4 text-center bg-emerald-50/50 text-emerald-900 border-r border-emerald-100">5º LP</th>
+                                    <th className="px-2 py-4 text-center bg-emerald-50/50 text-emerald-900 border-r border-slate-200">5º MAT</th>
+                                    <th className="px-2 py-4 text-center bg-amber-50/50 text-amber-900 border-r border-amber-100">9º LP</th>
+                                    <th className="px-2 py-4 text-center bg-amber-50/50 text-amber-900">9º MAT</th>
                                 </>
                             )}
                             {activeTab === 'CNCA' && (
@@ -385,22 +388,28 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, onUpd
                                     <>
                                         {(() => {
                                             const regs = escola.dadosEducacionais?.registrosSEAMA || [];
-                                            const maxYear = regs.length > 0 ? Math.max(...regs.map(r => r.ano)) : null;
-                                            const latestRegs = maxYear ? regs.filter(r => r.ano === maxYear) : [];
-                                            const getAvgForComp = (comp: string) => {
-                                                const compRegs = latestRegs.filter(r => r.componenteCurricular === comp);
-                                                if (compRegs.length === 0) return 0;
-                                                const sum = compRegs.reduce((acc, r) => acc + (r.proficienciaMedia || 0), 0);
-                                                return Number((sum / compRegs.length).toFixed(1));
+
+                                            // Helper to get value for specific grade and subject
+                                            const getItem = (serie: string, comp: string) => {
+                                                // Filter records for this series and component
+                                                const specificRegs = regs.filter(r => r.anoSerie === serie && r.componenteCurricular === comp);
+                                                if (specificRegs.length === 0) return '-';
+
+                                                // Get the latest one (by year)
+                                                const latest = specificRegs.sort((a, b) => b.ano - a.ano)[0];
+                                                return latest.proficienciaMedia || '-';
                                             };
-                                            const lp = getAvgForComp('Língua Portuguesa');
-                                            const mat = getAvgForComp('Matemática');
-                                            const mediaGeral = Number(((lp + mat) / (lp > 0 && mat > 0 ? 2 : 1)).toFixed(1));
+
                                             return (
                                                 <>
-                                                    <td className="px-4 py-5 text-center font-bold text-slate-600">{lp || '-'}</td>
-                                                    <td className="px-4 py-5 text-center font-bold text-slate-600">{mat || '-'}</td>
-                                                    <td className="px-4 py-5 text-center font-black text-sm bg-slate-900 text-white">{mediaGeral || '-'}</td>
+                                                    <td className="px-2 py-5 text-center font-bold text-slate-700 bg-indigo-50/10 border-r border-indigo-50">{getItem('2º ANO', 'Língua Portuguesa')}</td>
+                                                    <td className="px-2 py-5 text-center font-bold text-slate-700 bg-indigo-50/10 border-r border-slate-200">{getItem('2º ANO', 'Matemática')}</td>
+
+                                                    <td className="px-2 py-5 text-center font-bold text-slate-700 bg-emerald-50/10 border-r border-emerald-50">{getItem('5º ANO', 'Língua Portuguesa')}</td>
+                                                    <td className="px-2 py-5 text-center font-bold text-slate-700 bg-emerald-50/10 border-r border-slate-200">{getItem('5º ANO', 'Matemática')}</td>
+
+                                                    <td className="px-2 py-5 text-center font-bold text-slate-700 bg-amber-50/10 border-r border-amber-50">{getItem('9º ANO', 'Língua Portuguesa')}</td>
+                                                    <td className="px-2 py-5 text-center font-bold text-slate-700 bg-amber-50/10">{getItem('9º ANO', 'Matemática')}</td>
                                                 </>
                                             );
                                         })()}
@@ -422,7 +431,7 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, onUpd
                         ))}
                     </tbody>
                 </table>
-            </div>
+            </div >
         );
     };
 

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { PageHeader } from './ui/PageHeader';
 import { ChevronDown } from 'lucide-react';
-import { Escola, RegistroSEAMA } from '../types';
+import { Escola, RegistroSEAMA, Segmento } from '../types';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
     PieChart, Pie, Cell, Line, LineChart
@@ -38,10 +38,16 @@ export const SeamaDashboard: React.FC<SeamaDashboardProps> = ({ escolas = [] }) 
     const [selectedSerie, setSelectedSerie] = useState<string>('Todas');
     const [showFilters, setShowFilters] = useState(true);
 
+    // Filter out schools that are exclusively Educação Infantil
+    // Those schools do not participate in SEAMA assessment
+    const filteredEscolas = useMemo(() => {
+        return escolas?.filter(e => e.segmentos?.some(s => s !== Segmento.INFANTIL)) || [];
+    }, [escolas]);
+
     // Consolidar registros
     const allRecords = useMemo(() => {
         const records: any[] = [];
-        escolas?.forEach(escola => {
+        filteredEscolas.forEach(escola => {
             escola?.dadosEducacionais?.registrosSEAMA?.forEach(reg => {
                 records.push({
                     ...reg,
