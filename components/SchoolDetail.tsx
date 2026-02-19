@@ -15,7 +15,7 @@ import {
 import { generateUUID } from '../utils';
 import { generateAcompanhamentoMensal } from '../constants';
 import { Button } from './ui/Button';
-import { Escola, Visita, DadosEducacionais, ItemAcompanhamento, RecursoHumano, MetaAcao, StatusMeta, Coordenador } from '../types';
+import { Escola, Visita, DadosEducacionais, ItemAcompanhamento, RecursoHumano, MetaAcao, StatusMeta, Coordenador, Segmento } from '../types';
 
 interface SchoolDetailProps {
   escola: Escola;
@@ -364,7 +364,19 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                   <button onClick={handleSaveIndicators} className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2"><Save size={18} /> Salvar Dados</button>
                 </div>
                 <div className="space-y-8">
-                  {['infantil', 'fundamental'].map(seg => (
+                  {['infantil', 'fundamental'].filter(seg => {
+                    if (seg === 'fundamental') {
+                      // Se a escola for EXCLUSIVAMENTE Infantil, não mostra fundamental
+                      const isExclusivelyInfantil = escola.segmentos.every(s => s === Segmento.INFANTIL) && escola.segmentos.length > 0;
+                      return !isExclusivelyInfantil;
+                    }
+                    if (seg === 'infantil') {
+                      // Se a escola for EXCLUSIVAMENTE Fundamental (I ou II), não mostra infantil
+                      const isExclusivelyFundamental = escola.segmentos.every(s => s === Segmento.FUNDAMENTAL_I || s === Segmento.FUNDAMENTAL_II) && escola.segmentos.length > 0;
+                      return !isExclusivelyFundamental;
+                    }
+                    return true;
+                  }).map(seg => (
                     <div key={seg} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
                       <div className="bg-gradient-to-r from-slate-800 to-slate-900 px-6 py-4 text-center">
                         <h4 className="text-white font-bold text-sm uppercase tracking-widest">{seg === 'infantil' ? 'Educação Infantil' : 'Ensino Fundamental'}</h4>
