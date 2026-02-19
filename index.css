@@ -144,26 +144,40 @@
 @media print {
   @page {
     size: A4 portrait;
-    margin: 8mm 15mm 12mm 15mm;
+    margin: 15mm 15mm 20mm 15mm;
   }
 
-  /* Hide everything except the print report */
-  body * {
-    visibility: hidden !important;
-  }
-
-  #print-report,
-  #print-report * {
-    visibility: visible !important;
-  }
-
-  #print-report {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
-    width: 100% !important;
-    padding: 0 !important;
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
     margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Hide the main app root */
+  #root {
+    display: none !important;
+  }
+
+  /* Ensure body is visible for the portal */
+  body {
+    visibility: visible !important;
+    background: white !important;
+  }
+
+  /* Show the print report portal */
+  #print-report {
+    display: block !important;
+    visibility: visible !important;
+    position: relative !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    top: auto !important;
+    left: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
     background: white !important;
     color: #1e293b !important;
     font-family: 'Inter', 'Segoe UI', system-ui, sans-serif !important;
@@ -171,6 +185,7 @@
     line-height: 1.5 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    z-index: 9999;
   }
 
   /* Force hide UI elements */
@@ -216,12 +231,27 @@
     font-size: 9pt !important;
   }
 
+  #print-report thead {
+    display: table-header-group !important;
+  }
+
+  #print-report tbody {
+    display: table-row-group !important;
+  }
+
+  #print-report tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
   #print-report thead th {
     background-color: #f1f5f9 !important;
     font-weight: 700 !important;
     text-transform: uppercase !important;
     font-size: 7pt !important;
     letter-spacing: 0.05em !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   /* Signature block spacing */

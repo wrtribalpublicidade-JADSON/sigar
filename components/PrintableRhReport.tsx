@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { Escola, Coordenador, RecursoHumano } from '../types';
 
 interface PrintableRhReportProps {
@@ -14,7 +15,7 @@ export const PrintableRhReport: React.FC<PrintableRhReportProps> = ({ escola, co
     // Agrupar por função ou vínculo se necessário, mas por enquanto lista simples
     const servidores = escola.recursosHumanos || [];
 
-    return (
+    return createPortal(
         <div id="print-report" className="hidden print:block bg-white text-slate-900" style={{ fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif" }}>
 
             {/* ====== INSTITUTIONAL HEADER ====== */}
@@ -74,7 +75,7 @@ export const PrintableRhReport: React.FC<PrintableRhReportProps> = ({ escola, co
             </div>
 
             {/* ====== LIST OF SERVERS ====== */}
-            <div className="print-avoid-break" style={{ marginBottom: '10pt' }}>
+            <div style={{ marginBottom: '10pt' }}>
                 <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', background: '#0f172a', color: '#fff', padding: '5pt 10pt' }}>
                     Relação Nominal de Servidores
                 </div>
@@ -144,6 +145,7 @@ export const PrintableRhReport: React.FC<PrintableRhReportProps> = ({ escola, co
                 <span>SIGAR • Sistema Integrado de Gestão</span>
                 <span>{escola.nome}</span>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
