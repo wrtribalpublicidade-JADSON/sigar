@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { PageHeader } from './ui/PageHeader';
 import { Escola, RegistroFluenciaPARC } from '../types';
 import {
@@ -65,7 +65,7 @@ export const FluenciaParcDashboard: React.FC<FluenciaParcDashboardProps> = ({ es
         const types = Array.from(new Set(allRecords.map(r => r.tipoTurma))).sort();
 
         return {
-            years: years.length > 0 ? years : [2024, 2025],
+            years: years.length > 0 ? years : [new Date().getFullYear(), new Date().getFullYear() - 1],
             polos: ['Todos', ...polos],
             escolas: ['Todas', ...names],
             localidades: ['Todas', 'Sede', 'Zona Rural'],
@@ -73,6 +73,12 @@ export const FluenciaParcDashboard: React.FC<FluenciaParcDashboardProps> = ({ es
             tiposTurma: ['Todos', ...types]
         };
     }, [allRecords]);
+
+    useEffect(() => {
+        if (filterOptions.years.length > 0 && !filterOptions.years.includes(selectedYear)) {
+            setSelectedYear(filterOptions.years[0]);
+        }
+    }, [filterOptions.years, selectedYear]);
 
     // Filtragem
     const filteredRecords = useMemo(() => {

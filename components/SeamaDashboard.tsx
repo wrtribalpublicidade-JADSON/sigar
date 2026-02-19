@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { PageHeader } from './ui/PageHeader';
 import { ChevronDown } from 'lucide-react';
 import { Escola, RegistroSEAMA, Segmento } from '../types';
@@ -82,11 +82,11 @@ export const SeamaDashboard: React.FC<SeamaDashboardProps> = ({ escolas = [] }) 
     }, [allRecords]);
 
     // Ajuste de ano inicial se não houver dados para o ano atual
-    useState(() => {
+    useEffect(() => {
         if (filterOptions.years.length > 0 && !filterOptions.years.includes(selectedYear)) {
             setSelectedYear(filterOptions.years[0]);
         }
-    });
+    }, [filterOptions.years, selectedYear]);
 
     // Filtragem
     const filteredRecords = useMemo(() => {
