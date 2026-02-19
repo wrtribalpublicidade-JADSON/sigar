@@ -84,22 +84,76 @@ const countTotalStudents = (detalhada: any): number => {
   return total;
 };
 
+// Helper to safely sum classes from deep structure
+const countTotalClasses = (detalhada: any): number => {
+  if (!detalhada) return 0;
+  let total = 0;
+
+  // Helper to extract numbers from DadosTurno
+  const sumTurnos = (dados: any) => {
+    if (!dados || typeof dados !== 'object') return 0;
+    // Check if it has 'turmas' property (for DadosNivel) otherwise assume dados is turmas
+    const target = dados.turmas || dados;
+    return (Number(target.integral) || 0) +
+      (Number(target.manha) || 0) +
+      (Number(target.tarde) || 0) +
+      (Number(target.noite) || 0);
+  };
+
+  try {
+    // Traverse 'infantil'
+    if (detalhada.infantil && typeof detalhada.infantil === 'object') {
+      Object.values(detalhada.infantil).forEach((nivel: any) => {
+        total += sumTurnos(nivel);
+      });
+    }
+    // Traverse 'fundamental'
+    if (detalhada.fundamental && typeof detalhada.fundamental === 'object') {
+      Object.values(detalhada.fundamental).forEach((nivel: any) => {
+        total += sumTurnos(nivel);
+      });
+    }
+  } catch (e) {
+    console.warn("Error calculating detailed classes:", e);
+  }
+  return total;
+};
+
 export const checkSchoolPendencies = (escola: Escola) => {
   const pendencies: { type: PendencyType; label: string; severity: 'critical' | 'warning' }[] = [];
 
   if (!escola) return [];
 
   try {
-    // 1. Matrícula Total
+    // 1. Matrícula (Alunos)
     // Check main field first, then calculate detail if needed (though structure suggests censoEscolar is the source of truth for total)
-    const hasMatricula = (escola.dadosEducacionais?.censoEscolar?.matriculaTotal || 0) > 0;
+    const hasCensoMatricula = (escola.dadosEducacionais?.censoEscolar?.matriculaTotal || 0) > 0;
+    const hasSummaryMatricula = (escola.dadosEducacionais?.matricula && (
+      (escola.dadosEducacionais.matricula.infantil || 0) +
+      (escola.dadosEducacionais.matricula.anosIniciais || 0) +
+      (escola.dadosEducacionais.matricula.anosFinais || 0) +
+      (escola.dadosEducacionais.matricula.eja || 0)
+    ) > 0);
+    const hasDetailedMatricula = countTotalStudents(escola.dadosEducacionais?.matriculaDetalhada) > 0;
+
+    // If ANY source has students, it's not pending
+    const hasMatricula = hasCensoMatricula || hasSummaryMatricula || hasDetailedMatricula;
 
     if (!hasMatricula) {
       pendencies.push({ type: 'MATRICULA', label: 'Matrícula total não informada', severity: 'critical' });
     }
 
     // 2. Turmas
-    const hasTurmas = (escola.dadosEducacionais?.censoEscolar?.turmas || 0) > 0;
+    const hasCensoTurmas = (escola.dadosEducacionais?.censoEscolar?.turmas || 0) > 0;
+    const hasSummaryTurmas = (escola.dadosEducacionais?.turmas && (
+      (escola.dadosEducacionais.turmas.manha || 0) +
+      (escola.dadosEducacionais.turmas.tarde || 0) +
+      (escola.dadosEducacionais.turmas.noite || 0)
+    ) > 0);
+    const hasDetailedTurmas = countTotalClasses(escola.dadosEducacionais?.matriculaDetalhada) > 0;
+
+    // If ANY source has classes, it's not pending
+    const hasTurmas = hasCensoTurmas || hasSummaryTurmas || hasDetailedTurmas;
 
     if (!hasTurmas) {
       pendencies.push({ type: 'TURMAS', label: 'Quantitativo de turmas pendente', severity: 'critical' });
