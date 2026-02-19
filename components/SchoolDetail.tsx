@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { ArrowLeft, Target, TrendingUp, History, FileText, Save, Users, Calculator, Briefcase, Plus, Trash2, Edit, ClipboardCheck, AlertCircle, AlertTriangle, CheckCircle2, School as SchoolIcon, LayoutDashboard, GraduationCap, Clock, Activity, Award, BookOpen, UserPlus, X, MapPin, ChevronRight, CheckSquare, Printer } from 'lucide-react';
 import { PageHeader } from './ui/PageHeader';
 import { PrintableVisitReport } from './PrintableVisitReport';
+import { PrintableRhReport } from './PrintableRhReport';
 import {
   BarChart,
   Bar,
@@ -49,6 +50,16 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
       window.print();
       setSelectedVisitForPrint(null);
     }, 100);
+  };
+
+  const [isPrintingRh, setIsPrintingRh] = useState(false);
+
+  const handlePrintRh = () => {
+    setIsPrintingRh(true);
+    setTimeout(() => {
+      window.print();
+      setIsPrintingRh(false);
+    }, 500);
   };
 
   const initialAcompanhamento = useMemo(() => {
@@ -427,7 +438,16 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                     <h3 className="text-2xl font-bold text-slate-800">Recursos Humanos</h3>
                     <p className="text-slate-500 text-sm mt-1">Gestão de servidores da unidade escolar.</p>
                   </div>
-                  {!isAddingRh && <button onClick={() => setIsAddingRh(true)} className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2"><UserPlus size={18} /> Adicionar Servidor</button>}
+                  {!isAddingRh && (
+                    <div className="flex gap-2">
+                      <button onClick={handlePrintRh} className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl font-semibold shadow-sm transition-all flex items-center gap-2">
+                        <Printer size={18} /> Imprimir Relatório
+                      </button>
+                      <button onClick={() => setIsAddingRh(true)} className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2">
+                        <UserPlus size={18} /> Adicionar Servidor
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Summary badges */}
@@ -721,6 +741,13 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
           }
         </div>
       </div>
+
+      {isPrintingRh && (
+        <PrintableRhReport
+          escola={escola}
+          coordenador={regionalCoordinator}
+        />
+      )}
     </div>
   );
 };
