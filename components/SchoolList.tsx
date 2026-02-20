@@ -315,10 +315,43 @@ export const SchoolList: React.FC<SchoolListProps> = ({ escolas, onSelectEscola,
                 <div className="w-10 h-10 bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl flex items-center justify-center text-orange-400 font-bold text-lg shadow-md">
                   {escola.nome.charAt(0)}
                 </div>
-                <div className="text-right">
-                  <div className={`px-2 py-1 rounded-lg text-xs font-bold ${escola.indicadores.ideb >= 5.5 ? 'bg-emerald-100 text-emerald-700' : escola.indicadores.ideb >= 4.5 ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'}`}>
-                    IDEB {escola.indicadores.ideb > 0 ? escola.indicadores.ideb.toFixed(1) : '-'}
-                  </div>
+                <div className="text-right flex items-center justify-end gap-2">
+                  {(() => {
+                    const regs = escola.dadosEducacionais?.registrosIDEB || [];
+                    const latest = [...regs].sort((a, b) => b.ano - a.ano)[0];
+                    if (!latest) {
+                      return (
+                        <div className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                          IDEB -
+                        </div>
+                      );
+                    }
+                    return (
+                      <>
+                        {latest.anosIniciais > 0 && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] text-slate-400 font-bold uppercase">IDEB 5º ANO</span>
+                            <span className={`inline-flex px-1.5 py-0.5 font-black text-[10px] border rounded ${latest.anosIniciais >= 4.5 ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                              {latest.anosIniciais.toFixed(1)}
+                            </span>
+                          </div>
+                        )}
+                        {latest.anosFinais > 0 && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] text-slate-400 font-bold uppercase">IDEB 9º ANO</span>
+                            <span className={`inline-flex px-1.5 py-0.5 font-black text-[10px] border rounded ${latest.anosFinais >= 4.5 ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                              {latest.anosFinais.toFixed(1)}
+                            </span>
+                          </div>
+                        )}
+                        {latest.anosIniciais <= 0 && latest.anosFinais <= 0 && (
+                          <div className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                            IDEB -
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
               <h3 className="text-base font-bold text-slate-800 leading-tight mb-2 group-hover:text-orange-600 transition-colors line-clamp-2 min-h-[2.5rem]">{escola.nome}</h3>
