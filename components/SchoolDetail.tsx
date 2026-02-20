@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ArrowLeft, Target, TrendingUp, History, FileText, Save, Users, Calculator, Briefcase, Plus, Trash2, Edit, ClipboardCheck, AlertCircle, AlertTriangle, CheckCircle2, School as SchoolIcon, LayoutDashboard, GraduationCap, Clock, Activity, Award, BookOpen, UserPlus, X, MapPin, ChevronRight, CheckSquare, Printer } from 'lucide-react';
 import { PageHeader } from './ui/PageHeader';
 import { PrintableVisitReport } from './PrintableVisitReport';
@@ -63,13 +63,32 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
   };
 
   const initialAcompanhamento = useMemo(() => {
+    const template = generateAcompanhamentoMensal();
     if (escola.acompanhamentoMensal && escola.acompanhamentoMensal.length > 0) {
-      return escola.acompanhamentoMensal;
+      const savedMap = new Map(escola.acompanhamentoMensal.map(item => [item.pergunta, item]));
+
+      return template.map(templateItem => {
+        const savedItem = savedMap.get(templateItem.pergunta);
+        if (savedItem) {
+          return {
+            ...templateItem,
+            id: savedItem.id,
+            resposta: savedItem.resposta,
+            observacao: savedItem.observacao
+          };
+        }
+        return templateItem;
+      });
     }
-    return generateAcompanhamentoMensal();
-  }, [escola.id]);
+    return template;
+  }, [escola.id, escola.acompanhamentoMensal]);
 
   const [localAcompanhamento, setLocalAcompanhamento] = useState<ItemAcompanhamento[]>(initialAcompanhamento);
+
+  useEffect(() => {
+    setLocalAcompanhamento(initialAcompanhamento);
+  }, [initialAcompanhamento]);
+
   const [isAddingRh, setIsAddingRh] = useState(false);
   const [editingRhId, setEditingRhId] = useState<string | null>(null);
   const [rhForm, setRhForm] = useState<RecursoHumano>({

@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { PageHeader } from './ui/PageHeader';
 import { ChevronDown } from 'lucide-react';
-import { Escola, RegistroSEAMA, Segmento } from '../types';
+import { Escola, RegistroSEAMA, Segmento, Coordenador } from '../types';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
     PieChart, Pie, Cell, Line, LineChart
@@ -14,6 +14,7 @@ import {
 
 interface SeamaDashboardProps {
     escolas: Escola[];
+    coordenadores: Coordenador[];
 }
 
 const COLORS = {
@@ -25,7 +26,7 @@ const COLORS = {
 
 type TabType = 'GERAL' | 'EVOLUCAO' | 'RANKING';
 
-export const SeamaDashboard: React.FC<SeamaDashboardProps> = ({ escolas = [] }) => {
+export const SeamaDashboard: React.FC<SeamaDashboardProps> = ({ escolas = [], coordenadores = [] }) => {
     const [activeTab, setActiveTab] = useState<TabType>('GERAL');
 
     // Filtros
@@ -48,18 +49,21 @@ export const SeamaDashboard: React.FC<SeamaDashboardProps> = ({ escolas = [] }) 
     const allRecords = useMemo(() => {
         const records: any[] = [];
         filteredEscolas.forEach(escola => {
+            const coord = coordenadores.find(c => c.escolasIds.includes(escola.id));
+            const coordenadorNome = coord ? coord.nome : 'NÃO TEM';
+
             escola?.dadosEducacionais?.registrosSEAMA?.forEach(reg => {
                 records.push({
                     ...reg,
                     escolaNome: escola.nome || 'Escola sem nome',
                     localizacao: escola.localizacao || 'N/A',
-                    coordenadorEscola: escola.coordenador || 'N/A',
+                    coordenadorEscola: coordenadorNome,
                     polo: (escola as any).polo || 'N/A' // Fallback se polo não existir no tipo base
                 });
             });
         });
         return records;
-    }, [escolas]);
+    }, [filteredEscolas, coordenadores]);
 
     // Opções de filtro
     const filterOptions = useMemo(() => {

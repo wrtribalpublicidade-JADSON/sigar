@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { PageHeader } from './ui/PageHeader';
-import { Escola, RegistroCNCA } from '../types';
+import { Escola, RegistroCNCA, Coordenador } from '../types';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
     PieChart, Pie, Cell, ComposedChart, Line, LineChart
@@ -13,6 +13,7 @@ import {
 
 interface CncaPnraDashboardProps {
     escolas: Escola[];
+    coordenadores: Coordenador[];
 }
 
 const COLORS = {
@@ -23,7 +24,7 @@ const COLORS = {
 
 type TabType = 'GERAL' | 'EVOLUCAO' | 'TURMAS';
 
-export const CncaPnraDashboard: React.FC<CncaPnraDashboardProps> = ({ escolas = [] }) => {
+export const CncaPnraDashboard: React.FC<CncaPnraDashboardProps> = ({ escolas = [], coordenadores = [] }) => {
     const [activeTab, setActiveTab] = useState<TabType>('GERAL');
 
     // Filtros
@@ -42,17 +43,20 @@ export const CncaPnraDashboard: React.FC<CncaPnraDashboardProps> = ({ escolas = 
     const allRecords = useMemo(() => {
         const records: any[] = [];
         escolas?.forEach(escola => {
+            const coord = coordenadores.find(c => c.escolasIds.includes(escola.id));
+            const coordenadorNome = coord ? coord.nome : 'NÃO TEM';
+
             escola?.dadosEducacionais?.registrosCNCA?.forEach(reg => {
                 records.push({
                     ...reg,
                     escolaNome: escola.nome || 'Escola sem nome',
                     localizacao: escola.localizacao || 'N/A',
-                    coordenadorEscola: escola.coordenador || 'N/A'
+                    coordenadorEscola: coordenadorNome
                 });
             });
         });
         return records;
-    }, [escolas]);
+    }, [escolas, coordenadores]);
 
     // Opções de filtro
     const filterOptions = useMemo(() => {

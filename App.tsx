@@ -784,24 +784,28 @@ export default function App() {
         return (
           <FluenciaParcDashboard
             escolas={escolas}
+            coordenadores={coordenadores}
           />
         );
       case 'ANALISE_CNCA_PNRA':
         return (
           <CncaPnraDashboard
             escolas={escolas}
+            coordenadores={coordenadores}
           />
         );
       case 'ANALISE_SEAMA':
         return (
           <SeamaDashboard
             escolas={escolas}
+            coordenadores={coordenadores}
           />
         );
       case 'ANALISE_SAEB':
         return (
           <SaebDashboard
             escolas={escolas}
+            coordenadores={coordenadores}
           />
         );
       case 'NOTIFICACOES':
