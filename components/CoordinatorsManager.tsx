@@ -5,7 +5,7 @@ import {
   Save, X, ClipboardList, ArrowLeft, AlertTriangle, CheckCircle,
   TrendingUp, BookOpen, Target, ShieldCheck, User, Download, Users
 } from 'lucide-react';
-import { exportToCSV } from '../utils';
+import { exportToCSV, checkSchoolPendencies } from '../utils';
 import { ConfirmModal } from './ui/ConfirmModal';
 
 interface CoordinatorsManagerProps {
@@ -45,11 +45,17 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); if (formData) { onSave(formData); setIsEditing(false); setFormData(null); } };
   const confirmDelete = () => { if (deleteConfirmationId) { onDelete(deleteConfirmationId); setDeleteConfirmationId(null); } };
   const handleExport = () => {
-    const dataToExport = coordenadores.map(c => ({
-      NOME: c.nome, EMAIL: c.contato, FUNCAO: c.funcao || 'Coordenador Regional', REGIAO: c.regiao,
-      QTD_ESCOLAS: c.escolasIds.length,
-      ESCOLAS_VINCULADAS: escolas.filter(e => c.escolasIds.includes(e.id)).map(e => e.nome).join(', ')
-    }));
+    const dataToExport = coordenadores.map(c => {
+      const escolasDoCoord = escolas.filter(e => c.escolasIds.includes(e.id));
+      const totalPendencias = escolasDoCoord.reduce((sum, escola) => sum + checkSchoolPendencies(escola).length, 0);
+
+      return {
+        NOME: c.nome, EMAIL: c.contato, FUNCAO: c.funcao || 'Coordenador Regional', REGIAO: c.regiao,
+        QTD_ESCOLAS: c.escolasIds.length,
+        PENDENCIAS: totalPendencias,
+        ESCOLAS_VINCULADAS: escolasDoCoord.map(e => e.nome).join(', ')
+      };
+    });
     exportToCSV(dataToExport, 'lista_usuarios_sistema');
   };
 
@@ -305,59 +311,69 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
                 <th className="px-6 py-4 font-semibold">E-mail</th>
                 <th className="px-6 py-4 font-semibold">Função</th>
                 <th className="px-6 py-4 font-semibold">Região</th>
-                <th className="px-6 py-4 font-semibold">Escolas</th>
+                <th className="px-6 py-4 font-semibold text-center">Escolas</th>
+                <th className="px-6 py-4 font-semibold text-center">Pendências</th>
                 <th className="px-6 py-4 text-center font-semibold">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {coordenadores.map(coord => (
-                <tr key={coord.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center text-orange-400 font-bold shrink-0">
-                        {coord.nome.charAt(0)}
+              {coordenadores.map(coord => {
+                const escolasDoCoord = escolas.filter(e => coord.escolasIds.includes(e.id));
+                const totalPendencias = escolasDoCoord.reduce((sum, escola) => sum + checkSchoolPendencies(escola).length, 0);
+
+                return (
+                  <tr key={coord.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center text-orange-400 font-bold shrink-0">
+                          {coord.nome.charAt(0)}
+                        </div>
+                        <span className="font-bold text-slate-800">{coord.nome}</span>
                       </div>
-                      <span className="font-bold text-slate-800">{coord.nome}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 font-medium text-slate-500">
-                    <div className="flex items-center gap-1.5">
-                      <Mail className="w-3.5 h-3.5 text-slate-400" />{coord.contato}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${coord.funcao === 'Administrador' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'}`}>
-                      {coord.funcao === 'Administrador' && <ShieldCheck className="w-3 h-3 inline mr-1" />}{coord.funcao || 'Coordenador'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-1 text-slate-600">
-                      <MapPin className="w-3.5 h-3.5 text-slate-400" />{coord.regiao}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center">
-                        <SchoolIcon className="w-4 h-4 text-slate-500" />
+                    </td>
+                    <td className="px-6 py-4 font-medium text-slate-500">
+                      <div className="flex items-center gap-1.5">
+                        <Mail className="w-3.5 h-3.5 text-slate-400" />{coord.contato}
                       </div>
-                      <span className="font-bold text-slate-700">{coord.escolasIds.length}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex justify-center gap-1">
-                      <button onClick={() => handleViewSummary(coord)} className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition" title="Monitorar">
-                        <ClipboardList className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => handleEdit(coord)} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition" title="Editar">
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => setDeleteConfirmationId(coord.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="Remover">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${coord.funcao === 'Administrador' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'}`}>
+                        {coord.funcao === 'Administrador' && <ShieldCheck className="w-3 h-3 inline mr-1" />}{coord.funcao || 'Coordenador'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-1 text-slate-600">
+                        <MapPin className="w-3.5 h-3.5 text-slate-400" />{coord.regiao}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="font-bold text-slate-700 bg-slate-100 px-3 py-1 rounded-full">{coord.escolasIds.length}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-center gap-2">
+                        <span className={`font-bold px-3 py-1 rounded-full ${totalPendencias > 0 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                          {totalPendencias}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex justify-center gap-1">
+                        <button onClick={() => handleViewSummary(coord)} className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition" title="Monitorar">
+                          <ClipboardList className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => handleEdit(coord)} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition" title="Editar">
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => setDeleteConfirmationId(coord.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="Remover">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
