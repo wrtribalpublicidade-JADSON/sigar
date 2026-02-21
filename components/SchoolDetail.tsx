@@ -3,6 +3,7 @@ import { ArrowLeft, Target, TrendingUp, History, FileText, Save, Users, Calculat
 import { PageHeader } from './ui/PageHeader';
 import { PrintableVisitReport } from './PrintableVisitReport';
 import { PrintableRhReport } from './PrintableRhReport';
+import { PrintableChecklistReport } from './PrintableChecklistReport';
 import {
   BarChart,
   Bar,
@@ -59,6 +60,16 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
     setTimeout(() => {
       window.print();
       setIsPrintingRh(false);
+    }, 500);
+  };
+
+  const [isPrintingChecklist, setIsPrintingChecklist] = useState(false);
+
+  const handlePrintChecklist = () => {
+    setIsPrintingChecklist(true);
+    setTimeout(() => {
+      window.print();
+      setIsPrintingChecklist(false);
     }, 500);
   };
 
@@ -179,7 +190,20 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
   };
 
   const handleSaveAcompanhamento = () => {
+    const pendentesCount = localAcompanhamento.filter(i => !i.resposta).length;
+    if (pendentesCount > 0) {
+      alert(`Atenção: Existem ${pendentesCount} itens sem resposta. Por favor, preencha todos os itens antes de salvar.`);
+      return;
+    }
     onUpdate({ ...escola, acompanhamentoMensal: localAcompanhamento });
+  };
+
+  const handleClearAcompanhamento = () => {
+    if (confirm('Tem certeza que deseja apagar todos os registros do Checklist? Esta ação não pode ser desfeita.')) {
+      const emptyChecklist = generateAcompanhamentoMensal();
+      setLocalAcompanhamento(emptyChecklist);
+      onUpdate({ ...escola, acompanhamentoMensal: emptyChecklist });
+    }
   };
 
   const handleSaveMeta = () => {
@@ -340,47 +364,70 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
 
 
           {
-            activeTab === 'acompanhamento' && (
-              <div className="space-y-6 animate-fade-in">
-                <div className="flex justify-between items-center pb-5 border-b border-slate-100">
-                  <div>
-                    <h3 className="text-xl font-bold text-slate-800">Checklist de Verificação</h3>
-                    <p className="text-sm text-slate-500 mt-1">Status: Monitoramento Mensal</p>
+            activeTab === 'acompanhamento' && (() => {
+              const pendentesCount = localAcompanhamento.filter(i => !i.resposta).length;
+
+              return (
+                <div className="space-y-6 animate-fade-in">
+                  <div className="flex justify-between items-center pb-5 border-b border-slate-100">
+                    <div>
+                      <h3 className="text-xl font-bold text-slate-800">Checklist de Verificação</h3>
+                      <p className="text-sm text-slate-500 mt-1 flex items-center gap-2">
+                        Status: Monitoramento Mensal
+                        {pendentesCount > 0 ? (
+                          <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-md">
+                            {pendentesCount} itens pendentes
+                          </span>
+                        ) : (
+                          <span className="text-xs font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-md flex items-center gap-1">
+                            <CheckCircle2 size={12} /> Tudo preenchido
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <div className="flex gap-3">
+                      <button onClick={handleClearAcompanhamento} className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-4 py-2.5 rounded-xl font-semibold transition-all flex items-center gap-2">
+                        <Trash2 size={18} /> Apagar Registros
+                      </button>
+                      <button onClick={handlePrintChecklist} className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 px-4 py-2.5 rounded-xl font-semibold transition-all flex items-center gap-2">
+                        <Printer size={18} /> Imprimir Relatório
+                      </button>
+                      <button onClick={handleSaveAcompanhamento} className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2">
+                        <Save size={18} /> Salvar Registros
+                      </button>
+                    </div>
                   </div>
-                  <button onClick={handleSaveAcompanhamento} className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2">
-                    <Save size={18} /> Salvar Registros
-                  </button>
-                </div>
-                <div className="grid gap-5">
-                  {['Gestão', 'Financeiro'].map(cat => {
-                    const itens = localAcompanhamento.filter(i => i.categoria === cat);
-                    return (
-                      <div key={cat} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-                        <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 font-bold text-slate-700 flex justify-between items-center">
-                          <span>{cat}</span>
-                          <span className="text-xs font-normal text-slate-500 bg-slate-200 px-2 py-1 rounded-md">{itens.length} itens</span>
-                        </div>
-                        <div className="divide-y divide-slate-100">
-                          {itens.map(item => (
-                            <div key={item.id} className="p-6 flex flex-col md:flex-row gap-6 items-start hover:bg-slate-50/50 transition-colors">
-                              <div className="flex-1">
-                                <p className="text-sm font-medium text-slate-800 leading-relaxed mb-3">{item.pergunta}</p>
-                                <input type="text" placeholder="Adicionar observação..." value={item.observacao} onChange={e => handleAcompanhamentoChange(item.id, 'observacao', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all" />
+                  <div className="grid gap-5">
+                    {['Gestão', 'Financeiro'].map(cat => {
+                      const itens = localAcompanhamento.filter(i => i.categoria === cat);
+                      return (
+                        <div key={cat} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                          <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 font-bold text-slate-700 flex justify-between items-center">
+                            <span>{cat}</span>
+                            <span className="text-xs font-normal text-slate-500 bg-slate-200 px-2 py-1 rounded-md">{itens.length} itens</span>
+                          </div>
+                          <div className="divide-y divide-slate-100">
+                            {itens.map(item => (
+                              <div key={item.id} className="p-6 flex flex-col md:flex-row gap-6 items-start hover:bg-slate-50/50 transition-colors">
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-slate-800 leading-relaxed mb-3">{item.pergunta}</p>
+                                  <input type="text" placeholder="Adicionar observação..." value={item.observacao} onChange={e => handleAcompanhamentoChange(item.id, 'observacao', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all" />
+                                </div>
+                                <div className="flex gap-2 shrink-0">
+                                  {['Sim', 'Não', 'Parcialmente'].map(res => (
+                                    <button key={res} onClick={() => handleAcompanhamentoChange(item.id, 'resposta', res)} className={`px-4 py-2 text-xs font-bold rounded-lg border transition-all ${item.resposta === res ? 'bg-orange-500 border-orange-600 text-white shadow-md shadow-orange-500/20' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{res}</button>
+                                  ))}
+                                </div>
                               </div>
-                              <div className="flex gap-2 shrink-0">
-                                {['Sim', 'Não', 'Parcialmente'].map(res => (
-                                  <button key={res} onClick={() => handleAcompanhamentoChange(item.id, 'resposta', res)} className={`px-4 py-2 text-xs font-bold rounded-lg border transition-all ${item.resposta === res ? 'bg-orange-500 border-orange-600 text-white shadow-md shadow-orange-500/20' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{res}</button>
-                                ))}
-                              </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            )
+              );
+            })()
           }
 
           {
@@ -765,6 +812,13 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
         <PrintableRhReport
           escola={escola}
           coordenador={regionalCoordinator}
+        />
+      )}
+
+      {isPrintingChecklist && (
+        <PrintableChecklistReport
+          escola={escola}
+          acompanhamentoMensal={localAcompanhamento}
         />
       )}
     </div>

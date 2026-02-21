@@ -69,6 +69,12 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, onUpd
         if (activeTab === 'EI') {
             return matchesSearch && escola.segmentos.includes(Segmento.INFANTIL);
         }
+        if (activeTab === 'PARC') {
+            return matchesSearch && escola.segmentos.includes(Segmento.FUNDAMENTAL_I);
+        }
+        if (activeTab === 'SAEB') {
+            return matchesSearch && (escola.segmentos.includes(Segmento.FUNDAMENTAL_I) || escola.segmentos.includes(Segmento.FUNDAMENTAL_II));
+        }
         return matchesSearch;
     });
 
@@ -288,7 +294,12 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, onUpd
                                 </th>
                             )}
                             {activeTab === 'PARC' && <th className="px-4 py-4 text-center bg-brand-orange/5 text-brand-orange">Último PARC (%)</th>}
-                            {activeTab === 'SAEB' && <th className="px-4 py-4 text-center">SAEB Score</th>}
+                            {activeTab === 'SAEB' && (
+                                <>
+                                    <th className="px-4 py-4 text-center">SAEB (5º ANO)</th>
+                                    <th className="px-4 py-4 text-center">SAEB (9º ANO)</th>
+                                </>
+                            )}
                             {activeTab === 'IDEB' && <th className="px-4 py-4 text-center">IDEB Rank</th>}
                             {activeTab === 'SEAMA' && (
                                 <>
@@ -352,9 +363,27 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, onUpd
                                     </td>
                                 )}
                                 {activeTab === 'SAEB' && (
-                                    <td className="px-4 py-5 text-center font-black text-slate-900 bg-slate-50/50">
-                                        {escola.dadosEducacionais?.avaliacoesExternas?.saeb || '-'}
-                                    </td>
+                                    <>
+                                        {(() => {
+                                            const regs = escola.dadosEducacionais?.registrosSAEB || [];
+                                            const getScore = (serie: string) => {
+                                                const specificRegs = regs.filter(r => r.anoSerie === serie);
+                                                if (specificRegs.length === 0) return '-';
+                                                const latest = specificRegs.sort((a, b) => b.ano - a.ano)[0];
+                                                return latest.notaSaeb || '-';
+                                            };
+                                            return (
+                                                <>
+                                                    <td className="px-4 py-5 text-center font-black text-slate-900 bg-slate-50/50 border-r border-slate-200">
+                                                        {getScore('5º ANO')}
+                                                    </td>
+                                                    <td className="px-4 py-5 text-center font-black text-slate-900 bg-slate-50/50">
+                                                        {getScore('9º ANO')}
+                                                    </td>
+                                                </>
+                                            );
+                                        })()}
+                                    </>
                                 )}
                                 {activeTab === 'IDEB' && (
                                     <td className="px-4 py-5 text-center">

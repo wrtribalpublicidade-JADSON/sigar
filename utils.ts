@@ -175,7 +175,16 @@ export const checkSchoolPendencies = (escola: Escola) => {
 
     // 5. Monitoramento (Acompanhamento Mensal)
     if (!escola.acompanhamentoMensal || !Array.isArray(escola.acompanhamentoMensal) || escola.acompanhamentoMensal.length === 0) {
-      pendencies.push({ type: 'MONITORAMENTO', label: 'Monitoramento mensal não iniciado', severity: 'warning' });
+      pendencies.push({ type: 'MONITORAMENTO', label: 'Monitoramento não iniciado', severity: 'warning' });
+    } else {
+      const unansweredCount = escola.acompanhamentoMensal.filter(item => !item.resposta).length;
+      if (unansweredCount > 0) {
+        pendencies.push({
+          type: 'MONITORAMENTO',
+          label: `Checklist incompleto (${unansweredCount} pendentes)`,
+          severity: 'warning'
+        });
+      }
     }
 
   } catch (error) {

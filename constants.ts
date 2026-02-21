@@ -1,4 +1,5 @@
 import { Escola, Visita, Segmento, StatusMeta, Coordenador, DadosNivel, MatriculaDetalhada, ItemAcompanhamento } from './types';
+import { generateUUID } from './utils';
 
 // Helper para criar dados vazios
 const createEmptyNivel = (): DadosNivel => ({
@@ -82,16 +83,16 @@ const PERGUNTAS_FINANCEIRO = [
 ];
 
 export const generateAcompanhamentoMensal = (): ItemAcompanhamento[] => {
-  const itensGestao: ItemAcompanhamento[] = PERGUNTAS_GESTAO.map((pergunta, index) => ({
-    id: `g-${index}-${Date.now()}`,
+  const itensGestao: ItemAcompanhamento[] = PERGUNTAS_GESTAO.map((pergunta) => ({
+    id: generateUUID(),
     pergunta,
     categoria: 'Gestão',
     resposta: null,
     observacao: ''
   }));
 
-  const itensFinanceiro: ItemAcompanhamento[] = PERGUNTAS_FINANCEIRO.map((pergunta, index) => ({
-    id: `f-${index}-${Date.now()}`,
+  const itensFinanceiro: ItemAcompanhamento[] = PERGUNTAS_FINANCEIRO.map((pergunta) => ({
+    id: generateUUID(),
     pergunta,
     categoria: 'Financeiro',
     resposta: null,
