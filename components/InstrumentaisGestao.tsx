@@ -211,6 +211,53 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
     };
 
     // ============================================
+    // ESTADOS: PLANO DE FORMAÇÃO
+    // ============================================
+    const [isEditingFormacao, setIsEditingFormacao] = useState(false);
+    const [formacaoForm, setFormacaoForm] = useState({
+        id: '',
+        especificacao: '',
+        objetivo: '',
+        data: '',
+        publicoAlvo: '',
+        responsavel: currentUser || '',
+        custo: ''
+    });
+    const [mockFormacoes, setMockFormacoes] = useState([
+        {
+            id: '1',
+            especificacao: 'Metodologias Ativas no Ensino Fundamental',
+            objetivo: 'Capacitar professores no uso de ferramentas digitais e metodologias participativas.',
+            data: '2026-03-20',
+            publicoAlvo: 'Professores do Ensino Fundamental',
+            responsavel: 'Maria Nogueira',
+            custo: 'R$ 1.500,00'
+        }
+    ]);
+
+    const handleSaveFormacao = () => {
+        if (!formacaoForm.especificacao || !formacaoForm.data) return;
+        if (formacaoForm.id) {
+            setMockFormacoes(prev => prev.map(m => m.id === formacaoForm.id ? formacaoForm : m));
+        } else {
+            setMockFormacoes(prev => [...prev, { ...formacaoForm, id: Date.now().toString() }]);
+        }
+        setIsEditingFormacao(false);
+        setFormacaoForm({ id: '', especificacao: '', objetivo: '', data: '', publicoAlvo: '', responsavel: currentUser || '', custo: '' });
+    };
+
+    const handleEditFormacao = (formacao: any) => {
+        setFormacaoForm(formacao);
+        setIsEditingFormacao(true);
+    };
+
+    const handleDeleteFormacao = (id: string) => {
+        if (confirm('Tem certeza que deseja excluir esta formação?')) {
+            setMockFormacoes(prev => prev.filter(m => m.id !== id));
+        }
+    };
+
+    // ============================================
     // ESTADOS: PROPOSTA PEDAGÓGICA (PPP)
     // ============================================
     const mockPppHistory = [
@@ -495,14 +542,141 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
                 );
             case 'formacao':
                 return (
-                    <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm text-center">
-                        <div className="w-16 h-16 bg-purple-50 text-purple-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                            <BookOpen className="w-8 h-8" />
+                    <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm text-left">
+                        <div className="flex justify-between items-start mb-8">
+                            <div>
+                                <h3 className="text-2xl font-bold text-slate-800">PLANO DE FORMAÇÃO</h3>
+                                <p className="text-sm text-slate-500 mt-1">Estruturação e acompanhamento das formações continuadas.</p>
+                            </div>
+                            {!isEditingFormacao && (
+                                <button
+                                    onClick={() => {
+                                        setFormacaoForm({ id: '', especificacao: '', objetivo: '', data: '', publicoAlvo: '', responsavel: currentUser || '', custo: '' });
+                                        setIsEditingFormacao(true);
+                                    }}
+                                    className="bg-purple-500 hover:bg-purple-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-purple-500/20 transition-all flex items-center gap-2"
+                                >
+                                    <BookOpen size={18} /> Nova Formação
+                                </button>
+                            )}
                         </div>
-                        <h3 className="text-xl font-bold text-slate-800 mb-2">Plano de Formação</h3>
-                        <p className="text-slate-500 max-w-md mx-auto">
-                            Estruturação dos planos de formação continuada para a equipe escolar. Em breve, ferramentas para acompanhamento de trilhas de aprendizado.
-                        </p>
+
+                        {isEditingFormacao && (
+                            <div className="p-8 border border-slate-200 rounded-2xl bg-white shadow-sm mb-8 animate-fade-in">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="md:col-span-2">
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Especificação da Formação</label>
+                                        <input
+                                            type="text"
+                                            value={formacaoForm.especificacao}
+                                            onChange={e => setFormacaoForm({ ...formacaoForm, especificacao: e.target.value })}
+                                            className="w-full text-lg font-medium text-slate-800 border-b border-slate-200 py-2 focus:border-purple-500 focus:outline-none placeholder-slate-300"
+                                            placeholder="Tema / Título da Formação..."
+                                        />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Objetivo</label>
+                                        <textarea
+                                            value={formacaoForm.objetivo}
+                                            onChange={e => setFormacaoForm({ ...formacaoForm, objetivo: e.target.value })}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 h-24 resize-none"
+                                            placeholder="Descreva o principal objetivo desta formação..."
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Data / Período</label>
+                                        <input
+                                            type="date"
+                                            value={formacaoForm.data}
+                                            onChange={e => setFormacaoForm({ ...formacaoForm, data: e.target.value })}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Público-Alvo</label>
+                                        <input
+                                            type="text"
+                                            value={formacaoForm.publicoAlvo}
+                                            onChange={e => setFormacaoForm({ ...formacaoForm, publicoAlvo: e.target.value })}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+                                            placeholder="Ex: Professores de Matemática"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Responsável</label>
+                                        <input
+                                            type="text"
+                                            value={formacaoForm.responsavel}
+                                            onChange={e => setFormacaoForm({ ...formacaoForm, responsavel: e.target.value })}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+                                            placeholder="Nome do responsável..."
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Custo Estimado / Planejado</label>
+                                        <input
+                                            type="text"
+                                            value={formacaoForm.custo}
+                                            onChange={e => setFormacaoForm({ ...formacaoForm, custo: e.target.value })}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+                                            placeholder="Ex: R$ 0,00"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex gap-3 pt-6 border-t border-slate-100 mt-6">
+                                    <button onClick={handleSaveFormacao} className="bg-purple-500 hover:bg-purple-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-purple-500/20 transition-colors">
+                                        Salvar Formação
+                                    </button>
+                                    <button onClick={() => setIsEditingFormacao(false)} className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-6 py-2.5 rounded-xl font-semibold transition-colors">
+                                        Cancelar
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="space-y-4">
+                            {mockFormacoes.map(formacao => (
+                                <div key={formacao.id} className="p-6 border border-slate-100 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row justify-between items-center gap-6 group">
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-3 mb-2">
+                                            <span className="px-3 py-1 text-xs font-bold uppercase rounded-full bg-purple-100 text-purple-700">
+                                                Formação
+                                            </span>
+                                            <span className="text-xs font-medium text-slate-400 flex items-center gap-1">
+                                                <Calendar size={12} /> {formacao.data}
+                                            </span>
+                                            {formacao.custo && (
+                                                <span className="text-xs font-medium text-amber-600 flex items-center gap-1 border-l border-slate-200 pl-3">
+                                                    Custo: {formacao.custo}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <h4 className="text-lg font-bold text-slate-900 leading-tight mb-1">{formacao.especificacao}</h4>
+                                        <p className="text-sm text-slate-500 mb-3">{formacao.objetivo}</p>
+                                        <div className="flex items-center gap-4">
+                                            <p className="text-xs font-medium text-purple-600 tracking-wide">Resp: {formacao.responsavel}</p>
+                                            <p className="text-xs font-medium text-slate-500 tracking-wide flex items-center gap-1">
+                                                <Users size={12} /> Público: {formacao.publicoAlvo}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button title="Editar Formação" onClick={() => handleEditFormacao(formacao)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-purple-50 hover:text-purple-600 transition-all flex-shrink-0">
+                                            <Edit size={16} />
+                                        </button>
+                                        <button title="Excluir Formação" onClick={() => handleDeleteFormacao(formacao.id)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-600 transition-all flex-shrink-0">
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                            {mockFormacoes.length === 0 && !isEditingFormacao && (
+                                <div className="text-center p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                                    <BookOpen className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                                    <p className="text-slate-500">Nenhum plano de formação cadastrado.</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 );
             case 'acao':
