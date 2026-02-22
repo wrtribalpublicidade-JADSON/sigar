@@ -260,14 +260,18 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
     // ============================================
     // ESTADOS: PROPOSTA PEDAGÓGICA (PPP)
     // ============================================
-    const mockPppHistory = [
+    // ============================================
+    // ESTADOS: PROPOSTA PEDAGÓGICA (PPP)
+    // ============================================
+    const [pppHistory, setPppHistory] = useState([
         {
             id: '1',
             arquivo: 'PPP_2026_Escola_Municipal_Centro.pdf',
             dataEnvio: '15/02/2026 às 14:30',
             usuario: 'Jadson Carlos',
             coordenadorRegional: 'Ana Silva',
-            status: 'Aprovado'
+            status: 'Aprovado',
+            tamanho: '1.2 MB'
         },
         {
             id: '2',
@@ -275,9 +279,68 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
             dataEnvio: '20/02/2026 às 09:15',
             usuario: 'Jadson Carlos',
             coordenadorRegional: 'Ana Silva',
-            status: 'Aguardando Análise'
+            status: 'Aguardando Análise',
+            tamanho: '850 KB'
         }
-    ];
+    ]);
+
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+    const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        // Validation for 2MB limit
+        if (file.size > 2 * 1024 * 1024) {
+            alert('O tamanho do arquivo não pode exceder 2MB.');
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            return;
+        }
+
+        const sizeInMb = file.size / (1024 * 1024);
+        const sizeFormatted = sizeInMb >= 1
+            ? `${sizeInMb.toFixed(1)} MB`
+            : `${Math.round(file.size / 1024)} KB`;
+
+        const now = new Date();
+        const formattedDate = `${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+
+        const newPpp = {
+            id: Date.now().toString(),
+            arquivo: file.name,
+            dataEnvio: formattedDate,
+            usuario: currentUser || 'Usuário logado',
+            coordenadorRegional: 'Ana Silva',
+            status: 'Aguardando Análise',
+            tamanho: sizeFormatted
+        };
+
+        setPppHistory([newPpp, ...pppHistory]);
+
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    const handleDownloadArquivo = (arquivoNome: string) => {
+        // Simulação de download
+        const blob = new Blob([`Conteúdo simulado do arquivo PDF: ${arquivoNome}`], { type: 'application/pdf' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = arquivoNome;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    };
+
+    const toggleStatus = (id: string, currentStatus: string) => {
+        let nextStatus = '';
+        if (currentStatus === 'Aguardando Análise') nextStatus = 'Em Análise';
+        else if (currentStatus === 'Em Análise') nextStatus = 'Aprovado';
+        else nextStatus = 'Aguardando Análise';
+
+        setPppHistory(prev => prev.map(item => item.id === id ? { ...item, status: nextStatus } : item));
+    };
 
     const renderTabContent = () => {
         switch (activeTab) {
@@ -802,15 +865,28 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
                                 <h3 className="text-2xl font-bold text-slate-800">PROPOSTA PEDAGÓGICA</h3>
                                 <p className="text-sm text-slate-500 mt-1">Repositório e acompanhamento dos PPPs.</p>
                             </div>
-                            <button className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2">
-                                <Upload size={18} /> Subir Arquivo (PDF)
-                            </button>
+                            <div>
+                                <input
+                                    type="file"
+                                    accept=".pdf"
+                                    className="hidden"
+                                    ref={fileInputRef}
+                                    onChange={handleFileUpload}
+                                />
+                                <button
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2"
+                                >
+                                    <Upload size={18} /> Subir Arquivo (PDF)
+                                </button>
+                            </div>
                         </div>
                         <div className="overflow-x-auto border border-slate-200 rounded-xl">
                             <table className="w-full text-left border-collapse min-w-[800px]">
                                 <thead>
                                     <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
                                         <th className="p-4 py-3">Arquivo Enviado</th>
+                                        <th className="p-4 py-3">Tamanho</th>
                                         <th className="p-4 py-3">Data do Envio</th>
                                         <th className="p-4 py-3">Responsável</th>
                                         <th className="p-4 py-3">Coordenador Regional</th>
@@ -818,17 +894,27 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {mockPppHistory.map((item) => (
+                                    {pppHistory.map((item) => (
                                         <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                                            <td className="p-4 text-sm font-bold text-blue-600 hover:text-blue-700 cursor-pointer">{item.arquivo}</td>
+                                            <td
+                                                className="p-4 text-sm font-bold text-blue-600 hover:text-blue-700 cursor-pointer underline decoration-blue-200 underline-offset-4"
+                                                onClick={() => handleDownloadArquivo(item.arquivo)}
+                                            >
+                                                {item.arquivo}
+                                            </td>
+                                            <td className="p-4 text-sm font-medium text-slate-500">{item.tamanho}</td>
                                             <td className="p-4 text-sm font-bold text-slate-700">{item.dataEnvio}</td>
                                             <td className="p-4 text-sm font-medium text-slate-600">{item.usuario}</td>
                                             <td className="p-4 text-sm font-medium text-slate-600">{item.coordenadorRegional}</td>
                                             <td className="p-4">
-                                                <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${item.status === 'Aprovado' ? 'bg-emerald-100 text-emerald-700' :
-                                                    item.status === 'Aguardando Análise' ? 'bg-amber-100 text-amber-700' :
-                                                        'bg-rose-100 text-rose-700'
-                                                    }`}>
+                                                <span
+                                                    onClick={() => toggleStatus(item.id, item.status)}
+                                                    className={`px-2.5 py-1 rounded-md text-xs font-bold cursor-pointer transition-colors active:scale-95 inline-block select-none ${item.status === 'Aprovado' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' :
+                                                            item.status === 'Aguardando Análise' ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' :
+                                                                item.status === 'Em Análise' ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' :
+                                                                    'bg-slate-100 text-slate-700'
+                                                        }`}
+                                                >
                                                     {item.status}
                                                 </span>
                                             </td>

@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { PageHeader } from './ui/PageHeader';
 import { Users, BookOpen, UserCheck, AlertTriangle, GraduationCap, Edit, Trash2, Calendar, Hand, Book, CheckSquare, MessageCircle, Search, Printer, Lock, Send, CheckCircle2, FileText, LayoutDashboard, TrendingUp, TrendingDown, Minus, ArrowUpRight, ArrowDownRight, AlertCircle, FileDown, Download } from 'lucide-react';
+import { CadastroTurmaModal, TurmaData } from './modals/CadastroTurmaModal';
+import { StudentReportModal } from './modals/StudentReportModal';
+import { ReuniaoEstudantilForm } from './ReuniaoEstudantilForm';
 
 type Tab = 'estudantil' | 'avaliacao' | 'acompanhamento' | 'encaminhamentos';
 
@@ -10,7 +13,23 @@ export const ConselhoClasse: React.FC = () => {
     // ============================================
     // ESTADOS: AVALIAÇÃO DOCENTE
     // ============================================
-    const [avaliacaoBimestre, setAvaliacaoBimestre] = useState('Consolidação e Evolução do Estudante');
+    const [avaliacaoBimestre, setAvaliacaoBimestre] = useState('Resultado Consolidado');
+    const [isTurmaModalOpen, setIsTurmaModalOpen] = useState(false);
+    const [isStudentReportOpen, setIsStudentReportOpen] = useState(false);
+    const [activeStudentReport, setActiveStudentReport] = useState<any>(null);
+    const [turmasCadastradas, setTurmasCadastradas] = useState<TurmaData[]>([
+        { etapa: 'Anos Iniciais', anoSerie: '5º ANO', identificacao: 'Turma B', turno: 'MANHÃ', tipo: 'REGULAR' }
+    ]);
+    const [activeTurma, setActiveTurma] = useState<TurmaData>(turmasCadastradas[0]);
+    const [showSuccessToast, setShowSuccessToast] = useState(false);
+
+    const handleSalvarTurma = (novaTurma: TurmaData) => {
+        setTurmasCadastradas([...turmasCadastradas, novaTurma]);
+        setActiveTurma(novaTurma);
+        setIsTurmaModalOpen(false);
+        setShowSuccessToast(true);
+        setTimeout(() => setShowSuccessToast(false), 3000);
+    };
 
     const [studentsAvaliacao, setStudentsAvaliacao] = useState<any[]>([
         { id: 1, name: 'ANA BEATRIZ SILVA SANTOS', fre: 'E', par: 'B', mat: 'R', atv: 'I', com: 'E', pes: 'B', con: 'R', notas: { av1: 7, av2: 8, av3: 7.5, rec: null }, media: 7.5, parecer: 'PLENO' },
@@ -65,7 +84,7 @@ export const ConselhoClasse: React.FC = () => {
         setEditingGradesStudentId(null);
     };
 
-    const avaliacaoTabsList = ['Consolidação e Evolução do Estudante', '1º Bimestre', '2º Bimestre', '3º Bimestre', '4º Bimestre'];
+    const avaliacaoTabsList = ['Resultado Consolidado', '1º Bimestre', '2º Bimestre', '3º Bimestre', '4º Bimestre'];
 
     const [visaoGeralData, setVisaoGeralData] = useState([
         { id: 1, name: 'ANA BEATRIZ SILVA SANTOS', b1: 6.5, b2: 7.2, b3: 8.0, b4: 8.5, mediaFinal: 7.5 },
@@ -277,14 +296,8 @@ export const ConselhoClasse: React.FC = () => {
         switch (activeTab) {
             case 'estudantil':
                 return (
-                    <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm text-center">
-                        <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                            <Users className="w-8 h-8" />
-                        </div>
-                        <h3 className="text-xl font-bold text-slate-800 mb-2">Reunião Estudantil</h3>
-                        <p className="text-slate-500 max-w-md mx-auto">
-                            Acompanhamento e registro dos Conselhos de Classe participativos com foco nos estudantes.
-                        </p>
+                    <div className="animate-in fade-in zoom-in-95 duration-200">
+                        <ReuniaoEstudantilForm />
                     </div>
                 );
             case 'avaliacao':
@@ -328,34 +341,23 @@ export const ConselhoClasse: React.FC = () => {
                                 <div>
                                     <h2 className="text-xl font-bold text-slate-800">Avaliação Detalhada por Etapa Pedagógica</h2>
                                     <div className="flex gap-4 mt-1 text-sm">
-                                        <span className="text-slate-500">Filtro Ativo: <strong className="text-emerald-600">{avaliacaoBimestre.toUpperCase()}</strong></span>
+                                        <span className="text-slate-500">Filtro Ativo: <strong className="text-emerald-600">
+                                            {avaliacaoBimestre.toUpperCase()}
+                                        </strong></span>
                                         <span className="text-amber-500 font-bold flex items-center gap-1"><Lock className="w-3 h-3" /> SOMENTE LEITURA</span>
                                     </div>
                                 </div>
                             </div>
                             <div className="flex gap-3">
-                                {avaliacaoBimestre === 'Consolidação e Evolução do Estudante' ? (
-                                    <>
-                                        <button className="bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-xl font-bold text-sm hover:bg-slate-50 flex items-center gap-2 transition-all">
-                                            <FileDown className="w-4 h-4" /> Exportar PDF
-                                        </button>
-                                        <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-md shadow-blue-500/20">
-                                            <Printer className="w-4 h-4" /> Imprimir Relatório
-                                        </button>
-                                    </>
-                                ) : (
-                                    <>
-                                        <button className="bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-xl font-bold text-sm hover:bg-slate-50 flex items-center gap-2 transition-all">
-                                            <Printer className="w-4 h-4" /> Imprimir {avaliacaoBimestre}
-                                        </button>
-                                        <button className="border border-amber-200 bg-amber-50 text-amber-600 px-4 py-2 rounded-xl font-bold text-sm hover:bg-amber-100 flex items-center gap-2 transition-all">
-                                            <Lock className="w-4 h-4" /> Solicitar Desbloqueio
-                                        </button>
-                                        <button className="bg-slate-100 text-slate-400 px-4 py-2 rounded-xl font-bold text-sm cursor-not-allowed flex items-center gap-2">
-                                            <Send className="w-4 h-4" /> Finalizar e Enviar Etapa
-                                        </button>
-                                    </>
-                                )}
+                                <button className="bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-xl font-bold text-sm hover:bg-slate-50 flex items-center gap-2 transition-all">
+                                    <Printer className="w-4 h-4" /> Imprimir {avaliacaoBimestre === 'Resultado Consolidado' ? 'Relatório' : avaliacaoBimestre}
+                                </button>
+                                <button className="border border-amber-200 bg-amber-50 text-amber-600 px-4 py-2 rounded-xl font-bold text-sm hover:bg-amber-100 flex items-center gap-2 transition-all">
+                                    <Lock className="w-4 h-4" /> Solicitar Desbloqueio
+                                </button>
+                                <button className="bg-slate-100 text-slate-400 px-4 py-2 rounded-xl font-bold text-sm cursor-not-allowed flex items-center gap-2">
+                                    <Send className="w-4 h-4" /> Finalizar e Enviar Etapa
+                                </button>
                             </div>
                         </div>
 
@@ -374,38 +376,28 @@ export const ConselhoClasse: React.FC = () => {
                                 <p className="text-sm font-semibold text-slate-800">Língua Portuguesa - BNCC</p>
                             </div>
                             <div className="px-4 flex items-center gap-3">
-                                <div>
-                                    <p className="text-xs font-bold text-slate-400 uppercase mb-1">Turma / Ano</p>
-                                    <p className="text-sm font-semibold text-slate-800">5º Ano B • Matutino</p>
-                                </div>
+                                <button
+                                    onClick={() => setIsTurmaModalOpen(true)}
+                                    className="group text-left"
+                                >
+                                    <p className="text-xs font-bold text-slate-400 uppercase mb-1 group-hover:text-blue-500 transition-colors flex items-center gap-1">
+                                        Turma / Ano
+                                        <Edit className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </p>
+                                    <p className="text-sm font-semibold text-slate-800 group-hover:text-blue-600 transition-colors">
+                                        {activeTurma ? `${activeTurma.anoSerie} ${activeTurma.identificacao.replace('Turma ', '')} • ${activeTurma.turno}` : '5º Ano B • Matutino'}
+                                    </p>
+                                </button>
                                 <div className="ml-auto flex items-center gap-2 text-[10px] font-bold text-slate-400 border border-slate-200 rounded-lg p-2 bg-slate-50">
                                     <Lock className="w-3 h-3" />
-                                    <span>ETAPA BLOQUEADA - ENVIADA À<br />COORDENAÇÃO</span>
+                                    <span>ETAPA BLOQUEADA<br />ENVIADA À COORDENAÇÃO</span>
                                 </div>
                             </div>
                         </div>
 
                         {/* Renderização Condicional do Conteúdo da Tab */}
-                        {avaliacaoBimestre === 'Consolidação e Evolução do Estudante' ? (
+                        {avaliacaoBimestre === 'Resultado Consolidado' ? (
                             <div className="space-y-6">
-                                {/* Filtros Avançados */}
-                                <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-                                    <div className="flex items-center gap-4">
-                                        <div className="flex items-center gap-2 text-sm font-bold text-slate-500">
-                                            <Search className="w-4 h-4" /> FILTROS AVANÇADOS:
-                                        </div>
-                                        <select className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
-                                            <option>Queda em relação ao bimestre anterior</option>
-                                        </select>
-                                        <div className="bg-red-50 border border-red-100 px-3 py-1.5 rounded-lg text-red-600 font-bold text-xs flex items-center gap-2">
-                                            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
-                                            6 alunos em alerta
-                                        </div>
-                                        <div className="ml-auto text-xs text-slate-400 italic">
-                                            * Filtro de alertas ativo (exibindo destaques em vermelho)
-                                        </div>
-                                    </div>
-                                </div>
 
                                 {/* Overview Cards */}
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -457,39 +449,65 @@ export const ConselhoClasse: React.FC = () => {
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-left border-collapse min-w-max">
                                             <thead>
-                                                <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase tracking-wider">
-                                                    <th className="p-4 font-bold text-center w-12">Nº</th>
-                                                    <th className="p-4 font-bold">NOME DO ESTUDANTE</th>
-                                                    <th className="p-4 font-bold text-center">1º BIMESTRE</th>
-                                                    <th className="p-4 font-bold text-center">2º BIMESTRE</th>
-                                                    <th className="p-4 font-bold text-center">3º BIMESTRE</th>
-                                                    <th className="p-4 font-bold text-center">4º BIMESTRE</th>
-                                                    <th className="p-4 font-bold text-center bg-slate-100 text-slate-700">MÉDIA FINAL</th>
-                                                    <th className="p-4 font-bold text-center">TRAJETÓRIA</th>
+                                                <tr className="bg-slate-800 text-white border-b border-slate-700">
+                                                    <th className="p-4 rounded-tl-xl w-16 text-center text-slate-400 font-medium">Nº</th>
+                                                    <th className="p-4 font-bold text-sm tracking-wide bg-white text-slate-800 min-w-[200px] border-r border-slate-200">NOME DO ESTUDANTE</th>
+                                                    <th className="p-4 text-center">
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider block">1º Bimestre</span>
+                                                    </th>
+                                                    <th className="p-4 text-center">
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider block">2º Bimestre</span>
+                                                    </th>
+                                                    <th className="p-4 text-center">
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider block">3º Bimestre</span>
+                                                    </th>
+                                                    <th className="p-4 text-center">
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider block">4º Bimestre</span>
+                                                    </th>
+                                                    <th className="p-4 text-center bg-emerald-700/80">
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider block">Média Final</span>
+                                                    </th>
+                                                    <th className="p-4 text-center bg-emerald-800 rounded-tr-xl">
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider block">Trajetória</span>
+                                                    </th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100">
                                                 {visaoGeralData.map(student => (
                                                     <tr key={student.id} className={`transition-colors group ${student.alert ? 'bg-red-50/30' : 'hover:bg-slate-50'}`}>
                                                         <td className="p-4 text-center text-sm font-medium text-slate-400 group-hover:text-blue-500 transition-colors">{student.id}</td>
-                                                        <td className="p-4 text-sm font-bold text-slate-700 flex items-center gap-2">
-                                                            {student.alert && <AlertTriangle className="w-4 h-4 text-red-500" />}
-                                                            {student.name}
+                                                        <td className="p-4 text-sm font-bold text-slate-700">
+                                                            <button
+                                                                onClick={() => {
+                                                                    setActiveStudentReport(student);
+                                                                    setIsStudentReportOpen(true);
+                                                                }}
+                                                                className="flex items-center gap-2 group/btn text-left"
+                                                            >
+                                                                {student.alert && <AlertTriangle className="w-4 h-4 text-red-500" />}
+                                                                <span className="group-hover/btn:text-blue-600 transition-colors border-b border-transparent group-hover/btn:border-blue-200 pb-0.5">{student.name}</span>
+                                                            </button>
                                                         </td>
                                                         <td className={`p-4 text-center text-sm font-bold ${student.b1 < 6 ? 'text-red-500' : 'text-slate-700'}`}>
                                                             {student.b1.toFixed(1)}
                                                         </td>
-                                                        <td className="p-4 text-center text-sm flex flex-col items-center">
-                                                            <span className={`font-bold ${student.b2 < 6 ? 'text-red-500' : 'text-slate-700'}`}>{student.b2.toFixed(1)}</span>
-                                                            {renderVisaoGeralTrend(student.b2, student.b1)}
+                                                        <td className="p-4 text-center text-sm">
+                                                            <div className="flex flex-col items-center">
+                                                                <span className={`font-bold ${student.b2 < 6 ? 'text-red-500' : 'text-slate-700'}`}>{student.b2.toFixed(1)}</span>
+                                                                {renderVisaoGeralTrend(student.b2, student.b1)}
+                                                            </div>
                                                         </td>
-                                                        <td className="p-4 text-center text-sm flex flex-col items-center">
-                                                            <span className={`font-bold ${student.b3 < 6 ? 'text-red-500' : 'text-slate-700'}`}>{student.b3.toFixed(1)}</span>
-                                                            {renderVisaoGeralTrend(student.b3, student.b2)}
+                                                        <td className="p-4 text-center text-sm">
+                                                            <div className="flex flex-col items-center">
+                                                                <span className={`font-bold ${student.b3 < 6 ? 'text-red-500' : 'text-slate-700'}`}>{student.b3.toFixed(1)}</span>
+                                                                {renderVisaoGeralTrend(student.b3, student.b2)}
+                                                            </div>
                                                         </td>
-                                                        <td className="p-4 text-center text-sm flex flex-col items-center">
-                                                            <span className={`font-bold ${student.b4 < 6 ? 'text-red-500' : 'text-slate-700'}`}>{student.b4.toFixed(1)}</span>
-                                                            {renderVisaoGeralTrend(student.b4, student.b3)}
+                                                        <td className="p-4 text-center text-sm">
+                                                            <div className="flex flex-col items-center">
+                                                                <span className={`font-bold ${student.b4 < 6 ? 'text-red-500' : 'text-slate-700'}`}>{student.b4.toFixed(1)}</span>
+                                                                {renderVisaoGeralTrend(student.b4, student.b3)}
+                                                            </div>
                                                         </td>
                                                         <td className="p-4 text-center bg-slate-50 group-hover:bg-slate-100 transition-colors">
                                                             <span className={`px-3 py-1.5 rounded-lg border font-bold text-sm ${student.mediaFinal < 6 ? 'bg-red-100 text-red-700 border-red-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
@@ -607,7 +625,17 @@ export const ConselhoClasse: React.FC = () => {
                                                 {studentsAvaliacao.map(student => (
                                                     <tr key={student.id} className="hover:bg-slate-50 transition-colors group">
                                                         <td className="p-4 text-center text-sm font-medium text-slate-400 group-hover:text-emerald-500 transition-colors">{student.id}</td>
-                                                        <td className="p-4 text-sm font-bold text-slate-700 border-r border-slate-100">{student.name}</td>
+                                                        <td className="p-4 text-sm font-bold text-slate-700 border-r border-slate-100">
+                                                            <button
+                                                                onClick={() => {
+                                                                    setActiveStudentReport(student);
+                                                                    setIsStudentReportOpen(true);
+                                                                }}
+                                                                className="flex items-center gap-2 group/btn text-left w-full h-full"
+                                                            >
+                                                                <span className="group-hover/btn:text-emerald-600 transition-colors border-b border-transparent group-hover/btn:border-emerald-200 pb-0.5">{student.name}</span>
+                                                            </button>
+                                                        </td>
                                                         <td className="p-4 text-center">{renderConceptBadge(student.fre)}</td>
                                                         <td className="p-4 text-center">{renderConceptBadge(student.par)}</td>
                                                         <td className="p-4 text-center">{renderConceptBadge(student.mat)}</td>
@@ -1147,6 +1175,28 @@ export const ConselhoClasse: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            <CadastroTurmaModal
+                isOpen={isTurmaModalOpen}
+                onClose={() => setIsTurmaModalOpen(false)}
+                onSave={handleSalvarTurma}
+                turmasExistentes={turmasCadastradas}
+            />
+
+            <StudentReportModal
+                isOpen={isStudentReportOpen}
+                onClose={() => setIsStudentReportOpen(false)}
+                student={activeStudentReport}
+                context={avaliacaoBimestre}
+            />
+
+            {/* Success Toast */}
+            <div className={`fixed bottom-4 right-4 z-50 transition-all duration-300 transform ${showSuccessToast ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0 pointer-events-none'}`}>
+                <div className="bg-emerald-500 text-white px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 font-bold text-sm">
+                    <CheckCircle2 className="w-5 h-5" />
+                    <span>Turma salva com sucesso!</span>
+                </div>
+            </div>
         </div>
     );
 };
