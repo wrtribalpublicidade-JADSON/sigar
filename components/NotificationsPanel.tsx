@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { PageHeader } from './ui/PageHeader';
-import { Escola } from '../types';
+import { Escola, Coordenador } from '../types';
 import {
     Bell, CheckCircle, AlertTriangle, XCircle, Search,
     Filter, ChevronRight, School, Users, FileText, Calendar, Target
@@ -9,6 +9,7 @@ import { Card } from './ui/Card';
 
 interface NotificationsPanelProps {
     escolas: Escola[];
+    coordenadores: Coordenador[];
     onNavigateToSchool: (escolaId: string) => void;
 }
 
@@ -24,8 +25,9 @@ interface SchoolPendency {
     }[];
 }
 
-export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ escolas, onNavigateToSchool }) => {
+export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ escolas, coordenadores, onNavigateToSchool }) => {
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedCoordenador, setSelectedCoordenador] = useState('');
     const [filterType, setFilterType] = useState<PendencyType | 'ALL'>('ALL');
 
     const pendingData = useMemo(() => {
@@ -44,7 +46,16 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ escolas,
     const filteredData = pendingData.filter(item => {
         const matchesSearch = item.escola.nome.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesFilter = filterType === 'ALL' || item.pendencies.some(p => p.type === filterType);
-        return matchesSearch && matchesFilter;
+
+        let matchesCoordenador = true;
+        if (selectedCoordenador) {
+            const coord = coordenadores.find(c => c.id === selectedCoordenador);
+            if (coord) {
+                matchesCoordenador = coord.escolasIds.includes(item.escola.id);
+            }
+        }
+
+        return matchesSearch && matchesFilter && matchesCoordenador;
     });
 
     return (
@@ -57,15 +68,31 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ escolas,
             />
 
             <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
-                <div className="relative w-full md:w-96">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                    <input
-                        type="text"
-                        placeholder="Buscar escola..."
-                        value={searchTerm}
-                        onChange={e => setSearchTerm(e.target.value)}
-                        className="w-full pl-12 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-brand-orange focus:ring-4 focus:ring-brand-orange/10 outline-none transition-all"
-                    />
+                <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto flex-1">
+                    <div className="relative w-full md:w-96">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                        <input
+                            type="text"
+                            placeholder="Buscar escola..."
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
+                            className="w-full pl-12 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-brand-orange focus:ring-4 focus:ring-brand-orange/10 outline-none transition-all"
+                        />
+                    </div>
+
+                    <div className="w-full md:w-96">
+                        <select
+                            value={selectedCoordenador}
+                            onChange={(e) => setSelectedCoordenador(e.target.value)}
+                            className="w-full px-4 py-2.5 text-slate-700 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/20 focus:border-brand-orange cursor-pointer appearance-none transition-all"
+                            style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: `right 0.5rem center`, backgroundRepeat: `no-repeat`, backgroundSize: `1.5em 1.5em`, paddingRight: `2.5rem` }}
+                        >
+                            <option value="">Todos os Coordenadores</option>
+                            {coordenadores.map(c => (
+                                <option key={c.id} value={c.id}>{c.nome}</option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
 
                 <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">

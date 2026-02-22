@@ -20,6 +20,10 @@ import { SeamaDashboard } from './components/SeamaDashboard';
 import { SaebDashboard } from './components/SaebDashboard';
 import { NotificationsPanel } from './components/NotificationsPanel';
 import { LoginPage } from './components/LoginPage';
+import { AuditLogDashboard } from './components/AuditLogDashboard';
+import { UserManagement } from './components/UserManagement';
+import { InstrumentaisGestao } from './components/InstrumentaisGestao';
+import { ConselhoClasse } from './components/ConselhoClasse';
 import { Preloader } from './components/ui/Preloader';
 import { ViewState, Escola, Visita, Coordenador } from './types';
 import { supabase } from './services/supabase';
@@ -27,8 +31,6 @@ import { useNotification } from './context/NotificationContext';
 import { generateUUID, checkSchoolPendencies } from './utils';
 import { ESCOLAS_MOCK, VISITAS_MOCK, COORDENADORES_MOCK } from './constants';
 import { logAccess, logAudit } from './services/logService';
-import { AuditLogDashboard } from './components/AuditLogDashboard';
-
 const ADMIN_EMAIL = 'jadsoncsilv@gmail.com';
 
 export default function App() {
@@ -554,10 +556,13 @@ export default function App() {
 
     try {
       if (coord.id) {
+        const funcaoToSave = (coord.funcao as any) === '' ? null : coord.funcao;
         const { error } = await supabase.from('coordenadores').update({
           nome: coord.nome,
           contato: coord.contato,
-          regiao: coord.regiao
+          regiao: coord.regiao,
+          funcao: funcaoToSave,
+          status: coord.status || 'Ativo'
         }).eq('id', coord.id);
 
         await logAudit('UPDATE', 'COORDENADOR', coord.id, coord);
@@ -575,11 +580,14 @@ export default function App() {
         showNotification('success', 'Coordenador atualizado!');
       } else {
         const newId = generateUUID();
+        const funcaoToSave = (coord.funcao as any) === '' ? null : coord.funcao;
         const { error } = await supabase.from('coordenadores').insert({
           id: newId,
           nome: coord.nome,
           contato: coord.contato,
-          regiao: coord.regiao
+          regiao: coord.regiao,
+          funcao: funcaoToSave,
+          status: coord.status || 'Ativo'
         });
 
         await logAudit('CREATE', 'COORDENADOR', newId, coord);
@@ -595,9 +603,9 @@ export default function App() {
         setCoordenadores([...coordenadores, { ...coord, id: newId }]);
         showNotification('success', 'Coordenador cadastrado!');
       }
-    } catch (error) {
-      console.error(error);
-      showNotification('error', 'Erro ao salvar coordenador.');
+    } catch (error: any) {
+      console.error("CoordinatorsManager Save Error:", error);
+      showNotification('error', `Erro ao salvar coordenador: ${error.message || 'Desconhecido'}`);
     }
   };
 
@@ -808,10 +816,15 @@ export default function App() {
             coordenadores={coordenadores}
           />
         );
+      case 'INSTRUMENTAIS_GESTAO':
+        return <InstrumentaisGestao escolas={escolas} />;
+      case 'CONSELHO_CLASSE':
+        return <ConselhoClasse />;
       case 'NOTIFICACOES':
         return (
           <NotificationsPanel
             escolas={escolas}
+            coordenadores={coordenadores}
             onNavigateToSchool={(id) => {
               setSelectedEscolaId(id);
               setCurrentView('DETALHE_ESCOLA');
@@ -823,6 +836,18 @@ export default function App() {
         return (
           <AuditLogDashboard onBack={() => setCurrentView('DASHBOARD')} />
         )
+      case 'GESTAO_USUARIOS':
+        if (!isAdmin && effectiveUser?.funcao !== 'Coordenador Regional') return <div>Acesso restrito.</div>;
+        return (
+          <UserManagement
+            userEmail={userEmail}
+            isAdmin={isAdmin}
+            currentUserRole={effectiveUser?.funcao}
+            coordenadores={coordenadores}
+            escolas={escolas}
+            isDemoMode={isDemoMode}
+          />
+        );
       default:
         return <div>Página não encontrada</div>;
     }
@@ -876,6 +901,7 @@ export default function App() {
       userName={userName}
       userEmail={userEmail}
       notificationCount={notificationCount}
+      userRole={effectiveUser?.funcao}
     >
       {isDemoMode && (
         <div className="bg-amber-100 border-l-4 border-amber-500 text-amber-700 p-3 mb-6 flex justify-between items-center rounded-r-md shadow-sm animate-fade-in">

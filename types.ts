@@ -290,7 +290,8 @@ export interface Coordenador {
   nome: string;
   contato: string; // Utilizado como E-mail principal/Autenticação
   regiao: string; // Ex: "Regional Sede", "Regional Litoral"
-  funcao?: 'Coordenador Regional' | 'Administrador' | 'Técnico'; // Papel no sistema
+  funcao?: 'Administrador' | 'Coordenador Regional' | 'Gestor' | 'Coordenador Pedagógico' | 'Técnico'; // Papel no sistema
+  status?: 'Ativo' | 'Inativo'; // Controle de acesso
   escolasIds: string[]; // Vínculo com escolas
 }
 
@@ -308,7 +309,7 @@ export interface Visita {
   status: 'Planejada' | 'Realizada' | 'Relatório Pendente';
 }
 
-export type ViewState = 'DASHBOARD' | 'LISTA_ESCOLAS' | 'DETALHE_ESCOLA' | 'NOVA_VISITA' | 'COORDENADORES' | 'RELATORIOS' | 'INDICADORES' | 'ANALISE_PARC' | 'ANALISE_CNCA_PNRA' | 'ANALISE_SEAMA' | 'ANALISE_SAEB' | 'NOTIFICACOES' | 'AUDIT_LOGS';
+export type ViewState = 'DASHBOARD' | 'LISTA_ESCOLAS' | 'DETALHE_ESCOLA' | 'NOVA_VISITA' | 'COORDENADORES' | 'RELATORIOS' | 'INDICADORES' | 'ANALISE_PARC' | 'ANALISE_CNCA_PNRA' | 'ANALISE_SEAMA' | 'ANALISE_SAEB' | 'NOTIFICACOES' | 'AUDIT_LOGS' | 'GESTAO_USUARIOS' | 'INSTRUMENTAIS_GESTAO' | 'CONSELHO_CLASSE';
 
 export type PendencyType = 'MATRICULA' | 'TURMAS' | 'RH' | 'MONITORAMENTO' | 'PLANO_ACAO';
 

@@ -11,6 +11,7 @@ interface LayoutProps {
   userName: string | null;
   userEmail: string | null;
   notificationCount?: number;
+  userRole?: string;
 }
 
 export const Layout: React.FC<LayoutProps> = ({
@@ -21,7 +22,8 @@ export const Layout: React.FC<LayoutProps> = ({
   isAdmin,
   userName,
   userEmail,
-  notificationCount = 0
+  notificationCount = 0,
+  userRole
 }) => {
   return (
     <div className="h-screen bg-brand-light flex flex-col md:flex-row overflow-hidden">
@@ -34,6 +36,7 @@ export const Layout: React.FC<LayoutProps> = ({
         userEmail={userEmail}
         isAdmin={isAdmin}
         notificationCount={notificationCount}
+        userRole={userRole}
       />
 
       {/* Main Content */}

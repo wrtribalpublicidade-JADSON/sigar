@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     LayoutDashboard, School, Users, FileText,
-    ChevronLeft, ChevronRight, Menu, X, LogOut, PlusCircle, BarChart3, TrendingUp, ClipboardCheck, GraduationCap, ClipboardList, Bell, Shield
+    ChevronLeft, ChevronRight, Menu, X, LogOut, PlusCircle, BarChart3, TrendingUp, ClipboardCheck, GraduationCap, ClipboardList, Bell, Shield, FileStack, Library
 } from 'lucide-react';
 import { ViewState } from '../../types';
 
@@ -14,6 +14,7 @@ interface SidebarProps {
     hasNotifications?: boolean;
     notificationCount?: number;
     isAdmin?: boolean;
+    userRole?: string;
 }
 
 interface NavItemProps {
@@ -36,7 +37,7 @@ const NavItem: React.FC<NavItemProps> = ({ icon: Icon, label, isActive, isCollap
                 : isHighlighted
                     ? 'bg-brand-orange/5 text-brand-orange hover:bg-brand-orange/10'
                     : 'text-slate-500 hover:bg-slate-50 hover:text-brand-orange'
-            }`}
+            } `}
         title={isCollapsed ? label : ''}
     >
         {isActive && (
@@ -66,7 +67,7 @@ const NavItem: React.FC<NavItemProps> = ({ icon: Icon, label, isActive, isCollap
     </button>
 );
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, userName, userEmail, isAdmin, notificationCount = 0 }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, userName, userEmail, isAdmin, userRole, notificationCount = 0 }) => {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [isMobileOpen, setIsMobileOpen] = useState(false);
 
@@ -96,8 +97,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
         { icon: ClipboardList, label: 'Análise SAEB', view: 'ANALISE_SAEB' as ViewState },
         { icon: ClipboardCheck, label: 'Análise CNCA/PNRA', view: 'ANALISE_CNCA_PNRA' as ViewState },
         { icon: BarChart3, label: 'Indicadores', view: 'INDICADORES' as ViewState },
+        { icon: FileStack, label: 'Instrumentais de Gestão', view: 'INSTRUMENTAIS_GESTAO' as ViewState },
+        { icon: Library, label: 'Conselho de Classe', view: 'CONSELHO_CLASSE' as ViewState },
         { icon: Bell, label: 'Notificações', view: 'NOTIFICACOES' as ViewState, isHighlighted: true, hasNotification: notificationCount > 0 },
     ];
+
+
 
     if (isAdmin) {
         managementNavItems.push({ icon: Shield, label: 'Auditoria', view: 'AUDIT_LOGS' as ViewState });
