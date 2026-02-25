@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { Visita, Escola, Coordenador, TopicoPauta, EncaminhamentoVisita } from '../types';
 
 interface PrintableVisitReportProps {
@@ -15,7 +16,7 @@ export const PrintableVisitReport: React.FC<PrintableVisitReportProps> = ({ visi
     const emissionDate = new Date().toLocaleDateString('pt-BR');
     const emissionTime = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-    return (
+    return createPortal(
         <div id="print-report" className="hidden print:block bg-white text-slate-900" style={{ fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif" }}>
 
             {/* ====== INSTITUTIONAL HEADER ====== */}
@@ -267,6 +268,7 @@ export const PrintableVisitReport: React.FC<PrintableVisitReportProps> = ({ visi
                 <span>SIGAR • Sistema Integrado de Gestão e Acompanhamento Regional</span>
                 <span>Secretaria Municipal de Educação • Humberto de Campos/MA</span>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

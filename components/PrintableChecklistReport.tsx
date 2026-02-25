@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { Escola, ItemAcompanhamento } from '../types';
 
 interface PrintableChecklistReportProps {
@@ -44,7 +45,7 @@ export const PrintableChecklistReport: React.FC<PrintableChecklistReportProps> =
         );
     };
 
-    return (
+    return createPortal(
         <div className="print-only" style={{ padding: '0px', width: '210mm', minHeight: '297mm', background: 'white' }}>
             {/* Header */}
             <div className="text-center font-serif text-black mb-6">
@@ -88,6 +89,7 @@ export const PrintableChecklistReport: React.FC<PrintableChecklistReportProps> =
                     </div>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

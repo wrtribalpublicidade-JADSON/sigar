@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 
 interface PrintableAtaProps {
     reuniao: any;
@@ -18,7 +19,7 @@ export const PrintableAta: React.FC<PrintableAtaProps> = ({ reuniao }) => {
         formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
     }
 
-    return (
+    return createPortal(
         <div id="print-ata" className="hidden print:block bg-white text-slate-900" style={{ fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif" }}>
 
             {/* ====== INSTITUTIONAL HEADER ====== */}
@@ -161,6 +162,7 @@ export const PrintableAta: React.FC<PrintableAtaProps> = ({ reuniao }) => {
                 <span>SIGAR • Documento Gerado em {emissionDate} às {emissionTime}</span>
                 <span>Secretaria Municipal de Educação</span>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
