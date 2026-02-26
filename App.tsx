@@ -31,6 +31,7 @@ import { supabase } from './services/supabase';
 import { useNotification } from './context/NotificationContext';
 import { generateUUID, checkSchoolPendencies } from './utils';
 import { hasAccess } from './utils/permissions';
+import { loadPermissions as preloadPermissions } from './services/permissoesService';
 import { ESCOLAS_MOCK, VISITAS_MOCK, COORDENADORES_MOCK } from './constants';
 import { logAccess, logAudit } from './services/logService';
 const ADMIN_EMAIL = 'jadsoncsilv@gmail.com';
@@ -250,6 +251,7 @@ export default function App() {
         setUserName(name);
         setIsAuthenticated(true);
         fetchData(false, email);
+        preloadPermissions().catch(() => { });
       } else {
         setIsAuthenticated(false);
       }

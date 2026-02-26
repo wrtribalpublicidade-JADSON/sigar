@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Lock, Eye, Edit3, Save, CheckCircle, X, ChevronDown, ChevronRight, Info } from 'lucide-react';
+import { Shield, Lock, Eye, Edit3, Save, CheckCircle, X, ChevronDown, ChevronRight, Info, Loader2 } from 'lucide-react';
 import { PageHeader } from './ui/PageHeader';
+import { loadPermissions as loadPermissionsFromDB, savePermissions as savePermissionsToDB } from '../services/permissoesService';
 
 type AccessLevel = 'none' | 'readonly' | 'full';
 
@@ -79,18 +80,35 @@ const cycleAccess = (current: AccessLevel): AccessLevel => {
 };
 
 export const PermissoesManager: React.FC = () => {
-    const [permissions, setPermissions] = useState<Record<string, Record<string, AccessLevel>>>(() => {
-        try {
-            const saved = localStorage.getItem(STORAGE_KEY);
-            if (saved) return JSON.parse(saved);
-        } catch { }
-        return { ...DEFAULT_PERMISSIONS };
-    });
+    const [permissions, setPermissions] = useState<Record<string, Record<string, AccessLevel>>>({ ...DEFAULT_PERMISSIONS });
 
     const [selectedRole, setSelectedRole] = useState<string>(ALL_ROLES[0]);
     const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['Menu', 'Gestão', 'Análises', 'Sistema']));
     const [hasChanges, setHasChanges] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+
+    // Load from Supabase on mount
+    useEffect(() => {
+        (async () => {
+            try {
+                const dbPerms = await loadPermissionsFromDB();
+                // Merge with defaults: fill any missing roles/modules from defaults
+                const merged = { ...DEFAULT_PERMISSIONS };
+                for (const role of ALL_ROLES) {
+                    if (dbPerms[role]) {
+                        merged[role] = { ...merged[role], ...dbPerms[role] };
+                    }
+                }
+                setPermissions(merged);
+            } catch (err) {
+                console.error('Erro ao carregar permissões:', err);
+            } finally {
+                setLoading(false);
+            }
+        })();
+    }, []);
 
     const handleToggleAccess = (moduleId: string) => {
         const current = permissions[selectedRole]?.[moduleId] || 'none';
@@ -106,11 +124,18 @@ export const PermissoesManager: React.FC = () => {
         setSaved(false);
     };
 
-    const handleSave = () => {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(permissions));
-        setHasChanges(false);
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2500);
+    const handleSave = async () => {
+        setSaving(true);
+        try {
+            await savePermissionsToDB(permissions);
+            setHasChanges(false);
+            setSaved(true);
+            setTimeout(() => setSaved(false), 2500);
+        } catch (err: any) {
+            alert('Erro ao salvar permissões: ' + (err?.message || 'Falha desconhecida'));
+        } finally {
+            setSaving(false);
+        }
     };
 
     const handleSetAll = (access: AccessLevel) => {
@@ -143,6 +168,15 @@ export const PermissoesManager: React.FC = () => {
 
     const countByAccess = (access: AccessLevel) =>
         ALL_MODULES.filter(m => (rolePermissions[m.id] || 'none') === access).length;
+
+    if (loading) {
+        return (
+            <div className="flex flex-col items-center justify-center py-20 animate-fade-in">
+                <Loader2 className="w-8 h-8 text-brand-orange animate-spin mb-4" />
+                <p className="text-slate-500 text-sm font-medium">Carregando permissões...</p>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6 pb-12 animate-fade-in relative">
@@ -238,13 +272,13 @@ export const PermissoesManager: React.FC = () => {
                         )}
                         <button
                             onClick={handleSave}
-                            disabled={!hasChanges}
+                            disabled={!hasChanges || saving}
                             className={`flex items-center gap-2 px-5 py-2 rounded-xl font-bold text-sm transition-all ${hasChanges
                                 ? 'bg-brand-orange hover:bg-orange-600 text-white shadow-lg shadow-orange-500/20'
                                 : 'bg-slate-700 text-slate-400 cursor-not-allowed'
                                 }`}
                         >
-                            <Save className="w-4 h-4" /> Salvar Alterações
+                            <Save className="w-4 h-4" /> {saving ? 'Salvando...' : 'Salvar Alterações'}
                         </button>
                     </div>
                 </div>
