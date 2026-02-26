@@ -30,6 +30,7 @@ import { ViewState, Escola, Visita, Coordenador } from './types';
 import { supabase } from './services/supabase';
 import { useNotification } from './context/NotificationContext';
 import { generateUUID, checkSchoolPendencies } from './utils';
+import { hasAccess } from './utils/permissions';
 import { ESCOLAS_MOCK, VISITAS_MOCK, COORDENADORES_MOCK } from './constants';
 import { logAccess, logAudit } from './services/logService';
 const ADMIN_EMAIL = 'jadsoncsilv@gmail.com';
@@ -783,6 +784,23 @@ export default function App() {
   };
 
   const renderContent = () => {
+    // Enforce permissions — admins bypass
+    const effectiveRole = isAdmin ? undefined : effectiveUser?.funcao;
+    if (effectiveRole && !hasAccess(currentView, effectiveRole)) {
+      return (
+        <div className="flex flex-col items-center justify-center py-20 animate-fade-in">
+          <div className="w-20 h-20 bg-red-50 rounded-2xl flex items-center justify-center mb-6">
+            <svg className="w-10 h-10 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m0 0v2m0-2h2m-2 0H10m9.364-7.364A9 9 0 115.636 5.636a9 9 0 0113.728 0z" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-black text-slate-800 mb-2">Acesso Restrito</h2>
+          <p className="text-slate-500 text-sm max-w-md text-center">Seu perfil (<strong>{effectiveRole}</strong>) não possui permissão para acessar este módulo. Solicite acesso ao administrador do sistema.</p>
+          <button onClick={() => setCurrentView('DASHBOARD')} className="mt-6 px-6 py-2.5 bg-brand-orange text-white rounded-xl font-bold hover:bg-orange-600 transition">Voltar ao Início</button>
+        </div>
+      );
+    }
+
     switch (currentView) {
       case 'LISTA_ESCOLAS':
         return (
@@ -1081,23 +1099,30 @@ export default function App() {
       )}
 
       {currentView === 'DASHBOARD' ? (
-        <Dashboard
-          escolas={escolas}
-          visitas={visitas}
-          coordenadores={coordenadores}
-          currentUser={effectiveUser}
-          onNavigateToEscolas={() => setCurrentView('LISTA_ESCOLAS')}
-          onNavigateToVisitas={() => {
-            setCurrentView('NOVA_VISITA');
-            setSelectedVisit(null);
-          }}
-          onNavigateToDetail={(id) => {
-            setSelectedEscolaId(id);
-            setCurrentView('DETALHE_ESCOLA');
-          }}
-          onNavigateToNotifications={() => setCurrentView('NOTIFICACOES')}
-          notificationCount={notificationCount}
-        />
+        (!isAdmin && effectiveUser?.funcao && !hasAccess('DASHBOARD', effectiveUser.funcao)) ? (
+          <div className="flex flex-col items-center justify-center py-20 animate-fade-in">
+            <h2 className="text-2xl font-black text-slate-800 mb-2">Acesso Restrito</h2>
+            <p className="text-slate-500 text-sm">Seu perfil não possui acesso ao Dashboard.</p>
+          </div>
+        ) : (
+          <Dashboard
+            escolas={escolas}
+            visitas={visitas}
+            coordenadores={coordenadores}
+            currentUser={effectiveUser}
+            onNavigateToEscolas={() => setCurrentView('LISTA_ESCOLAS')}
+            onNavigateToVisitas={() => {
+              setCurrentView('NOVA_VISITA');
+              setSelectedVisit(null);
+            }}
+            onNavigateToDetail={(id) => {
+              setSelectedEscolaId(id);
+              setCurrentView('DETALHE_ESCOLA');
+            }}
+            onNavigateToNotifications={() => setCurrentView('NOTIFICACOES')}
+            notificationCount={notificationCount}
+          />
+        )
       ) : (
         renderContent()
       )}

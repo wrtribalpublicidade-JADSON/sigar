@@ -4,6 +4,7 @@ import {
     ChevronLeft, ChevronRight, Menu, X, LogOut, PlusCircle, BarChart3, TrendingUp, ClipboardCheck, GraduationCap, ClipboardList, Bell, Shield, FileStack, Library, KeyRound
 } from 'lucide-react';
 import { ViewState } from '../../types';
+import { getAccessForSidebarItem } from '../../utils/permissions';
 
 interface SidebarProps {
     currentView: ViewState;
@@ -109,6 +110,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
         managementNavItems.push({ icon: KeyRound, label: 'Permissões', view: 'PERMISSOES' as ViewState });
     }
 
+    // Filter items based on user role permissions (admins bypass)
+    const effectiveRole = isAdmin ? undefined : userRole;
+    const filteredMainNav = mainNavItems.filter(item => getAccessForSidebarItem(item.label, effectiveRole) !== 'none');
+    const filteredManagementNav = managementNavItems.filter(item => getAccessForSidebarItem(item.label, effectiveRole) !== 'none');
+    const showRegistrarVisita = getAccessForSidebarItem('Registrar Visita', effectiveRole) !== 'none';
+
     const SidebarContent = () => (
         <div className="flex flex-col h-full bg-white">
             {/* Logo */}
@@ -131,7 +138,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
                 <div>
                     {!isCollapsed && <p className="px-3 mb-3 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Menu</p>}
                     <div className="space-y-1">
-                        {mainNavItems.map(item => (
+                        {filteredMainNav.map(item => (
                             <NavItem
                                 key={item.view}
                                 icon={item.icon}
@@ -147,7 +154,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
                 <div>
                     {!isCollapsed && <p className="px-3 mb-3 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Gestão</p>}
                     <div className="space-y-1">
-                        {managementNavItems.map(item => (
+                        {filteredManagementNav.map(item => (
                             <NavItem
                                 key={item.view}
                                 icon={item.icon}
@@ -162,16 +169,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
                 </div>
 
                 {/* Quick Action */}
-                <div className="pt-4">
-                    <NavItem
-                        icon={PlusCircle}
-                        label="Registrar Visita"
-                        isActive={currentView === 'NOVA_VISITA'}
-                        isCollapsed={isCollapsed}
-                        onClick={() => { onNavigate('NOVA_VISITA'); setIsMobileOpen(false); }}
-                        isHighlighted={true}
-                    />
-                </div>
+                {showRegistrarVisita && (
+                    <div className="pt-4">
+                        <NavItem
+                            icon={PlusCircle}
+                            label="Registrar Visita"
+                            isActive={currentView === 'NOVA_VISITA'}
+                            isCollapsed={isCollapsed}
+                            onClick={() => { onNavigate('NOVA_VISITA'); setIsMobileOpen(false); }}
+                            isHighlighted={true}
+                        />
+                    </div>
+                )}
             </nav>
 
             {/* User Info & Footer */}
