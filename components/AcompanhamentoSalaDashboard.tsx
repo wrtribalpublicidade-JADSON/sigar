@@ -107,15 +107,6 @@ export const AcompanhamentoSalaDashboard: React.FC<AcompanhamentoSalaDashboardPr
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
                 <h2 className="text-2xl font-black text-slate-800 tracking-tight">Visão Geral das Observações</h2>
-                <div className="flex items-center gap-3 w-full sm:w-auto">
-                    <button className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-all shadow-sm">
-                        <Bell className="w-5 h-5" />
-                    </button>
-                    <button className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-md shadow-blue-600/20">
-                        <Plus className="w-5 h-5" />
-                        Nova Observação
-                    </button>
-                </div>
             </div>
 
             {/* Metricas */}

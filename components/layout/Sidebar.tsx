@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     LayoutDashboard, School, Users, FileText,
-    ChevronLeft, ChevronRight, Menu, X, LogOut, PlusCircle, BarChart3, TrendingUp, ClipboardCheck, GraduationCap, ClipboardList, Bell, Shield, FileStack, Library
+    ChevronLeft, ChevronRight, Menu, X, LogOut, PlusCircle, BarChart3, TrendingUp, ClipboardCheck, GraduationCap, ClipboardList, Bell, Shield, FileStack, Library, KeyRound
 } from 'lucide-react';
 import { ViewState } from '../../types';
 
@@ -106,6 +106,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
 
     if (isAdmin) {
         managementNavItems.push({ icon: Shield, label: 'Auditoria', view: 'AUDIT_LOGS' as ViewState });
+        managementNavItems.push({ icon: KeyRound, label: 'Permissões', view: 'PERMISSOES' as ViewState });
     }
 
     const SidebarContent = () => (

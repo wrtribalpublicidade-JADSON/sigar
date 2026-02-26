@@ -24,6 +24,7 @@ import { AuditLogDashboard } from './components/AuditLogDashboard';
 import { UserManagement } from './components/UserManagement';
 import { InstrumentaisGestao } from './components/InstrumentaisGestao';
 import { ConselhoClasse } from './components/ConselhoClasse';
+import { PermissoesManager } from './components/PermissoesManager';
 import { Preloader } from './components/ui/Preloader';
 import { ViewState, Escola, Visita, Coordenador } from './types';
 import { supabase } from './services/supabase';
@@ -1006,6 +1007,9 @@ export default function App() {
             isDemoMode={isDemoMode}
           />
         );
+      case 'PERMISSOES':
+        if (!isAdmin) return <div>Acesso restrito.</div>;
+        return <PermissoesManager />;
       default:
         return <div>Página não encontrada</div>;
     }

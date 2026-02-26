@@ -219,6 +219,10 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
                 <option value="Coordenador Regional">Coordenador Regional</option>
                 <option value="Administrador">Administrador</option>
                 <option value="Técnico">Técnico Pedagógico</option>
+                <option value="Professor">Professor</option>
+                <option value="Coordenador Pedagógico">Coordenador Pedagógico</option>
+                <option value="Gestor Geral">Gestor Geral</option>
+                <option value="Gestor Pedagógico">Gestor Pedagógico</option>
               </select>
             </div>
             <div>

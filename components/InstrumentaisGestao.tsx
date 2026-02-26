@@ -5,6 +5,8 @@ import { FileStack, Users, BookOpen, Target, FileText, Presentation, Upload, Clo
 import { Escola } from '../types';
 import { generateAtaDocx } from '../utils/docxUtils';
 import { PrintableAta } from './PrintableAta';
+import { igCicloReunioesService, igPlanoFormacaoService, igPlanoAcaoService, igPppService } from '../services/gestaoConselhoService';
+import { supabase } from '../services/supabase';
 
 type Tab = 'reunioes' | 'formacao' | 'acao' | 'pedagogica' | 'sala';
 
@@ -15,6 +17,7 @@ interface InstrumentaisGestaoProps {
 
 export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escolas = [], currentUser = '' }) => {
     const [activeTab, setActiveTab] = useState<Tab>('reunioes');
+    const [isLoading, setIsLoading] = useState(true);
 
     const tabs = [
         { id: 'reunioes', label: 'Ciclo de Reuniões', icon: Users },
@@ -46,22 +49,7 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
     const [showAtaModal, setShowAtaModal] = useState<any | null>(null);
     const [reuniaoParaImprimir, setReuniaoParaImprimir] = useState<any | null>(null);
 
-    const [mockReunioes, setMockReunioes] = useState<any[]>([
-        {
-            id: '1',
-            dataReuniao: '2026-02-18',
-            horaInicio: '08:00',
-            horaFim: '10:00',
-            tipo: 'Administrativa',
-            pauta: 'Alocação de Recursos Q1',
-            status: 'Realizada',
-            responsavel: 'João Silva',
-            local: 'Sala da Direção',
-            registro: 'Aprovada a realocação...',
-            encaminhamentos: 'João vai fazer X',
-            participantes: ['João Silva', 'Maria Sousa']
-        }
-    ]);
+    const [mockReunioes, setMockReunioes] = useState<any[]>([]);
 
     const [tiposReuniao, setTiposReuniao] = useState<string[]>(['Pedagógica', 'Administrativa', 'Conselho Escolar', 'Reunião de Pais e Mestres']);
     const [isGerenciandoTipos, setIsGerenciandoTipos] = useState(false);
@@ -80,21 +68,35 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
         setReuniaoForm({ ...reuniaoForm, participantes: reuniaoForm.participantes.filter(p => p !== nome) });
     };
 
-    const handleSaveReuniao = () => {
+    const handleSaveReuniao = async () => {
         if (!reuniaoForm.pauta || !reuniaoForm.dataReuniao) return;
 
-        let savedReuniao = { ...reuniaoForm, responsavel: currentUser || '' };
-        if (reuniaoForm.id) {
-            setMockReunioes(prev => prev.map(m => m.id === reuniaoForm.id ? savedReuniao : m));
-        } else {
-            savedReuniao.id = Date.now().toString();
-            setMockReunioes(prev => [...prev, savedReuniao]);
+        try {
+            let savedReuniao = { ...reuniaoForm, responsavel: currentUser || '' };
+            if (!savedReuniao.id) {
+                delete (savedReuniao as any).id;
+            }
+
+            // Format time strings (ensure length length is 5 e.g "10:00") or append :00
+            if (savedReuniao.horaInicio && savedReuniao.horaInicio.length === 5) savedReuniao.horaInicio += ':00';
+            if (savedReuniao.horaFim && savedReuniao.horaFim.length === 5) savedReuniao.horaFim += ':00';
+
+            const result = await igCicloReunioesService.save(savedReuniao);
+
+            if (reuniaoForm.id) {
+                setMockReunioes(prev => prev.map(m => m.id === reuniaoForm.id ? { ...result, participantes: result.participantes || [] } : m));
+            } else {
+                setMockReunioes(prev => [{ ...result, participantes: result.participantes || [] }, ...prev]);
+            }
+
+            setIsEditingReuniao(false);
+            setReuniaoForm({ id: '', dataReuniao: '', horaInicio: '', horaFim: '', local: '', registro: '', encaminhamentos: '', tipo: 'Pedagógica', pauta: '', status: 'Agendada', responsavel: currentUser || '', participantes: [] });
+
+            setShowAtaModal({ ...result, participantes: result.participantes || [] });
+        } catch (error) {
+            console.error("Erro ao salvar reunião:", error);
+            alert("Erro ao salvar reunião.");
         }
-
-        setIsEditingReuniao(false);
-        setReuniaoForm({ id: '', dataReuniao: '', horaInicio: '', horaFim: '', local: '', registro: '', encaminhamentos: '', tipo: 'Pedagógica', pauta: '', status: 'Agendada', responsavel: currentUser || '', participantes: [] });
-
-        setShowAtaModal(savedReuniao);
     };
 
     const handleEditReuniao = (reuniao: any) => {
@@ -107,9 +109,15 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
         setIsEditingReuniao(true);
     };
 
-    const handleDeleteReuniao = (id: string) => {
+    const handleDeleteReuniao = async (id: string) => {
         if (confirm('Tem certeza que deseja excluir este registro de reunião?')) {
-            setMockReunioes(prev => prev.filter(m => m.id !== id));
+            try {
+                await igCicloReunioesService.delete(id);
+                setMockReunioes(prev => prev.filter(m => m.id !== id));
+            } catch (error) {
+                console.error("Erro ao excluir reunião:", error);
+                alert("Erro ao excluir reunião.");
+            }
         }
     };
 
@@ -183,20 +191,29 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
         status: 'Não Iniciado',
         responsavel: ''
     });
-    const [mockMetas, setMockMetas] = useState([
-        { id: '1', descricao: 'Aprimorar leitura fluente do 2º ano', prazo: '2026-04-30', status: 'Em Andamento', responsavel: 'Silvana (Coordenadora)' },
-        { id: '2', descricao: 'Oficina de Matemática Divertida', prazo: '2026-03-15', status: 'Concluído', responsavel: 'Carlos (Professor)' },
-    ]);
+    const [mockMetas, setMockMetas] = useState<any[]>([]);
 
-    const handleSaveMeta = () => {
+    const handleSaveMeta = async () => {
         if (!metaForm.descricao) return;
-        if (metaForm.id) {
-            setMockMetas(prev => prev.map(m => m.id === metaForm.id ? metaForm : m));
-        } else {
-            setMockMetas(prev => [...prev, { ...metaForm, id: Date.now().toString() }]);
+        try {
+            let metaToSave = { ...metaForm };
+            if (!metaToSave.id) delete (metaToSave as any).id;
+
+            // Format dates simply
+
+            const result = await igPlanoAcaoService.save(metaToSave);
+
+            if (metaForm.id) {
+                setMockMetas(prev => prev.map(m => m.id === metaForm.id ? result : m));
+            } else {
+                setMockMetas(prev => [...prev, result]);
+            }
+            setIsEditingMeta(false);
+            setMetaForm({ id: '', descricao: '', prazo: '', status: 'Não Iniciado', responsavel: '' });
+        } catch (error) {
+            console.error("Erro ao salvar meta:", error);
+            alert("Erro ao salvar meta.");
         }
-        setIsEditingMeta(false);
-        setMetaForm({ id: '', descricao: '', prazo: '', status: 'Não Iniciado', responsavel: '' });
     };
 
     const handleEditMeta = (meta: any) => {
@@ -204,9 +221,15 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
         setIsEditingMeta(true);
     };
 
-    const handleDeleteMeta = (id: string) => {
+    const handleDeleteMeta = async (id: string) => {
         if (confirm('Tem certeza que deseja excluir esta meta?')) {
-            setMockMetas(prev => prev.filter(m => m.id !== id));
+            try {
+                await igPlanoAcaoService.delete(id);
+                setMockMetas(prev => prev.filter(m => m.id !== id));
+            } catch (error) {
+                console.error("Erro ao excluir meta:", error);
+                alert("Erro ao excluir meta.");
+            }
         }
     };
 
@@ -223,27 +246,40 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
         responsavel: currentUser || '',
         custo: ''
     });
-    const [mockFormacoes, setMockFormacoes] = useState([
-        {
-            id: '1',
-            especificacao: 'Metodologias Ativas no Ensino Fundamental',
-            objetivo: 'Capacitar professores no uso de ferramentas digitais e metodologias participativas.',
-            data: '2026-03-20',
-            publicoAlvo: 'Professores do Ensino Fundamental',
-            responsavel: 'Maria Nogueira',
-            custo: 'R$ 1.500,00'
-        }
-    ]);
+    const [mockFormacoes, setMockFormacoes] = useState<any[]>([]);
 
-    const handleSaveFormacao = () => {
-        if (!formacaoForm.especificacao || !formacaoForm.data) return;
-        if (formacaoForm.id) {
-            setMockFormacoes(prev => prev.map(m => m.id === formacaoForm.id ? formacaoForm : m));
-        } else {
-            setMockFormacoes(prev => [...prev, { ...formacaoForm, id: Date.now().toString() }]);
+    const handleSaveFormacao = async () => {
+        if (!formacaoForm.especificacao || !formacaoForm.data) return; // 'data_formacao' is fetched as 'data' from API map, but we save as data_formacao
+        try {
+            let saveForm = {
+                id: formacaoForm.id,
+                especificacao: formacaoForm.especificacao,
+                objetivo: formacaoForm.objetivo,
+                data_formacao: formacaoForm.data,
+                publico_alvo: formacaoForm.publicoAlvo,
+                responsavel: formacaoForm.responsavel,
+                custo: formacaoForm.custo
+            };
+            if (!saveForm.id) delete (saveForm as any).id;
+
+            const result = await igPlanoFormacaoService.save(saveForm);
+            const formattedResult = {
+                ...result,
+                data: result.data_formacao,
+                publicoAlvo: result.publico_alvo
+            };
+
+            if (formacaoForm.id) {
+                setMockFormacoes(prev => prev.map(m => m.id === formacaoForm.id ? formattedResult : m));
+            } else {
+                setMockFormacoes(prev => [...prev, formattedResult]);
+            }
+            setIsEditingFormacao(false);
+            setFormacaoForm({ id: '', especificacao: '', objetivo: '', data: '', publicoAlvo: '', responsavel: currentUser || '', custo: '' });
+        } catch (error) {
+            console.error("Erro ao salvar formacao:", error);
+            alert("Erro ao salvar formacao.");
         }
-        setIsEditingFormacao(false);
-        setFormacaoForm({ id: '', especificacao: '', objetivo: '', data: '', publicoAlvo: '', responsavel: currentUser || '', custo: '' });
     };
 
     const handleEditFormacao = (formacao: any) => {
@@ -251,9 +287,15 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
         setIsEditingFormacao(true);
     };
 
-    const handleDeleteFormacao = (id: string) => {
+    const handleDeleteFormacao = async (id: string) => {
         if (confirm('Tem certeza que deseja excluir esta formação?')) {
-            setMockFormacoes(prev => prev.filter(m => m.id !== id));
+            try {
+                await igPlanoFormacaoService.delete(id);
+                setMockFormacoes(prev => prev.filter(m => m.id !== id));
+            } catch (error) {
+                console.error("Erro ao excluir formação:", error);
+                alert("Erro ao excluir formação.");
+            }
         }
     };
 
@@ -263,30 +305,64 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
     // ============================================
     // ESTADOS: PROPOSTA PEDAGÓGICA (PPP)
     // ============================================
-    const [pppHistory, setPppHistory] = useState([
-        {
-            id: '1',
-            arquivo: 'PPP_2026_Escola_Municipal_Centro.pdf',
-            dataEnvio: '15/02/2026 às 14:30',
-            usuario: 'Jadson Carlos',
-            coordenadorRegional: 'Ana Silva',
-            status: 'Aprovado',
-            tamanho: '1.2 MB'
-        },
-        {
-            id: '2',
-            arquivo: 'Anexo_I_Metodologias_Ativas_Revisado.pdf',
-            dataEnvio: '20/02/2026 às 09:15',
-            usuario: 'Jadson Carlos',
-            coordenadorRegional: 'Ana Silva',
-            status: 'Aguardando Análise',
-            tamanho: '850 KB'
-        }
-    ]);
+    const [pppHistory, setPppHistory] = useState<any[]>([]);
 
     const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-    const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    // ============================================
+    // FETCH DATA EFECT
+    // ============================================
+    React.useEffect(() => {
+        const loadDados = async () => {
+            setIsLoading(true);
+            try {
+                const [reunioes, metas, formacoes, ppps] = await Promise.all([
+                    igCicloReunioesService.getAll(),
+                    igPlanoAcaoService.getAll(),
+                    igPlanoFormacaoService.getAll(),
+                    igPppService.getAll()
+                ]);
+
+                if (reunioes) {
+                    setMockReunioes(reunioes.map(r => ({
+                        ...r,
+                        horaInicio: r.hora_inicio ? r.hora_inicio.substring(0, 5) : '',
+                        horaFim: r.hora_fim ? r.hora_fim.substring(0, 5) : '',
+                        dataReuniao: r.data_reuniao,
+                        participantes: r.participantes || []
+                    })));
+                }
+
+                if (metas) setMockMetas(metas);
+
+                if (formacoes) {
+                    setMockFormacoes(formacoes.map(f => ({
+                        ...f,
+                        data: f.data_formacao,
+                        publicoAlvo: f.publico_alvo
+                    })));
+                }
+
+                if (ppps) {
+                    setPppHistory(ppps.map(p => ({
+                        ...p,
+                        dataEnvio: p.data_envio ? new Date(p.data_envio).toLocaleString('pt-BR') : '',
+                        tamanho: p.tamanho_kb,
+                        usuario: p.usuario || 'Sistema',
+                        coordenadorRegional: p.coordenador_regional || '-'
+                    })));
+                }
+            } catch (error) {
+                console.error("Erro ao carregar dados dos Instrumentais de Gestão:", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadDados();
+    }, []);
+
+    const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
 
@@ -305,41 +381,76 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
         const now = new Date();
         const formattedDate = `${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
 
-        const newPpp = {
-            id: Date.now().toString(),
-            arquivo: file.name,
-            dataEnvio: formattedDate,
-            usuario: currentUser || 'Usuário logado',
-            coordenadorRegional: 'Ana Silva',
-            status: 'Aguardando Análise',
-            tamanho: sizeFormatted
-        };
+        const filePath = `ppp/${Date.now()}_${file.name}`;
 
-        setPppHistory([newPpp, ...pppHistory]);
+        try {
+            // Upload to Supabase Storage
+            const { error: uploadError } = await supabase.storage
+                .from('ppp-files')
+                .upload(filePath, file, { cacheControl: '3600', upsert: false });
+
+            if (uploadError) throw uploadError;
+
+            // Get public URL
+            const { data: urlData } = supabase.storage.from('ppp-files').getPublicUrl(filePath);
+
+            const newPpp = {
+                arquivo: file.name,
+                arquivo_url: urlData.publicUrl || filePath,
+                data_envio: now.toISOString(),
+                usuario: currentUser || 'Usuário logado',
+                coordenador_regional: 'Ana Silva',
+                status: 'Aguardando Análise',
+                tamanho_kb: sizeFormatted
+            };
+
+            const result = await igPppService.save(newPpp);
+            setPppHistory([{
+                ...result,
+                dataEnvio: formattedDate,
+                tamanho: result.tamanho_kb,
+                coordenadorRegional: result.coordenador_regional
+            }, ...pppHistory]);
+        } catch (error: any) {
+            console.error("Erro ao salvar PPP:", error);
+            alert("Erro ao salvar PPP: " + (error?.message || JSON.stringify(error)));
+        }
 
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
-    const handleDownloadArquivo = (arquivoNome: string) => {
-        // Simulação de download
-        const blob = new Blob([`Conteúdo simulado do arquivo PDF: ${arquivoNome}`], { type: 'application/pdf' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = arquivoNome;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
+    const handleDeletePpp = async (id: string) => {
+        if (!confirm('Tem certeza que deseja excluir este arquivo?')) return;
+        try {
+            await igPppService.delete(id);
+            setPppHistory(prev => prev.filter(p => p.id !== id));
+        } catch (error: any) {
+            console.error('Erro ao excluir PPP:', error);
+            alert('Erro ao excluir arquivo: ' + (error?.message || ''));
+        }
     };
 
-    const toggleStatus = (id: string, currentStatus: string) => {
+    const handleDownloadArquivo = (item: any) => {
+        if (item.arquivo_url) {
+            window.open(item.arquivo_url, '_blank');
+        } else {
+            alert('URL do arquivo não disponível. O arquivo pode não ter sido enviado ao storage.');
+        }
+    };
+
+    const toggleStatus = async (id: string, currentStatus: string) => {
         let nextStatus = '';
         if (currentStatus === 'Aguardando Análise') nextStatus = 'Em Análise';
         else if (currentStatus === 'Em Análise') nextStatus = 'Aprovado';
         else nextStatus = 'Aguardando Análise';
 
-        setPppHistory(prev => prev.map(item => item.id === id ? { ...item, status: nextStatus } : item));
+        try {
+            await igPppService.updateStatus(id, nextStatus);
+            setPppHistory(prev => prev.map(item => item.id === id ? { ...item, status: nextStatus } : item));
+        } catch (error) {
+            console.error("Erro ao atualizar status do PPP:", error);
+            alert("Erro ao atualizar status");
+        }
     };
 
     const renderTabContent = () => {
@@ -891,6 +1002,7 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
                                         <th className="p-4 py-3">Responsável</th>
                                         <th className="p-4 py-3">Coordenador Regional</th>
                                         <th className="p-4 py-3">Status</th>
+                                        <th className="p-4 py-3 text-center">Ações</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
@@ -898,7 +1010,7 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
                                         <tr key={item.id} className="hover:bg-slate-50 transition-colors">
                                             <td
                                                 className="p-4 text-sm font-bold text-blue-600 hover:text-blue-700 cursor-pointer underline decoration-blue-200 underline-offset-4"
-                                                onClick={() => handleDownloadArquivo(item.arquivo)}
+                                                onClick={() => handleDownloadArquivo(item)}
                                             >
                                                 {item.arquivo}
                                             </td>
@@ -910,13 +1022,22 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
                                                 <span
                                                     onClick={() => toggleStatus(item.id, item.status)}
                                                     className={`px-2.5 py-1 rounded-md text-xs font-bold cursor-pointer transition-colors active:scale-95 inline-block select-none ${item.status === 'Aprovado' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' :
-                                                            item.status === 'Aguardando Análise' ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' :
-                                                                item.status === 'Em Análise' ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' :
-                                                                    'bg-slate-100 text-slate-700'
+                                                        item.status === 'Aguardando Análise' ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' :
+                                                            item.status === 'Em Análise' ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' :
+                                                                'bg-slate-100 text-slate-700'
                                                         }`}
                                                 >
                                                     {item.status}
                                                 </span>
+                                            </td>
+                                            <td className="p-4 text-center">
+                                                <button
+                                                    onClick={() => handleDeletePpp(item.id)}
+                                                    title="Excluir arquivo"
+                                                    className="w-9 h-9 border border-slate-200 rounded-xl flex items-center justify-center text-slate-400 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all mx-auto"
+                                                >
+                                                    <Trash2 size={15} />
+                                                </button>
                                             </td>
                                         </tr>
                                     ))}
@@ -957,7 +1078,14 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
 
             {/* Content Area */}
             <div className="mt-6">
-                {renderTabContent()}
+                {isLoading ? (
+                    <div className="flex items-center justify-center p-12 bg-white rounded-2xl border border-slate-200">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-800"></div>
+                        <span className="ml-3 text-slate-500 font-medium">Carregando dados...</span>
+                    </div>
+                ) : (
+                    renderTabContent()
+                )}
 
                 {/* Modal de Configuração da Ata */}
                 {showAtaModal && (

@@ -4,11 +4,13 @@ import { Users, BookOpen, UserCheck, AlertTriangle, GraduationCap, Edit, Trash2,
 import { CadastroTurmaModal, TurmaData } from './modals/CadastroTurmaModal';
 import { StudentReportModal } from './modals/StudentReportModal';
 import { ReuniaoEstudantilForm } from './ReuniaoEstudantilForm';
+import { ccAcompanhamentoDocenteService, ccEncaminhamentosService } from '../services/gestaoConselhoService';
 
 type Tab = 'estudantil' | 'avaliacao' | 'acompanhamento' | 'encaminhamentos';
 
 export const ConselhoClasse: React.FC = () => {
     const [activeTab, setActiveTab] = useState<Tab>('estudantil');
+    const [isLoading, setIsLoading] = useState(true);
 
     // ============================================
     // ESTADOS: AVALIAÇÃO DOCENTE
@@ -49,6 +51,30 @@ export const ConselhoClasse: React.FC = () => {
 
     const [editingGradesStudentId, setEditingGradesStudentId] = useState<number | null>(null);
     const [gradeForm, setGradeForm] = useState({ av1: '', av2: '', av3: '', rec: '' });
+    const [isAddingStudent, setIsAddingStudent] = useState(false);
+    const [newStudentName, setNewStudentName] = useState('');
+
+    const handleAddStudent = () => {
+        if (!newStudentName.trim()) return;
+        const newId = studentsAvaliacao.length > 0 ? Math.max(...studentsAvaliacao.map(s => s.id)) + 1 : 1;
+        const newStudent = {
+            id: newId,
+            name: newStudentName.trim().toUpperCase(),
+            fre: 'B', par: 'B', mat: 'B', atv: 'B', com: 'B', pes: 'B', con: 'B',
+            notas: { av1: 0, av2: 0, av3: 0, rec: null },
+            media: 0,
+            parecer: 'BOM'
+        };
+        setStudentsAvaliacao(prev => [...prev, newStudent]);
+        setNewStudentName('');
+        setIsAddingStudent(false);
+    };
+
+    const handleDeleteStudent = (id: number) => {
+        if (confirm('Tem certeza que deseja remover este estudante?')) {
+            setStudentsAvaliacao(prev => prev.filter(s => s.id !== id));
+        }
+    };
 
     const handleOpenGradeEditor = (student: any) => {
         setEditingGradesStudentId(student.id);
@@ -116,7 +142,23 @@ export const ConselhoClasse: React.FC = () => {
         );
     };
 
-    const renderConceptBadge = (concept: string) => {
+    const toggleConcept = (studentId: number, field: string) => {
+        setStudentsAvaliacao(prev => prev.map(student => {
+            if (student.id === studentId) {
+                const currentConcept = student[field];
+                let nextConcept = 'E';
+                if (currentConcept === 'E') nextConcept = 'B';
+                else if (currentConcept === 'B') nextConcept = 'R';
+                else if (currentConcept === 'R') nextConcept = 'I';
+                else if (currentConcept === 'I') nextConcept = 'E';
+
+                return { ...student, [field]: nextConcept };
+            }
+            return student;
+        }));
+    };
+
+    const renderConceptBadge = (studentId: number, field: string, concept: string) => {
         let colors = '';
         if (concept === 'E') colors = 'bg-emerald-50 text-emerald-500 border-emerald-200';
         else if (concept === 'B') colors = 'bg-blue-50 text-blue-500 border-blue-200';
@@ -125,7 +167,7 @@ export const ConselhoClasse: React.FC = () => {
         else colors = 'bg-slate-50 text-slate-500 border-slate-200';
 
         return (
-            <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold mx-auto transition-transform hover:scale-110 cursor-pointer ${colors}`}>
+            <div onClick={() => toggleConcept(studentId, field)} className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold mx-auto transition-transform hover:scale-110 cursor-pointer ${colors} select-none`}>
                 {concept}
             </div>
         );
@@ -182,30 +224,52 @@ export const ConselhoClasse: React.FC = () => {
         intervencao: ''
     });
 
-    const [mockAcompanhamentos, setMockAcompanhamentos] = useState([
-        {
-            id: '1',
-            professor: 'Profa. Márcia',
-            componente: 'História',
-            turma: '8º Ano A',
-            periodoLetivo: '1º Bimestre',
-            data: '2026-03-10',
-            estudante: 'João Pedro Alves',
-            lider: 'Ana Beatriz Souza',
-            dificuldades: 'Desatenção e conversas paralelas recolhidas durante as explicações, afetando o desempenho na última avaliação.',
-            intervencao: 'Mudança de lugar para a primeira fileira. Acordo de metas de atenção com o líder da turma como apoio. Notificação no diário.'
-        }
-    ]);
+    const [mockAcompanhamentos, setMockAcompanhamentos] = useState<any[]>([]);
 
-    const handleSaveAcomp = () => {
+    const handleSaveAcomp = async () => {
         if (!acompForm.professor || !acompForm.estudante) return;
-        if (acompForm.id) {
-            setMockAcompanhamentos(prev => prev.map(m => m.id === acompForm.id ? acompForm : m));
-        } else {
-            setMockAcompanhamentos(prev => [...prev, { ...acompForm, id: Date.now().toString() }]);
+        try {
+            let acToSave = {
+                id: acompForm.id,
+                professor: acompForm.professor,
+                componente_curricular: acompForm.componente,
+                turma_nome: acompForm.turma,
+                periodo_letivo: acompForm.periodoLetivo,
+                data_registro: acompForm.data,
+                estudante_nome: acompForm.estudante,
+                lider_turma: acompForm.lider,
+                dificuldades: acompForm.dificuldades,
+                intervencao_pedagogica: acompForm.intervencao
+            };
+
+            if (!acToSave.id) delete (acToSave as any).id;
+
+            const result = await ccAcompanhamentoDocenteService.save(acToSave);
+
+            const formattedResult = {
+                id: result.id,
+                professor: result.professor,
+                componente: result.componente_curricular,
+                turma: result.turma_nome,
+                periodoLetivo: result.periodo_letivo,
+                data: result.data_registro,
+                estudante: result.estudante_nome,
+                lider: result.lider_turma,
+                dificuldades: result.dificuldades,
+                intervencao: result.intervencao_pedagogica
+            };
+
+            if (acompForm.id) {
+                setMockAcompanhamentos(prev => prev.map(m => m.id === acompForm.id ? formattedResult : m));
+            } else {
+                setMockAcompanhamentos(prev => [formattedResult, ...prev]);
+            }
+            setIsEditingAcomp(false);
+            setAcompForm({ id: '', professor: '', componente: '', turma: '', periodoLetivo: '1º Bimestre', data: '', estudante: '', lider: '', dificuldades: '', intervencao: '' });
+        } catch (error) {
+            console.error("Erro ao salvar acompanhamento:", error);
+            alert("Erro ao salvar acompanhamento");
         }
-        setIsEditingAcomp(false);
-        setAcompForm({ id: '', professor: '', componente: '', turma: '', periodoLetivo: '1º Bimestre', data: '', estudante: '', lider: '', dificuldades: '', intervencao: '' });
     };
 
     const handleEditAcomp = (acomp: any) => {
@@ -213,9 +277,15 @@ export const ConselhoClasse: React.FC = () => {
         setIsEditingAcomp(true);
     };
 
-    const handleDeleteAcomp = (id: string) => {
+    const handleDeleteAcomp = async (id: string) => {
         if (confirm('Tem certeza que deseja excluir este registro?')) {
-            setMockAcompanhamentos(prev => prev.filter(m => m.id !== id));
+            try {
+                await ccAcompanhamentoDocenteService.delete(id);
+                setMockAcompanhamentos(prev => prev.filter(m => m.id !== id));
+            } catch (error) {
+                console.error("Erro ao excluir acompanhamento", error);
+                alert("Erro ao excluir acompanhamento");
+            }
         }
     };
 
@@ -236,42 +306,51 @@ export const ConselhoClasse: React.FC = () => {
         responsavel: ''
     });
 
-    const [mockEncaminhamentos, setMockEncaminhamentos] = useState([
-        {
-            id: '1',
-            estudante: 'Lucas Silva Mendes',
-            turma: '7º Ano B',
-            tipo: 'Pedagógico',
-            descricao: 'Baixo rendimento em Matemática e dificuldade na entrega de atividades propostas.',
-            encaminhamento: 'Acompanhamento no contraturno com monitoria de Matemática. Conversa com a família agendada para repassar cronograma.',
-            data: '2026-03-12',
-            periodoLetivo: '1º Bimestre',
-            status: 'Em Andamento',
-            responsavel: 'Coord. Ana Paula'
-        },
-        {
-            id: '2',
-            estudante: 'Mariana Costa',
-            turma: '9º Ano A',
-            tipo: 'Psicológico',
-            descricao: 'Aluna tem se mostrado muito retraída e chorosa após o intervalo.',
-            encaminhamento: 'Encaminhamento para acolhimento com o psicólogo escolar. Notificação preventiva aos responsáveis.',
-            data: '2026-03-15',
-            periodoLetivo: '1º Bimestre',
-            status: 'Pendente',
-            responsavel: 'Psic. Roberto'
-        }
-    ]);
+    const [mockEncaminhamentos, setMockEncaminhamentos] = useState<any[]>([]);
 
-    const handleSaveEnc = () => {
+    const handleSaveEnc = async () => {
         if (!encForm.estudante || !encForm.descricao) return;
-        if (encForm.id) {
-            setMockEncaminhamentos(prev => prev.map(m => m.id === encForm.id ? encForm : m));
-        } else {
-            setMockEncaminhamentos(prev => [...prev, { ...encForm, id: Date.now().toString() }]);
+        try {
+            let encToSave = {
+                id: encForm.id,
+                estudante_nome: encForm.estudante,
+                turma_nome: encForm.turma,
+                tipo_intervencao: encForm.tipo,
+                descricao_caso: encForm.descricao,
+                encaminhamento_proposto: encForm.encaminhamento,
+                data_registro: encForm.data,
+                periodo_letivo: encForm.periodoLetivo,
+                status: encForm.status,
+                responsavel_acao: encForm.responsavel
+            };
+            if (!encToSave.id) delete (encToSave as any).id;
+
+            const result = await ccEncaminhamentosService.save(encToSave);
+
+            const formattedResult = {
+                id: result.id,
+                estudante: result.estudante_nome,
+                turma: result.turma_nome,
+                tipo: result.tipo_intervencao,
+                descricao: result.descricao_caso,
+                encaminhamento: result.encaminhamento_proposto,
+                data: result.data_registro,
+                periodoLetivo: result.periodo_letivo,
+                status: result.status,
+                responsavel: result.responsavel_acao
+            };
+
+            if (encForm.id) {
+                setMockEncaminhamentos(prev => prev.map(m => m.id === encForm.id ? formattedResult : m));
+            } else {
+                setMockEncaminhamentos(prev => [formattedResult, ...prev]);
+            }
+            setIsEditingEnc(false);
+            setEncForm({ id: '', estudante: '', turma: '', tipo: 'Pedagógico', descricao: '', encaminhamento: '', data: '', periodoLetivo: '1º Bimestre', status: 'Pendente', responsavel: '' });
+        } catch (error) {
+            console.error("Erro ao salvar encaminhamento:", error);
+            alert("Erro ao salvar acompanhamento");
         }
-        setIsEditingEnc(false);
-        setEncForm({ id: '', estudante: '', turma: '', tipo: 'Pedagógico', descricao: '', encaminhamento: '', data: '', periodoLetivo: '1º Bimestre', status: 'Pendente', responsavel: '' });
     };
 
     const handleEditEnc = (enc: any) => {
@@ -279,9 +358,15 @@ export const ConselhoClasse: React.FC = () => {
         setIsEditingEnc(true);
     };
 
-    const handleDeleteEnc = (id: string) => {
+    const handleDeleteEnc = async (id: string) => {
         if (confirm('Tem certeza que deseja excluir este registro de encaminhamento?')) {
-            setMockEncaminhamentos(prev => prev.filter(m => m.id !== id));
+            try {
+                await ccEncaminhamentosService.delete(id);
+                setMockEncaminhamentos(prev => prev.filter(m => m.id !== id));
+            } catch (error) {
+                console.error("Erro ao excluir encaminhamento", error);
+                alert("Erro ao excluir");
+            }
         }
     };
 
@@ -291,6 +376,54 @@ export const ConselhoClasse: React.FC = () => {
         { id: 'acompanhamento', label: 'Acompanhamento Docente', icon: UserCheck },
         { id: 'encaminhamentos', label: 'Encaminhamentos e Intervenções', icon: AlertTriangle }
     ];
+
+    React.useEffect(() => {
+        const loadDocs = async () => {
+            setIsLoading(true);
+            try {
+                const [acomp, encs] = await Promise.all([
+                    ccAcompanhamentoDocenteService.getAll(),
+                    ccEncaminhamentosService.getAll()
+                ]);
+
+                if (acomp) {
+                    setMockAcompanhamentos(acomp.map(a => ({
+                        id: a.id,
+                        professor: a.professor,
+                        componente: a.componente_curricular,
+                        turma: a.turma_nome,
+                        periodoLetivo: a.periodo_letivo,
+                        data: a.data_registro ? a.data_registro.substring(0, 10) : '',
+                        estudante: a.estudante_nome,
+                        lider: a.lider_turma || '',
+                        dificuldades: a.dificuldades || '',
+                        intervencao: a.intervencao_pedagogica || ''
+                    })));
+                }
+
+                if (encs) {
+                    setMockEncaminhamentos(encs.map(e => ({
+                        id: e.id,
+                        estudante: e.estudante_nome,
+                        turma: e.turma_nome,
+                        tipo: e.tipo_intervencao,
+                        descricao: e.descricao_caso,
+                        encaminhamento: e.encaminhamento_proposto,
+                        data: e.data_registro ? e.data_registro.substring(0, 10) : '',
+                        periodoLetivo: e.periodo_letivo,
+                        status: e.status,
+                        responsavel: e.responsavel_acao
+                    })));
+                }
+            } catch (error) {
+                console.error("Erro ao carregar dados do Conselho de Classe:", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadDocs();
+    }, []);
 
     const renderTabContent = () => {
         switch (activeTab) {
@@ -636,13 +769,13 @@ export const ConselhoClasse: React.FC = () => {
                                                                 <span className="group-hover/btn:text-emerald-600 transition-colors border-b border-transparent group-hover/btn:border-emerald-200 pb-0.5">{student.name}</span>
                                                             </button>
                                                         </td>
-                                                        <td className="p-4 text-center">{renderConceptBadge(student.fre)}</td>
-                                                        <td className="p-4 text-center">{renderConceptBadge(student.par)}</td>
-                                                        <td className="p-4 text-center">{renderConceptBadge(student.mat)}</td>
-                                                        <td className="p-4 text-center">{renderConceptBadge(student.atv)}</td>
-                                                        <td className="p-4 text-center">{renderConceptBadge(student.com)}</td>
-                                                        <td className="p-4 text-center">{renderConceptBadge(student.pes)}</td>
-                                                        <td className="p-4 text-center">{renderConceptBadge(student.con)}</td>
+                                                        <td className="p-4 text-center">{renderConceptBadge(student.id, 'fre', student.fre)}</td>
+                                                        <td className="p-4 text-center">{renderConceptBadge(student.id, 'par', student.par)}</td>
+                                                        <td className="p-4 text-center">{renderConceptBadge(student.id, 'mat', student.mat)}</td>
+                                                        <td className="p-4 text-center">{renderConceptBadge(student.id, 'atv', student.atv)}</td>
+                                                        <td className="p-4 text-center">{renderConceptBadge(student.id, 'com', student.com)}</td>
+                                                        <td className="p-4 text-center">{renderConceptBadge(student.id, 'pes', student.pes)}</td>
+                                                        <td className="p-4 text-center">{renderConceptBadge(student.id, 'con', student.con)}</td>
                                                         <td className="p-4 text-center">
                                                             <button onClick={() => handleOpenGradeEditor(student)} className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-bold text-xs px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer min-w-[3rem]">
                                                                 {student.media.toFixed(1)}
@@ -659,7 +792,10 @@ export const ConselhoClasse: React.FC = () => {
 
                                     {/* Footer */}
                                     <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-between items-center rounded-b-2xl">
-                                        <button className="text-sm font-bold text-slate-500 flex items-center gap-2 hover:text-emerald-600 transition-colors disabled:opacity-50" disabled>
+                                        <button
+                                            onClick={() => setIsAddingStudent(true)}
+                                            className="text-sm font-bold text-slate-500 flex items-center gap-2 hover:text-emerald-600 transition-colors"
+                                        >
                                             <Users className="w-4 h-4" /> Adicionar Novo Estudante
                                         </button>
                                         <div className="flex items-center gap-4 text-xs font-bold text-slate-400">
@@ -673,6 +809,45 @@ export const ConselhoClasse: React.FC = () => {
                                             </div>
                                         </div>
                                     </div>
+
+                                    {/* Modal Adicionar Estudante */}
+                                    {isAddingStudent && (
+                                        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm animate-fade-in">
+                                            <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-scale-in">
+                                                <div className="bg-emerald-600 p-6 text-white flex justify-between items-center">
+                                                    <div>
+                                                        <h3 className="text-xl font-bold flex items-center gap-2">
+                                                            <Users className="w-5 h-5" /> Novo Estudante
+                                                        </h3>
+                                                        <p className="text-emerald-100 text-xs mt-1">O estudante será adicionado com conceitos padrão (B).</p>
+                                                    </div>
+                                                    <button onClick={() => { setIsAddingStudent(false); setNewStudentName(''); }} className="w-8 h-8 rounded-full bg-emerald-700 hover:bg-emerald-800 text-emerald-200 flex items-center justify-center transition-colors">
+                                                        &times;
+                                                    </button>
+                                                </div>
+                                                <div className="p-6">
+                                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Nome Completo do Estudante</label>
+                                                    <input
+                                                        type="text"
+                                                        value={newStudentName}
+                                                        onChange={e => setNewStudentName(e.target.value)}
+                                                        onKeyDown={e => { if (e.key === 'Enter') handleAddStudent(); }}
+                                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 uppercase"
+                                                        placeholder="Ex: JOÃO PEDRO SILVA"
+                                                        autoFocus
+                                                    />
+                                                </div>
+                                                <div className="bg-slate-50 px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
+                                                    <button onClick={() => { setIsAddingStudent(false); setNewStudentName(''); }} className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-5 py-2.5 rounded-xl font-semibold text-sm transition-colors">
+                                                        Cancelar
+                                                    </button>
+                                                    <button onClick={handleAddStudent} className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-semibold text-sm shadow-lg shadow-emerald-500/20 transition-colors">
+                                                        Adicionar
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </>
                         )}
@@ -1106,7 +1281,14 @@ export const ConselhoClasse: React.FC = () => {
             </div>
 
             <div className="mt-8">
-                {renderTabContent()}
+                {isLoading && (activeTab === 'acompanhamento' || activeTab === 'encaminhamentos') ? (
+                    <div className="flex items-center justify-center p-12 bg-white rounded-2xl border border-slate-200">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-800"></div>
+                        <span className="ml-3 text-slate-500 font-medium">Carregando dados...</span>
+                    </div>
+                ) : (
+                    renderTabContent()
+                )}
             </div>
             {editingGradesStudentId && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm animate-fade-in">
