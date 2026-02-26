@@ -110,9 +110,25 @@ export default function App() {
 
       const activeSchoolIds = (escData || []).map(e => e.id);
 
-      const { data: metasData } = await supabase.from('metas_acao').select('*').in('escola_id', activeSchoolIds);
-      const { data: rhData } = await supabase.from('recursos_humanos').select('*').in('escola_id', activeSchoolIds);
-      const { data: acompData } = await supabase.from('acompanhamento_mensal').select('*').in('escola_id', activeSchoolIds);
+      const [
+        { data: metasData },
+        { data: rhData },
+        { data: acompData },
+        { data: parcData },
+        { data: cncaData },
+        { data: seamaData },
+        { data: saebData },
+        { data: idebData }
+      ] = await Promise.all([
+        supabase.from('metas_acao').select('*').in('escola_id', activeSchoolIds),
+        supabase.from('recursos_humanos').select('*').in('escola_id', activeSchoolIds),
+        supabase.from('acompanhamento_mensal').select('*').in('escola_id', activeSchoolIds),
+        supabase.from('registros_fluencia_parc').select('*').in('escola_id', activeSchoolIds),
+        supabase.from('registros_cnca').select('*').in('escola_id', activeSchoolIds),
+        supabase.from('registros_seama').select('*').in('escola_id', activeSchoolIds),
+        supabase.from('registros_saeb').select('*').in('escola_id', activeSchoolIds),
+        supabase.from('registros_ideb').select('*').in('escola_id', activeSchoolIds)
+      ]);
 
       const mappedEscolas: Escola[] = (escData || []).map((e: any) => ({
         id: e.id,
@@ -123,7 +139,44 @@ export default function App() {
         segmentos: e.segmentos || [],
         alunosMatriculados: e.alunos_matriculados,
         indicadores: e.indicadores || { ideb: 0, frequenciaMedia: 0, fluenciaLeitora: 0, taxaAprovacao: 0 },
-        dadosEducacionais: e.dados_educacionais || {},
+        // Construct dadosEducacionais combining the DB JSON + Relational Table arrays
+        dadosEducacionais: {
+          ...(e.dados_educacionais || {}),
+          registrosFluenciaParc: parcData?.filter((r: any) => r.escola_id === e.id).map((r: any) => ({
+            id: r.id, escolaId: r.escola_id, polo: r.polo, ano: r.ano, edicao: r.edicao,
+            etapaAplicacao: r.etapa_aplicacao, tipoTurma: r.tipo_turma, turma: r.turma,
+            participacao: r.participacao, classificacao: r.classificacao,
+            dataRegistro: r.data_registro, responsavel: r.responsavel
+          })) || [],
+          registrosCNCA: cncaData?.filter((r: any) => r.escola_id === e.id).map((r: any) => ({
+            id: r.id, escolaId: r.escola_id, ano: r.ano, tipoAvaliacao: r.tipo_avaliacao,
+            componenteCurricular: r.componente_curricular, anoSerie: r.ano_serie, tipoTurma: r.tipo_turma,
+            estudantesAvaliados: r.estudantes_avaliados, estudantesPrevistos: r.estudantes_previstos,
+            defasagem: r.defasagem, aprendizadoIntermediario: r.aprendizado_intermediario,
+            aprendizadoAdequado: r.aprendizado_adequado, dataRegistro: r.data_registro, responsavel: r.responsavel
+          })) || [],
+          registrosSEAMA: seamaData?.filter((r: any) => r.escola_id === e.id).map((r: any) => ({
+            id: r.id, escolaId: r.escola_id, ano: r.ano, tipoAvaliacao: r.tipo_avaliacao,
+            componenteCurricular: r.componente_curricular, anoSerie: r.ano_serie,
+            estudantesAvaliados: r.estudantes_avaliados, estudantesPrevistos: r.estudantes_previstos,
+            abaixoBasico: r.abaixo_basico, basico: r.basico, adequado: r.adequado, avançado: r.avancado,
+            proficienciaMedia: r.proficiencia_media, dataRegistro: r.data_registro, responsavel: r.responsavel
+          })) || [],
+          registrosSAEB: saebData?.filter((r: any) => r.escola_id === e.id).map((r: any) => ({
+            id: r.id, escolaId: r.escola_id, ano: r.ano, tipoAvaliacao: r.tipo_avaliacao,
+            componenteCurricular: r.componente_curricular, anoSerie: r.ano_serie,
+            estudantesAvaliados: r.estudantes_avaliados, estudantesPrevistos: r.estudantes_previstos,
+            insuficiente: r.insuficiente, basico: r.basico, proficiente: r.proficiente, avançado: r.avancado,
+            proficienciaMedia: r.proficiencia_media, proficienciaLp: r.proficiencia_lp,
+            proficienciaMat: r.proficiencia_mat, notaPadronizadaLp: r.nota_padronizada_lp,
+            notaPadronizadaMat: r.nota_padronizada_mat, notaSaeb: r.nota_saeb,
+            dataRegistro: r.data_registro, responsavel: r.responsavel
+          })) || [],
+          registrosIDEB: idebData?.filter((r: any) => r.escola_id === e.id).map((r: any) => ({
+            id: r.id, escolaId: r.escola_id, ano: r.ano, anosIniciais: r.anos_iniciais,
+            anosFinais: r.anos_finais, dataRegistro: r.data_registro, responsavel: r.responsavel
+          })) || []
+        },
         planoAcao: metasData?.filter((m: any) => m.escola_id === e.id).map((m: any) => ({ ...m, status: m.status as any })) || [],
         recursosHumanos: rhData?.filter((r: any) => r.escola_id === e.id).map((r: any) => ({
           id: r.id,
@@ -286,6 +339,18 @@ export default function App() {
       const rhChanged = !currentEscola || currentEscola.recursosHumanos !== updatedEscola.recursosHumanos;
       const acompChanged = !currentEscola || currentEscola.acompanhamentoMensal !== updatedEscola.acompanhamentoMensal;
 
+      const parcChanged = !currentEscola || currentEscola.dadosEducacionais?.registrosFluenciaParc !== updatedEscola.dadosEducacionais?.registrosFluenciaParc;
+      const cncaChanged = !currentEscola || currentEscola.dadosEducacionais?.registrosCNCA !== updatedEscola.dadosEducacionais?.registrosCNCA;
+      const seamaChanged = !currentEscola || currentEscola.dadosEducacionais?.registrosSEAMA !== updatedEscola.dadosEducacionais?.registrosSEAMA;
+      const saebChanged = !currentEscola || currentEscola.dadosEducacionais?.registrosSAEB !== updatedEscola.dadosEducacionais?.registrosSAEB;
+      const idebChanged = !currentEscola || currentEscola.dadosEducacionais?.registrosIDEB !== updatedEscola.dadosEducacionais?.registrosIDEB;
+
+      // Extract JSON-only data by removing relational arrays
+      const {
+        registrosFluenciaParc, registrosCNCA, registrosSEAMA, registrosSAEB, registrosIDEB,
+        ...cleanDadosEducacionais
+      } = updatedEscola.dadosEducacionais;
+
       const { error } = await supabase.from('escolas').update({
         nome: updatedEscola.nome,
         gestor: updatedEscola.gestor,
@@ -294,7 +359,7 @@ export default function App() {
         segmentos: updatedEscola.segmentos,
         alunos_matriculados: updatedEscola.alunosMatriculados,
         indicadores: updatedEscola.indicadores,
-        dados_educacionais: updatedEscola.dadosEducacionais
+        dados_educacionais: cleanDadosEducacionais
       }).eq('id', updatedEscola.id);
 
       await logAudit('UPDATE', 'ESCOLA', updatedEscola.id, {
@@ -371,6 +436,95 @@ export default function App() {
             observacao: a.observacao
           })));
           if (upsertErr) throw upsertErr;
+        }
+      }
+
+      // --- Registros Fluência PARC ---
+      if (parcChanged) {
+        const registros = updatedEscola.dadosEducacionais.registrosFluenciaParc || [];
+        const currentIds = registros.map(r => r.id);
+        const { data: existing } = await supabase.from('registros_fluencia_parc').select('id').eq('escola_id', updatedEscola.id);
+        const idsToDelete = (existing || []).map((r: any) => r.id).filter((id: string) => !currentIds.includes(id));
+        if (idsToDelete.length > 0) await supabase.from('registros_fluencia_parc').delete().in('id', idsToDelete);
+        if (registros.length > 0) {
+          await supabase.from('registros_fluencia_parc').upsert(registros.map(r => ({
+            id: r.id, escola_id: updatedEscola.id, polo: r.polo, ano: r.ano, edicao: r.edicao,
+            etapa_aplicacao: r.etapaAplicacao, tipo_turma: r.tipoTurma, turma: r.turma,
+            participacao: r.participacao, classificacao: r.classificacao,
+            data_registro: r.dataRegistro, responsavel: r.responsavel
+          })));
+        }
+      }
+
+      // --- Registros CNCA ---
+      if (cncaChanged) {
+        const registros = updatedEscola.dadosEducacionais.registrosCNCA || [];
+        const currentIds = registros.map(r => r.id);
+        const { data: existing } = await supabase.from('registros_cnca').select('id').eq('escola_id', updatedEscola.id);
+        const idsToDelete = (existing || []).map((r: any) => r.id).filter((id: string) => !currentIds.includes(id));
+        if (idsToDelete.length > 0) await supabase.from('registros_cnca').delete().in('id', idsToDelete);
+        if (registros.length > 0) {
+          await supabase.from('registros_cnca').upsert(registros.map(r => ({
+            id: r.id, escola_id: updatedEscola.id, ano: r.ano, tipo_avaliacao: r.tipoAvaliacao,
+            componente_curricular: r.componenteCurricular, ano_serie: r.anoSerie, tipo_turma: r.tipoTurma,
+            estudantes_avaliados: r.estudantesAvaliados, estudantes_previstos: r.estudantesPrevistos,
+            defasagem: r.defasagem, aprendizado_intermediario: r.aprendizadoIntermediario,
+            aprendizado_adequado: r.aprendizadoAdequado, data_registro: r.dataRegistro, responsavel: r.responsavel
+          })));
+        }
+      }
+
+      // --- Registros SEAMA ---
+      if (seamaChanged) {
+        const registros = updatedEscola.dadosEducacionais.registrosSEAMA || [];
+        const currentIds = registros.map(r => r.id);
+        const { data: existing } = await supabase.from('registros_seama').select('id').eq('escola_id', updatedEscola.id);
+        const idsToDelete = (existing || []).map((r: any) => r.id).filter((id: string) => !currentIds.includes(id));
+        if (idsToDelete.length > 0) await supabase.from('registros_seama').delete().in('id', idsToDelete);
+        if (registros.length > 0) {
+          await supabase.from('registros_seama').upsert(registros.map(r => ({
+            id: r.id, escola_id: updatedEscola.id, ano: r.ano, tipo_avaliacao: r.tipoAvaliacao,
+            componente_curricular: r.componenteCurricular, ano_serie: r.anoSerie,
+            estudantes_avaliados: r.estudantesAvaliados, estudantes_previstos: r.estudantesPrevistos,
+            abaixo_basico: r.abaixoBasico, basico: r.basico, adequado: r.adequado, avancado: r.avançado,
+            proficiencia_media: r.proficienciaMedia, data_registro: r.dataRegistro, responsavel: r.responsavel
+          })));
+        }
+      }
+
+      // --- Registros SAEB ---
+      if (saebChanged) {
+        const registros = updatedEscola.dadosEducacionais.registrosSAEB || [];
+        const currentIds = registros.map(r => r.id);
+        const { data: existing } = await supabase.from('registros_saeb').select('id').eq('escola_id', updatedEscola.id);
+        const idsToDelete = (existing || []).map((r: any) => r.id).filter((id: string) => !currentIds.includes(id));
+        if (idsToDelete.length > 0) await supabase.from('registros_saeb').delete().in('id', idsToDelete);
+        if (registros.length > 0) {
+          await supabase.from('registros_saeb').upsert(registros.map(r => ({
+            id: r.id, escola_id: updatedEscola.id, ano: r.ano, tipo_avaliacao: r.tipoAvaliacao,
+            componente_curricular: r.componenteCurricular, ano_serie: r.anoSerie,
+            estudantes_avaliados: r.estudantesAvaliados, estudantes_previstos: r.estudantesPrevistos,
+            insuficiente: r.insuficiente, basico: r.basico, proficiente: r.proficiente, avancado: r.avançado,
+            proficiencia_media: r.proficienciaMedia, proficiencia_lp: r.proficienciaLp,
+            proficiencia_mat: r.proficienciaMat, nota_padronizada_lp: r.notaPadronizadaLp,
+            nota_padronizada_mat: r.notaPadronizadaMat, nota_saeb: r.notaSaeb,
+            data_registro: r.dataRegistro, responsavel: r.responsavel
+          })));
+        }
+      }
+
+      // --- Registros IDEB ---
+      if (idebChanged) {
+        const registros = updatedEscola.dadosEducacionais.registrosIDEB || [];
+        const currentIds = registros.map(r => r.id);
+        const { data: existing } = await supabase.from('registros_ideb').select('id').eq('escola_id', updatedEscola.id);
+        const idsToDelete = (existing || []).map((r: any) => r.id).filter((id: string) => !currentIds.includes(id));
+        if (idsToDelete.length > 0) await supabase.from('registros_ideb').delete().in('id', idsToDelete);
+        if (registros.length > 0) {
+          await supabase.from('registros_ideb').upsert(registros.map(r => ({
+            id: r.id, escola_id: updatedEscola.id, ano: r.ano, anos_iniciais: r.anosIniciais,
+            anos_finais: r.anosFinais, data_registro: r.dataRegistro, responsavel: r.responsavel
+          })));
         }
       }
 
@@ -793,6 +947,7 @@ export default function App() {
           <FluenciaParcDashboard
             escolas={escolas}
             coordenadores={coordenadores}
+            onUpdateEscola={handleUpdateEscola}
           />
         );
       case 'ANALISE_CNCA_PNRA':
@@ -800,6 +955,7 @@ export default function App() {
           <CncaPnraDashboard
             escolas={escolas}
             coordenadores={coordenadores}
+            onUpdateEscola={handleUpdateEscola}
           />
         );
       case 'ANALISE_SEAMA':
@@ -807,6 +963,7 @@ export default function App() {
           <SeamaDashboard
             escolas={escolas}
             coordenadores={coordenadores}
+            onUpdateEscola={handleUpdateEscola}
           />
         );
       case 'ANALISE_SAEB':
@@ -814,6 +971,7 @@ export default function App() {
           <SaebDashboard
             escolas={escolas}
             coordenadores={coordenadores}
+            onUpdateEscola={handleUpdateEscola}
           />
         );
       case 'INSTRUMENTAIS_GESTAO':

@@ -1,7 +1,10 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { PageHeader } from './ui/PageHeader';
 import { ChevronDown } from 'lucide-react';
 import { Escola, RegistroSEAMA, Segmento, Coordenador } from '../types';
+import { exportToCSV } from '../utils/exportUtils';
+import { parseCSV } from '../utils/importUtils';
+import { useNotification } from '../context/NotificationContext';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
     PieChart, Pie, Cell, Line, LineChart
@@ -15,6 +18,7 @@ import {
 interface SeamaDashboardProps {
     escolas: Escola[];
     coordenadores: Coordenador[];
+    onUpdateEscola?: (escola: Escola) => void;
 }
 
 const COLORS = {
@@ -26,7 +30,9 @@ const COLORS = {
 
 type TabType = 'GERAL' | 'EVOLUCAO' | 'RANKING';
 
-export const SeamaDashboard: React.FC<SeamaDashboardProps> = ({ escolas = [], coordenadores = [] }) => {
+export const SeamaDashboard: React.FC<SeamaDashboardProps> = ({ escolas = [], coordenadores = [], onUpdateEscola }) => {
+    const { showNotification } = useNotification();
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const [activeTab, setActiveTab] = useState<TabType>('GERAL');
 
     // Filtros
@@ -249,6 +255,114 @@ export const SeamaDashboard: React.FC<SeamaDashboardProps> = ({ escolas = [], co
         }).filter(d => d.proficiencia > 0 || d.abaixoBasico > 0);
     }, [allRecords, selectedPolo, selectedEscola, selectedComponente, selectedSerie]);
 
+    const handleExport = () => {
+        const columns = [
+            { header: 'Ano', key: 'ano' },
+            { header: 'Polo', key: 'polo' },
+            { header: 'Regional', key: 'coordenadorEscola' },
+            { header: 'Escola', key: 'escolaNome' },
+            { header: 'Localização', key: 'localizacao' },
+            { header: 'Série', key: 'anoSerie' },
+            { header: 'Componente Curricular', key: 'componenteCurricular' },
+            { header: 'Estudantes Previstos', key: 'estudantesPrevistos' },
+            { header: 'Estudantes Avaliados', key: 'estudantesAvaliados' },
+            { header: 'Proficiência Média', key: 'proficienciaMedia' },
+            { header: 'Avançado (%)', key: 'avançado' },
+            { header: 'Adequado (%)', key: 'adequado' },
+            { header: 'Básico (%)', key: 'basico' },
+            { header: 'Abaixo do Básico (%)', key: 'abaixoBasico' }
+        ];
+
+        exportToCSV(allRecords, columns, 'analise_seama_dados');
+    };
+
+    const handleImportClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const text = e.target?.result as string;
+                if (!text) throw new Error('Arquivo vazio');
+
+                const parsedData = parseCSV(text);
+                if (parsedData.length === 0) throw new Error('Nenhum dado válido encontrado no CSV');
+
+                const escolasToUpdate = new Map<string, Escola>();
+                let importedCount = 0;
+
+                parsedData.forEach(row => {
+                    const escolaNome = row['Escola'];
+                    if (!escolaNome) return;
+
+                    let targetEscola = escolasToUpdate.get(escolaNome) || escolas.find(esc => esc.nome === escolaNome);
+                    if (!targetEscola) return;
+
+                    if (!escolasToUpdate.has(escolaNome)) {
+                        targetEscola = JSON.parse(JSON.stringify(targetEscola));
+                        escolasToUpdate.set(escolaNome, targetEscola!);
+                    }
+
+                    if (!targetEscola!.dadosEducacionais) targetEscola!.dadosEducacionais = {} as any;
+                    if (!targetEscola!.dadosEducacionais.registrosSEAMA) targetEscola!.dadosEducacionais.registrosSEAMA = [];
+
+                    const newRecord: RegistroSEAMA = {
+                        id: crypto.randomUUID(),
+                        escolaId: targetEscola!.id,
+                        ano: parseInt(row['Ano']) || new Date().getFullYear(),
+                        tipoAvaliacao: 'SEAMA',
+                        componenteCurricular: (row['Componente Curricular'] as 'Língua Portuguesa' | 'Matemática') || 'Língua Portuguesa',
+                        anoSerie: (row['Série'] as '2º ANO' | '5º ANO' | '9º ANO') || '2º ANO',
+                        estudantesPrevistos: parseInt(row['Estudantes Previstos']) || 0,
+                        estudantesAvaliados: parseInt(row['Estudantes Avaliados']) || 0,
+                        proficienciaMedia: parseFloat(row['Proficiência Média']) || 0,
+                        avançado: parseFloat(row['Avançado (%)']) || 0,
+                        adequado: parseFloat(row['Adequado (%)']) || 0,
+                        basico: parseFloat(row['Básico (%)']) || 0,
+                        abaixoBasico: parseFloat(row['Abaixo do Básico (%)']) || 0,
+                        dataRegistro: new Date().toISOString(),
+                        responsavel: 'Importação CSV'
+                    };
+
+                    const existingIndex = targetEscola!.dadosEducacionais.registrosSEAMA.findIndex(
+                        r => r.ano === newRecord.ano &&
+                            r.componenteCurricular === newRecord.componenteCurricular &&
+                            r.anoSerie === newRecord.anoSerie
+                    );
+
+                    if (existingIndex >= 0) {
+                        newRecord.id = targetEscola!.dadosEducacionais.registrosSEAMA[existingIndex].id;
+                        targetEscola!.dadosEducacionais.registrosSEAMA[existingIndex] = newRecord;
+                    } else {
+                        targetEscola!.dadosEducacionais.registrosSEAMA.push(newRecord);
+                    }
+
+                    importedCount++;
+                });
+
+                if (importedCount > 0 && onUpdateEscola) {
+                    escolasToUpdate.forEach(escola => {
+                        onUpdateEscola(escola);
+                    });
+                    showNotification('success', `${importedCount} registros importados/atualizados com sucesso.`);
+                } else {
+                    showNotification('error', 'Não foi possível relacionar os dados do CSV com as escolas cadastradas.');
+                }
+
+            } catch (error) {
+                console.error('Erro ao importar CSV:', error);
+                showNotification('error', 'Erro ao ler o arquivo CSV. Verifique o formato.');
+            }
+            if (event.target) event.target.value = '';
+        };
+        reader.readAsText(file);
+    };
+
     const renderGeral = () => (
         <div className="space-y-6 animate-fade-in relative">
 
@@ -452,13 +566,33 @@ export const SeamaDashboard: React.FC<SeamaDashboardProps> = ({ escolas = [], co
 
     return (
         <div className="space-y-6 pb-12 animate-fade-in relative">
+            <input
+                type="file"
+                accept=".csv"
+                ref={fileInputRef}
+                className="hidden"
+                onChange={handleFileUpload}
+            />
             {/* Header - Sharp Technical */}
             <PageHeader
                 title="Análise SEAMA"
                 subtitle="Monitoramento Estadual de Proficiência"
                 icon={GraduationCap}
                 badgeText="Monitoramento de Aprendizado"
-                actions={[]}
+                actions={[
+                    {
+                        label: 'Importar',
+                        icon: ClipboardCheck,
+                        onClick: handleImportClick,
+                        variant: 'outline'
+                    },
+                    {
+                        label: 'Exportar Dados',
+                        icon: ClipboardCheck,
+                        onClick: handleExport,
+                        variant: 'outline'
+                    }
+                ]}
             />
 
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-6 flex flex-wrap gap-2">
@@ -514,3 +648,4 @@ export const SeamaDashboard: React.FC<SeamaDashboardProps> = ({ escolas = [], co
         </div>
     );
 };
+

@@ -1,6 +1,9 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { PageHeader } from './ui/PageHeader';
 import { Escola, RegistroFluenciaPARC, Coordenador } from '../types';
+import { exportToCSV } from '../utils/exportUtils';
+import { parseCSV } from '../utils/importUtils';
+import { useNotification } from '../context/NotificationContext';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
     PieChart, Pie, Cell, ComposedChart, Line, LineChart
@@ -14,6 +17,7 @@ import {
 interface FluenciaParcDashboardProps {
     escolas: Escola[];
     coordenadores: Coordenador[];
+    onUpdateEscola?: (escola: Escola) => void;
 }
 
 const COLORS = {
@@ -28,7 +32,9 @@ const COLORS = {
 
 type TabType = 'GERAL' | 'EVOLUCAO' | 'TURMAS';
 
-export const FluenciaParcDashboard: React.FC<FluenciaParcDashboardProps> = ({ escolas = [], coordenadores = [] }) => {
+export const FluenciaParcDashboard: React.FC<FluenciaParcDashboardProps> = ({ escolas = [], coordenadores = [], onUpdateEscola }) => {
+    const { showNotification } = useNotification();
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const [activeTab, setActiveTab] = useState<TabType>('GERAL');
 
     // Filtros
@@ -246,6 +252,131 @@ export const FluenciaParcDashboard: React.FC<FluenciaParcDashboardProps> = ({ es
         })).sort((a, b) => b.pAlfabet - a.pAlfabet);
     }, [filteredRecords]);
 
+    const handleExport = () => {
+        const columns = [
+            { header: 'Ano', key: 'ano' },
+            { header: 'Edição', key: 'edicao' },
+            { header: 'Polo', key: 'polo' },
+            { header: 'Regional', key: 'coordenadorEscola' },
+            { header: 'Escola', key: 'escolaNome' },
+            { header: 'Localização', key: 'localizacao' },
+            { header: 'Turma', key: 'turmaNome' },
+            { header: 'Tipo de Turma', key: 'tipoTurma' },
+            { header: 'Matriculados', key: (r: any) => r.participacao?.matriculados || 0 },
+            { header: 'Presentes', key: (r: any) => r.participacao?.presentes || 0 },
+            { header: 'Leitor Fluente', key: (r: any) => r.classificacao?.leitorFluente || 0 },
+            { header: 'Leitor Iniciante', key: (r: any) => r.classificacao?.leitorIniciante || 0 },
+            { header: 'Pré-Leitor N1', key: (r: any) => r.classificacao?.preLeitorNivel1 || 0 },
+            { header: 'Pré-Leitor N2', key: (r: any) => r.classificacao?.preLeitorNivel2 || 0 },
+            { header: 'Pré-Leitor N3', key: (r: any) => r.classificacao?.preLeitorNivel3 || 0 },
+            { header: 'Pré-Leitor N4', key: (r: any) => r.classificacao?.preLeitorNivel4 || 0 }
+        ];
+
+        exportToCSV(allRecords, columns, 'analise_parc_dados');
+    };
+
+    const handleImportClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const text = e.target?.result as string;
+                if (!text) throw new Error('Arquivo vazio');
+
+                const parsedData = parseCSV(text);
+                if (parsedData.length === 0) throw new Error('Nenhum dado válido encontrado no CSV');
+
+                const escolasToUpdate = new Map<string, Escola>();
+
+                let importedCount = 0;
+
+                parsedData.forEach(row => {
+                    // Try to find the school
+                    const escolaNome = row['Escola'];
+                    if (!escolaNome) return;
+
+                    let targetEscola = escolasToUpdate.get(escolaNome) || escolas.find(esc => esc.nome === escolaNome);
+                    if (!targetEscola) return; // School not found in DB
+
+                    // Clone the school object to avoid direct state mutation
+                    if (!escolasToUpdate.has(escolaNome)) {
+                        targetEscola = JSON.parse(JSON.stringify(targetEscola));
+                        escolasToUpdate.set(escolaNome, targetEscola!);
+                    }
+
+                    // Prepare existing records or initialize array
+                    if (!targetEscola!.dadosEducacionais) targetEscola!.dadosEducacionais = {} as any;
+                    if (!targetEscola!.dadosEducacionais.registrosFluenciaParc) targetEscola!.dadosEducacionais.registrosFluenciaParc = [];
+
+                    const newRecord: RegistroFluenciaPARC = {
+                        id: crypto.randomUUID(), // Assuming new record or we could try to match by unique composite key
+                        escolaId: targetEscola!.id,
+                        polo: row['Polo'] || '',
+                        ano: parseInt(row['Ano']) || new Date().getFullYear(),
+                        edicao: (row['Edição'] as 'Entrada' | 'Saída') || 'Entrada',
+                        etapaAplicacao: '',
+                        tipoTurma: (row['Tipo de Turma'] as 'Regular' | 'Multisseriada') || 'Regular',
+                        turma: {
+                            nome: row['Turma'] || 'Turma Única',
+                            anoSerie: '2º ANO' // Defaulting to 2º Ano as Parc is usually 2nd year
+                        },
+                        participacao: {
+                            matriculados: parseInt(row['Matriculados']) || 0,
+                            presentes: parseInt(row['Presentes']) || 0
+                        },
+                        classificacao: {
+                            leitorFluente: parseInt(row['Leitor Fluente']) || 0,
+                            leitorIniciante: parseInt(row['Leitor Iniciante']) || 0,
+                            preLeitorNivel1: parseInt(row['Pré-Leitor N1']) || 0,
+                            preLeitorNivel2: parseInt(row['Pré-Leitor N2']) || 0,
+                            preLeitorNivel3: parseInt(row['Pré-Leitor N3']) || 0,
+                            preLeitorNivel4: parseInt(row['Pré-Leitor N4']) || 0,
+                        },
+                        dataRegistro: new Date().toISOString(),
+                        responsavel: 'Importação CSV'
+                    };
+
+                    // Very basic deduplication based on Year, Edition and Turma
+                    const existingIndex = targetEscola!.dadosEducacionais.registrosFluenciaParc.findIndex(
+                        r => r.ano === newRecord.ano && r.edicao === newRecord.edicao && r.turma.nome === newRecord.turma.nome
+                    );
+
+                    if (existingIndex >= 0) {
+                        newRecord.id = targetEscola!.dadosEducacionais.registrosFluenciaParc[existingIndex].id;
+                        targetEscola!.dadosEducacionais.registrosFluenciaParc[existingIndex] = newRecord;
+                    } else {
+                        targetEscola!.dadosEducacionais.registrosFluenciaParc.push(newRecord);
+                    }
+
+                    importedCount++;
+                });
+
+                if (importedCount > 0 && onUpdateEscola) {
+                    escolasToUpdate.forEach(escola => {
+                        onUpdateEscola(escola);
+                    });
+                    showNotification('success', `${importedCount} registros importados/atualizados com sucesso.`);
+                } else {
+                    showNotification('error', 'Não foi possível relacionar os dados do CSV com as escolas cadastradas.');
+                }
+
+            } catch (error) {
+                console.error('Erro ao importar CSV:', error);
+                showNotification('error', 'Erro ao ler o arquivo CSV. Verifique o formato.');
+            }
+
+            // Reset input
+            if (event.target) event.target.value = '';
+        };
+        reader.readAsText(file);
+    };
+
     const renderGeral = () => (
         <div className="space-y-6 animate-fade-in relative">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-4 gap-4">
@@ -432,12 +563,32 @@ export const FluenciaParcDashboard: React.FC<FluenciaParcDashboardProps> = ({ es
 
     return (
         <div className="space-y-6 pb-12 animate-fade-in relative">
+            <input
+                type="file"
+                accept=".csv"
+                ref={fileInputRef}
+                className="hidden"
+                onChange={handleFileUpload}
+            />
             <PageHeader
                 title="Análise PARC"
                 subtitle="Monitoramento de Fluência Leitora"
                 icon={Activity}
                 badgeText="Fluência e Alfabetização"
-                actions={[]}
+                actions={[
+                    {
+                        label: 'Importar',
+                        icon: ClipboardCheck, // reusing icon or we can use Download/Upload
+                        onClick: handleImportClick,
+                        variant: 'outline'
+                    },
+                    {
+                        label: 'Exportar Dados',
+                        icon: ClipboardCheck,
+                        onClick: handleExport,
+                        variant: 'outline'
+                    }
+                ]}
             />
 
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-6 flex flex-wrap gap-2">
@@ -490,3 +641,4 @@ export const FluenciaParcDashboard: React.FC<FluenciaParcDashboardProps> = ({ es
         </div>
     );
 };
+

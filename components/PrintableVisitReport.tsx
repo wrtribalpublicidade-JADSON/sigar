@@ -102,16 +102,22 @@ export const PrintableVisitReport: React.FC<PrintableVisitReportProps> = ({ visi
                                 {visita.tipo}
                             </td>
                         </tr>
-                        {coordenador && (
-                            <tr>
-                                <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc' }}>
-                                    Coordenador(a)
-                                </td>
-                                <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 600, color: '#334155' }} colSpan={3}>
-                                    {coordenador.nome} — Região: {coordenador.regiao}
-                                </td>
-                            </tr>
-                        )}
+                        <tr>
+                            <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc' }}>
+                                Coordenador(a) Resp.
+                            </td>
+                            <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 600, color: '#334155' }}>
+                                {coordenador?.nome || 'Não Atribuído'} {coordenador?.regiao ? `— Região: ${coordenador.regiao}` : ''}
+                            </td>
+                            <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc' }}>
+                                Status do Relatório
+                            </td>
+                            <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 600, color: '#334155', textTransform: 'uppercase' }}>
+                                <span style={{ padding: '2pt 6pt', borderRadius: '12pt', fontSize: '7.5pt', fontWeight: 800, backgroundColor: visita.status === 'Realizada' ? '#d1fae5' : visita.status === 'Planejada' ? '#dbeafe' : '#ffedd5', color: visita.status === 'Realizada' ? '#047857' : visita.status === 'Planejada' ? '#1d4ed8' : '#c2410c' }}>
+                                    {visita.status || 'N/A'}
+                                </span>
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
