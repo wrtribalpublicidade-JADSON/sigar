@@ -153,6 +153,66 @@ export const igAcompanhamentoSalaService = {
     }
 };
 
+// 6. Calendário Oficial (SEMED)
+export const igCalendarioOficialService = {
+    async getAll(anoLetivo?: string) {
+        let query = supabase.from('ig_calendario_oficial').select('*').order('data', { ascending: true });
+        if (anoLetivo) query = query.eq('ano_letivo', anoLetivo);
+        const { data, error } = await query;
+        if (error) throw error;
+        return data;
+    },
+
+    async save(evento: any) {
+        if (evento.id && evento.id.length > 20) {
+            const { data, error } = await supabase.from('ig_calendario_oficial').update(evento).eq('id', evento.id).select().single();
+            if (error) throw error;
+            return data;
+        } else {
+            const { id, ...newEvento } = evento;
+            const { data, error } = await supabase.from('ig_calendario_oficial').insert(newEvento).select().single();
+            if (error) throw error;
+            return data;
+        }
+    },
+
+    async delete(id: string) {
+        const { error } = await supabase.from('ig_calendario_oficial').delete().eq('id', id);
+        if (error) throw error;
+        return true;
+    }
+};
+
+// 7. Calendário Interno (Escola)
+export const igCalendarioInternoService = {
+    async getAll(escolaId?: string) {
+        let query = supabase.from('ig_calendario_interno').select('*').order('data', { ascending: true });
+        if (escolaId) query = query.eq('escola_id', escolaId);
+        const { data, error } = await query;
+        if (error) throw error;
+        return data;
+    },
+
+    async save(evento: any) {
+        if (evento.id && evento.id.length > 20) {
+            const { data, error } = await supabase.from('ig_calendario_interno').update(evento).eq('id', evento.id).select().single();
+            if (error) throw error;
+            return data;
+        } else {
+            const { id, ...newEvento } = evento;
+            const { data, error } = await supabase.from('ig_calendario_interno').insert(newEvento).select().single();
+            if (error) throw error;
+            return data;
+        }
+    },
+
+    async delete(id: string) {
+        const { error } = await supabase.from('ig_calendario_interno').delete().eq('id', id);
+        if (error) throw error;
+        return true;
+    }
+};
+
 // ==========================================
 // CONSELHO DE CLASSE
 // ==========================================

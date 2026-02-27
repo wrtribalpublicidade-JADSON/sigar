@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { PageHeader } from './ui/PageHeader';
 import { AcompanhamentoSalaDashboard } from './AcompanhamentoSalaDashboard';
+import { CalendarioInterno } from './CalendarioInterno';
 import { FileStack, Users, BookOpen, Target, FileText, Presentation, Upload, Clock, Edit, Trash2, Calendar, Settings, Plus, Check, X, Printer, FileDown, Eye } from 'lucide-react';
 import { Escola } from '../types';
 import { generateAtaDocx } from '../utils/docxUtils';
@@ -8,7 +9,7 @@ import { PrintableAta } from './PrintableAta';
 import { igCicloReunioesService, igPlanoFormacaoService, igPlanoAcaoService, igPppService } from '../services/gestaoConselhoService';
 import { supabase } from '../services/supabase';
 
-type Tab = 'reunioes' | 'formacao' | 'acao' | 'pedagogica' | 'sala';
+type Tab = 'reunioes' | 'formacao' | 'acao' | 'pedagogica' | 'sala' | 'calendario';
 
 interface InstrumentaisGestaoProps {
     escolas?: Escola[];
@@ -24,7 +25,8 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
         { id: 'formacao', label: 'Plano de Formação', icon: BookOpen },
         { id: 'acao', label: 'Plano de Ação', icon: Target },
         { id: 'pedagogica', label: 'Proposta Pedagógica', icon: FileText },
-        { id: 'sala', label: 'Acompanhamento em Sala', icon: Presentation }
+        { id: 'sala', label: 'Acompanhamento em Sala', icon: Presentation },
+        { id: 'calendario', label: 'Calendário Interno', icon: Calendar }
     ];
 
     // ============================================
@@ -381,7 +383,12 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
         const now = new Date();
         const formattedDate = `${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
 
-        const filePath = `ppp/${Date.now()}_${file.name}`;
+        // Sanitize file name: remove accents, replace spaces, strip invalid chars
+        const sanitizedName = file.name
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove accents
+            .replace(/\s+/g, '_')                            // spaces → underscores
+            .replace(/[^a-zA-Z0-9._-]/g, '');               // keep only safe chars
+        const filePath = `ppp/${Date.now()}_${sanitizedName}`;
 
         try {
             // Upload to Supabase Storage
@@ -1048,6 +1055,8 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
                 );
             case 'sala':
                 return <AcompanhamentoSalaDashboard escolas={escolas} />;
+            case 'calendario':
+                return <CalendarioInterno escolas={escolas} currentUser={currentUser} />;
             default:
                 return null;
         }
