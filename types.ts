@@ -164,7 +164,7 @@ export interface EncaminhamentoVisita {
   id: string;
   descricao: string;
   responsavel: string;
-  status: 'Pendente' | 'Em Execução' | 'Concluído';
+  status: 'Pendente' | 'Em Execução' | 'Concluído' | 'Dentro do Prazo' | 'Atrasado' | 'Realizado';
   prazo: string;
 }
 

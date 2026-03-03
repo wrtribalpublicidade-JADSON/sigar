@@ -49,7 +49,7 @@ export const VisitForm: React.FC<VisitFormProps> = ({ escolas, coordenadores, on
   const [isEditingPauta, setIsEditingPauta] = useState(false);
 
   const [encaminhamentoForm, setEncaminhamentoForm] = useState<EncaminhamentoVisita>({
-    id: '', descricao: '', responsavel: 'Gestor Geral', status: 'Pendente', prazo: ''
+    id: '', descricao: '', responsavel: 'Gestor Geral', status: 'Dentro do Prazo', prazo: ''
   });
   const [isEditingEncaminhamento, setIsEditingEncaminhamento] = useState(false);
 
@@ -92,11 +92,24 @@ export const VisitForm: React.FC<VisitFormProps> = ({ escolas, coordenadores, on
     } else {
       setFormData(prev => ({ ...prev, encaminhamentosRegistrados: [...prev.encaminhamentosRegistrados, { ...encaminhamentoForm, id: Date.now().toString() }] }));
     }
-    setEncaminhamentoForm({ id: '', descricao: '', responsavel: 'Gestor Geral', status: 'Pendente', prazo: '' });
+    setEncaminhamentoForm({ id: '', descricao: '', responsavel: 'Gestor Geral', status: 'Dentro do Prazo', prazo: '' });
   };
 
   const handleEditEncaminhamento = (enc: EncaminhamentoVisita) => { setEncaminhamentoForm(enc); setIsEditingEncaminhamento(true); };
   const handleDeleteEncaminhamento = (id: string) => { setFormData(prev => ({ ...prev, encaminhamentosRegistrados: prev.encaminhamentosRegistrados.filter(e => e.id !== id) })); };
+
+  const handleToggleEncaminhamentoStatus = (id: string) => {
+    const statusCycle: EncaminhamentoVisita['status'][] = ['Dentro do Prazo', 'Atrasado', 'Realizado'];
+    setFormData(prev => ({
+      ...prev,
+      encaminhamentosRegistrados: prev.encaminhamentosRegistrados.map(e => {
+        if (e.id !== id) return e;
+        const currentIndex = statusCycle.indexOf(e.status);
+        const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % statusCycle.length;
+        return { ...e, status: statusCycle[nextIndex] };
+      })
+    }));
+  };
 
   const StepIndicator = ({ num, label, icon: Icon }: { num: number, label: string, icon: any }) => (
     <div className={`flex flex-col items-center gap-2 relative z-10 ${step === num ? 'text-orange-600' : step > num ? 'text-emerald-500' : 'text-slate-300'}`}>
@@ -327,9 +340,24 @@ export const VisitForm: React.FC<VisitFormProps> = ({ escolas, coordenadores, on
                     {formData.encaminhamentosRegistrados.map(enc => (
                       <div key={enc.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between hover:bg-slate-50 transition-colors group gap-4">
                         <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-1">
+                          <div className="flex items-center gap-3 mb-1 flex-wrap">
                             <span className="px-2 py-1 bg-orange-100 text-orange-700 text-[10px] font-bold uppercase rounded-md">{enc.responsavel}</span>
                             <span className="text-xs text-slate-400 font-medium flex items-center gap-1"><Clock size={12} /> Prazo: {new Date(enc.prazo + 'T12:00:00').toLocaleDateString()}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleEncaminhamentoStatus(enc.id)}
+                              className={`px-3 py-1 text-[10px] font-bold uppercase rounded-full cursor-pointer transition-all border ${enc.status === 'Dentro do Prazo' ? 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200' :
+                                enc.status === 'Atrasado' ? 'bg-red-100 text-red-700 border-red-200 hover:bg-red-200' :
+                                  enc.status === 'Realizado' ? 'bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-200' :
+                                    'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                                }`}
+                              title="Clique para alterar o status"
+                            >
+                              {enc.status === 'Dentro do Prazo' ? '● Dentro do Prazo' :
+                                enc.status === 'Atrasado' ? '● Atrasado' :
+                                  enc.status === 'Realizado' ? '✓ Realizado' :
+                                    enc.status}
+                            </button>
                           </div>
                           <p className="font-bold text-slate-800 text-sm">{enc.descricao}</p>
                         </div>
