@@ -290,7 +290,7 @@ export interface Coordenador {
   nome: string;
   contato: string; // Utilizado como E-mail principal/Autenticação
   regiao: string; // Ex: "Regional Sede", "Regional Litoral"
-  funcao?: 'Administrador' | 'Coordenador Regional' | 'Gestor' | 'Coordenador Pedagógico' | 'Técnico'; // Papel no sistema
+  funcao?: 'Administrador' | 'Coordenador Regional' | 'Gestor' | 'Coordenador Pedagógico' | 'Técnico' | 'Gestor Geral' | 'Gestor Pedagógico' | 'Professor'; // Papel no sistema
   status?: 'Ativo' | 'Inativo'; // Controle de acesso
   escolasIds: string[]; // Vínculo com escolas
 }

@@ -13,7 +13,7 @@ interface EventoOficial {
     data: string;
     data_fim?: string;
     titulo: string;
-    tipo: 'feriado' | 'recesso' | 'pedagogico' | 'letivo_especial';
+    tipo: 'feriado' | 'recesso' | 'pedagogico' | 'letivo_especial' | 'ponto_facultativo';
     obrigatorio: boolean;
     ano_letivo: string;
 }
@@ -46,7 +46,23 @@ const TIPOS_OFICIAL: Record<string, { label: string; color: string; bg: string; 
     feriado: { label: 'Feriado', color: 'text-red-700', bg: 'bg-red-100 border-red-200', icon: Star },
     recesso: { label: 'Recesso', color: 'text-amber-700', bg: 'bg-amber-100 border-amber-200', icon: Clock },
     pedagogico: { label: 'Data Pedagógica', color: 'text-purple-700', bg: 'bg-purple-100 border-purple-200', icon: BookOpen },
-    letivo_especial: { label: 'Letivo Especial', color: 'text-blue-700', bg: 'bg-blue-100 border-blue-200', icon: GraduationCap }
+    letivo_especial: { label: 'Letivo Especial', color: 'text-blue-700', bg: 'bg-blue-100 border-blue-200', icon: GraduationCap },
+    ponto_facultativo: { label: 'Ponto Facultativo', color: 'text-gray-700', bg: 'bg-gray-100 border-gray-200', icon: Briefcase }
+};
+
+// All event types combined for select dropdowns
+const TODOS_TIPOS_EVENTOS: Record<string, string> = {
+    feriado: 'Feriado',
+    recesso: 'Recesso',
+    pedagogico: 'Data Pedagógica',
+    letivo_especial: 'Letivo Especial',
+    ponto_facultativo: 'Ponto Facultativo',
+    reuniao_pedagogica: 'Reunião Pedagógica',
+    conselho_classe: 'Conselho de Classe',
+    evento_escolar: 'Evento Escolar',
+    projeto: 'Projeto',
+    formacao_interna: 'Formação Interna',
+    outro: 'Outro'
 };
 
 const TIPOS_INTERNO: Record<string, { label: string; color: string; bg: string; dotColor: string }> = {
@@ -160,7 +176,7 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
                 if (isWeekend(currentYear, m, d)) continue;
                 const dk = formatDateKey(currentYear, m, d);
                 const oficiais = getOficiaisForDate(dk);
-                const isNaoLetivo = oficiais.some(e => e.tipo === 'feriado' || e.tipo === 'recesso');
+                const isNaoLetivo = oficiais.some(e => e.tipo === 'feriado' || e.tipo === 'recesso' || e.tipo === 'ponto_facultativo');
                 const internos = getInternosForDate(dk);
                 const isInternoNaoLetivo = internos.some(e => e.classificacao === 'nao_letivo');
                 if (!isNaoLetivo && !isInternoNaoLetivo) count++;
@@ -176,7 +192,7 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
         const oficiais = getOficiaisForDate(dateKey);
         const internos = getInternosForDate(dateKey);
         if (oficiais.length > 0 && internos.length > 0) {
-            const isNaoLetivo = oficiais.some(e => e.tipo === 'feriado' || e.tipo === 'recesso');
+            const isNaoLetivo = oficiais.some(e => e.tipo === 'feriado' || e.tipo === 'recesso' || e.tipo === 'ponto_facultativo');
             const hasLetivoInterno = internos.some(e => e.classificacao === 'letivo');
             return isNaoLetivo && hasLetivoInterno;
         }
@@ -342,8 +358,8 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
                     <select value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)}
                         className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20">
                         <option value="todos">Todos os Eventos</option>
-                        {Object.entries(TIPOS_INTERNO).map(([k, v]) => (
-                            <option key={k} value={k}>{v.label}</option>
+                        {Object.entries(TODOS_TIPOS_EVENTOS).map(([k, v]) => (
+                            <option key={k} value={k}>{v}</option>
                         ))}
                     </select>
                 </div>
@@ -352,6 +368,7 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
                     <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-amber-400 inline-block" /> Recesso</span>
                     <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-purple-400 inline-block" /> Pedagógico</span>
                     <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-blue-400 inline-block" /> Letivo Especial</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-gray-400 inline-block" /> P. Facultativo</span>
                     <span className="text-slate-300">|</span>
                     <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-teal-500 inline-block" /> Reunião</span>
                     <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-indigo-500 inline-block" /> Conselho</span>
@@ -601,7 +618,7 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tipo</label>
                                     <select value={form.tipo} onChange={e => setForm({ ...form, tipo: e.target.value })}
                                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20">
-                                        {Object.entries(TIPOS_INTERNO).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                                        {Object.entries(TODOS_TIPOS_EVENTOS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                                     </select>
                                 </div>
                                 <div>
@@ -664,7 +681,7 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tipo</label>
                                     <select value={oficialForm.tipo} onChange={e => setOficialForm({ ...oficialForm, tipo: e.target.value })}
                                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20">
-                                        {Object.entries(TIPOS_OFICIAL).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                                        {Object.entries(TODOS_TIPOS_EVENTOS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                                     </select>
                                 </div>
                                 <div>

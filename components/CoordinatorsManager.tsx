@@ -14,18 +14,37 @@ interface CoordinatorsManagerProps {
   visitas: Visita[];
   onSave: (coord: Coordenador) => void;
   onDelete: (id: string) => void;
+  isAdmin?: boolean;
+  loggedInCoordId?: string | null;
 }
 
 export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
-  coordenadores, escolas, visitas, onSave, onDelete
+  coordenadores, escolas, visitas, onSave, onDelete, isAdmin = true, loggedInCoordId = null
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [viewSummaryCoord, setViewSummaryCoord] = useState<Coordenador | null>(null);
   const [formData, setFormData] = useState<Coordenador | null>(null);
   const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null);
 
+  // Coordenador Regional: find own record and filter users linked to same schools
+  const loggedInCoord = loggedInCoordId ? coordenadores.find(c => c.id === loggedInCoordId) : null;
+  const mySchoolIds = loggedInCoord?.escolasIds || [];
+
+  const displayCoordenadores = isAdmin
+    ? coordenadores
+    : coordenadores.filter(c => {
+      // Show users that share at least one school with the logged-in coordinator
+      if (c.id === loggedInCoordId) return true; // always show self
+      return c.escolasIds.some(eid => mySchoolIds.includes(eid));
+    });
+
+  // Roles available for Coordenador Regional to assign
+  const coordRoles = ['Gestor Geral', 'Gestor Pedagógico', 'Coordenador Pedagógico', 'Professor'];
+
   const handleCreate = () => {
-    setFormData({ id: '', nome: '', contato: '', regiao: '', funcao: 'Coordenador Regional', escolasIds: [] });
+    const defaultFuncao = isAdmin ? 'Coordenador Regional' : 'Gestor Geral';
+    const defaultEscolas = isAdmin ? [] : [...mySchoolIds];
+    setFormData({ id: '', nome: '', contato: '', regiao: loggedInCoord?.regiao || '', funcao: defaultFuncao, escolasIds: defaultEscolas });
     setViewSummaryCoord(null);
     setIsEditing(true);
   };
@@ -216,13 +235,21 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Função</label>
               <select className="w-full rounded-xl border-slate-200 shadow-sm focus:border-orange-500 focus:ring-orange-500 border px-4 py-2.5" value={formData.funcao} onChange={e => setFormData({ ...formData, funcao: e.target.value as any })}>
-                <option value="Coordenador Regional">Coordenador Regional</option>
-                <option value="Administrador">Administrador</option>
-                <option value="Técnico">Técnico Pedagógico</option>
-                <option value="Professor">Professor</option>
-                <option value="Coordenador Pedagógico">Coordenador Pedagógico</option>
-                <option value="Gestor Geral">Gestor Geral</option>
-                <option value="Gestor Pedagógico">Gestor Pedagógico</option>
+                {isAdmin ? (
+                  <>
+                    <option value="Coordenador Regional">Coordenador Regional</option>
+                    <option value="Administrador">Administrador</option>
+                    <option value="Técnico">Técnico Pedagógico</option>
+                    <option value="Professor">Professor</option>
+                    <option value="Coordenador Pedagógico">Coordenador Pedagógico</option>
+                    <option value="Gestor Geral">Gestor Geral</option>
+                    <option value="Gestor Pedagógico">Gestor Pedagógico</option>
+                  </>
+                ) : (
+                  <>
+                    {coordRoles.map(r => <option key={r} value={r}>{r}</option>)}
+                  </>
+                )}
               </select>
             </div>
             <div>
@@ -291,8 +318,8 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
                 Administração
               </span>
             </div>
-            <h2 className="text-2xl font-black text-white">Gestão de Usuários</h2>
-            <p className="text-slate-400 text-sm mt-1">Profissionais com acesso ao sistema SIGAR</p>
+            <h2 className="text-2xl font-black text-white">{isAdmin ? 'Gestão de Usuários' : 'Minha Equipe'}</h2>
+            <p className="text-slate-400 text-sm mt-1">{isAdmin ? 'Profissionais com acesso ao sistema SIGAR' : `Profissionais vinculados às suas escolas — ${loggedInCoord?.regiao || ''}`}</p>
           </div>
           <div className="flex gap-3 w-full md:w-auto">
             <button onClick={handleExport} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-white/10 border border-white/20 rounded-xl text-white hover:bg-white/20 transition font-medium text-sm">
@@ -321,12 +348,13 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {coordenadores.map(coord => {
+              {displayCoordenadores.map(coord => {
                 const escolasDoCoord = escolas.filter(e => coord.escolasIds.includes(e.id));
                 const totalPendencias = escolasDoCoord.reduce((sum, escola) => sum + checkSchoolPendencies(escola).length, 0);
+                const isSelf = coord.id === loggedInCoordId;
 
                 return (
-                  <tr key={coord.id} className="hover:bg-slate-50 transition-colors">
+                  <tr key={coord.id} className={`hover:bg-slate-50 transition-colors ${isSelf && !isAdmin ? 'bg-orange-50/40' : ''}`}>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center text-orange-400 font-bold shrink-0">
@@ -364,15 +392,19 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex justify-center gap-1">
-                        <button onClick={() => handleViewSummary(coord)} className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition" title="Monitorar">
-                          <ClipboardList className="w-4 h-4" />
-                        </button>
+                        {isAdmin && (
+                          <button onClick={() => handleViewSummary(coord)} className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition" title="Monitorar">
+                            <ClipboardList className="w-4 h-4" />
+                          </button>
+                        )}
                         <button onClick={() => handleEdit(coord)} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition" title="Editar">
                           <Edit2 className="w-4 h-4" />
                         </button>
-                        <button onClick={() => setDeleteConfirmationId(coord.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="Remover">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {isAdmin && (
+                          <button onClick={() => setDeleteConfirmationId(coord.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="Remover">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

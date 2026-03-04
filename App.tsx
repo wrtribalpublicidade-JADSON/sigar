@@ -46,6 +46,7 @@ export default function App() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [loggedInCoordId, setLoggedInCoordId] = useState<string | null>(null);
 
   const [currentView, setCurrentView] = useState<ViewState>('DASHBOARD');
   const [selectedEscolaId, setSelectedEscolaId] = useState<string | null>(null);
@@ -66,6 +67,7 @@ export default function App() {
       setVisitas(VISITAS_MOCK);
       setCoordenadores(COORDENADORES_MOCK);
       setIsAdmin(true);
+      setLoggedInCoordId(null);
       return;
     }
 
@@ -95,6 +97,7 @@ export default function App() {
         currentUserCoord = mappedCoords.find(c => c.contato.toLowerCase() === currentEmail?.toLowerCase());
         if (currentUserCoord) {
           linkedSchoolIds = currentUserCoord.escolasIds;
+          setLoggedInCoordId(currentUserCoord.id);
         } else {
           setEscolas([]);
           setVisitas([]);
@@ -938,7 +941,6 @@ export default function App() {
           </div>
         );
       case 'COORDENADORES':
-        if (!isAdmin) return <div>Acesso negado.</div>;
         return (
           <CoordinatorsManager
             coordenadores={coordenadores}
@@ -946,6 +948,8 @@ export default function App() {
             visitas={visitas}
             onSave={handleSaveCoordenador}
             onDelete={handleDeleteCoordenador}
+            isAdmin={isAdmin}
+            loggedInCoordId={loggedInCoordId}
           />
         );
       case 'RELATORIOS':
