@@ -10,9 +10,9 @@ export const igCicloReunioesService = {
         let query = supabase.from('ig_ciclo_reunioes').select('*').order('data_reuniao', { ascending: false });
         if (escolaId) {
             if (Array.isArray(escolaId)) {
-                query = query.in('escola_id', escolaId);
+                query = query.or(`escola_id.in.(${escolaId.join(',')}),escola_id.is.null`);
             } else {
-                query = query.eq('escola_id', escolaId);
+                query = query.or(`escola_id.eq.${escolaId},escola_id.is.null`);
             }
         }
         const { data, error } = await query;
@@ -46,9 +46,9 @@ export const igPlanoFormacaoService = {
         let query = supabase.from('ig_plano_formacao').select('*').order('data_formacao', { ascending: false });
         if (escolaId) {
             if (Array.isArray(escolaId)) {
-                query = query.in('escola_id', escolaId);
+                query = query.or(`escola_id.in.(${escolaId.join(',')}),escola_id.is.null`);
             } else {
-                query = query.eq('escola_id', escolaId);
+                query = query.or(`escola_id.eq.${escolaId},escola_id.is.null`);
             }
         }
         const { data, error } = await query;
@@ -82,9 +82,9 @@ export const igPlanoAcaoService = {
         let query = supabase.from('ig_plano_acao').select('*').order('prazo', { ascending: true });
         if (escolaId) {
             if (Array.isArray(escolaId)) {
-                query = query.in('escola_id', escolaId);
+                query = query.or(`escola_id.in.(${escolaId.join(',')}),escola_id.is.null`);
             } else {
-                query = query.eq('escola_id', escolaId);
+                query = query.or(`escola_id.eq.${escolaId},escola_id.is.null`);
             }
         }
         const { data, error } = await query;
@@ -118,9 +118,9 @@ export const igPppService = {
         let query = supabase.from('ig_proposta_pedagogica').select('*').order('created_at', { ascending: false });
         if (escolaId) {
             if (Array.isArray(escolaId)) {
-                query = query.in('escola_id', escolaId);
+                query = query.or(`escola_id.in.(${escolaId.join(',')}),escola_id.is.null`);
             } else {
-                query = query.eq('escola_id', escolaId);
+                query = query.or(`escola_id.eq.${escolaId},escola_id.is.null`);
             }
         }
         const { data, error } = await query;
@@ -213,9 +213,9 @@ export const igCalendarioInternoService = {
         let query = supabase.from('ig_calendario_interno').select('*').order('data', { ascending: true });
         if (escolaId) {
             if (Array.isArray(escolaId)) {
-                query = query.in('escola_id', escolaId);
+                query = query.or(`escola_id.in.(${escolaId.join(',')}),escola_id.is.null`);
             } else {
-                query = query.eq('escola_id', escolaId);
+                query = query.or(`escola_id.eq.${escolaId},escola_id.is.null`);
             }
         }
         const { data, error } = await query;
