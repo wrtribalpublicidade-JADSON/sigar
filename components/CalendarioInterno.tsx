@@ -124,6 +124,10 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
         descricao: '', responsavel: currentUser || '', data_fim: ''
     });
 
+    // Escola filter
+    const escolaIds = React.useMemo(() => escolas.map(e => e.id), [escolas]);
+    const [filtroEscola, setFiltroEscola] = useState<string>(escolas.length === 1 ? escolas[0].id : 'todas');
+
     // Filters
     const [filtroTipo, setFiltroTipo] = useState<string>('todos');
 
@@ -135,9 +139,10 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
         const load = async () => {
             setIsLoading(true);
             try {
+                const escolaFilter = escolaIds.length > 0 ? escolaIds : undefined;
                 const [oficiais, internos] = await Promise.all([
                     igCalendarioOficialService.getAll(String(currentYear)),
-                    igCalendarioInternoService.getAll()
+                    igCalendarioInternoService.getAll(escolaFilter)
                 ]);
                 if (oficiais) setEventosOficiais(oficiais);
                 if (internos) setEventosInternos(internos);
@@ -148,7 +153,7 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
             }
         };
         load();
-    }, [currentYear]);
+    }, [currentYear, escolaIds]);
 
     // ---- Navigation ----
     const prevMonth = () => {
@@ -164,8 +169,11 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
     // ---- Events for date ----
     const getOficiaisForDate = (dateKey: string) =>
         eventosOficiais.filter(e => isDateInRange(dateKey, e.data, e.data_fim));
-    const getInternosForDate = (dateKey: string) =>
-        eventosInternos.filter(e => isDateInRange(dateKey, e.data, e.data_fim));
+    const getInternosForDate = (dateKey: string) => {
+        let filtered = eventosInternos;
+        if (filtroEscola !== 'todas') filtered = filtered.filter(e => e.escola_id === filtroEscola);
+        return filtered.filter(e => isDateInRange(dateKey, e.data, e.data_fim));
+    };
 
     // ---- Letive day count (full year) ----
     const countDiasLetivos = () => {
@@ -222,7 +230,8 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
             const payload: any = {
                 titulo: form.titulo, tipo: form.tipo, classificacao: form.classificacao,
                 descricao: form.descricao, responsavel: form.responsavel,
-                data: selectedDate, data_fim: form.data_fim || null
+                data: selectedDate, data_fim: form.data_fim || null,
+                escola_id: filtroEscola !== 'todas' ? filtroEscola : (escolas.length > 0 ? escolas[0].id : null)
             };
             if (editingEvento) payload.id = editingEvento.id;
             const result = await igCalendarioInternoService.save(payload);
@@ -284,9 +293,10 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
     const handlePrint = () => window.print();
 
     // ---- Filtered events for sidebar list ----
+    const baseInternos = filtroEscola === 'todas' ? eventosInternos : eventosInternos.filter(e => e.escola_id === filtroEscola);
     const filteredInternos = filtroTipo === 'todos'
-        ? eventosInternos
-        : eventosInternos.filter(e => e.tipo === filtroTipo);
+        ? baseInternos
+        : baseInternos.filter(e => e.tipo === filtroTipo);
 
     const monthInternos = filteredInternos.filter(e => {
         const d = parseDateStr(e.data);
@@ -353,8 +363,22 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
 
             {/* Filters + Legend */}
             <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-wrap gap-4 items-center justify-between print:hidden">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                     <Filter size={16} className="text-slate-400" />
+                    {escolas.length > 1 && (
+                        <select value={filtroEscola} onChange={e => setFiltroEscola(e.target.value)}
+                            className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+                            <option value="todas">Todas as Escolas</option>
+                            {escolas.map(esc => (
+                                <option key={esc.id} value={esc.id}>{esc.nome}</option>
+                            ))}
+                        </select>
+                    )}
+                    {escolas.length === 1 && (
+                        <span className="text-sm font-semibold text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
+                            {escolas[0].nome}
+                        </span>
+                    )}
                     <select value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)}
                         className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20">
                         <option value="todos">Todos os Eventos</option>

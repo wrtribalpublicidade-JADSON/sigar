@@ -6,9 +6,15 @@ import { supabase } from './supabase';
 
 // 1. Ciclo de Reuniões
 export const igCicloReunioesService = {
-    async getAll(escolaId?: string) {
+    async getAll(escolaId?: string | string[]) {
         let query = supabase.from('ig_ciclo_reunioes').select('*').order('data_reuniao', { ascending: false });
-        if (escolaId) query = query.eq('escola_id', escolaId);
+        if (escolaId) {
+            if (Array.isArray(escolaId)) {
+                query = query.in('escola_id', escolaId);
+            } else {
+                query = query.eq('escola_id', escolaId);
+            }
+        }
         const { data, error } = await query;
         if (error) throw error;
         return data;
@@ -36,9 +42,15 @@ export const igCicloReunioesService = {
 
 // 2. Plano de Formação
 export const igPlanoFormacaoService = {
-    async getAll(escolaId?: string) {
+    async getAll(escolaId?: string | string[]) {
         let query = supabase.from('ig_plano_formacao').select('*').order('data_formacao', { ascending: false });
-        if (escolaId) query = query.eq('escola_id', escolaId);
+        if (escolaId) {
+            if (Array.isArray(escolaId)) {
+                query = query.in('escola_id', escolaId);
+            } else {
+                query = query.eq('escola_id', escolaId);
+            }
+        }
         const { data, error } = await query;
         if (error) throw error;
         return data;
@@ -66,9 +78,15 @@ export const igPlanoFormacaoService = {
 
 // 3. Plano de Ação
 export const igPlanoAcaoService = {
-    async getAll(escolaId?: string) {
+    async getAll(escolaId?: string | string[]) {
         let query = supabase.from('ig_plano_acao').select('*').order('prazo', { ascending: true });
-        if (escolaId) query = query.eq('escola_id', escolaId);
+        if (escolaId) {
+            if (Array.isArray(escolaId)) {
+                query = query.in('escola_id', escolaId);
+            } else {
+                query = query.eq('escola_id', escolaId);
+            }
+        }
         const { data, error } = await query;
         if (error) throw error;
         return data;
@@ -96,9 +114,15 @@ export const igPlanoAcaoService = {
 
 // 4. Proposta Pedagógica
 export const igPppService = {
-    async getAll(escolaId?: string) {
+    async getAll(escolaId?: string | string[]) {
         let query = supabase.from('ig_proposta_pedagogica').select('*').order('created_at', { ascending: false });
-        if (escolaId) query = query.eq('escola_id', escolaId);
+        if (escolaId) {
+            if (Array.isArray(escolaId)) {
+                query = query.in('escola_id', escolaId);
+            } else {
+                query = query.eq('escola_id', escolaId);
+            }
+        }
         const { data, error } = await query;
         if (error) throw error;
         return data;
@@ -185,9 +209,15 @@ export const igCalendarioOficialService = {
 
 // 7. Calendário Interno (Escola)
 export const igCalendarioInternoService = {
-    async getAll(escolaId?: string) {
+    async getAll(escolaId?: string | string[]) {
         let query = supabase.from('ig_calendario_interno').select('*').order('data', { ascending: true });
-        if (escolaId) query = query.eq('escola_id', escolaId);
+        if (escolaId) {
+            if (Array.isArray(escolaId)) {
+                query = query.in('escola_id', escolaId);
+            } else {
+                query = query.eq('escola_id', escolaId);
+            }
+        }
         const { data, error } = await query;
         if (error) throw error;
         return data;

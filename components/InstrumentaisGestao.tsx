@@ -20,6 +20,9 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
     const [activeTab, setActiveTab] = useState<Tab>('reunioes');
     const [isLoading, setIsLoading] = useState(true);
 
+    // IDs das escolas vinculadas ao usuário logado
+    const escolaIds = React.useMemo(() => escolas.map(e => e.id), [escolas]);
+
     const tabs = [
         { id: 'reunioes', label: 'Ciclo de Reuniões', icon: Users },
         { id: 'formacao', label: 'Plano de Formação', icon: BookOpen },
@@ -91,7 +94,8 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
                 encaminhamentos: reuniaoForm.encaminhamentos || null,
                 status: reuniaoForm.status,
                 responsavel: currentUser || '',
-                participantes: reuniaoForm.participantes
+                participantes: reuniaoForm.participantes,
+                escola_id: escolas.length > 0 ? escolas[0].id : null
             };
 
             if (reuniaoForm.id) {
@@ -343,11 +347,12 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
         const loadDados = async () => {
             setIsLoading(true);
             try {
+                const escolaFilter = escolaIds.length > 0 ? escolaIds : undefined;
                 const [reunioes, metas, formacoes, ppps] = await Promise.all([
-                    igCicloReunioesService.getAll(),
-                    igPlanoAcaoService.getAll(),
-                    igPlanoFormacaoService.getAll(),
-                    igPppService.getAll()
+                    igCicloReunioesService.getAll(escolaFilter),
+                    igPlanoAcaoService.getAll(escolaFilter),
+                    igPlanoFormacaoService.getAll(escolaFilter),
+                    igPppService.getAll(escolaFilter)
                 ]);
 
                 if (reunioes) {
@@ -388,7 +393,7 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
         };
 
         loadDados();
-    }, []);
+    }, [escolaIds]);
 
     const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
