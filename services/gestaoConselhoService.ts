@@ -155,9 +155,15 @@ export const igPppService = {
 
 // 5. Acompanhamento Sala
 export const igAcompanhamentoSalaService = {
-    async getAll(escolaId?: string) {
+    async getAll(escolaId?: string | string[]) {
         let query = supabase.from('ig_acompanhamento_sala').select('*').order('data_observacao', { ascending: false });
-        if (escolaId) query = query.eq('escola_id', escolaId);
+        if (escolaId) {
+            if (Array.isArray(escolaId)) {
+                query = query.in('escola_id', escolaId);
+            } else {
+                query = query.eq('escola_id', escolaId);
+            }
+        }
         const { data, error } = await query;
         if (error) throw error;
         return data;
@@ -174,6 +180,11 @@ export const igAcompanhamentoSalaService = {
             if (error) throw error;
             return data;
         }
+    },
+
+    async remove(id: string) {
+        const { error } = await supabase.from('ig_acompanhamento_sala').delete().eq('id', id);
+        if (error) throw error;
     }
 };
 

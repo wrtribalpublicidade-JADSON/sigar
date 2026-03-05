@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
-import { ChevronRight, ChevronLeft, Check, X, CheckSquare, Square, Building2, Edit, Printer, Trash2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ChevronRight, ChevronLeft, Check, X, CheckSquare, Square, Building2, Edit, Printer, Trash2, Loader2 } from 'lucide-react';
+import { igAcompanhamentoSalaService } from '../services/gestaoConselhoService';
+import { PrintableAcompanhamentoSala } from './PrintableAcompanhamentoSala';
 
 interface ObservacaoSalaFormProps {
     onClose: () => void;
@@ -9,9 +11,11 @@ interface ObservacaoSalaFormProps {
         etapa: string;
     };
     escolasVinculadas: { id: string; nome: string }[];
+    historico?: any[];
+    onSaveSuccess?: () => void;
 }
 
-export const ObservacaoSalaForm: React.FC<ObservacaoSalaFormProps> = ({ onClose, professor, escolasVinculadas }) => {
+export const ObservacaoSalaForm: React.FC<ObservacaoSalaFormProps> = ({ onClose, professor, escolasVinculadas, historico = [], onSaveSuccess }) => {
     const [step, setStep] = useState(1);
     const [escolaSelecionada, setEscolaSelecionada] = useState(escolasVinculadas.length === 1 ? escolasVinculadas[0].id : '');
     const [observacaoEscola, setObservacaoEscola] = useState(false); // Validar se a escola foi escolhida
@@ -31,6 +35,44 @@ export const ObservacaoSalaForm: React.FC<ObservacaoSalaFormProps> = ({ onClose,
         statusPlano: 'Aguardando Início'
     });
 
+    const [isSaving, setIsSaving] = useState(false);
+    const [isDeleting, setIsDeleting] = useState<string | null>(null);
+    const [currentRecordId, setCurrentRecordId] = useState<string | null>(null);
+    const [printingRecord, setPrintingRecord] = useState<any>(null);
+
+    // Efeito para acionar a impressão logo após o componente Printable ser renderizado no DOM
+    useEffect(() => {
+        if (printingRecord) {
+            // Um pequeno delay para a renderização do portal
+            setTimeout(() => {
+                window.print();
+                setPrintingRecord(null);
+            }, 500);
+        }
+    }, [printingRecord]);
+
+    const loadRecordIntoForm = (record: any) => {
+        setCurrentRecordId(record.id);
+        if (record.escola_id) setEscolaSelecionada(record.escola_id);
+        if (record.detalhes_observacao) {
+            const dets = record.detalhes_observacao;
+            if (dets.respostas) setRespostas(dets.respostas);
+            if (dets.observacoesAdicionais) setObservacoesAdicionais(dets.observacoesAdicionais);
+            if (dets.registroCoordenador) setRegistroCoordenador(dets.registroCoordenador);
+        }
+        setStep(1); // Reset to first step for editing
+    };
+
+    // Auto-load draft if it exists
+    React.useEffect(() => {
+        if (historico.length > 0 && !currentRecordId) {
+            const latest = historico[0];
+            if (latest.status === 'Rascunho') {
+                loadRecordIntoForm(latest);
+            }
+        }
+    }, [historico, currentRecordId]);
+
     const cycleResposta = (id: string) => {
         setRespostas(prev => {
             const current = prev[id];
@@ -43,11 +85,73 @@ export const ObservacaoSalaForm: React.FC<ObservacaoSalaFormProps> = ({ onClose,
         });
     };
 
-    // Mock history data for demonstration
-    const mockHistorico = [
-        { id: 1, dataObservacao: '15/08/2023', dataRetorno: '30/08/2023', status: 'Concluído' },
-        { id: 2, dataObservacao: '12/10/2023', dataRetorno: '26/10/2023', status: 'Aguardando Início' },
-    ];
+    const handleSave = async (statusFinal: 'Concluído' | 'Rascunho') => {
+        if (escolasVinculadas.length > 1 && !escolaSelecionada) {
+            setStep(1);
+            setObservacaoEscola(true);
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            const payload: any = {
+                escola_id: escolaSelecionada,
+                professor_id: professor.id,
+                professor_nome: professor.nome,
+                etapa: professor.etapa,
+                data_observacao: new Date().toISOString().split('T')[0],
+                status: statusFinal,
+                detalhes_observacao: {
+                    respostas,
+                    observacoesAdicionais,
+                    registroCoordenador
+                }
+            };
+
+            if (currentRecordId) {
+                payload.id = currentRecordId;
+            }
+
+            const saved = await igAcompanhamentoSalaService.save(payload);
+
+            if (onSaveSuccess) onSaveSuccess();
+            onClose();
+        } catch (err) {
+            console.error('Erro ao salvar observação:', err);
+            alert('Falha ao salvar a observação. Tente novamente.');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleEdit = (item: any) => {
+        if (confirm('Deseja carregar este acompanhamento para edição? Alterações não salvas no rascunho atual serão perdidas.')) {
+            loadRecordIntoForm(item);
+        }
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!confirm('Tem certeza que deseja excluir permanentemente este registro de acompanhamento?')) return;
+
+        setIsDeleting(id);
+        try {
+            await igAcompanhamentoSalaService.remove(id);
+            if (onSaveSuccess) onSaveSuccess();
+            if (currentRecordId === id) {
+                // Se está editando o registro que acabou de apagar, fecha o modal
+                onClose();
+            }
+        } catch (err) {
+            console.error('Erro ao excluir observação:', err);
+            alert('Falha ao excluir o registro.');
+        } finally {
+            setIsDeleting(null);
+        }
+    };
+
+    const handlePrint = (item: any) => {
+        setPrintingRecord(item);
+    };
 
     const handleNext = () => {
         if (step === 1 && escolasVinculadas.length > 1 && !escolaSelecionada) {
@@ -535,31 +639,51 @@ export const ObservacaoSalaForm: React.FC<ObservacaoSalaFormProps> = ({ onClose,
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
-                                            {mockHistorico.map((item) => (
-                                                <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                                                    <td className="p-4 text-sm font-bold text-slate-700">{item.dataObservacao}</td>
-                                                    <td className="p-4 text-sm font-medium text-slate-600">{item.dataRetorno}</td>
-                                                    <td className="p-4">
-                                                        <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${item.status === 'Concluído'
-                                                            ? 'bg-emerald-100 text-emerald-700'
-                                                            : 'bg-amber-100 text-amber-700'
-                                                            }`}>
-                                                            {item.status}
-                                                        </span>
-                                                    </td>
-                                                    <td className="p-4 flex items-center justify-end gap-2">
-                                                        <button className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
-                                                            <Edit className="w-4 h-4" />
-                                                        </button>
-                                                        <button className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors" title="Imprimir">
-                                                            <Printer className="w-4 h-4" />
-                                                        </button>
-                                                        <button className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Excluir">
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </button>
+                                            {historico.length === 0 && (
+                                                <tr>
+                                                    <td colSpan={4} className="p-4 text-center text-slate-500 text-sm">
+                                                        Nenhum registro de acompanhamento encontrado.
                                                     </td>
                                                 </tr>
-                                            ))}
+                                            )}
+                                            {historico.map((item) => {
+                                                const dataObs = item.data_observacao ? new Date(item.data_observacao).toLocaleDateString('pt-BR') : '-';
+                                                const dataRet = item.detalhes_observacao?.registroCoordenador?.dataRetorno
+                                                    ? new Date(item.detalhes_observacao.registroCoordenador.dataRetorno).toLocaleDateString('pt-BR')
+                                                    : '-';
+                                                return (
+                                                    <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                                                        <td className="p-4 text-sm font-bold text-slate-700">{dataObs}</td>
+                                                        <td className="p-4 text-sm font-medium text-slate-600">{dataRet}</td>
+                                                        <td className="p-4">
+                                                            <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${item.status === 'Concluído'
+                                                                ? 'bg-emerald-100 text-emerald-700'
+                                                                : 'bg-amber-100 text-amber-700'
+                                                                }`}>
+                                                                {item.status}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-4 flex items-center justify-end gap-2">
+                                                            <button
+                                                                onClick={() => handleEdit(item)}
+                                                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
+                                                                <Edit className="w-4 h-4" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handlePrint(item)}
+                                                                className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors" title="Imprimir">
+                                                                <Printer className="w-4 h-4" />
+                                                            </button>
+                                                            <button
+                                                                disabled={isDeleting === item.id}
+                                                                onClick={() => handleDelete(item.id)}
+                                                                className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50" title="Excluir">
+                                                                {isDeleting === item.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
                                         </tbody>
                                     </table>
                                 </div>
@@ -595,19 +719,36 @@ export const ObservacaoSalaForm: React.FC<ObservacaoSalaFormProps> = ({ onClose,
                     </button>
 
                     <div className="flex items-center gap-3">
-                        <button className="px-5 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 transition-all hidden sm:block">
+                        <button
+                            disabled={isSaving}
+                            onClick={() => handleSave('Rascunho')}
+                            className="px-5 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 transition-all hidden sm:block disabled:opacity-50">
                             Salvar Rascunho
                         </button>
                         <button
-                            onClick={step === 6 ? onClose : handleNext}
-                            className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-700 transition-all shadow-md shadow-blue-600/20"
+                            disabled={isSaving}
+                            onClick={step === 6 ? () => handleSave('Concluído') : handleNext}
+                            className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-700 transition-all shadow-md shadow-blue-600/20 disabled:opacity-50"
                         >
-                            {step === 6 ? 'Finalizar Relatório' : 'Próximo'}
-                            {step < 6 && <ChevronRight className="w-4 h-4" />}
+                            {isSaving ? (
+                                <><Loader2 className="w-4 h-4 animate-spin" /> Salvando...</>
+                            ) : (
+                                <>
+                                    {step === 6 ? 'Finalizar Relatório' : 'Próximo'}
+                                    {step < 6 && <ChevronRight className="w-4 h-4" />}
+                                </>
+                            )}
                         </button>
                     </div>
                 </div>
             </div>
+
+            {printingRecord && (
+                <PrintableAcompanhamentoSala
+                    acompanhamento={printingRecord}
+                    escolaNome={escolasVinculadas.find(e => e.id === printingRecord.escola_id)?.nome || 'Unidade Escolar'}
+                />
+            )}
         </div>
     );
 };

@@ -6,6 +6,7 @@ import {
 
 import { Escola, RecursoHumano } from '../types';
 import { ObservacaoSalaForm } from './ObservacaoSalaForm';
+import { igAcompanhamentoSalaService } from '../services/gestaoConselhoService';
 
 interface Observacao {
     id: string;
@@ -42,6 +43,25 @@ export const AcompanhamentoSalaDashboard: React.FC<AcompanhamentoSalaDashboardPr
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedProfessor, setSelectedProfessor] = useState<{ id: string; nome: string; etapa: string; escolasVinculadas: { id: string; nome: string }[] } | null>(null);
+    const [acompanhamentos, setAcompanhamentos] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    const loadDados = async () => {
+        setIsLoading(true);
+        try {
+            const escolaIds = escolas.map(e => e.id);
+            const dados = await igAcompanhamentoSalaService.getAll(escolaIds.length > 0 ? escolaIds : undefined);
+            setAcompanhamentos(dados || []);
+        } catch (err) {
+            console.error('Erro ao carregar acompanhamentos de sala:', err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    React.useEffect(() => {
+        loadDados();
+    }, [escolas]);
 
     const allObservacoes = React.useMemo(() => {
         let obsList: Observacao[] = [];
@@ -70,8 +90,26 @@ export const AcompanhamentoSalaDashboard: React.FC<AcompanhamentoSalaDashboardPr
         // Sort alphabetically to maintain consistency
         obsList.sort((a, b) => a.professor.localeCompare(b.professor));
 
+        // Merge with fetched records
+        obsList = obsList.map(obs => {
+            // Find the most recent record for this professor
+            const professorRecords = acompanhamentos.filter(a => a.professor_id === obs.id).sort((a, b) => {
+                return new Date(b.data_observacao || b.created_at).getTime() - new Date(a.data_observacao || a.created_at).getTime();
+            });
+
+            if (professorRecords.length > 0) {
+                const latest = professorRecords[0];
+                return {
+                    ...obs,
+                    status: latest.status as any,
+                    data: latest.data_observacao ? new Date(latest.data_observacao).toLocaleDateString('pt-BR') : '-',
+                };
+            }
+            return obs;
+        });
+
         return obsList;
-    }, [escolas]);
+    }, [escolas, acompanhamentos]);
 
     const filteredObservacoes = React.useMemo(() => {
         return allObservacoes.filter(obs => {
@@ -98,9 +136,8 @@ export const AcompanhamentoSalaDashboard: React.FC<AcompanhamentoSalaDashboardPr
     }, [allObservacoes, activeFilterTab, searchTerm]);
 
     const totalCount = filteredObservacoes.length;
-    // As placeholders, we use 0 since we don't have real observational records
-    const rascunhosCount = 0;
-    const concluidoCount = 0;
+    const rascunhosCount = filteredObservacoes.filter(o => o.status === 'Rascunho').length;
+    const concluidoCount = filteredObservacoes.filter(o => o.status === 'Concluído').length;
 
     return (
         <div className="space-y-6 animate-fade-in w-full text-left">
@@ -288,6 +325,10 @@ export const AcompanhamentoSalaDashboard: React.FC<AcompanhamentoSalaDashboardPr
                 <ObservacaoSalaForm
                     professor={selectedProfessor}
                     escolasVinculadas={selectedProfessor.escolasVinculadas}
+                    historico={acompanhamentos.filter(a => a.professor_id === selectedProfessor.id).sort((a, b) => new Date(b.data_observacao || b.created_at).getTime() - new Date(a.data_observacao || a.created_at).getTime())}
+                    onSaveSuccess={() => {
+                        loadDados();
+                    }}
                     onClose={() => {
                         setIsModalOpen(false);
                         setSelectedProfessor(null);
