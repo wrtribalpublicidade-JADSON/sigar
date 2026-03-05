@@ -74,27 +74,52 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
         if (!reuniaoForm.pauta || !reuniaoForm.dataReuniao) return;
 
         try {
-            let savedReuniao = { ...reuniaoForm, responsavel: currentUser || '' };
-            if (!savedReuniao.id) {
-                delete (savedReuniao as any).id;
-            }
+            // Map camelCase form fields to snake_case DB columns
+            let horaInicio = reuniaoForm.horaInicio || null;
+            let horaFim = reuniaoForm.horaFim || null;
+            if (horaInicio && horaInicio.length === 5) horaInicio += ':00';
+            if (horaFim && horaFim.length === 5) horaFim += ':00';
 
-            // Format time strings (ensure length length is 5 e.g "10:00") or append :00
-            if (savedReuniao.horaInicio && savedReuniao.horaInicio.length === 5) savedReuniao.horaInicio += ':00';
-            if (savedReuniao.horaFim && savedReuniao.horaFim.length === 5) savedReuniao.horaFim += ':00';
-
-            const result = await igCicloReunioesService.save(savedReuniao);
+            const dbPayload: any = {
+                data_reuniao: reuniaoForm.dataReuniao,
+                hora_inicio: horaInicio,
+                hora_fim: horaFim,
+                tipo: reuniaoForm.tipo,
+                pauta: reuniaoForm.pauta,
+                local_reuniao: reuniaoForm.local || null,
+                registro: reuniaoForm.registro || null,
+                encaminhamentos: reuniaoForm.encaminhamentos || null,
+                status: reuniaoForm.status,
+                responsavel: currentUser || '',
+                participantes: reuniaoForm.participantes
+            };
 
             if (reuniaoForm.id) {
-                setMockReunioes(prev => prev.map(m => m.id === reuniaoForm.id ? { ...result, participantes: result.participantes || [] } : m));
+                dbPayload.id = reuniaoForm.id;
+            }
+
+            const result = await igCicloReunioesService.save(dbPayload);
+
+            // Map result back to component format
+            const mappedResult = {
+                ...result,
+                dataReuniao: result.data_reuniao,
+                horaInicio: result.hora_inicio ? result.hora_inicio.substring(0, 5) : '',
+                horaFim: result.hora_fim ? result.hora_fim.substring(0, 5) : '',
+                local: result.local_reuniao || '',
+                participantes: result.participantes || []
+            };
+
+            if (reuniaoForm.id) {
+                setMockReunioes(prev => prev.map(m => m.id === reuniaoForm.id ? mappedResult : m));
             } else {
-                setMockReunioes(prev => [{ ...result, participantes: result.participantes || [] }, ...prev]);
+                setMockReunioes(prev => [mappedResult, ...prev]);
             }
 
             setIsEditingReuniao(false);
-            setReuniaoForm({ id: '', dataReuniao: '', horaInicio: '', horaFim: '', local: '', registro: '', encaminhamentos: '', tipo: 'Pedagógica', pauta: '', status: 'Agendada', responsavel: currentUser || '', participantes: [] });
+            setReuniaoForm({ id: '', dataReuniao: '', horaInicio: '', horaFim: '', tipo: 'Pedagógica', pauta: '', local: '', registro: '', encaminhamentos: '', status: 'Agendada', responsavel: currentUser || '', participantes: [] });
 
-            setShowAtaModal({ ...result, participantes: result.participantes || [] });
+            setShowAtaModal(mappedResult);
         } catch (error) {
             console.error("Erro ao salvar reunião:", error);
             alert("Erro ao salvar reunião.");
@@ -331,6 +356,7 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
                         horaInicio: r.hora_inicio ? r.hora_inicio.substring(0, 5) : '',
                         horaFim: r.hora_fim ? r.hora_fim.substring(0, 5) : '',
                         dataReuniao: r.data_reuniao,
+                        local: r.local_reuniao || '',
                         participantes: r.participantes || []
                     })));
                 }

@@ -1002,7 +1002,7 @@ export default function App() {
       case 'INSTRUMENTAIS_GESTAO':
         return <InstrumentaisGestao escolas={escolas} currentUser={userName} />;
       case 'CONSELHO_CLASSE':
-        return <ConselhoClasse />;
+        return <ConselhoClasse escolas={escolas} />;
       case 'NOTIFICACOES':
         return (
           <NotificationsPanel

@@ -1,16 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { PageHeader } from './ui/PageHeader';
-import { Users, BookOpen, UserCheck, AlertTriangle, GraduationCap, Edit, Trash2, Calendar, Hand, Book, CheckSquare, MessageCircle, Search, Printer, Lock, Send, CheckCircle2, FileText, LayoutDashboard, TrendingUp, TrendingDown, Minus, ArrowUpRight, ArrowDownRight, AlertCircle, FileDown, Download } from 'lucide-react';
+import { Users, BookOpen, UserCheck, AlertTriangle, GraduationCap, Edit, Trash2, Calendar, Hand, Book, CheckSquare, MessageCircle, Search, Printer, Lock, Send, CheckCircle2, FileText, LayoutDashboard, TrendingUp, TrendingDown, Minus, ArrowUpRight, ArrowDownRight, AlertCircle, FileDown, Download, Baby, School } from 'lucide-react';
 import { CadastroTurmaModal, TurmaData } from './modals/CadastroTurmaModal';
 import { StudentReportModal } from './modals/StudentReportModal';
 import { ReuniaoEstudantilForm } from './ReuniaoEstudantilForm';
 import { ccAcompanhamentoDocenteService, ccEncaminhamentosService } from '../services/gestaoConselhoService';
+import { Escola, Segmento } from '../types';
 
 type Tab = 'estudantil' | 'avaliacao' | 'acompanhamento' | 'encaminhamentos';
 
-export const ConselhoClasse: React.FC = () => {
+interface ConselhoClasseProps {
+    escolas?: Escola[];
+}
+
+export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) => {
     const [activeTab, setActiveTab] = useState<Tab>('estudantil');
     const [isLoading, setIsLoading] = useState(true);
+
+    // Detectar etapas disponíveis na escola
+    const schoolLevels = useMemo(() => {
+        const segs = escolas.flatMap(e => e.segmentos || []);
+        const hasInfantil = segs.includes(Segmento.INFANTIL);
+        const hasFundamental = segs.includes(Segmento.FUNDAMENTAL_I) || segs.includes(Segmento.FUNDAMENTAL_II);
+        return { hasInfantil, hasFundamental, hasBoth: hasInfantil && hasFundamental };
+    }, [escolas]);
+
+    const defaultEtapa = schoolLevels.hasInfantil && !schoolLevels.hasFundamental ? 'infantil' : 'fundamental';
+    const [acompEtapa, setAcompEtapa] = useState<'fundamental' | 'infantil'>(defaultEtapa);
+    const [encEtapa, setEncEtapa] = useState<'fundamental' | 'infantil'>(defaultEtapa);
 
     // ============================================
     // ESTADOS: AVALIAÇÃO DOCENTE
@@ -226,6 +243,97 @@ export const ConselhoClasse: React.FC = () => {
 
     const [mockAcompanhamentos, setMockAcompanhamentos] = useState<any[]>([]);
 
+    // ============================================
+    // ESTADOS: ACOMPANHAMENTO DOCENTE - ED. INFANTIL
+    // ============================================
+    const CAMPOS_EXPERIENCIA_BNCC = [
+        'O eu, o outro e o nós',
+        'Corpo, gestos e movimentos',
+        'Traços, sons, cores e formas',
+        'Escuta, fala, pensamento e imaginação',
+        'Espaços, tempos, quantidades, relações e transformações'
+    ];
+
+    const [acompInfantilForm, setAcompInfantilForm] = useState({
+        id: '',
+        professor: '',
+        agrupamento: '',
+        periodoLetivo: '1º Bimestre',
+        data: '',
+        campoExperiencia: '',
+        crianca: '',
+        tipoInteracao: '',
+        evidencias: '',
+        intencionalidade: ''
+    });
+
+    const [isEditingAcompInfantil, setIsEditingAcompInfantil] = useState(false);
+    const [mockAcompInfantil, setMockAcompInfantil] = useState<any[]>([]);
+
+    const handleSaveAcompInfantil = async () => {
+        if (!acompInfantilForm.professor || !acompInfantilForm.crianca) return;
+        try {
+            let acToSave = {
+                id: acompInfantilForm.id,
+                professor: acompInfantilForm.professor,
+                componente_curricular: acompInfantilForm.campoExperiencia,
+                turma_nome: acompInfantilForm.agrupamento,
+                periodo_letivo: acompInfantilForm.periodoLetivo,
+                data_registro: acompInfantilForm.data,
+                estudante_nome: acompInfantilForm.crianca,
+                lider_turma: acompInfantilForm.tipoInteracao,
+                dificuldades: acompInfantilForm.evidencias,
+                intervencao_pedagogica: acompInfantilForm.intencionalidade,
+                etapa: 'infantil'
+            };
+            if (!acToSave.id) delete (acToSave as any).id;
+
+            const result = await ccAcompanhamentoDocenteService.save(acToSave);
+
+            const formattedResult = {
+                id: result.id,
+                professor: result.professor,
+                agrupamento: result.turma_nome,
+                periodoLetivo: result.periodo_letivo,
+                data: result.data_registro,
+                campoExperiencia: result.componente_curricular,
+                crianca: result.estudante_nome,
+                tipoInteracao: result.lider_turma || '',
+                evidencias: result.dificuldades || '',
+                intencionalidade: result.intervencao_pedagogica || '',
+                etapa: 'infantil'
+            };
+
+            if (acompInfantilForm.id) {
+                setMockAcompInfantil(prev => prev.map(m => m.id === acompInfantilForm.id ? formattedResult : m));
+            } else {
+                setMockAcompInfantil(prev => [formattedResult, ...prev]);
+            }
+            setIsEditingAcompInfantil(false);
+            setAcompInfantilForm({ id: '', professor: '', agrupamento: '', periodoLetivo: '1º Bimestre', data: '', campoExperiencia: '', crianca: '', tipoInteracao: '', evidencias: '', intencionalidade: '' });
+        } catch (error) {
+            console.error("Erro ao salvar acompanhamento infantil:", error);
+            alert("Erro ao salvar acompanhamento");
+        }
+    };
+
+    const handleEditAcompInfantil = (acomp: any) => {
+        setAcompInfantilForm(acomp);
+        setIsEditingAcompInfantil(true);
+    };
+
+    const handleDeleteAcompInfantil = async (id: string) => {
+        if (confirm('Tem certeza que deseja excluir este registro?')) {
+            try {
+                await ccAcompanhamentoDocenteService.delete(id);
+                setMockAcompInfantil(prev => prev.filter(m => m.id !== id));
+            } catch (error) {
+                console.error("Erro ao excluir acompanhamento infantil", error);
+                alert("Erro ao excluir acompanhamento");
+            }
+        }
+    };
+
     const handleSaveAcomp = async () => {
         if (!acompForm.professor || !acompForm.estudante) return;
         try {
@@ -365,6 +473,88 @@ export const ConselhoClasse: React.FC = () => {
                 setMockEncaminhamentos(prev => prev.filter(m => m.id !== id));
             } catch (error) {
                 console.error("Erro ao excluir encaminhamento", error);
+                alert("Erro ao excluir");
+            }
+        }
+    };
+
+    // ============================================
+    // ESTADOS: ENCAMINHAMENTOS INFANTIL
+    // ============================================
+    const [isEditingEncInfantil, setIsEditingEncInfantil] = useState(false);
+    const [encInfantilForm, setEncInfantilForm] = useState({
+        id: '',
+        crianca: '',
+        agrupamento: '',
+        campoExperiencia: '',
+        periodoLetivo: '1º Bimestre',
+        data: '',
+        evidencias: '',
+        estrategia: '',
+        professor: '',
+        status: 'Pendente'
+    });
+    const [mockEncInfantil, setMockEncInfantil] = useState<any[]>([]);
+
+    const handleSaveEncInfantil = async () => {
+        if (!encInfantilForm.crianca || !encInfantilForm.evidencias) return;
+        try {
+            let encToSave = {
+                id: encInfantilForm.id,
+                estudante_nome: encInfantilForm.crianca,
+                turma_nome: encInfantilForm.agrupamento,
+                tipo_intervencao: encInfantilForm.campoExperiencia,
+                descricao_caso: encInfantilForm.evidencias,
+                encaminhamento_proposto: encInfantilForm.estrategia,
+                data_registro: encInfantilForm.data,
+                periodo_letivo: encInfantilForm.periodoLetivo,
+                status: encInfantilForm.status,
+                responsavel_acao: encInfantilForm.professor,
+                etapa: 'infantil'
+            };
+            if (!encToSave.id) delete (encToSave as any).id;
+
+            const result = await ccEncaminhamentosService.save(encToSave);
+
+            const formattedResult = {
+                id: result.id,
+                crianca: result.estudante_nome,
+                agrupamento: result.turma_nome,
+                campoExperiencia: result.tipo_intervencao,
+                evidencias: result.descricao_caso,
+                estrategia: result.encaminhamento_proposto,
+                data: result.data_registro ? result.data_registro.substring(0, 10) : '',
+                periodoLetivo: result.periodo_letivo,
+                status: result.status,
+                professor: result.responsavel_acao,
+                etapa: 'infantil'
+            };
+
+            if (encInfantilForm.id) {
+                setMockEncInfantil(prev => prev.map(m => m.id === encInfantilForm.id ? formattedResult : m));
+            } else {
+                setMockEncInfantil(prev => [formattedResult, ...prev]);
+            }
+            setIsEditingEncInfantil(false);
+            setEncInfantilForm({ id: '', crianca: '', agrupamento: '', campoExperiencia: '', periodoLetivo: '1º Bimestre', data: '', evidencias: '', estrategia: '', professor: '', status: 'Pendente' });
+        } catch (error) {
+            console.error("Erro ao salvar encaminhamento infantil:", error);
+            alert("Erro ao salvar encaminhamento");
+        }
+    };
+
+    const handleEditEncInfantil = (enc: any) => {
+        setEncInfantilForm(enc);
+        setIsEditingEncInfantil(true);
+    };
+
+    const handleDeleteEncInfantil = async (id: string) => {
+        if (confirm('Tem certeza que deseja excluir este registro?')) {
+            try {
+                await ccEncaminhamentosService.delete(id);
+                setMockEncInfantil(prev => prev.filter(m => m.id !== id));
+            } catch (error) {
+                console.error("Erro ao excluir encaminhamento infantil", error);
                 alert("Erro ao excluir");
             }
         }
@@ -858,200 +1048,289 @@ export const ConselhoClasse: React.FC = () => {
                     <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm text-left">
                         <div className="flex justify-between items-start mb-8">
                             <div>
-                                <h3 className="text-2xl font-bold text-slate-800">ACOMPANHAMENTO DOCENTE</h3>
-                                <p className="text-sm text-slate-500 mt-1">Registros de acompanhamento contínuo e feedback para os professores.</p>
+                                <h3 className="text-2xl font-bold text-slate-800">
+                                    ACOMPANHAMENTO DOCENTE{acompEtapa === 'infantil' ? ' — EDUCAÇÃO INFANTIL' : ''}
+                                </h3>
+                                <p className="text-sm text-slate-500 mt-1">
+                                    {acompEtapa === 'infantil'
+                                        ? 'Registros de observação contínua, evidências de aprendizagem e mediação pedagógica para o desenvolvimento integral da criança.'
+                                        : 'Registros de acompanhamento contínuo e feedback para os professores.'}
+                                </p>
                             </div>
-                            {!isEditingAcomp && (
-                                <button
-                                    onClick={() => {
-                                        setAcompForm({ id: '', professor: '', componente: '', turma: '', periodoLetivo: '1º Bimestre', data: '', estudante: '', lider: '', dificuldades: '', intervencao: '' });
-                                        setIsEditingAcomp(true);
-                                    }}
-                                    className="bg-brand-orange hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2"
-                                >
-                                    <UserCheck size={18} /> Novo Acompanhamento
-                                </button>
-                            )}
+                            <div className="flex items-center gap-3">
+                                {!isEditingAcomp && !isEditingAcompInfantil && (
+                                    <button
+                                        onClick={() => {
+                                            if (acompEtapa === 'infantil') {
+                                                setAcompInfantilForm({ id: '', professor: '', agrupamento: '', periodoLetivo: '1º Bimestre', data: '', campoExperiencia: '', crianca: '', tipoInteracao: '', evidencias: '', intencionalidade: '' });
+                                                setIsEditingAcompInfantil(true);
+                                            } else {
+                                                setAcompForm({ id: '', professor: '', componente: '', turma: '', periodoLetivo: '1º Bimestre', data: '', estudante: '', lider: '', dificuldades: '', intervencao: '' });
+                                                setIsEditingAcomp(true);
+                                            }
+                                        }}
+                                        className="bg-brand-orange hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2"
+                                    >
+                                        <UserCheck size={18} /> Novo Acompanhamento
+                                    </button>
+                                )}
+                            </div>
                         </div>
 
-                        {isEditingAcomp && (
+                        {/* Seletor de Etapa (apenas para escolas com ambas as etapas) */}
+                        {(schoolLevels.hasBoth || (!schoolLevels.hasInfantil && !schoolLevels.hasFundamental)) && (
+                            <div className="flex gap-2 mb-6 bg-slate-100 p-1.5 rounded-xl w-fit">
+                                <button
+                                    onClick={() => setAcompEtapa('fundamental')}
+                                    className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${acompEtapa === 'fundamental'
+                                        ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
+                                        : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                >
+                                    <School size={16} /> Ensino Fundamental
+                                </button>
+                                <button
+                                    onClick={() => setAcompEtapa('infantil')}
+                                    className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${acompEtapa === 'infantil'
+                                        ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
+                                        : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                >
+                                    <Baby size={16} /> Educação Infantil
+                                </button>
+                            </div>
+                        )}
+
+                        {/* ===== FORMULÁRIO ENSINO FUNDAMENTAL ===== */}
+                        {acompEtapa === 'fundamental' && isEditingAcomp && (
                             <div className="p-8 border border-slate-200 rounded-2xl bg-white shadow-sm mb-8 animate-fade-in">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Professor(a) Responsável</label>
-                                        <input
-                                            type="text"
-                                            value={acompForm.professor}
-                                            onChange={e => setAcompForm({ ...acompForm, professor: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-                                            placeholder="Nome do(a) professor(a)..."
-                                        />
+                                        <input type="text" value={acompForm.professor} onChange={e => setAcompForm({ ...acompForm, professor: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Nome do(a) professor(a)..." />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Componente Curricular</label>
-                                        <input
-                                            type="text"
-                                            value={acompForm.componente}
-                                            onChange={e => setAcompForm({ ...acompForm, componente: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-                                            placeholder="Ex: Português"
-                                        />
+                                        <input type="text" value={acompForm.componente} onChange={e => setAcompForm({ ...acompForm, componente: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Ex: Português" />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Turma</label>
-                                        <input
-                                            type="text"
-                                            value={acompForm.turma}
-                                            onChange={e => setAcompForm({ ...acompForm, turma: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-                                            placeholder="Ex: 8º Ano A"
-                                        />
+                                        <input type="text" value={acompForm.turma} onChange={e => setAcompForm({ ...acompForm, turma: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Ex: 8º Ano A" />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Período Letivo</label>
-                                        <select
-                                            value={acompForm.periodoLetivo || '1º Bimestre'}
-                                            onChange={e => setAcompForm({ ...acompForm, periodoLetivo: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 appearance-none"
-                                        >
-                                            <option>1º Bimestre</option>
-                                            <option>2º Bimestre</option>
-                                            <option>3º Bimestre</option>
-                                            <option>4º Bimestre</option>
-                                            <option>1º Semestre</option>
-                                            <option>2º Semestre</option>
-                                            <option>Anual</option>
+                                        <select value={acompForm.periodoLetivo || '1º Bimestre'} onChange={e => setAcompForm({ ...acompForm, periodoLetivo: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 appearance-none">
+                                            <option>1º Bimestre</option><option>2º Bimestre</option><option>3º Bimestre</option><option>4º Bimestre</option>
+                                            <option>1º Semestre</option><option>2º Semestre</option><option>Anual</option>
                                         </select>
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Data</label>
-                                        <div className="relative">
-                                            <input
-                                                type="date"
-                                                value={acompForm.data}
-                                                onChange={e => setAcompForm({ ...acompForm, data: e.target.value })}
-                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-                                            />
-                                        </div>
+                                        <input type="date" value={acompForm.data} onChange={e => setAcompForm({ ...acompForm, data: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Líder de Turma</label>
-                                        <input
-                                            type="text"
-                                            value={acompForm.lider}
-                                            onChange={e => setAcompForm({ ...acompForm, lider: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-                                            placeholder="Nome do líder da turma..."
-                                        />
+                                        <input type="text" value={acompForm.lider} onChange={e => setAcompForm({ ...acompForm, lider: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Nome do líder da turma..." />
                                     </div>
                                     <div className="md:col-span-2">
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Estudante com Dificuldade</label>
-                                        <input
-                                            type="text"
-                                            value={acompForm.estudante}
-                                            onChange={e => setAcompForm({ ...acompForm, estudante: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-                                            placeholder="Nome do estudante..."
-                                        />
+                                        <input type="text" value={acompForm.estudante} onChange={e => setAcompForm({ ...acompForm, estudante: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Nome do estudante..." />
                                     </div>
                                     <div className="md:col-span-2">
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Dificuldades Encontradas</label>
-                                        <textarea
-                                            value={acompForm.dificuldades}
-                                            onChange={e => setAcompForm({ ...acompForm, dificuldades: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 h-24 resize-none"
-                                            placeholder="Descreva as dificuldades..."
-                                        />
+                                        <textarea value={acompForm.dificuldades} onChange={e => setAcompForm({ ...acompForm, dificuldades: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 h-24 resize-none" placeholder="Descreva as dificuldades..." />
                                     </div>
                                     <div className="md:col-span-2">
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Intervenção Pedagógica do Professor</label>
-                                        <textarea
-                                            value={acompForm.intervencao}
-                                            onChange={e => setAcompForm({ ...acompForm, intervencao: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 h-24 resize-none"
-                                            placeholder="Descreva a intervenção aplicada..."
-                                        />
+                                        <textarea value={acompForm.intervencao} onChange={e => setAcompForm({ ...acompForm, intervencao: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 h-24 resize-none" placeholder="Descreva a intervenção aplicada..." />
                                     </div>
                                 </div>
                                 <div className="flex gap-3 pt-6 border-t border-slate-100 mt-6">
-                                    <button onClick={handleSaveAcomp} className="bg-brand-orange hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-colors flex items-center gap-2">
-                                        Salvar Registro
-                                    </button>
-                                    <button onClick={() => setIsEditingAcomp(false)} className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-6 py-2.5 rounded-xl font-semibold transition-colors">
-                                        Cancelar
-                                    </button>
+                                    <button onClick={handleSaveAcomp} className="bg-brand-orange hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-colors flex items-center gap-2">Salvar Registro</button>
+                                    <button onClick={() => setIsEditingAcomp(false)} className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-6 py-2.5 rounded-xl font-semibold transition-colors">Cancelar</button>
                                 </div>
                             </div>
                         )}
 
-                        <div className="space-y-4">
-                            {mockAcompanhamentos.map(acomp => (
-                                <div key={acomp.id} className="p-6 border border-slate-100 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all flex flex-col lg:flex-row justify-between lg:items-start gap-6 group">
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-3 mb-2 flex-wrap">
-                                            <span className="px-3 py-1 text-xs font-bold uppercase rounded-full border border-slate-200 text-slate-500">
-                                                {acomp.turma}
-                                            </span>
-                                            <span className="px-3 py-1 text-xs font-bold uppercase rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100">
-                                                {acomp.componente}
-                                            </span>
-                                            {acomp.data && (
-                                                <span className="text-xs font-medium text-slate-400">
-                                                    Data: {acomp.data}
-                                                </span>
-                                            )}
-                                            {acomp.periodoLetivo && (
-                                                <span className="text-xs font-medium text-slate-400 border-l border-slate-200 pl-3">
-                                                    Período: {acomp.periodoLetivo}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <h4 className="text-lg font-bold text-slate-900 leading-tight mb-1">Prof. {acomp.professor}</h4>
+                        {/* ===== FORMULÁRIO EDUCAÇÃO INFANTIL ===== */}
+                        {acompEtapa === 'infantil' && isEditingAcompInfantil && (
+                            <div className="p-8 border border-slate-200 rounded-2xl bg-white shadow-sm mb-8 animate-fade-in">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Professor(a) Responsável</label>
+                                        <input type="text" value={acompInfantilForm.professor} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, professor: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Nome completo do docente" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Agrupamento/Turma</label>
+                                        <input type="text" value={acompInfantilForm.agrupamento} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, agrupamento: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Ex: Berçário II A" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Período Letivo</label>
+                                        <select value={acompInfantilForm.periodoLetivo} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, periodoLetivo: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20">
+                                            <option>1º Bimestre</option><option>2º Bimestre</option><option>3º Bimestre</option><option>4º Bimestre</option>
+                                            <option>1º Semestre</option><option>2º Semestre</option><option>Anual</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Data</label>
+                                        <input type="date" value={acompInfantilForm.data} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, data: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" />
+                                    </div>
+                                </div>
 
-                                        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                                                <div className="mb-3">
-                                                    <p className="text-xs font-bold text-slate-400 uppercase mb-1">Estudante c/ Dificuldade</p>
-                                                    <p className="text-sm font-semibold text-slate-700">{acomp.estudante}</p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Campo de Experiência (BNCC)</label>
+                                        <select value={acompInfantilForm.campoExperiencia} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, campoExperiencia: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20">
+                                            <option value="">Selecione o campo principal</option>
+                                            {CAMPOS_EXPERIENCIA_BNCC.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Criança em Observação</label>
+                                        <input type="text" value={acompInfantilForm.crianca} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, crianca: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Nome da criança" />
+                                    </div>
+                                </div>
+
+                                <div className="mt-6">
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Tipo de Interação Predominante</label>
+                                    <div className="flex gap-4 flex-wrap">
+                                        {['Criança-Criança', 'Criança-Adulto', 'Criança-Ambiente'].map(tipo => (
+                                            <label key={tipo} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border cursor-pointer transition-all text-sm font-medium ${acompInfantilForm.tipoInteracao === tipo
+                                                ? 'bg-orange-50 border-orange-300 text-orange-700'
+                                                : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300'
+                                                }`}>
+                                                <input type="radio" name="tipoInteracao" value={tipo} checked={acompInfantilForm.tipoInteracao === tipo} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, tipoInteracao: e.target.value })} className="sr-only" />
+                                                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${acompInfantilForm.tipoInteracao === tipo ? 'border-orange-500' : 'border-slate-300'
+                                                    }`}>
+                                                    {acompInfantilForm.tipoInteracao === tipo && <div className="w-2 h-2 rounded-full bg-orange-500" />}
                                                 </div>
-                                                <div>
-                                                    <p className="text-xs font-bold text-slate-400 uppercase mb-1">Dificuldades</p>
-                                                    <p className="text-sm text-slate-600 line-clamp-3">{acomp.dificuldades}</p>
-                                                </div>
+                                                {tipo}
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="mt-6">
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Evidências de Aprendizagem e Desenvolvimento</label>
+                                    <textarea value={acompInfantilForm.evidencias} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, evidencias: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 h-28 resize-none" placeholder="Descreva os processos observados, as falas, as conquistas e as descobertas da criança durante a vivência..." />
+                                </div>
+
+                                <div className="mt-6">
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Intencionalidade Pedagógica / Mediação do Professor</label>
+                                    <textarea value={acompInfantilForm.intencionalidade} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, intencionalidade: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 h-28 resize-none" placeholder="Descreva qual foi o seu papel como mediador, as intervenções feitas e como o ambiente foi preparado para potencializar a experiência..." />
+                                </div>
+
+                                <div className="flex gap-3 pt-6 border-t border-slate-100 mt-6">
+                                    <button onClick={handleSaveAcompInfantil} className="bg-brand-orange hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-colors flex items-center gap-2">Salvar Registro</button>
+                                    <button onClick={() => setIsEditingAcompInfantil(false)} className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-6 py-2.5 rounded-xl font-semibold transition-colors">Cancelar</button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ===== LISTA DE REGISTROS ===== */}
+                        {acompEtapa === 'fundamental' && (
+                            <div className="space-y-4">
+                                {mockAcompanhamentos.filter(a => a.etapa !== 'infantil').map(acomp => (
+                                    <div key={acomp.id} className="p-6 border border-slate-100 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all flex flex-col lg:flex-row justify-between lg:items-start gap-6 group">
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-3 mb-2 flex-wrap">
+                                                <span className="px-3 py-1 text-xs font-bold uppercase rounded-full border border-slate-200 text-slate-500">{acomp.turma}</span>
+                                                <span className="px-3 py-1 text-xs font-bold uppercase rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100">{acomp.componente}</span>
+                                                {acomp.data && <span className="text-xs font-medium text-slate-400">Data: {acomp.data}</span>}
+                                                {acomp.periodoLetivo && <span className="text-xs font-medium text-slate-400 border-l border-slate-200 pl-3">Período: {acomp.periodoLetivo}</span>}
                                             </div>
-                                            <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100/50">
-                                                <div className="mb-3">
-                                                    <p className="text-xs font-bold text-emerald-600/80 uppercase mb-1">Intervenção Pedagógica</p>
-                                                    <p className="text-sm text-slate-700 line-clamp-3">{acomp.intervencao}</p>
-                                                </div>
-                                                {acomp.lider && (
-                                                    <div className="pt-3 border-t border-emerald-100/50">
-                                                        <p className="text-xs font-bold text-emerald-600/80 uppercase mb-1 flex items-center gap-1">
-                                                            <UserCheck size={12} /> Líder de Turma
-                                                        </p>
-                                                        <p className="text-sm text-slate-600">{acomp.lider}</p>
+                                            <h4 className="text-lg font-bold text-slate-900 leading-tight mb-1">Prof. {acomp.professor}</h4>
+                                            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                                    <div className="mb-3">
+                                                        <p className="text-xs font-bold text-slate-400 uppercase mb-1">Estudante c/ Dificuldade</p>
+                                                        <p className="text-sm font-semibold text-slate-700">{acomp.estudante}</p>
                                                     </div>
-                                                )}
+                                                    <div>
+                                                        <p className="text-xs font-bold text-slate-400 uppercase mb-1">Dificuldades</p>
+                                                        <p className="text-sm text-slate-600 line-clamp-3">{acomp.dificuldades}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100/50">
+                                                    <div className="mb-3">
+                                                        <p className="text-xs font-bold text-emerald-600/80 uppercase mb-1">Intervenção Pedagógica</p>
+                                                        <p className="text-sm text-slate-700 line-clamp-3">{acomp.intervencao}</p>
+                                                    </div>
+                                                    {acomp.lider && (
+                                                        <div className="pt-3 border-t border-emerald-100/50">
+                                                            <p className="text-xs font-bold text-emerald-600/80 uppercase mb-1 flex items-center gap-1"><UserCheck size={12} /> Líder de Turma</p>
+                                                            <p className="text-sm text-slate-600">{acomp.lider}</p>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
+                                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity flex-row lg:flex-col justify-center">
+                                            <button title="Editar" onClick={() => handleEditAcomp(acomp)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-orange-50 hover:text-brand-orange hover:border-orange-200 transition-all flex-shrink-0"><Edit size={16} /></button>
+                                            <button title="Excluir" onClick={() => handleDeleteAcomp(acomp.id)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all flex-shrink-0"><Trash2 size={16} /></button>
+                                        </div>
                                     </div>
-                                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity flex-row lg:flex-col justify-center">
-                                        <button title="Editar" onClick={() => handleEditAcomp(acomp)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-orange-50 hover:text-brand-orange hover:border-orange-200 transition-all flex-shrink-0">
-                                            <Edit size={16} />
-                                        </button>
-                                        <button title="Excluir" onClick={() => handleDeleteAcomp(acomp.id)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all flex-shrink-0">
-                                            <Trash2 size={16} />
-                                        </button>
+                                ))}
+                                {mockAcompanhamentos.filter(a => a.etapa !== 'infantil').length === 0 && !isEditingAcomp && (
+                                    <div className="text-center p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                                        <UserCheck className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                                        <p className="text-slate-500">Nenhum acompanhamento docente registrado.</p>
                                     </div>
-                                </div>
-                            ))}
-                            {mockAcompanhamentos.length === 0 && !isEditingAcomp && (
-                                <div className="text-center p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                                    <UserCheck className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                                    <p className="text-slate-500">Nenhum acompanhamento docente registrado.</p>
-                                </div>
-                            )}
-                        </div>
+                                )}
+                            </div>
+                        )}
+
+                        {acompEtapa === 'infantil' && (
+                            <div className="space-y-4">
+                                {mockAcompInfantil.map(acomp => (
+                                    <div key={acomp.id} className="p-6 border border-slate-100 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all flex flex-col lg:flex-row justify-between lg:items-start gap-6 group">
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-3 mb-2 flex-wrap">
+                                                <span className="px-3 py-1 text-xs font-bold uppercase rounded-full border border-slate-200 text-slate-500">{acomp.agrupamento}</span>
+                                                <span className="px-3 py-1 text-xs font-bold uppercase rounded-full bg-purple-50 text-purple-600 border border-purple-100">{acomp.campoExperiencia}</span>
+                                                {acomp.data && <span className="text-xs font-medium text-slate-400">Data: {acomp.data}</span>}
+                                                {acomp.periodoLetivo && <span className="text-xs font-medium text-slate-400 border-l border-slate-200 pl-3">Período: {acomp.periodoLetivo}</span>}
+                                            </div>
+                                            <h4 className="text-lg font-bold text-slate-900 leading-tight mb-1">Prof. {acomp.professor}</h4>
+                                            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                                    <div className="mb-3">
+                                                        <p className="text-xs font-bold text-slate-400 uppercase mb-1">Criança em Observação</p>
+                                                        <p className="text-sm font-semibold text-slate-700">{acomp.crianca}</p>
+                                                    </div>
+                                                    {acomp.tipoInteracao && (
+                                                        <div className="mb-3">
+                                                            <p className="text-xs font-bold text-slate-400 uppercase mb-1">Tipo de Interação</p>
+                                                            <span className="px-2.5 py-1 text-xs font-bold rounded-lg bg-orange-50 text-orange-600 border border-orange-100">{acomp.tipoInteracao}</span>
+                                                        </div>
+                                                    )}
+                                                    <div>
+                                                        <p className="text-xs font-bold text-slate-400 uppercase mb-1">Evidências de Aprendizagem</p>
+                                                        <p className="text-sm text-slate-600 line-clamp-3">{acomp.evidencias}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="bg-purple-50/50 p-4 rounded-xl border border-purple-100/50">
+                                                    <div>
+                                                        <p className="text-xs font-bold text-purple-600/80 uppercase mb-1">Intencionalidade Pedagógica / Mediação</p>
+                                                        <p className="text-sm text-slate-700 line-clamp-4">{acomp.intencionalidade}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity flex-row lg:flex-col justify-center">
+                                            <button title="Editar" onClick={() => handleEditAcompInfantil(acomp)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-orange-50 hover:text-brand-orange hover:border-orange-200 transition-all flex-shrink-0"><Edit size={16} /></button>
+                                            <button title="Excluir" onClick={() => handleDeleteAcompInfantil(acomp.id)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all flex-shrink-0"><Trash2 size={16} /></button>
+                                        </div>
+                                    </div>
+                                ))}
+                                {mockAcompInfantil.length === 0 && !isEditingAcompInfantil && (
+                                    <div className="text-center p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                                        <Baby className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                                        <p className="text-slate-500">Nenhum registro de observação da Educação Infantil.</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 );
             case 'encaminhamentos':
@@ -1059,198 +1338,254 @@ export const ConselhoClasse: React.FC = () => {
                     <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm text-left">
                         <div className="flex justify-between items-start mb-8">
                             <div>
-                                <h3 className="text-2xl font-bold text-slate-800">ENCAMINHAMENTOS E INTERVENÇÕES</h3>
-                                <p className="text-sm text-slate-500 mt-1">Gestão de planos de intervenção pedagógica e encaminhamentos multidisciplinares.</p>
+                                <h3 className="text-2xl font-bold text-slate-800">
+                                    ENCAMINHAMENTOS E INTERVENÇÕES{encEtapa === 'infantil' ? ' — EDUCAÇÃO INFANTIL' : ''}
+                                </h3>
+                                <p className="text-sm text-slate-500 mt-1">
+                                    {encEtapa === 'infantil'
+                                        ? 'Gestão de planos de intervenção pedagógica e acompanhamento para a Educação Infantil.'
+                                        : 'Gestão de planos de intervenção pedagógica e encaminhamentos multidisciplinares.'}
+                                </p>
                             </div>
-                            {!isEditingEnc && (
-                                <button
-                                    onClick={() => {
-                                        setEncForm({ id: '', estudante: '', turma: '', tipo: 'Pedagógico', descricao: '', encaminhamento: '', data: '', periodoLetivo: '1º Bimestre', status: 'Pendente', responsavel: '' });
-                                        setIsEditingEnc(true);
-                                    }}
-                                    className="bg-brand-orange hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2"
-                                >
-                                    <AlertTriangle size={18} /> Novo Encaminhamento
-                                </button>
-                            )}
+                            <div className="flex items-center gap-3">
+                                {!isEditingEnc && !isEditingEncInfantil && (
+                                    <button
+                                        onClick={() => {
+                                            if (encEtapa === 'infantil') {
+                                                setEncInfantilForm({ id: '', crianca: '', agrupamento: '', campoExperiencia: '', periodoLetivo: '1º Bimestre', data: '', evidencias: '', estrategia: '', professor: '', status: 'Pendente' });
+                                                setIsEditingEncInfantil(true);
+                                            } else {
+                                                setEncForm({ id: '', estudante: '', turma: '', tipo: 'Pedagógico', descricao: '', encaminhamento: '', data: '', periodoLetivo: '1º Bimestre', status: 'Pendente', responsavel: '' });
+                                                setIsEditingEnc(true);
+                                            }
+                                        }}
+                                        className="bg-brand-orange hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2"
+                                    >
+                                        <AlertTriangle size={18} /> Novo Encaminhamento
+                                    </button>
+                                )}
+                            </div>
                         </div>
 
-                        {isEditingEnc && (
+                        {/* Seletor de Etapa */}
+                        {(schoolLevels.hasBoth || (!schoolLevels.hasInfantil && !schoolLevels.hasFundamental)) && (
+                            <div className="flex gap-2 mb-6 bg-slate-100 p-1.5 rounded-xl w-fit">
+                                <button
+                                    onClick={() => setEncEtapa('fundamental')}
+                                    className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${encEtapa === 'fundamental'
+                                            ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
+                                            : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                >
+                                    <School size={16} /> Ensino Fundamental
+                                </button>
+                                <button
+                                    onClick={() => setEncEtapa('infantil')}
+                                    className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${encEtapa === 'infantil'
+                                            ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
+                                            : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                >
+                                    <Baby size={16} /> Educação Infantil
+                                </button>
+                            </div>
+                        )}
+
+                        {/* ===== FORMULÁRIO ENSINO FUNDAMENTAL ===== */}
+                        {encEtapa === 'fundamental' && isEditingEnc && (
                             <div className="p-8 border border-slate-200 rounded-2xl bg-white shadow-sm mb-8 animate-fade-in">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Estudante</label>
-                                        <input
-                                            type="text"
-                                            value={encForm.estudante}
-                                            onChange={e => setEncForm({ ...encForm, estudante: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-                                            placeholder="Nome do aluno..."
-                                        />
+                                        <input type="text" value={encForm.estudante} onChange={e => setEncForm({ ...encForm, estudante: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Nome do aluno..." />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Turma</label>
-                                        <input
-                                            type="text"
-                                            value={encForm.turma}
-                                            onChange={e => setEncForm({ ...encForm, turma: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-                                            placeholder="Ex: 6º Ano A"
-                                        />
+                                        <input type="text" value={encForm.turma} onChange={e => setEncForm({ ...encForm, turma: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Ex: 6º Ano A" />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Tipo de Intervenção</label>
-                                        <select
-                                            value={encForm.tipo}
-                                            onChange={e => setEncForm({ ...encForm, tipo: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 appearance-none"
-                                        >
-                                            <option>Pedagógico</option>
-                                            <option>Psicológico</option>
-                                            <option>Familiar / Responsáveis</option>
-                                            <option>Saúde / Rede de Apoio</option>
-                                            <option>Disciplinar</option>
+                                        <select value={encForm.tipo} onChange={e => setEncForm({ ...encForm, tipo: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 appearance-none">
+                                            <option>Pedagógico</option><option>Psicológico</option><option>Familiar / Responsáveis</option><option>Saúde / Rede de Apoio</option><option>Disciplinar</option>
                                         </select>
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Período Letivo</label>
-                                        <select
-                                            value={encForm.periodoLetivo || '1º Bimestre'}
-                                            onChange={e => setEncForm({ ...encForm, periodoLetivo: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 appearance-none"
-                                        >
-                                            <option>1º Bimestre</option>
-                                            <option>2º Bimestre</option>
-                                            <option>3º Bimestre</option>
-                                            <option>4º Bimestre</option>
-                                            <option>1º Semestre</option>
-                                            <option>2º Semestre</option>
-                                            <option>Anual</option>
+                                        <select value={encForm.periodoLetivo || '1º Bimestre'} onChange={e => setEncForm({ ...encForm, periodoLetivo: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 appearance-none">
+                                            <option>1º Bimestre</option><option>2º Bimestre</option><option>3º Bimestre</option><option>4º Bimestre</option>
+                                            <option>1º Semestre</option><option>2º Semestre</option><option>Anual</option>
                                         </select>
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Data do Registro</label>
-                                        <div className="relative">
-                                            <input
-                                                type="date"
-                                                value={encForm.data}
-                                                onChange={e => setEncForm({ ...encForm, data: e.target.value })}
-                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-                                            />
-                                        </div>
+                                        <input type="date" value={encForm.data} onChange={e => setEncForm({ ...encForm, data: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" />
                                     </div>
                                     <div className="md:col-span-2">
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Descrição do Caso / Motivo</label>
-                                        <textarea
-                                            value={encForm.descricao}
-                                            onChange={e => setEncForm({ ...encForm, descricao: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 h-24 resize-none"
-                                            placeholder="Descreva detalhadamente a situação e o motivo do encaminhamento..."
-                                        />
+                                        <textarea value={encForm.descricao} onChange={e => setEncForm({ ...encForm, descricao: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 h-24 resize-none" placeholder="Descreva detalhadamente a situação e o motivo do encaminhamento..." />
                                     </div>
                                     <div className="md:col-span-2">
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Encaminhamento / Ação Proposta</label>
-                                        <textarea
-                                            value={encForm.encaminhamento}
-                                            onChange={e => setEncForm({ ...encForm, encaminhamento: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 h-24 resize-none"
-                                            placeholder="Especifique qual ação deve ser tomada, para onde ou para quem o aluno será encaminhado..."
-                                        />
+                                        <textarea value={encForm.encaminhamento} onChange={e => setEncForm({ ...encForm, encaminhamento: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 h-24 resize-none" placeholder="Especifique qual ação deve ser tomada, para onde ou para quem o aluno será encaminhado..." />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Responsável pela Ação</label>
-                                        <input
-                                            type="text"
-                                            value={encForm.responsavel}
-                                            onChange={e => setEncForm({ ...encForm, responsavel: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-                                            placeholder="Nome do/a responsável..."
-                                        />
+                                        <input type="text" value={encForm.responsavel} onChange={e => setEncForm({ ...encForm, responsavel: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Nome do/a responsável..." />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Status</label>
-                                        <select
-                                            value={encForm.status}
-                                            onChange={e => setEncForm({ ...encForm, status: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 appearance-none"
-                                        >
-                                            <option value="Pendente">Pendente</option>
-                                            <option value="Em Andamento">Em Andamento</option>
-                                            <option value="Concluído">Concluído</option>
+                                        <select value={encForm.status} onChange={e => setEncForm({ ...encForm, status: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 appearance-none">
+                                            <option value="Pendente">Pendente</option><option value="Em Andamento">Em Andamento</option><option value="Concluído">Concluído</option>
                                         </select>
                                     </div>
                                 </div>
                                 <div className="flex gap-3 pt-6 border-t border-slate-100 mt-6">
-                                    <button onClick={handleSaveEnc} className="bg-brand-orange hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-colors flex items-center gap-2">
-                                        Salvar Registro
-                                    </button>
-                                    <button onClick={() => setIsEditingEnc(false)} className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-6 py-2.5 rounded-xl font-semibold transition-colors">
-                                        Cancelar
-                                    </button>
+                                    <button onClick={handleSaveEnc} className="bg-brand-orange hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-colors flex items-center gap-2">Salvar Registro</button>
+                                    <button onClick={() => setIsEditingEnc(false)} className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-6 py-2.5 rounded-xl font-semibold transition-colors">Cancelar</button>
                                 </div>
                             </div>
                         )}
 
-                        <div className="space-y-4">
-                            {mockEncaminhamentos.map(enc => (
-                                <div key={enc.id} className="p-6 border border-slate-100 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all flex flex-col lg:flex-row justify-between lg:items-center gap-6 group">
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-3 mb-2 flex-wrap">
-                                            <span className={`px-3 py-1 text-xs font-bold uppercase rounded-full ${enc.status === 'Concluído' ? 'bg-emerald-100 text-emerald-700' :
-                                                enc.status === 'Em Andamento' ? 'bg-blue-100 text-blue-700' :
-                                                    'bg-amber-100 text-amber-700'
-                                                }`}>
-                                                {enc.status}
-                                            </span>
-                                            <span className="px-3 py-1 text-xs font-bold uppercase rounded-full border border-slate-200 text-slate-500">
-                                                {enc.tipo}
-                                            </span>
-                                            <span className="text-xs font-medium text-slate-400">
-                                                Registrado em: {enc.data}
-                                            </span>
-                                            {enc.periodoLetivo && (
-                                                <span className="text-xs font-medium text-slate-400 border-l border-slate-200 pl-3">
-                                                    Período: {enc.periodoLetivo}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <h4 className="text-lg font-bold text-slate-900 leading-tight mb-1">{enc.estudante} <span className="text-slate-400 font-normal text-sm ml-2">({enc.turma})</span></h4>
-
-                                        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                                                <p className="text-xs font-bold text-slate-400 uppercase mb-1">Motivo / Descrição</p>
-                                                <p className="text-sm text-slate-600 line-clamp-2">{enc.descricao}</p>
-                                            </div>
-                                            <div className="bg-orange-50 p-3 rounded-xl border border-orange-100/50">
-                                                <p className="text-xs font-bold text-orange-400/80 uppercase mb-1">Encaminhamento</p>
-                                                <p className="text-sm text-slate-700 line-clamp-2">{enc.encaminhamento}</p>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center gap-4 mt-4">
-                                            <p className="text-xs font-medium text-slate-500 tracking-wide flex items-center gap-1">
-                                                Resp: {enc.responsavel}
-                                            </p>
-                                        </div>
+                        {/* ===== FORMULÁRIO EDUCAÇÃO INFANTIL ===== */}
+                        {encEtapa === 'infantil' && isEditingEncInfantil && (
+                            <div className="p-8 border border-slate-200 rounded-2xl bg-white shadow-sm mb-8 animate-fade-in">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Criança</label>
+                                        <input type="text" value={encInfantilForm.crianca} onChange={e => setEncInfantilForm({ ...encInfantilForm, crianca: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Nome da criança..." />
                                     </div>
-                                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity lg:flex-col justify-center">
-                                        <button title="Editar Encaminhamento" onClick={() => handleEditEnc(enc)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-orange-50 hover:text-brand-orange hover:border-orange-200 transition-all flex-shrink-0">
-                                            <Edit size={16} />
-                                        </button>
-                                        <button title="Excluir Registro" onClick={() => handleDeleteEnc(enc.id)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all flex-shrink-0">
-                                            <Trash2 size={16} />
-                                        </button>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Agrupamento / Turma</label>
+                                        <input type="text" value={encInfantilForm.agrupamento} onChange={e => setEncInfantilForm({ ...encInfantilForm, agrupamento: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Ex: Maternal II - Integral" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Campo de Experiência (BNCC)</label>
+                                        <select value={encInfantilForm.campoExperiencia} onChange={e => setEncInfantilForm({ ...encInfantilForm, campoExperiencia: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20">
+                                            <option value="">Selecione o campo...</option>
+                                            {CAMPOS_EXPERIENCIA_BNCC.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Período Letivo</label>
+                                        <select value={encInfantilForm.periodoLetivo} onChange={e => setEncInfantilForm({ ...encInfantilForm, periodoLetivo: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20">
+                                            <option>1º Bimestre</option><option>2º Bimestre</option><option>3º Bimestre</option><option>4º Bimestre</option>
+                                            <option>1º Semestre</option><option>2º Semestre</option><option>Anual</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Data da Observação</label>
+                                        <input type="date" value={encInfantilForm.data} onChange={e => setEncInfantilForm({ ...encInfantilForm, data: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Evidências Observadas / Motivo do Registro</label>
+                                        <textarea value={encInfantilForm.evidencias} onChange={e => setEncInfantilForm({ ...encInfantilForm, evidencias: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 h-28 resize-none" placeholder="Descreva detalhadamente as situações observadas no cotidiano escolar..." />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Estratégia Pedagógica / Intervenção Proposta</label>
+                                        <textarea value={encInfantilForm.estrategia} onChange={e => setEncInfantilForm({ ...encInfantilForm, estrategia: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 h-28 resize-none" placeholder="Especifique qual intervenção ou estratégia será adotada para favorecer o desenvolvimento da criança..." />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Professor(a) Responsável</label>
+                                        <input type="text" value={encInfantilForm.professor} onChange={e => setEncInfantilForm({ ...encInfantilForm, professor: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Nome do/a profissional..." />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Status do Acompanhamento</label>
+                                        <select value={encInfantilForm.status} onChange={e => setEncInfantilForm({ ...encInfantilForm, status: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20">
+                                            <option value="Pendente">Pendente</option><option value="Em Andamento">Em Andamento</option><option value="Concluído">Concluído</option>
+                                        </select>
                                     </div>
                                 </div>
-                            ))}
-                            {mockEncaminhamentos.length === 0 && !isEditingEnc && (
-                                <div className="text-center p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                                    <AlertTriangle className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                                    <p className="text-slate-500">Nenhum encaminhamento ou intervenção registrada.</p>
+                                <div className="flex gap-3 pt-6 border-t border-slate-100 mt-6">
+                                    <button onClick={handleSaveEncInfantil} className="bg-brand-orange hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-colors flex items-center gap-2">Salvar Registro</button>
+                                    <button onClick={() => setIsEditingEncInfantil(false)} className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-6 py-2.5 rounded-xl font-semibold transition-colors">Cancelar</button>
                                 </div>
-                            )}
-                        </div>
-                    </div >
+                            </div>
+                        )}
+
+                        {/* ===== LISTA DE REGISTROS FUNDAMENTAL ===== */}
+                        {encEtapa === 'fundamental' && (
+                            <div className="space-y-4">
+                                {mockEncaminhamentos.filter(e => e.etapa !== 'infantil').map(enc => (
+                                    <div key={enc.id} className="p-6 border border-slate-100 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all flex flex-col lg:flex-row justify-between lg:items-center gap-6 group">
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-3 mb-2 flex-wrap">
+                                                <span className={`px-3 py-1 text-xs font-bold uppercase rounded-full ${enc.status === 'Concluído' ? 'bg-emerald-100 text-emerald-700' : enc.status === 'Em Andamento' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>{enc.status}</span>
+                                                <span className="px-3 py-1 text-xs font-bold uppercase rounded-full border border-slate-200 text-slate-500">{enc.tipo}</span>
+                                                <span className="text-xs font-medium text-slate-400">Registrado em: {enc.data}</span>
+                                                {enc.periodoLetivo && <span className="text-xs font-medium text-slate-400 border-l border-slate-200 pl-3">Período: {enc.periodoLetivo}</span>}
+                                            </div>
+                                            <h4 className="text-lg font-bold text-slate-900 leading-tight mb-1">{enc.estudante} <span className="text-slate-400 font-normal text-sm ml-2">({enc.turma})</span></h4>
+                                            <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                                    <p className="text-xs font-bold text-slate-400 uppercase mb-1">Motivo / Descrição</p>
+                                                    <p className="text-sm text-slate-600 line-clamp-2">{enc.descricao}</p>
+                                                </div>
+                                                <div className="bg-orange-50 p-3 rounded-xl border border-orange-100/50">
+                                                    <p className="text-xs font-bold text-orange-400/80 uppercase mb-1">Encaminhamento</p>
+                                                    <p className="text-sm text-slate-700 line-clamp-2">{enc.encaminhamento}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-4 mt-4">
+                                                <p className="text-xs font-medium text-slate-500 tracking-wide flex items-center gap-1">Resp: {enc.responsavel}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity lg:flex-col justify-center">
+                                            <button title="Editar" onClick={() => handleEditEnc(enc)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-orange-50 hover:text-brand-orange hover:border-orange-200 transition-all flex-shrink-0"><Edit size={16} /></button>
+                                            <button title="Excluir" onClick={() => handleDeleteEnc(enc.id)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all flex-shrink-0"><Trash2 size={16} /></button>
+                                        </div>
+                                    </div>
+                                ))}
+                                {mockEncaminhamentos.filter(e => e.etapa !== 'infantil').length === 0 && !isEditingEnc && (
+                                    <div className="text-center p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                                        <AlertTriangle className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                                        <p className="text-slate-500">Nenhum encaminhamento ou intervenção registrada.</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* ===== LISTA DE REGISTROS INFANTIL ===== */}
+                        {encEtapa === 'infantil' && (
+                            <div className="space-y-4">
+                                {mockEncInfantil.map(enc => (
+                                    <div key={enc.id} className="p-6 border border-slate-100 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all flex flex-col lg:flex-row justify-between lg:items-center gap-6 group">
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-3 mb-2 flex-wrap">
+                                                <span className={`px-3 py-1 text-xs font-bold uppercase rounded-full ${enc.status === 'Concluído' ? 'bg-emerald-100 text-emerald-700' : enc.status === 'Em Andamento' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>{enc.status}</span>
+                                                <span className="px-3 py-1 text-xs font-bold uppercase rounded-full bg-purple-50 text-purple-600 border border-purple-100">{enc.campoExperiencia}</span>
+                                                {enc.data && <span className="text-xs font-medium text-slate-400">Data: {enc.data}</span>}
+                                                {enc.periodoLetivo && <span className="text-xs font-medium text-slate-400 border-l border-slate-200 pl-3">Período: {enc.periodoLetivo}</span>}
+                                            </div>
+                                            <h4 className="text-lg font-bold text-slate-900 leading-tight mb-1">{enc.crianca} <span className="text-slate-400 font-normal text-sm ml-2">({enc.agrupamento})</span></h4>
+                                            <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                                    <p className="text-xs font-bold text-slate-400 uppercase mb-1">Evidências Observadas</p>
+                                                    <p className="text-sm text-slate-600 line-clamp-3">{enc.evidencias}</p>
+                                                </div>
+                                                <div className="bg-purple-50/50 p-3 rounded-xl border border-purple-100/50">
+                                                    <p className="text-xs font-bold text-purple-600/80 uppercase mb-1">Estratégia Pedagógica</p>
+                                                    <p className="text-sm text-slate-700 line-clamp-3">{enc.estrategia}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-4 mt-4">
+                                                <p className="text-xs font-medium text-slate-500 tracking-wide flex items-center gap-1">Prof.: {enc.professor}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity lg:flex-col justify-center">
+                                            <button title="Editar" onClick={() => handleEditEncInfantil(enc)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-orange-50 hover:text-brand-orange hover:border-orange-200 transition-all flex-shrink-0"><Edit size={16} /></button>
+                                            <button title="Excluir" onClick={() => handleDeleteEncInfantil(enc.id)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all flex-shrink-0"><Trash2 size={16} /></button>
+                                        </div>
+                                    </div>
+                                ))}
+                                {mockEncInfantil.length === 0 && !isEditingEncInfantil && (
+                                    <div className="text-center p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                                        <Baby className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                                        <p className="text-slate-500">Nenhum encaminhamento ou intervenção da Educação Infantil registrada.</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 );
             default:
                 return null;
