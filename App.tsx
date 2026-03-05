@@ -1000,7 +1000,7 @@ export default function App() {
           />
         );
       case 'INSTRUMENTAIS_GESTAO':
-        return <InstrumentaisGestao escolas={escolas} currentUser={userName} />;
+        return <InstrumentaisGestao escolas={escolas} currentUser={userName} isAdmin={isAdmin} />;
       case 'CONSELHO_CLASSE':
         return <ConselhoClasse escolas={escolas} />;
       case 'NOTIFICACOES':

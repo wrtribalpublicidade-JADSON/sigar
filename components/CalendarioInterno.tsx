@@ -33,6 +33,7 @@ interface EventoInterno {
 interface CalendarioInternoProps {
     escolas?: Escola[];
     currentUser?: string | null;
+    isAdmin?: boolean;
 }
 
 // ========== Constants ==========
@@ -107,7 +108,7 @@ function isWeekend(year: number, month: number, day: number) {
 }
 
 // ========== Component ==========
-export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = [], currentUser = '' }) => {
+export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = [], currentUser = '', isAdmin = false }) => {
     const today = new Date();
     const [currentMonth, setCurrentMonth] = useState(today.getMonth());
     const [currentYear, setCurrentYear] = useState(today.getFullYear());
@@ -126,7 +127,7 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
 
     // Escola filter
     const escolaIds = React.useMemo(() => escolas.map(e => e.id), [escolas]);
-    const [filtroEscola, setFiltroEscola] = useState<string>(escolas.length === 1 ? escolas[0].id : 'todas');
+    const [filtroEscola, setFiltroEscola] = useState<string>(isAdmin ? 'todas' : (escolas.length === 1 ? escolas[0].id : 'todas'));
 
     // Filters
     const [filtroTipo, setFiltroTipo] = useState<string>('todos');
@@ -139,7 +140,7 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
         const load = async () => {
             setIsLoading(true);
             try {
-                const escolaFilter = escolaIds.length > 0 ? escolaIds : undefined;
+                const escolaFilter = !isAdmin && escolaIds.length > 0 ? escolaIds : undefined;
                 const [oficiais, internos] = await Promise.all([
                     igCalendarioOficialService.getAll(String(currentYear)),
                     igCalendarioInternoService.getAll(escolaFilter)
@@ -365,7 +366,7 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
             <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-wrap gap-4 items-center justify-between print:hidden">
                 <div className="flex items-center gap-3">
                     <Filter size={16} className="text-slate-400" />
-                    {escolas.length > 1 && (
+                    {(isAdmin || escolas.length > 1) && (
                         <select value={filtroEscola} onChange={e => setFiltroEscola(e.target.value)}
                             className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20">
                             <option value="todas">Todas as Escolas</option>
@@ -374,7 +375,7 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
                             ))}
                         </select>
                     )}
-                    {escolas.length === 1 && (
+                    {!isAdmin && escolas.length === 1 && (
                         <span className="text-sm font-semibold text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
                             {escolas[0].nome}
                         </span>

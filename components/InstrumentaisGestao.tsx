@@ -14,9 +14,10 @@ type Tab = 'reunioes' | 'formacao' | 'acao' | 'pedagogica' | 'sala' | 'calendari
 interface InstrumentaisGestaoProps {
     escolas?: Escola[];
     currentUser?: string | null;
+    isAdmin?: boolean;
 }
 
-export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escolas = [], currentUser = '' }) => {
+export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escolas = [], currentUser = '', isAdmin = false }) => {
     const [activeTab, setActiveTab] = useState<Tab>('reunioes');
     const [isLoading, setIsLoading] = useState(true);
 
@@ -347,7 +348,7 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
         const loadDados = async () => {
             setIsLoading(true);
             try {
-                const escolaFilter = escolaIds.length > 0 ? escolaIds : undefined;
+                const escolaFilter = !isAdmin && escolaIds.length > 0 ? escolaIds : undefined;
                 const [reunioes, metas, formacoes, ppps] = await Promise.all([
                     igCicloReunioesService.getAll(escolaFilter),
                     igPlanoAcaoService.getAll(escolaFilter),
@@ -1087,7 +1088,7 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
             case 'sala':
                 return <AcompanhamentoSalaDashboard escolas={escolas} />;
             case 'calendario':
-                return <CalendarioInterno escolas={escolas} currentUser={currentUser} />;
+                return <CalendarioInterno escolas={escolas} currentUser={currentUser} isAdmin={isAdmin} />;
             default:
                 return null;
         }
