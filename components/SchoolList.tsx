@@ -397,8 +397,8 @@ export const SchoolList: React.FC<SchoolListProps> = ({ escolas, onSelectEscola,
         isOpen={showDeleteModal !== null}
         onClose={() => setShowDeleteModal(null)}
         onConfirm={handleConfirmDelete}
-        title="PURGE_RECORD?"
-        message="This operation will irreversibly expunge the unit and all associated data logs from the system core."
+        title="Excluir Escola?"
+        message="Esta operação removerá permanentemente a unidade escolar e todos os seus dados associados do sistema."
         icon={Trash2}
         variant="danger"
       />

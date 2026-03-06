@@ -106,7 +106,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
     ];
 
     // Filter items based on user role permissions (admins bypass)
-    const effectiveRole = isAdmin ? undefined : userRole;
+    // If the user is admin, force the logical role to be 'Administrador' so that permissions.ts can grant full access.
+    const effectiveRole = isAdmin ? 'Administrador' : userRole;
     const filteredMainNav = mainNavItems.filter(item => getAccessForSidebarItem(item.label, effectiveRole) !== 'none');
     const filteredManagementNav = managementNavItems.filter(item => getAccessForSidebarItem(item.label, effectiveRole) !== 'none');
     const showRegistrarVisita = getAccessForSidebarItem('Registrar Visita', effectiveRole) !== 'none';

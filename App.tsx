@@ -1038,8 +1038,19 @@ export default function App() {
 
   // Determine the effective user context for the dashboard
   const effectiveUser = useMemo(() => {
+    if (isAdmin) {
+      return {
+        id: 'admin',
+        nome: userName || 'Administrador',
+        contato: userEmail || ADMIN_EMAIL,
+        funcao: 'Administrador',
+        regiao: 'Geral',
+        escolasIds: escolas.map(e => e.id),
+        status: 'Ativo'
+      } as Coordenador;
+    }
     return coordenadores.find(c => c.contato === userEmail);
-  }, [coordenadores, userEmail]);
+  }, [coordenadores, userEmail, isAdmin, userName, escolas]);
 
   // Calculate global notifications (pendencies) for the current user
   const notificationCount = useMemo(() => {
