@@ -45,6 +45,22 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
     const [activeTurma, setActiveTurma] = useState<TurmaData>(turmasCadastradas[0]);
     const [showSuccessToast, setShowSuccessToast] = useState(false);
 
+    // Sync active tabs based on selected class stage
+    React.useEffect(() => {
+        if (activeTurma?.etapa === 'Educação Infantil') {
+            setAvaliacaoEtapa('infantil');
+            setAcompEtapa('infantil');
+            setEncEtapa('infantil');
+        } else if (activeTurma) {
+            setAvaliacaoEtapa('fundamental');
+            setAcompEtapa('fundamental');
+            setEncEtapa('fundamental');
+        }
+    }, [activeTurma]);
+
+    const isInfantilAllowed = !activeTurma || activeTurma.etapa === 'Educação Infantil';
+    const isFundamentalAllowed = !activeTurma || activeTurma.etapa !== 'Educação Infantil';
+
     const handleSalvarTurma = (novaTurma: TurmaData) => {
         setTurmasCadastradas([...turmasCadastradas, novaTurma]);
         setActiveTurma(novaTurma);
@@ -650,14 +666,16 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
                             schoolLevels.hasBoth && (
                                 <div className="bg-white rounded-2xl border border-slate-200 p-2 flex gap-2">
                                     <button
-                                        onClick={() => setAvaliacaoEtapa('fundamental')}
-                                        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all shadow-sm ${avaliacaoEtapa === 'fundamental' ? 'bg-sky-600 text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-transparent'}`}
+                                        onClick={() => isFundamentalAllowed && setAvaliacaoEtapa('fundamental')}
+                                        disabled={!isFundamentalAllowed}
+                                        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all shadow-sm ${avaliacaoEtapa === 'fundamental' ? 'bg-sky-600 text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-transparent'} ${!isFundamentalAllowed ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     >
                                         <BookOpen className="w-4 h-4" /> Ensino Fundamental
                                     </button>
                                     <button
-                                        onClick={() => setAvaliacaoEtapa('infantil')}
-                                        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all shadow-sm ${avaliacaoEtapa === 'infantil' ? 'bg-purple-600 text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-transparent'}`}
+                                        onClick={() => isInfantilAllowed && setAvaliacaoEtapa('infantil')}
+                                        disabled={!isInfantilAllowed}
+                                        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all shadow-sm ${avaliacaoEtapa === 'infantil' ? 'bg-purple-600 text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-transparent'} ${!isInfantilAllowed ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     >
                                         <Baby className="w-4 h-4" /> Educação Infantil
                                     </button>
@@ -666,27 +684,15 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
 
                         {/* Tabs Bimestre ou Campos de Experiência */}
                         <div className="bg-white rounded-2xl border border-slate-200 p-2 flex gap-2 overflow-x-auto custom-scrollbar">
-                            {avaliacaoEtapa === 'fundamental' ? (
-                                avaliacaoTabsList.map(tab => (
-                                    <button
-                                        key={tab}
-                                        onClick={() => setAvaliacaoBimestre(tab)}
-                                        className={`px-6 py-2.5 rounded-xl text-sm font-bold min-w-max transition-all ${avaliacaoBimestre === tab ? 'bg-emerald-50 text-emerald-600 border-b-2 border-emerald-500' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}
-                                    >
-                                        {tab}
-                                    </button>
-                                ))
-                            ) : (
-                                CAMPOS_EXPERIENCIA_BNCC.map(campo => (
-                                    <button
-                                        key={campo}
-                                        onClick={() => setAvaliacaoInfantilCampo(campo)}
-                                        className={`px-4 py-2.5 rounded-xl text-xs font-bold leading-tight min-w-max transition-all ${avaliacaoInfantilCampo === campo ? 'bg-purple-50 text-purple-600 border-b-2 border-purple-500' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}
-                                    >
-                                        {campo}
-                                    </button>
-                                ))
-                            )}
+                            {avaliacaoTabsList.map(tab => (
+                                <button
+                                    key={tab}
+                                    onClick={() => setAvaliacaoBimestre(tab)}
+                                    className={`px-6 py-2.5 rounded-xl text-sm font-bold min-w-max transition-all ${avaliacaoBimestre === tab ? 'bg-emerald-50 text-emerald-600 border-b-2 border-emerald-500' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}
+                                >
+                                    {tab}
+                                </button>
+                            ))}
                         </div>
 
                         {/* Header Contexto always visible */}
@@ -732,9 +738,21 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
                                 <p className="text-xs font-bold text-slate-400 uppercase mb-1">
                                     {avaliacaoEtapa === 'infantil' ? 'Campo de Experiência' : 'Componente Curricular'}
                                 </p>
-                                <p className="text-sm font-semibold text-slate-800">
-                                    {avaliacaoEtapa === 'infantil' ? avaliacaoInfantilCampo || 'Não selecionado' : 'Língua Portuguesa - BNCC'}
-                                </p>
+                                {avaliacaoEtapa === 'infantil' ? (
+                                    <select
+                                        value={avaliacaoInfantilCampo}
+                                        onChange={(e) => setAvaliacaoInfantilCampo(e.target.value)}
+                                        className="w-full bg-transparent text-sm font-semibold text-slate-800 focus:outline-none cursor-pointer appearance-none truncate hover:text-blue-600 transition-colors"
+                                    >
+                                        {CAMPOS_EXPERIENCIA_BNCC.map(campo => (
+                                            <option key={campo} value={campo}>{campo}</option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <p className="text-sm font-semibold text-slate-800">
+                                        Língua Portuguesa - BNCC
+                                    </p>
+                                )}
                             </div>
                             <div className="px-4 flex items-center gap-3">
                                 <button
@@ -756,167 +774,178 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
                             </div>
                         </div>
 
-                        {/* Renderização Condicional do Conteúdo da Tab */}
                         {
                             avaliacaoBimestre === 'Resultado Consolidado' ? (
-                                <div className="space-y-6">
-
-                                    {/* Overview Cards */}
-                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
-                                            <div className="flex justify-between items-start mb-2">
-                                                <h4 className="text-xs font-bold text-slate-500 uppercase">Evolução Média</h4>
-                                                <TrendingUp className="w-4 h-4 text-emerald-500" />
-                                            </div>
-                                            <div className="flex items-baseline gap-2">
-                                                <span className="text-2xl font-black text-slate-800">+12.5%</span>
-                                                <span className="text-xs font-bold text-emerald-500 flex items-center"><ArrowUpRight className="w-3 h-3" /> vs. ant.</span>
-                                            </div>
+                                avaliacaoEtapa === 'infantil' ? (
+                                    <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center flex flex-col items-center justify-center shadow-sm">
+                                        <div className="w-16 h-16 bg-purple-50 text-purple-500 rounded-full flex items-center justify-center mb-4 border border-purple-100">
+                                            <Baby className="w-8 h-8" />
                                         </div>
-                                        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
-                                            <div className="flex justify-between items-start mb-2">
-                                                <h4 className="text-xs font-bold text-slate-500 uppercase">Acima da Média</h4>
-                                                <Users className="w-4 h-4 text-blue-500" />
-                                            </div>
-                                            <div className="flex items-baseline gap-2">
-                                                <span className="text-2xl font-black text-slate-800">84%</span>
-                                                <span className="text-xs font-medium text-slate-400">21 / 25</span>
-                                            </div>
-                                        </div>
-                                        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
-                                            <div className="flex justify-between items-start mb-2">
-                                                <h4 className="text-xs font-bold text-slate-500 uppercase">Média Geral</h4>
-                                                <LayoutDashboard className="w-4 h-4 text-amber-500" />
-                                            </div>
-                                            <div className="flex items-baseline gap-2">
-                                                <span className="text-2xl font-black text-slate-800">7.8</span>
-                                                <span className="text-xs font-medium text-slate-400 text-amber-500">Meta: 7.0</span>
-                                            </div>
-                                        </div>
-                                        <div className="bg-red-50 rounded-2xl p-5 border border-red-100 shadow-sm flex flex-col justify-between relative overflow-hidden">
-                                            <div className="absolute -right-4 -top-4 w-16 h-16 bg-red-100 rounded-full opacity-50"></div>
-                                            <div className="flex justify-between items-start mb-2 relative z-10">
-                                                <h4 className="text-xs font-bold text-red-800 uppercase">Alertas de Queda</h4>
-                                                <AlertCircle className="w-4 h-4 text-red-500" />
-                                            </div>
-                                            <div className="flex items-baseline gap-2 relative z-10">
-                                                <span className="text-2xl font-black text-red-600">06</span>
-                                                <span className="text-xs font-bold text-red-500">estudantes</span>
-                                            </div>
-                                        </div>
+                                        <h3 className="text-xl font-bold text-slate-800 mb-2">Resultado Consolidado da Educação Infantil</h3>
+                                        <p className="text-slate-500 max-w-md mx-auto">
+                                            A visão consolidada para Educação Infantil foca na evolução contínua dos campos de experiência e será gerada ao final do ciclo letivo, reunindo o acompanhamento pedagógico.
+                                        </p>
                                     </div>
+                                ) : (
+                                    <div className="space-y-6">
 
-                                    {/* Tabela Consolidada */}
-                                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                                        <div className="overflow-x-auto">
-                                            <table className="w-full text-left border-collapse min-w-max">
-                                                <thead>
-                                                    <tr className="bg-slate-800 text-white border-b border-slate-700">
-                                                        <th className="p-4 rounded-tl-xl w-16 text-center text-slate-400 font-medium">Nº</th>
-                                                        <th className="p-4 font-bold text-sm tracking-wide bg-white text-slate-800 min-w-[200px] border-r border-slate-200">NOME DO ESTUDANTE</th>
-                                                        <th className="p-4 text-center">
-                                                            <span className="text-[10px] font-bold uppercase tracking-wider block">1º Bimestre</span>
-                                                        </th>
-                                                        <th className="p-4 text-center">
-                                                            <span className="text-[10px] font-bold uppercase tracking-wider block">2º Bimestre</span>
-                                                        </th>
-                                                        <th className="p-4 text-center">
-                                                            <span className="text-[10px] font-bold uppercase tracking-wider block">3º Bimestre</span>
-                                                        </th>
-                                                        <th className="p-4 text-center">
-                                                            <span className="text-[10px] font-bold uppercase tracking-wider block">4º Bimestre</span>
-                                                        </th>
-                                                        <th className="p-4 text-center bg-emerald-700/80">
-                                                            <span className="text-[10px] font-bold uppercase tracking-wider block">Média Final</span>
-                                                        </th>
-                                                        <th className="p-4 text-center bg-emerald-800 rounded-tr-xl">
-                                                            <span className="text-[10px] font-bold uppercase tracking-wider block">Trajetória</span>
-                                                        </th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-slate-100">
-                                                    {visaoGeralData.map(student => (
-                                                        <tr key={student.id} className={`transition-colors group ${student.alert ? 'bg-red-50/30' : 'hover:bg-slate-50'}`}>
-                                                            <td className="p-4 text-center text-sm font-medium text-slate-400 group-hover:text-blue-500 transition-colors">{student.id}</td>
-                                                            <td className="p-4 text-sm font-bold text-slate-700">
-                                                                <button
-                                                                    onClick={() => {
-                                                                        setActiveStudentReport(student);
-                                                                        setIsStudentReportOpen(true);
-                                                                    }}
-                                                                    className="flex items-center gap-2 group/btn text-left"
-                                                                >
-                                                                    {student.alert && <AlertTriangle className="w-4 h-4 text-red-500" />}
-                                                                    <span className="group-hover/btn:text-blue-600 transition-colors border-b border-transparent group-hover/btn:border-blue-200 pb-0.5">{student.name}</span>
-                                                                </button>
-                                                            </td>
-                                                            <td className={`p-4 text-center text-sm font-bold ${student.b1 < 6 ? 'text-red-500' : 'text-slate-700'}`}>
-                                                                {student.b1.toFixed(1)}
-                                                            </td>
-                                                            <td className="p-4 text-center text-sm">
-                                                                <div className="flex flex-col items-center">
-                                                                    <span className={`font-bold ${student.b2 < 6 ? 'text-red-500' : 'text-slate-700'}`}>{student.b2.toFixed(1)}</span>
-                                                                    {renderVisaoGeralTrend(student.b2, student.b1)}
-                                                                </div>
-                                                            </td>
-                                                            <td className="p-4 text-center text-sm">
-                                                                <div className="flex flex-col items-center">
-                                                                    <span className={`font-bold ${student.b3 < 6 ? 'text-red-500' : 'text-slate-700'}`}>{student.b3.toFixed(1)}</span>
-                                                                    {renderVisaoGeralTrend(student.b3, student.b2)}
-                                                                </div>
-                                                            </td>
-                                                            <td className="p-4 text-center text-sm">
-                                                                <div className="flex flex-col items-center">
-                                                                    <span className={`font-bold ${student.b4 < 6 ? 'text-red-500' : 'text-slate-700'}`}>{student.b4.toFixed(1)}</span>
-                                                                    {renderVisaoGeralTrend(student.b4, student.b3)}
-                                                                </div>
-                                                            </td>
-                                                            <td className="p-4 text-center bg-slate-50 group-hover:bg-slate-100 transition-colors">
-                                                                <span className={`px-3 py-1.5 rounded-lg border font-bold text-sm ${student.mediaFinal < 6 ? 'bg-red-100 text-red-700 border-red-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
-                                                                    {student.mediaFinal.toFixed(1)}
-                                                                </span>
-                                                            </td>
-                                                            <td className="p-4">
-                                                                {renderVisaoGeralTrajectory(student)}
-                                                            </td>
+                                        {/* Overview Cards */}
+                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <h4 className="text-xs font-bold text-slate-500 uppercase">Evolução Média</h4>
+                                                    <TrendingUp className="w-4 h-4 text-emerald-500" />
+                                                </div>
+                                                <div className="flex items-baseline gap-2">
+                                                    <span className="text-2xl font-black text-slate-800">+12.5%</span>
+                                                    <span className="text-xs font-bold text-emerald-500 flex items-center"><ArrowUpRight className="w-3 h-3" /> vs. ant.</span>
+                                                </div>
+                                            </div>
+                                            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <h4 className="text-xs font-bold text-slate-500 uppercase">Acima da Média</h4>
+                                                    <Users className="w-4 h-4 text-blue-500" />
+                                                </div>
+                                                <div className="flex items-baseline gap-2">
+                                                    <span className="text-2xl font-black text-slate-800">84%</span>
+                                                    <span className="text-xs font-medium text-slate-400">21 / 25</span>
+                                                </div>
+                                            </div>
+                                            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <h4 className="text-xs font-bold text-slate-500 uppercase">Média Geral</h4>
+                                                    <LayoutDashboard className="w-4 h-4 text-amber-500" />
+                                                </div>
+                                                <div className="flex items-baseline gap-2">
+                                                    <span className="text-2xl font-black text-slate-800">7.8</span>
+                                                    <span className="text-xs font-medium text-slate-400 text-amber-500">Meta: 7.0</span>
+                                                </div>
+                                            </div>
+                                            <div className="bg-red-50 rounded-2xl p-5 border border-red-100 shadow-sm flex flex-col justify-between relative overflow-hidden">
+                                                <div className="absolute -right-4 -top-4 w-16 h-16 bg-red-100 rounded-full opacity-50"></div>
+                                                <div className="flex justify-between items-start mb-2 relative z-10">
+                                                    <h4 className="text-xs font-bold text-red-800 uppercase">Alertas de Queda</h4>
+                                                    <AlertCircle className="w-4 h-4 text-red-500" />
+                                                </div>
+                                                <div className="flex items-baseline gap-2 relative z-10">
+                                                    <span className="text-2xl font-black text-red-600">06</span>
+                                                    <span className="text-xs font-bold text-red-500">estudantes</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Tabela Consolidada */}
+                                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-left border-collapse min-w-max">
+                                                    <thead>
+                                                        <tr className="bg-slate-800 text-white border-b border-slate-700">
+                                                            <th className="p-4 rounded-tl-xl w-16 text-center text-slate-400 font-medium">Nº</th>
+                                                            <th className="p-4 font-bold text-sm tracking-wide bg-white text-slate-800 min-w-[200px] border-r border-slate-200">NOME DO ESTUDANTE</th>
+                                                            <th className="p-4 text-center">
+                                                                <span className="text-[10px] font-bold uppercase tracking-wider block">1º Bimestre</span>
+                                                            </th>
+                                                            <th className="p-4 text-center">
+                                                                <span className="text-[10px] font-bold uppercase tracking-wider block">2º Bimestre</span>
+                                                            </th>
+                                                            <th className="p-4 text-center">
+                                                                <span className="text-[10px] font-bold uppercase tracking-wider block">3º Bimestre</span>
+                                                            </th>
+                                                            <th className="p-4 text-center">
+                                                                <span className="text-[10px] font-bold uppercase tracking-wider block">4º Bimestre</span>
+                                                            </th>
+                                                            <th className="p-4 text-center bg-emerald-700/80">
+                                                                <span className="text-[10px] font-bold uppercase tracking-wider block">Média Final</span>
+                                                            </th>
+                                                            <th className="p-4 text-center bg-emerald-800 rounded-tr-xl">
+                                                                <span className="text-[10px] font-bold uppercase tracking-wider block">Trajetória</span>
+                                                            </th>
                                                         </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                        <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-between items-center rounded-b-2xl">
-                                            <div className="text-xs text-slate-500 font-medium">
-                                                Exibindo {visaoGeralData.length} de 25 alunos matriculados nesta turma
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100">
+                                                        {visaoGeralData.map(student => (
+                                                            <tr key={student.id} className={`transition-colors group ${student.alert ? 'bg-red-50/30' : 'hover:bg-slate-50'}`}>
+                                                                <td className="p-4 text-center text-sm font-medium text-slate-400 group-hover:text-blue-500 transition-colors">{student.id}</td>
+                                                                <td className="p-4 text-sm font-bold text-slate-700">
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setActiveStudentReport(student);
+                                                                            setIsStudentReportOpen(true);
+                                                                        }}
+                                                                        className="flex items-center gap-2 group/btn text-left"
+                                                                    >
+                                                                        {student.alert && <AlertTriangle className="w-4 h-4 text-red-500" />}
+                                                                        <span className="group-hover/btn:text-blue-600 transition-colors border-b border-transparent group-hover/btn:border-blue-200 pb-0.5">{student.name}</span>
+                                                                    </button>
+                                                                </td>
+                                                                <td className={`p-4 text-center text-sm font-bold ${student.b1 < 6 ? 'text-red-500' : 'text-slate-700'}`}>
+                                                                    {student.b1.toFixed(1)}
+                                                                </td>
+                                                                <td className="p-4 text-center text-sm">
+                                                                    <div className="flex flex-col items-center">
+                                                                        <span className={`font-bold ${student.b2 < 6 ? 'text-red-500' : 'text-slate-700'}`}>{student.b2.toFixed(1)}</span>
+                                                                        {renderVisaoGeralTrend(student.b2, student.b1)}
+                                                                    </div>
+                                                                </td>
+                                                                <td className="p-4 text-center text-sm">
+                                                                    <div className="flex flex-col items-center">
+                                                                        <span className={`font-bold ${student.b3 < 6 ? 'text-red-500' : 'text-slate-700'}`}>{student.b3.toFixed(1)}</span>
+                                                                        {renderVisaoGeralTrend(student.b3, student.b2)}
+                                                                    </div>
+                                                                </td>
+                                                                <td className="p-4 text-center text-sm">
+                                                                    <div className="flex flex-col items-center">
+                                                                        <span className={`font-bold ${student.b4 < 6 ? 'text-red-500' : 'text-slate-700'}`}>{student.b4.toFixed(1)}</span>
+                                                                        {renderVisaoGeralTrend(student.b4, student.b3)}
+                                                                    </div>
+                                                                </td>
+                                                                <td className="p-4 text-center bg-slate-50 group-hover:bg-slate-100 transition-colors">
+                                                                    <span className={`px-3 py-1.5 rounded-lg border font-bold text-sm ${student.mediaFinal < 6 ? 'bg-red-100 text-red-700 border-red-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
+                                                                        {student.mediaFinal.toFixed(1)}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="p-4">
+                                                                    {renderVisaoGeralTrajectory(student)}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
                                             </div>
-                                            <div className="flex gap-1">
-                                                <button className="w-6 h-6 rounded flex items-center justify-center hover:bg-slate-200 text-slate-400 disabled:opacity-50" disabled>&laquo;</button>
-                                                <button className="w-6 h-6 rounded flex items-center justify-center hover:bg-slate-200 text-slate-400 disabled:opacity-50" disabled>&lsaquo;</button>
-                                                <button className="w-6 h-6 rounded flex items-center justify-center bg-white border border-slate-200 text-blue-600 font-bold text-xs shadow-sm">1</button>
-                                                <button className="w-6 h-6 rounded flex items-center justify-center bg-transparent text-slate-500 font-bold text-xs hover:bg-slate-200">2</button>
-                                                <button className="w-6 h-6 rounded flex items-center justify-center bg-transparent text-slate-500 font-bold text-xs hover:bg-slate-200">3</button>
-                                                <button className="w-6 h-6 rounded flex items-center justify-center hover:bg-slate-200 text-slate-500">&rsaquo;</button>
-                                                <button className="w-6 h-6 rounded flex items-center justify-center hover:bg-slate-200 text-slate-500">&raquo;</button>
+                                            <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-between items-center rounded-b-2xl">
+                                                <div className="text-xs text-slate-500 font-medium">
+                                                    Exibindo {visaoGeralData.length} de 25 alunos matriculados nesta turma
+                                                </div>
+                                                <div className="flex gap-1">
+                                                    <button className="w-6 h-6 rounded flex items-center justify-center hover:bg-slate-200 text-slate-400 disabled:opacity-50" disabled>&laquo;</button>
+                                                    <button className="w-6 h-6 rounded flex items-center justify-center hover:bg-slate-200 text-slate-400 disabled:opacity-50" disabled>&lsaquo;</button>
+                                                    <button className="w-6 h-6 rounded flex items-center justify-center bg-white border border-slate-200 text-blue-600 font-bold text-xs shadow-sm">1</button>
+                                                    <button className="w-6 h-6 rounded flex items-center justify-center bg-transparent text-slate-500 font-bold text-xs hover:bg-slate-200">2</button>
+                                                    <button className="w-6 h-6 rounded flex items-center justify-center bg-transparent text-slate-500 font-bold text-xs hover:bg-slate-200">3</button>
+                                                    <button className="w-6 h-6 rounded flex items-center justify-center hover:bg-slate-200 text-slate-500">&rsaquo;</button>
+                                                    <button className="w-6 h-6 rounded flex items-center justify-center hover:bg-slate-200 text-slate-500">&raquo;</button>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
 
-                                    {/* Legenda Evolução */}
-                                    <div className="bg-white rounded-2xl border border-slate-200 p-4 flex justify-between items-center shadow-sm">
-                                        <div className="flex items-center gap-6">
-                                            <span className="text-xs font-bold text-slate-400 uppercase flex items-center gap-2">
-                                                <AlertCircle className="w-4 h-4" /> LEGENDA DE EVOLUÇÃO:
-                                            </span>
-                                            <div className="flex gap-6 text-xs text-slate-600 font-bold">
-                                                <span className="flex items-center gap-2"><ArrowUpRight className="w-4 h-4 text-emerald-500" /> Melhoria em relação ao bimestre anterior</span>
-                                                <span className="flex items-center gap-2"><ArrowDownRight className="w-4 h-4 text-red-500" /> Queda em relação ao bimestre anterior</span>
-                                                <span className="flex items-center gap-2"><Minus className="w-4 h-4 text-slate-400" /> Estabilidade</span>
+                                        {/* Legenda Evolução */}
+                                        <div className="bg-white rounded-2xl border border-slate-200 p-4 flex justify-between items-center shadow-sm">
+                                            <div className="flex items-center gap-6">
+                                                <span className="text-xs font-bold text-slate-400 uppercase flex items-center gap-2">
+                                                    <AlertCircle className="w-4 h-4" /> LEGENDA DE EVOLUÇÃO:
+                                                </span>
+                                                <div className="flex gap-6 text-xs text-slate-600 font-bold">
+                                                    <span className="flex items-center gap-2"><ArrowUpRight className="w-4 h-4 text-emerald-500" /> Melhoria em relação ao bimestre anterior</span>
+                                                    <span className="flex items-center gap-2"><ArrowDownRight className="w-4 h-4 text-red-500" /> Queda em relação ao bimestre anterior</span>
+                                                    <span className="flex items-center gap-2"><Minus className="w-4 h-4 text-slate-400" /> Estabilidade</span>
+                                                </div>
                                             </div>
+                                            <span className="flex items-center gap-2 text-[10px] font-bold text-red-700 bg-red-50 border border-red-100 px-3 py-1 rounded-full uppercase">
+                                                <AlertTriangle className="w-3 h-3" /> ALERTA CRÍTICO DE DESEMPENHO
+                                            </span>
                                         </div>
-                                        <span className="flex items-center gap-2 text-[10px] font-bold text-red-700 bg-red-50 border border-red-100 px-3 py-1 rounded-full uppercase">
-                                            <AlertTriangle className="w-3 h-3" /> ALERTA CRÍTICO DE DESEMPENHO
-                                        </span>
                                     </div>
-                                </div>
+                                )
                             ) : avaliacaoEtapa === 'fundamental' ? (
                                 <>
                                     {/* Legenda de Conceitos - Fundamental */}
@@ -1219,20 +1248,22 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
                                 (schoolLevels.hasBoth || (!schoolLevels.hasInfantil && !schoolLevels.hasFundamental)) && (
                                     <div className="flex gap-2 mb-6 bg-slate-100 p-1.5 rounded-xl w-fit">
                                         <button
-                                            onClick={() => setAcompEtapa('fundamental')}
+                                            onClick={() => isFundamentalAllowed && setAcompEtapa('fundamental')}
+                                            disabled={!isFundamentalAllowed}
                                             className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${acompEtapa === 'fundamental'
                                                 ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
                                                 : 'text-slate-500 hover:text-slate-700'
-                                                }`}
+                                                } ${!isFundamentalAllowed ? 'opacity-50 cursor-not-allowed' : ''}`}
                                         >
                                             <School size={16} /> Ensino Fundamental
                                         </button>
                                         <button
-                                            onClick={() => setAcompEtapa('infantil')}
+                                            onClick={() => isInfantilAllowed && setAcompEtapa('infantil')}
+                                            disabled={!isInfantilAllowed}
                                             className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${acompEtapa === 'infantil'
                                                 ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
                                                 : 'text-slate-500 hover:text-slate-700'
-                                                }`}
+                                                } ${!isInfantilAllowed ? 'opacity-50 cursor-not-allowed' : ''}`}
                                         >
                                             <Baby size={16} /> Educação Infantil
                                         </button>
@@ -1510,20 +1541,22 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
                         {(schoolLevels.hasBoth || (!schoolLevels.hasInfantil && !schoolLevels.hasFundamental)) && (
                             <div className="flex gap-2 mb-6 bg-slate-100 p-1.5 rounded-xl w-fit">
                                 <button
-                                    onClick={() => setEncEtapa('fundamental')}
+                                    onClick={() => isFundamentalAllowed && setEncEtapa('fundamental')}
+                                    disabled={!isFundamentalAllowed}
                                     className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${encEtapa === 'fundamental'
                                         ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
                                         : 'text-slate-500 hover:text-slate-700'
-                                        }`}
+                                        } ${!isFundamentalAllowed ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
                                     <School size={16} /> Ensino Fundamental
                                 </button>
                                 <button
-                                    onClick={() => setEncEtapa('infantil')}
+                                    onClick={() => isInfantilAllowed && setEncEtapa('infantil')}
+                                    disabled={!isInfantilAllowed}
                                     className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${encEtapa === 'infantil'
                                         ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
                                         : 'text-slate-500 hover:text-slate-700'
-                                        }`}
+                                        } ${!isInfantilAllowed ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
                                     <Baby size={16} /> Educação Infantil
                                 </button>
