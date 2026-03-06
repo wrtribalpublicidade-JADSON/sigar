@@ -22,7 +22,7 @@ const VIEW_TO_MODULE: Record<string, string> = {
     'AUDIT_LOGS': 'auditoria',
     'NOVA_VISITA': 'registrar_visita',
     'GESTAO_USUARIOS': 'equipe',
-    'PERMISSOES': 'auditoria', // only admins see this
+    'PERMISSOES': 'auditoria',
 };
 
 // Sidebar label → moduleId mapping
@@ -44,6 +44,43 @@ const SIDEBAR_LABEL_TO_MODULE: Record<string, string> = {
     'Permissões': 'auditoria',
 };
 
+export const ALL_MODULES = [
+    { id: 'dashboard', name: 'Visão Geral (Dashboard)', group: 'Menu' },
+    { id: 'escolas', name: 'Escolas', group: 'Menu' },
+    { id: 'equipe', name: 'Equipe / Gestão de Usuários', group: 'Gestão' },
+    { id: 'relatorios', name: 'Relatórios', group: 'Gestão' },
+    { id: 'analise_parc', name: 'Análise PARC', group: 'Análises' },
+    { id: 'analise_seama', name: 'Análise SEAMA', group: 'Análises' },
+    { id: 'analise_saeb', name: 'Análise SAEB', group: 'Análises' },
+    { id: 'analise_cnca', name: 'Análise CNCA/PNRA', group: 'Análises' },
+    { id: 'indicadores', name: 'Indicadores', group: 'Gestão' },
+    { id: 'instrumentais', name: 'Instrumentais de Gestão', group: 'Gestão' },
+    { id: 'conselho', name: 'Conselho de Classe', group: 'Gestão' },
+    { id: 'notificacoes', name: 'Notificações', group: 'Sistema' },
+    { id: 'auditoria', name: 'Auditoria', group: 'Sistema' },
+    { id: 'registrar_visita', name: 'Registrar Visita', group: 'Sistema' },
+];
+
+export const ALL_ROLES = [
+    'Administrador',
+    'Coordenador Regional',
+    'Técnico Pedagógico',
+    'Professor',
+    'Coordenador Pedagógico',
+    'Gestor Geral',
+    'Gestor Pedagógico',
+];
+
+export const DEFAULT_PERMISSIONS: Record<string, Record<string, AccessLevel>> = {
+    'Administrador': Object.fromEntries(ALL_MODULES.map(m => [m.id, 'full'])),
+    'Coordenador Regional': Object.fromEntries(ALL_MODULES.map(m => [m.id, m.id === 'auditoria' ? 'none' : 'full'])),
+    'Técnico Pedagógico': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['equipe', 'auditoria'].includes(m.id) ? 'none' : 'full'])),
+    'Professor': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['dashboard', 'conselho', 'notificacoes'].includes(m.id) ? 'readonly' : 'none'])),
+    'Coordenador Pedagógico': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['auditoria', 'equipe'].includes(m.id) ? 'none' : 'full'])),
+    'Gestor Geral': Object.fromEntries(ALL_MODULES.map(m => [m.id, m.id === 'auditoria' ? 'readonly' : 'full'])),
+    'Gestor Pedagógico': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['auditoria', 'equipe'].includes(m.id) ? 'readonly' : 'full'])),
+};
+
 function loadPermissions(): Record<string, Record<string, AccessLevel>> {
     try {
         const saved = localStorage.getItem(STORAGE_KEY);
@@ -54,29 +91,38 @@ function loadPermissions(): Record<string, Record<string, AccessLevel>> {
 
 /**
  * Get the access level for a given view and user role.
- * Returns 'full' if no permissions are configured (default permissive).
+ * Fallbacks to DEFAULT_PERMISSIONS if no custom permissions are set.
+ * If neither has a rule, defaults to 'none' instead of 'full' for security.
  */
 export function getAccessForView(viewState: string, userRole?: string): AccessLevel {
-    if (!userRole) return 'full'; // no role info = allow all
-    const permissions = loadPermissions();
-    const rolePerms = permissions[userRole];
-    if (!rolePerms) return 'full'; // no config for this role = allow all
+    if (!userRole) return 'none'; // Require role
     const moduleId = VIEW_TO_MODULE[viewState];
-    if (!moduleId) return 'full';
-    return rolePerms[moduleId] || 'full';
+    if (!moduleId) return 'none';
+
+    // Always grant full access to Admins to prevent locking out
+    if (userRole === 'Administrador') return 'full';
+
+    const permissions = loadPermissions();
+    const rolePerms = permissions[userRole] || DEFAULT_PERMISSIONS[userRole] || {};
+
+    return rolePerms[moduleId] || 'none';
 }
 
 /**
  * Get the access level for a sidebar label and user role.
  */
 export function getAccessForSidebarItem(label: string, userRole?: string): AccessLevel {
-    if (!userRole) return 'full';
-    const permissions = loadPermissions();
-    const rolePerms = permissions[userRole];
-    if (!rolePerms) return 'full';
+    if (!userRole) return 'none';
     const moduleId = SIDEBAR_LABEL_TO_MODULE[label];
-    if (!moduleId) return 'full';
-    return rolePerms[moduleId] || 'full';
+    if (!moduleId) return 'none';
+
+    // Always grant full access to Admins to prevent locking out
+    if (userRole === 'Administrador') return 'full';
+
+    const permissions = loadPermissions();
+    const rolePerms = permissions[userRole] || DEFAULT_PERMISSIONS[userRole] || {};
+
+    return rolePerms[moduleId] || 'none';
 }
 
 /**

@@ -25,6 +25,9 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<'ALL' | 'Ativo' | 'Inativo'>('ALL');
     const [roleFilter, setRoleFilter] = useState<string>('ALL');
+    const [regionFilter, setRegionFilter] = useState<string>('ALL');
+    const [schoolFilter, setSchoolFilter] = useState<string>('ALL');
+    const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
@@ -105,15 +108,67 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
         loadData();
     }, [isAdmin, userEmail, currentUserRole]);
 
+    // Unique Regions for Filter Options
+    const regions = useMemo(() => Array.from(new Set(users.map(u => u.regiao).filter(Boolean))), [users]);
+
     // Filtering logic
     const filteredUsers = useMemo(() => {
-        return users.filter(user => {
+        let result = users.filter(user => {
             const matchesSearch = user.nome.toLowerCase().includes(searchTerm.toLowerCase()) || user.contato.toLowerCase().includes(searchTerm.toLowerCase());
             const matchesStatus = statusFilter === 'ALL' || user.status === statusFilter;
             const matchesRole = roleFilter === 'ALL' || user.funcao === roleFilter;
-            return matchesSearch && matchesStatus && matchesRole;
+            const matchesRegion = regionFilter === 'ALL' || user.regiao === regionFilter;
+            const matchesSchool = schoolFilter === 'ALL' || user.escolasIds.includes(schoolFilter);
+            return matchesSearch && matchesStatus && matchesRole && matchesRegion && matchesSchool;
         });
-    }, [users, searchTerm, statusFilter, roleFilter]);
+
+        if (sortConfig !== null) {
+            result.sort((a, b) => {
+                let aValue: any = '';
+                let bValue: any = '';
+
+                switch (sortConfig.key) {
+                    case 'nome':
+                        aValue = a.nome;
+                        bValue = b.nome;
+                        break;
+                    case 'funcao':
+                        aValue = a.funcao || '';
+                        bValue = b.funcao || '';
+                        break;
+                    case 'regiao':
+                        aValue = a.regiao || '';
+                        bValue = b.regiao || '';
+                        break;
+                    case 'escolas':
+                        aValue = a.escolasIds.length;
+                        bValue = b.escolasIds.length;
+                        break;
+                    case 'status':
+                        aValue = a.status || '';
+                        bValue = b.status || '';
+                        break;
+                }
+
+                if (aValue < bValue) {
+                    return sortConfig.direction === 'asc' ? -1 : 1;
+                }
+                if (aValue > bValue) {
+                    return sortConfig.direction === 'asc' ? 1 : -1;
+                }
+                return 0;
+            });
+        }
+        return result;
+    }, [users, searchTerm, statusFilter, roleFilter, regionFilter, schoolFilter, sortConfig]);
+
+    const requestSort = (key: string) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
 
     const handleEditUser = (user: Coordenador) => {
         setSelectedUser(user);
@@ -242,12 +297,34 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
                         <option value="Coordenador Regional">Coordenador Regional</option>
                         <option value="Gestor">Gestor</option>
                         <option value="Coordenador Pedagógico">Coordenador Pedagógico</option>
+                        <option value="TÉCNICO PEDAGÓGICO">Técnico Pedagógico</option>
+                    </select>
+
+                    <select
+                        value={regionFilter}
+                        onChange={(e) => setRegionFilter(e.target.value)}
+                        className="px-4 py-2.5 text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/20 cursor-pointer max-w-[160px] truncate"
+                        title="Filtrar por Região"
+                    >
+                        <option value="ALL">Todas as Regiões</option>
+                        {regions.map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
+
+                    <select
+                        value={schoolFilter}
+                        onChange={(e) => setSchoolFilter(e.target.value)}
+                        className="px-4 py-2.5 text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/20 cursor-pointer max-w-[200px] truncate"
+                        title="Filtrar por Escola"
+                    >
+                        <option value="ALL">Todas as Escolas</option>
+                        {escolas.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
                     </select>
 
                     <select
                         value={statusFilter}
                         onChange={(e: any) => setStatusFilter(e.target.value)}
                         className="px-4 py-2.5 text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/20 cursor-pointer"
+                        title="Filtrar por Status"
                     >
                         <option value="ALL">Todos os Status</option>
                         <option value="Ativo">Ativos</option>
@@ -266,10 +343,18 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-slate-50 border-b border-slate-100 uppercase text-[10px] font-extrabold text-slate-500 tracking-wider">
-                                <th className="p-4 pl-6 font-bold w-1/4">Nome e E-mail</th>
-                                <th className="p-4 font-bold w-1/6">Perfil</th>
-                                <th className="p-4 font-bold w-1/3">Vínculo (Escolas/Região)</th>
-                                <th className="p-4 font-bold text-center w-24">Status</th>
+                                <th className="p-4 pl-6 font-bold w-1/4 cursor-pointer hover:bg-slate-100 transition" onClick={() => requestSort('nome')}>
+                                    Nome e E-mail {sortConfig?.key === 'nome' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                </th>
+                                <th className="p-4 font-bold w-1/6 cursor-pointer hover:bg-slate-100 transition" onClick={() => requestSort('funcao')}>
+                                    Perfil {sortConfig?.key === 'funcao' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                </th>
+                                <th className="p-4 font-bold w-1/3 cursor-pointer hover:bg-slate-100 transition" onClick={() => requestSort('regiao')}>
+                                    Vínculo (Escolas/Região) {sortConfig?.key === 'regiao' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                </th>
+                                <th className="p-4 font-bold text-center w-24 cursor-pointer hover:bg-slate-100 transition" onClick={() => requestSort('status')}>
+                                    Status {sortConfig?.key === 'status' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                </th>
                                 <th className="p-4 pr-6 font-bold text-right w-32">Ações</th>
                             </tr>
                         </thead>
@@ -400,6 +485,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
                                         <option value="Coordenador Regional">Coordenador Regional</option>
                                         <option value="Gestor">Gestor(a)</option>
                                         <option value="Coordenador Pedagógico">Coordenador(a) Pedagógico (Local)</option>
+                                        <option value="TÉCNICO PEDAGÓGICO">Técnico Pedagógico</option>
                                     </select>
                                 </div>
 

@@ -178,7 +178,7 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
                            className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 pl-4 pr-10 text-sm font-medium text-slate-700 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/10 appearance-none shadow-sm"
                         >
                            <option value="">Todos os Coordenadores</option>
-                           {coordenadores.map(c => <option key={c.id} value={c.id}>{c.nome.toUpperCase()} - {c.regiao.toUpperCase()}</option>)}
+                           {coordenadores.map(c => <option key={c.id} value={c.id}>{(c.nome || '').toUpperCase()} - {(c.regiao || 'Sem Região').toUpperCase()}</option>)}
                         </select>
                         <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                      </div>

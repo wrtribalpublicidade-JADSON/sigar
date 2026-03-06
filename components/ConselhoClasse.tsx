@@ -32,6 +32,9 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
     // ============================================
     // ESTADOS: AVALIAÇÃO DOCENTE
     // ============================================
+    const defaultAvaliacaoEtapa = schoolLevels.hasInfantil && !schoolLevels.hasFundamental ? 'infantil' : 'fundamental';
+    const [avaliacaoEtapa, setAvaliacaoEtapa] = useState<'fundamental' | 'infantil'>(defaultAvaliacaoEtapa);
+    const [avaliacaoInfantilCampo, setAvaliacaoInfantilCampo] = useState('O EU, O OUTRO E O NÓS');
     const [avaliacaoBimestre, setAvaliacaoBimestre] = useState('Resultado Consolidado');
     const [isTurmaModalOpen, setIsTurmaModalOpen] = useState(false);
     const [isStudentReportOpen, setIsStudentReportOpen] = useState(false);
@@ -642,17 +645,48 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
                             </div>
                         </div>
 
-                        {/* Tabs Bimestre */}
-                        <div className="bg-white rounded-2xl border border-slate-200 p-2 flex gap-2">
-                            {avaliacaoTabsList.map(tab => (
-                                <button
-                                    key={tab}
-                                    onClick={() => setAvaliacaoBimestre(tab)}
-                                    className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${avaliacaoBimestre === tab ? 'bg-emerald-50 text-emerald-600 border-b-2 border-emerald-500' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}
-                                >
-                                    {tab}
-                                </button>
-                            ))}
+                        {/* Seletor de Etapas para Avaliação Docente (Mesmo de Encaminhamentos) */}
+                        {
+                            schoolLevels.hasBoth && (
+                                <div className="bg-white rounded-2xl border border-slate-200 p-2 flex gap-2">
+                                    <button
+                                        onClick={() => setAvaliacaoEtapa('fundamental')}
+                                        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all shadow-sm ${avaliacaoEtapa === 'fundamental' ? 'bg-sky-600 text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-transparent'}`}
+                                    >
+                                        <BookOpen className="w-4 h-4" /> Ensino Fundamental
+                                    </button>
+                                    <button
+                                        onClick={() => setAvaliacaoEtapa('infantil')}
+                                        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all shadow-sm ${avaliacaoEtapa === 'infantil' ? 'bg-purple-600 text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-transparent'}`}
+                                    >
+                                        <Baby className="w-4 h-4" /> Educação Infantil
+                                    </button>
+                                </div>
+                            )}
+
+                        {/* Tabs Bimestre ou Campos de Experiência */}
+                        <div className="bg-white rounded-2xl border border-slate-200 p-2 flex gap-2 overflow-x-auto custom-scrollbar">
+                            {avaliacaoEtapa === 'fundamental' ? (
+                                avaliacaoTabsList.map(tab => (
+                                    <button
+                                        key={tab}
+                                        onClick={() => setAvaliacaoBimestre(tab)}
+                                        className={`px-6 py-2.5 rounded-xl text-sm font-bold min-w-max transition-all ${avaliacaoBimestre === tab ? 'bg-emerald-50 text-emerald-600 border-b-2 border-emerald-500' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}
+                                    >
+                                        {tab}
+                                    </button>
+                                ))
+                            ) : (
+                                CAMPOS_EXPERIENCIA_BNCC.map(campo => (
+                                    <button
+                                        key={campo}
+                                        onClick={() => setAvaliacaoInfantilCampo(campo)}
+                                        className={`px-4 py-2.5 rounded-xl text-xs font-bold leading-tight min-w-max transition-all ${avaliacaoInfantilCampo === campo ? 'bg-purple-50 text-purple-600 border-b-2 border-purple-500' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}
+                                    >
+                                        {campo}
+                                    </button>
+                                ))
+                            )}
                         </div>
 
                         {/* Header Contexto always visible */}
@@ -695,8 +729,12 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
                                 <p className="text-sm font-semibold text-slate-800">Prof. Marcelo Fernandes</p>
                             </div>
                             <div className="px-4">
-                                <p className="text-xs font-bold text-slate-400 uppercase mb-1">Componente Curricular</p>
-                                <p className="text-sm font-semibold text-slate-800">Língua Portuguesa - BNCC</p>
+                                <p className="text-xs font-bold text-slate-400 uppercase mb-1">
+                                    {avaliacaoEtapa === 'infantil' ? 'Campo de Experiência' : 'Componente Curricular'}
+                                </p>
+                                <p className="text-sm font-semibold text-slate-800">
+                                    {avaliacaoEtapa === 'infantil' ? avaliacaoInfantilCampo || 'Não selecionado' : 'Língua Portuguesa - BNCC'}
+                                </p>
                             </div>
                             <div className="px-4 flex items-center gap-3">
                                 <button
@@ -704,7 +742,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
                                     className="group text-left"
                                 >
                                     <p className="text-xs font-bold text-slate-400 uppercase mb-1 group-hover:text-blue-500 transition-colors flex items-center gap-1">
-                                        Turma / Ano
+                                        {avaliacaoEtapa === 'infantil' ? 'Grupo de Faixa Etária' : 'Turma / Ano'}
                                         <Edit className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                                     </p>
                                     <p className="text-sm font-semibold text-slate-800 group-hover:text-blue-600 transition-colors">
@@ -719,194 +757,205 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
                         </div>
 
                         {/* Renderização Condicional do Conteúdo da Tab */}
-                        {avaliacaoBimestre === 'Resultado Consolidado' ? (
-                            <div className="space-y-6">
+                        {
+                            avaliacaoBimestre === 'Resultado Consolidado' ? (
+                                <div className="space-y-6">
 
-                                {/* Overview Cards */}
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                    <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <h4 className="text-xs font-bold text-slate-500 uppercase">Evolução Média</h4>
-                                            <TrendingUp className="w-4 h-4 text-emerald-500" />
+                                    {/* Overview Cards */}
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <h4 className="text-xs font-bold text-slate-500 uppercase">Evolução Média</h4>
+                                                <TrendingUp className="w-4 h-4 text-emerald-500" />
+                                            </div>
+                                            <div className="flex items-baseline gap-2">
+                                                <span className="text-2xl font-black text-slate-800">+12.5%</span>
+                                                <span className="text-xs font-bold text-emerald-500 flex items-center"><ArrowUpRight className="w-3 h-3" /> vs. ant.</span>
+                                            </div>
                                         </div>
-                                        <div className="flex items-baseline gap-2">
-                                            <span className="text-2xl font-black text-slate-800">+12.5%</span>
-                                            <span className="text-xs font-bold text-emerald-500 flex items-center"><ArrowUpRight className="w-3 h-3" /> vs. ant.</span>
+                                        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <h4 className="text-xs font-bold text-slate-500 uppercase">Acima da Média</h4>
+                                                <Users className="w-4 h-4 text-blue-500" />
+                                            </div>
+                                            <div className="flex items-baseline gap-2">
+                                                <span className="text-2xl font-black text-slate-800">84%</span>
+                                                <span className="text-xs font-medium text-slate-400">21 / 25</span>
+                                            </div>
+                                        </div>
+                                        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <h4 className="text-xs font-bold text-slate-500 uppercase">Média Geral</h4>
+                                                <LayoutDashboard className="w-4 h-4 text-amber-500" />
+                                            </div>
+                                            <div className="flex items-baseline gap-2">
+                                                <span className="text-2xl font-black text-slate-800">7.8</span>
+                                                <span className="text-xs font-medium text-slate-400 text-amber-500">Meta: 7.0</span>
+                                            </div>
+                                        </div>
+                                        <div className="bg-red-50 rounded-2xl p-5 border border-red-100 shadow-sm flex flex-col justify-between relative overflow-hidden">
+                                            <div className="absolute -right-4 -top-4 w-16 h-16 bg-red-100 rounded-full opacity-50"></div>
+                                            <div className="flex justify-between items-start mb-2 relative z-10">
+                                                <h4 className="text-xs font-bold text-red-800 uppercase">Alertas de Queda</h4>
+                                                <AlertCircle className="w-4 h-4 text-red-500" />
+                                            </div>
+                                            <div className="flex items-baseline gap-2 relative z-10">
+                                                <span className="text-2xl font-black text-red-600">06</span>
+                                                <span className="text-xs font-bold text-red-500">estudantes</span>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <h4 className="text-xs font-bold text-slate-500 uppercase">Acima da Média</h4>
-                                            <Users className="w-4 h-4 text-blue-500" />
-                                        </div>
-                                        <div className="flex items-baseline gap-2">
-                                            <span className="text-2xl font-black text-slate-800">84%</span>
-                                            <span className="text-xs font-medium text-slate-400">21 / 25</span>
-                                        </div>
-                                    </div>
-                                    <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <h4 className="text-xs font-bold text-slate-500 uppercase">Média Geral</h4>
-                                            <LayoutDashboard className="w-4 h-4 text-amber-500" />
-                                        </div>
-                                        <div className="flex items-baseline gap-2">
-                                            <span className="text-2xl font-black text-slate-800">7.8</span>
-                                            <span className="text-xs font-medium text-slate-400 text-amber-500">Meta: 7.0</span>
-                                        </div>
-                                    </div>
-                                    <div className="bg-red-50 rounded-2xl p-5 border border-red-100 shadow-sm flex flex-col justify-between relative overflow-hidden">
-                                        <div className="absolute -right-4 -top-4 w-16 h-16 bg-red-100 rounded-full opacity-50"></div>
-                                        <div className="flex justify-between items-start mb-2 relative z-10">
-                                            <h4 className="text-xs font-bold text-red-800 uppercase">Alertas de Queda</h4>
-                                            <AlertCircle className="w-4 h-4 text-red-500" />
-                                        </div>
-                                        <div className="flex items-baseline gap-2 relative z-10">
-                                            <span className="text-2xl font-black text-red-600">06</span>
-                                            <span className="text-xs font-bold text-red-500">estudantes</span>
-                                        </div>
-                                    </div>
-                                </div>
 
-                                {/* Tabela Consolidada */}
-                                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-left border-collapse min-w-max">
-                                            <thead>
-                                                <tr className="bg-slate-800 text-white border-b border-slate-700">
-                                                    <th className="p-4 rounded-tl-xl w-16 text-center text-slate-400 font-medium">Nº</th>
-                                                    <th className="p-4 font-bold text-sm tracking-wide bg-white text-slate-800 min-w-[200px] border-r border-slate-200">NOME DO ESTUDANTE</th>
-                                                    <th className="p-4 text-center">
-                                                        <span className="text-[10px] font-bold uppercase tracking-wider block">1º Bimestre</span>
-                                                    </th>
-                                                    <th className="p-4 text-center">
-                                                        <span className="text-[10px] font-bold uppercase tracking-wider block">2º Bimestre</span>
-                                                    </th>
-                                                    <th className="p-4 text-center">
-                                                        <span className="text-[10px] font-bold uppercase tracking-wider block">3º Bimestre</span>
-                                                    </th>
-                                                    <th className="p-4 text-center">
-                                                        <span className="text-[10px] font-bold uppercase tracking-wider block">4º Bimestre</span>
-                                                    </th>
-                                                    <th className="p-4 text-center bg-emerald-700/80">
-                                                        <span className="text-[10px] font-bold uppercase tracking-wider block">Média Final</span>
-                                                    </th>
-                                                    <th className="p-4 text-center bg-emerald-800 rounded-tr-xl">
-                                                        <span className="text-[10px] font-bold uppercase tracking-wider block">Trajetória</span>
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-100">
-                                                {visaoGeralData.map(student => (
-                                                    <tr key={student.id} className={`transition-colors group ${student.alert ? 'bg-red-50/30' : 'hover:bg-slate-50'}`}>
-                                                        <td className="p-4 text-center text-sm font-medium text-slate-400 group-hover:text-blue-500 transition-colors">{student.id}</td>
-                                                        <td className="p-4 text-sm font-bold text-slate-700">
-                                                            <button
-                                                                onClick={() => {
-                                                                    setActiveStudentReport(student);
-                                                                    setIsStudentReportOpen(true);
-                                                                }}
-                                                                className="flex items-center gap-2 group/btn text-left"
-                                                            >
-                                                                {student.alert && <AlertTriangle className="w-4 h-4 text-red-500" />}
-                                                                <span className="group-hover/btn:text-blue-600 transition-colors border-b border-transparent group-hover/btn:border-blue-200 pb-0.5">{student.name}</span>
-                                                            </button>
-                                                        </td>
-                                                        <td className={`p-4 text-center text-sm font-bold ${student.b1 < 6 ? 'text-red-500' : 'text-slate-700'}`}>
-                                                            {student.b1.toFixed(1)}
-                                                        </td>
-                                                        <td className="p-4 text-center text-sm">
-                                                            <div className="flex flex-col items-center">
-                                                                <span className={`font-bold ${student.b2 < 6 ? 'text-red-500' : 'text-slate-700'}`}>{student.b2.toFixed(1)}</span>
-                                                                {renderVisaoGeralTrend(student.b2, student.b1)}
-                                                            </div>
-                                                        </td>
-                                                        <td className="p-4 text-center text-sm">
-                                                            <div className="flex flex-col items-center">
-                                                                <span className={`font-bold ${student.b3 < 6 ? 'text-red-500' : 'text-slate-700'}`}>{student.b3.toFixed(1)}</span>
-                                                                {renderVisaoGeralTrend(student.b3, student.b2)}
-                                                            </div>
-                                                        </td>
-                                                        <td className="p-4 text-center text-sm">
-                                                            <div className="flex flex-col items-center">
-                                                                <span className={`font-bold ${student.b4 < 6 ? 'text-red-500' : 'text-slate-700'}`}>{student.b4.toFixed(1)}</span>
-                                                                {renderVisaoGeralTrend(student.b4, student.b3)}
-                                                            </div>
-                                                        </td>
-                                                        <td className="p-4 text-center bg-slate-50 group-hover:bg-slate-100 transition-colors">
-                                                            <span className={`px-3 py-1.5 rounded-lg border font-bold text-sm ${student.mediaFinal < 6 ? 'bg-red-100 text-red-700 border-red-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
-                                                                {student.mediaFinal.toFixed(1)}
-                                                            </span>
-                                                        </td>
-                                                        <td className="p-4">
-                                                            {renderVisaoGeralTrajectory(student)}
-                                                        </td>
+                                    {/* Tabela Consolidada */}
+                                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left border-collapse min-w-max">
+                                                <thead>
+                                                    <tr className="bg-slate-800 text-white border-b border-slate-700">
+                                                        <th className="p-4 rounded-tl-xl w-16 text-center text-slate-400 font-medium">Nº</th>
+                                                        <th className="p-4 font-bold text-sm tracking-wide bg-white text-slate-800 min-w-[200px] border-r border-slate-200">NOME DO ESTUDANTE</th>
+                                                        <th className="p-4 text-center">
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider block">1º Bimestre</span>
+                                                        </th>
+                                                        <th className="p-4 text-center">
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider block">2º Bimestre</span>
+                                                        </th>
+                                                        <th className="p-4 text-center">
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider block">3º Bimestre</span>
+                                                        </th>
+                                                        <th className="p-4 text-center">
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider block">4º Bimestre</span>
+                                                        </th>
+                                                        <th className="p-4 text-center bg-emerald-700/80">
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider block">Média Final</span>
+                                                        </th>
+                                                        <th className="p-4 text-center bg-emerald-800 rounded-tr-xl">
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider block">Trajetória</span>
+                                                        </th>
                                                     </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-between items-center rounded-b-2xl">
-                                        <div className="text-xs text-slate-500 font-medium">
-                                            Exibindo {visaoGeralData.length} de 25 alunos matriculados nesta turma
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100">
+                                                    {visaoGeralData.map(student => (
+                                                        <tr key={student.id} className={`transition-colors group ${student.alert ? 'bg-red-50/30' : 'hover:bg-slate-50'}`}>
+                                                            <td className="p-4 text-center text-sm font-medium text-slate-400 group-hover:text-blue-500 transition-colors">{student.id}</td>
+                                                            <td className="p-4 text-sm font-bold text-slate-700">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setActiveStudentReport(student);
+                                                                        setIsStudentReportOpen(true);
+                                                                    }}
+                                                                    className="flex items-center gap-2 group/btn text-left"
+                                                                >
+                                                                    {student.alert && <AlertTriangle className="w-4 h-4 text-red-500" />}
+                                                                    <span className="group-hover/btn:text-blue-600 transition-colors border-b border-transparent group-hover/btn:border-blue-200 pb-0.5">{student.name}</span>
+                                                                </button>
+                                                            </td>
+                                                            <td className={`p-4 text-center text-sm font-bold ${student.b1 < 6 ? 'text-red-500' : 'text-slate-700'}`}>
+                                                                {student.b1.toFixed(1)}
+                                                            </td>
+                                                            <td className="p-4 text-center text-sm">
+                                                                <div className="flex flex-col items-center">
+                                                                    <span className={`font-bold ${student.b2 < 6 ? 'text-red-500' : 'text-slate-700'}`}>{student.b2.toFixed(1)}</span>
+                                                                    {renderVisaoGeralTrend(student.b2, student.b1)}
+                                                                </div>
+                                                            </td>
+                                                            <td className="p-4 text-center text-sm">
+                                                                <div className="flex flex-col items-center">
+                                                                    <span className={`font-bold ${student.b3 < 6 ? 'text-red-500' : 'text-slate-700'}`}>{student.b3.toFixed(1)}</span>
+                                                                    {renderVisaoGeralTrend(student.b3, student.b2)}
+                                                                </div>
+                                                            </td>
+                                                            <td className="p-4 text-center text-sm">
+                                                                <div className="flex flex-col items-center">
+                                                                    <span className={`font-bold ${student.b4 < 6 ? 'text-red-500' : 'text-slate-700'}`}>{student.b4.toFixed(1)}</span>
+                                                                    {renderVisaoGeralTrend(student.b4, student.b3)}
+                                                                </div>
+                                                            </td>
+                                                            <td className="p-4 text-center bg-slate-50 group-hover:bg-slate-100 transition-colors">
+                                                                <span className={`px-3 py-1.5 rounded-lg border font-bold text-sm ${student.mediaFinal < 6 ? 'bg-red-100 text-red-700 border-red-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
+                                                                    {student.mediaFinal.toFixed(1)}
+                                                                </span>
+                                                            </td>
+                                                            <td className="p-4">
+                                                                {renderVisaoGeralTrajectory(student)}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
                                         </div>
-                                        <div className="flex gap-1">
-                                            <button className="w-6 h-6 rounded flex items-center justify-center hover:bg-slate-200 text-slate-400 disabled:opacity-50" disabled>&laquo;</button>
-                                            <button className="w-6 h-6 rounded flex items-center justify-center hover:bg-slate-200 text-slate-400 disabled:opacity-50" disabled>&lsaquo;</button>
-                                            <button className="w-6 h-6 rounded flex items-center justify-center bg-white border border-slate-200 text-blue-600 font-bold text-xs shadow-sm">1</button>
-                                            <button className="w-6 h-6 rounded flex items-center justify-center bg-transparent text-slate-500 font-bold text-xs hover:bg-slate-200">2</button>
-                                            <button className="w-6 h-6 rounded flex items-center justify-center bg-transparent text-slate-500 font-bold text-xs hover:bg-slate-200">3</button>
-                                            <button className="w-6 h-6 rounded flex items-center justify-center hover:bg-slate-200 text-slate-500">&rsaquo;</button>
-                                            <button className="w-6 h-6 rounded flex items-center justify-center hover:bg-slate-200 text-slate-500">&raquo;</button>
+                                        <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-between items-center rounded-b-2xl">
+                                            <div className="text-xs text-slate-500 font-medium">
+                                                Exibindo {visaoGeralData.length} de 25 alunos matriculados nesta turma
+                                            </div>
+                                            <div className="flex gap-1">
+                                                <button className="w-6 h-6 rounded flex items-center justify-center hover:bg-slate-200 text-slate-400 disabled:opacity-50" disabled>&laquo;</button>
+                                                <button className="w-6 h-6 rounded flex items-center justify-center hover:bg-slate-200 text-slate-400 disabled:opacity-50" disabled>&lsaquo;</button>
+                                                <button className="w-6 h-6 rounded flex items-center justify-center bg-white border border-slate-200 text-blue-600 font-bold text-xs shadow-sm">1</button>
+                                                <button className="w-6 h-6 rounded flex items-center justify-center bg-transparent text-slate-500 font-bold text-xs hover:bg-slate-200">2</button>
+                                                <button className="w-6 h-6 rounded flex items-center justify-center bg-transparent text-slate-500 font-bold text-xs hover:bg-slate-200">3</button>
+                                                <button className="w-6 h-6 rounded flex items-center justify-center hover:bg-slate-200 text-slate-500">&rsaquo;</button>
+                                                <button className="w-6 h-6 rounded flex items-center justify-center hover:bg-slate-200 text-slate-500">&raquo;</button>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
 
-                                {/* Legenda Evolução */}
-                                <div className="bg-white rounded-2xl border border-slate-200 p-4 flex justify-between items-center shadow-sm">
-                                    <div className="flex items-center gap-6">
-                                        <span className="text-xs font-bold text-slate-400 uppercase flex items-center gap-2">
-                                            <AlertCircle className="w-4 h-4" /> LEGENDA DE EVOLUÇÃO:
+                                    {/* Legenda Evolução */}
+                                    <div className="bg-white rounded-2xl border border-slate-200 p-4 flex justify-between items-center shadow-sm">
+                                        <div className="flex items-center gap-6">
+                                            <span className="text-xs font-bold text-slate-400 uppercase flex items-center gap-2">
+                                                <AlertCircle className="w-4 h-4" /> LEGENDA DE EVOLUÇÃO:
+                                            </span>
+                                            <div className="flex gap-6 text-xs text-slate-600 font-bold">
+                                                <span className="flex items-center gap-2"><ArrowUpRight className="w-4 h-4 text-emerald-500" /> Melhoria em relação ao bimestre anterior</span>
+                                                <span className="flex items-center gap-2"><ArrowDownRight className="w-4 h-4 text-red-500" /> Queda em relação ao bimestre anterior</span>
+                                                <span className="flex items-center gap-2"><Minus className="w-4 h-4 text-slate-400" /> Estabilidade</span>
+                                            </div>
+                                        </div>
+                                        <span className="flex items-center gap-2 text-[10px] font-bold text-red-700 bg-red-50 border border-red-100 px-3 py-1 rounded-full uppercase">
+                                            <AlertTriangle className="w-3 h-3" /> ALERTA CRÍTICO DE DESEMPENHO
                                         </span>
-                                        <div className="flex gap-6 text-xs text-slate-600 font-bold">
-                                            <span className="flex items-center gap-2"><ArrowUpRight className="w-4 h-4 text-emerald-500" /> Melhoria em relação ao bimestre anterior</span>
-                                            <span className="flex items-center gap-2"><ArrowDownRight className="w-4 h-4 text-red-500" /> Queda em relação ao bimestre anterior</span>
-                                            <span className="flex items-center gap-2"><Minus className="w-4 h-4 text-slate-400" /> Estabilidade</span>
-                                        </div>
-                                    </div>
-                                    <span className="flex items-center gap-2 text-[10px] font-bold text-red-700 bg-red-50 border border-red-100 px-3 py-1 rounded-full uppercase">
-                                        <AlertTriangle className="w-3 h-3" /> ALERTA CRÍTICO DE DESEMPENHO
-                                    </span>
-                                </div>
-                            </div>
-                        ) : (
-                            <>
-                                {/* Header Contexto previously duplicate */}
-
-                                {/* Legenda */}
-                                <div className="bg-white rounded-2xl border border-slate-200 p-4 flex justify-between items-center shadow-sm">
-                                    <div className="flex items-center gap-6">
-                                        <span className="text-xs font-bold text-slate-400 uppercase flex items-center gap-2">
-                                            <AlertTriangle className="w-4 h-4" /> Legenda de Conceitos:
-                                        </span>
-                                        <div className="flex gap-4">
-                                            <span className="flex items-center gap-2 text-xs font-bold text-red-700 bg-red-50 border border-red-100 px-3 py-1 rounded-full"><span className="w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center text-[10px]">I</span> INSUFICIENTE</span>
-                                            <span className="flex items-center gap-2 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-100 px-3 py-1 rounded-full"><span className="w-4 h-4 rounded-full bg-amber-500 text-white flex items-center justify-center text-[10px]">R</span> REGULAR</span>
-                                            <span className="flex items-center gap-2 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-100 px-3 py-1 rounded-full"><span className="w-4 h-4 rounded-full bg-blue-500 text-white flex items-center justify-center text-[10px]">B</span> BOM</span>
-                                            <span className="flex items-center gap-2 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-3 py-1 rounded-full"><span className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px]">E</span> EXCELENTE</span>
-                                        </div>
-                                    </div>
-                                    <div className="text-xs text-slate-400 italic flex items-center gap-1">
-                                        <Lock className="w-3 h-3" /> Edição bloqueada pelo sistema após envio
                                     </div>
                                 </div>
+                            ) : avaliacaoEtapa === 'fundamental' ? (
+                                <>
+                                    {/* Legenda de Conceitos - Fundamental */}
+                                    <div className="bg-white rounded-2xl border border-slate-200 p-4 mt-6 flex justify-between items-center shadow-sm animate-fade-in">
+                                        <div className="flex items-center gap-6 overflow-x-auto">
+                                            <span className="text-xs font-bold text-slate-400 uppercase flex items-center gap-2 whitespace-nowrap">
+                                                <AlertCircle className="w-4 h-4" /> LEGENDA DE CONCEITOS:
+                                            </span>
+                                            <div className="flex gap-4 text-xs font-bold">
+                                                <span className="bg-red-50 text-red-500 border border-red-200 px-3 py-1.5 rounded-full flex items-center gap-2 whitespace-nowrap">
+                                                    <div className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center text-[10px] text-red-600">I</div>
+                                                    INSUFICIENTE
+                                                </span>
+                                                <span className="bg-amber-50 text-amber-500 border border-amber-200 px-3 py-1.5 rounded-full flex items-center gap-2 whitespace-nowrap">
+                                                    <div className="w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center text-[10px] text-amber-600">R</div>
+                                                    REGULAR
+                                                </span>
+                                                <span className="bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1.5 rounded-full flex items-center gap-2 whitespace-nowrap">
+                                                    <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-[10px] text-blue-600">B</div>
+                                                    BOM (7.0 - 8.9)
+                                                </span>
+                                                <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 px-3 py-1.5 rounded-full flex items-center gap-2 whitespace-nowrap">
+                                                    <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center text-[10px] text-emerald-600">E</div>
+                                                    EXCELENTE (9.0 - 10.0)
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="hidden md:flex items-center gap-2 text-[10px] font-bold text-slate-400">
+                                        <Lock className="w-3 h-3" />
+                                        <span>Edição bloqueada pelo sistema após envio</span>
+                                    </div>
 
-                                {/* Tabela de Avaliação */}
-                                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                                    <div className="overflow-x-auto">
+                                    {/* Main Table Content - Ensino Fundamental */}
+                                    <div className="overflow-x-auto mt-6">
                                         <table className="w-full text-left border-collapse min-w-max">
                                             <thead>
                                                 <tr className="bg-slate-800 text-white border-b border-slate-700">
-                                                    <th className="p-4 rounded-tl-xl w-16 text-center text-slate-400 font-medium">#</th>
+                                                    <th className="p-4 w-16 text-center text-slate-400 font-medium">Nº</th>
                                                     <th className="p-4 font-bold text-sm tracking-wide bg-white text-slate-800 min-w-[200px] border-r border-slate-200">ESTUDANTE</th>
                                                     <th className="p-4 text-center">
                                                         <Calendar className="w-4 h-4 mx-auto mb-1 text-slate-400" />
@@ -937,10 +986,10 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
                                                         <span className="text-[10px] font-bold uppercase tracking-wider">Conduta</span>
                                                     </th>
                                                     <th className="p-4 text-center bg-emerald-700/80">
-                                                        <span className="text-[10px] font-bold uppercase tracking-wider block mt-4">Média do Período</span>
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider block mt-4">Média <br />(Período)</span>
                                                     </th>
                                                     <th className="p-4 text-center bg-emerald-800 rounded-tr-xl">
-                                                        <span className="text-[10px] font-bold uppercase tracking-wider block mt-4">Parecer da Etapa</span>
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider block mt-4">Parecer <br />(Etapa)</span>
                                                     </th>
                                                 </tr>
                                             </thead>
@@ -979,358 +1028,448 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
                                             </tbody>
                                         </table>
                                     </div>
-
-                                    {/* Footer */}
-                                    <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-between items-center rounded-b-2xl">
-                                        <button
-                                            onClick={() => setIsAddingStudent(true)}
-                                            className="text-sm font-bold text-slate-500 flex items-center gap-2 hover:text-emerald-600 transition-colors"
-                                        >
-                                            <Users className="w-4 h-4" /> Adicionar Novo Estudante
-                                        </button>
-                                        <div className="flex items-center gap-4 text-xs font-bold text-slate-400">
-                                            <span>EXIBINDO {studentsAvaliacao.length} DE {studentsAvaliacao.length} REGISTROS</span>
-                                            <div className="flex gap-1">
-                                                <button className="w-6 h-6 rounded flex items-center justify-center hover:bg-slate-200 disabled:opacity-50" disabled>&laquo;</button>
-                                                <button className="w-6 h-6 rounded flex items-center justify-center hover:bg-slate-200 disabled:opacity-50" disabled>&lsaquo;</button>
-                                                <button className="w-6 h-6 rounded flex items-center justify-center bg-white border border-slate-200 text-emerald-600">1</button>
-                                                <button className="w-6 h-6 rounded flex items-center justify-center hover:bg-slate-200 disabled:opacity-50" disabled>&rsaquo;</button>
-                                                <button className="w-6 h-6 rounded flex items-center justify-center hover:bg-slate-200 disabled:opacity-50" disabled>&raquo;</button>
+                                </>
+                            ) : avaliacaoEtapa === 'infantil' ? (
+                                // ===== TABELA EDUCAÇÃO INFANTIL =====
+                                <>
+                                    {/* Legenda de Conceitos - Infantil */}
+                                    <div className="bg-white rounded-2xl border border-slate-200 p-4 mt-6 flex justify-between items-center shadow-sm animate-fade-in">
+                                        <div className="flex items-center gap-6 overflow-x-auto">
+                                            <span className="text-xs font-bold text-slate-400 uppercase flex items-center gap-2 whitespace-nowrap">
+                                                <AlertCircle className="w-4 h-4" /> LEGENDA DE CONCEITOS:
+                                            </span>
+                                            <div className="flex gap-4 text-xs font-bold">
+                                                <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 px-3 py-1.5 rounded-full flex items-center gap-2 whitespace-nowrap">
+                                                    <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center text-[10px] text-emerald-600">ED</div>
+                                                    EM DESENVOLVIMENTO
+                                                </span>
+                                                <span className="bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1.5 rounded-full flex items-center gap-2 whitespace-nowrap">
+                                                    <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-[10px] text-blue-600">MD</div>
+                                                    MUITO DESENVOLVIDO
+                                                </span>
+                                                <span className="bg-slate-50 text-slate-500 border border-slate-200 px-3 py-1.5 rounded-full flex items-center gap-2 whitespace-nowrap">
+                                                    <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center text-[10px] text-slate-400">ND</div>
+                                                    NÃO DESENVOLVIDO
+                                                </span>
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Modal Adicionar Estudante */}
-                                    {isAddingStudent && (
-                                        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm animate-fade-in">
-                                            <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-scale-in">
-                                                <div className="bg-emerald-600 p-6 text-white flex justify-between items-center">
-                                                    <div>
-                                                        <h3 className="text-xl font-bold flex items-center gap-2">
-                                                            <Users className="w-5 h-5" /> Novo Estudante
-                                                        </h3>
-                                                        <p className="text-emerald-100 text-xs mt-1">O estudante será adicionado com conceitos padrão (B).</p>
-                                                    </div>
-                                                    <button onClick={() => { setIsAddingStudent(false); setNewStudentName(''); }} className="w-8 h-8 rounded-full bg-emerald-700 hover:bg-emerald-800 text-emerald-200 flex items-center justify-center transition-colors">
-                                                        &times;
-                                                    </button>
-                                                </div>
-                                                <div className="p-6">
-                                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Nome Completo do Estudante</label>
-                                                    <input
-                                                        type="text"
-                                                        value={newStudentName}
-                                                        onChange={e => setNewStudentName(e.target.value)}
-                                                        onKeyDown={e => { if (e.key === 'Enter') handleAddStudent(); }}
-                                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 uppercase"
-                                                        placeholder="Ex: JOÃO PEDRO SILVA"
-                                                        autoFocus
-                                                    />
-                                                </div>
-                                                <div className="bg-slate-50 px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
-                                                    <button onClick={() => { setIsAddingStudent(false); setNewStudentName(''); }} className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-5 py-2.5 rounded-xl font-semibold text-sm transition-colors">
-                                                        Cancelar
-                                                    </button>
-                                                    <button onClick={handleAddStudent} className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-semibold text-sm shadow-lg shadow-emerald-500/20 transition-colors">
-                                                        Adicionar
-                                                    </button>
-                                                </div>
+                                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-fade-in mt-6">
+                                        <div className="bg-purple-50 px-6 py-4 border-b border-purple-100 flex items-center gap-3">
+                                            <div className="w-8 h-8 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center">
+                                                <Baby className="w-5 h-5" />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-xs font-bold text-purple-600 uppercase tracking-wider mb-0.5">Campo em Avaliação</h3>
+                                                <p className="text-sm font-bold text-slate-800">{avaliacaoInfantilCampo}</p>
                                             </div>
                                         </div>
-                                    )}
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left border-collapse min-w-max">
+                                                <thead>
+                                                    <tr className="bg-slate-800 text-white border-b border-slate-700">
+                                                        <th className="p-4 w-16 text-center text-slate-400 font-medium">Nº</th>
+                                                        <th className="p-4 font-bold text-sm tracking-wide bg-white text-slate-800 min-w-[200px] border-r border-slate-200">ESTUDANTE</th>
+                                                        {/* Objetivos de Aprendizagem */}
+                                                        <th colSpan={4} className="p-4 text-center border-l bg-slate-50 border-slate-200 h-16">
+                                                            <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                                                                Objetivos de aprendizagem e desenvolvimento de cada campo de experiência de acordo com a faixa etária, segundo a bncc
+                                                            </span>
+                                                        </th>
+                                                        <th className="p-4 text-center bg-purple-700/80 w-32">
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider block">Progresso<br />do Campo</span>
+                                                        </th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100">
+                                                    {/* Mock Rows */}
+                                                    <tr className="hover:bg-slate-50 transition-colors group">
+                                                        <td className="p-4 text-center text-sm font-medium text-slate-400">1</td>
+                                                        <td className="p-4 text-sm font-bold text-slate-700 border-r border-slate-100 uppercase">ANA BEATRIZ SILVA SANTOS</td>
+                                                        <td className="p-4 text-center bg-slate-50/30">
+                                                            <button className="w-8 h-8 rounded-lg font-black text-xs flex items-center justify-center mx-auto transition-colors bg-blue-500 text-white shadow-sm shadow-blue-500/20">MD</button>
+                                                        </td>
+                                                        <td className="p-4 text-center bg-slate-50/30">
+                                                            <button className="w-8 h-8 rounded-lg font-black text-xs flex items-center justify-center mx-auto transition-colors bg-emerald-500 text-white shadow-sm shadow-emerald-500/20">ED</button>
+                                                        </td>
+                                                        <td className="p-4 text-center bg-slate-50/30">
+                                                            <button className="w-8 h-8 rounded-lg font-black text-xs flex items-center justify-center mx-auto transition-colors bg-slate-400 text-white shadow-sm shadow-slate-400/20">ND</button>
+                                                        </td>
+                                                        <td className="p-4 text-center bg-slate-50/30">
+                                                            <button className="w-8 h-8 rounded-lg font-black text-xs flex items-center justify-center mx-auto transition-colors bg-blue-500 text-white shadow-sm shadow-blue-500/20">MD</button>
+                                                        </td>
+                                                        <td className="p-4 text-center">
+                                                            <span className="px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider shadow-sm border bg-blue-50 text-blue-600 border-blue-200">
+                                                                MUITO DESENVOLVIDO
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                    <tr className="hover:bg-slate-50 transition-colors group">
+                                                        <td className="p-4 text-center text-sm font-medium text-slate-400">2</td>
+                                                        <td className="p-4 text-sm font-bold text-slate-700 border-r border-slate-100 uppercase">BRUNO FERREIRA LIMA</td>
+                                                        <td className="p-4 text-center bg-slate-50/30">
+                                                            <button className="w-8 h-8 rounded-lg font-black text-xs flex items-center justify-center mx-auto transition-colors bg-blue-500 text-white shadow-sm shadow-blue-500/20">MD</button>
+                                                        </td>
+                                                        <td className="p-4 text-center bg-slate-50/30">
+                                                            <button className="w-8 h-8 rounded-lg font-black text-xs flex items-center justify-center mx-auto transition-colors bg-blue-500 text-white shadow-sm shadow-blue-500/20">MD</button>
+                                                        </td>
+                                                        <td className="p-4 text-center bg-slate-50/30">
+                                                            <button className="w-8 h-8 rounded-lg font-black text-xs flex items-center justify-center mx-auto transition-colors bg-blue-500 text-white shadow-sm shadow-blue-500/20">MD</button>
+                                                        </td>
+                                                        <td className="p-4 text-center bg-slate-50/30">
+                                                            <button className="w-8 h-8 rounded-lg font-black text-xs flex items-center justify-center mx-auto transition-colors bg-blue-500 text-white shadow-sm shadow-blue-500/20">MD</button>
+                                                        </td>
+                                                        <td className="p-4 text-center">
+                                                            <span className="px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider shadow-sm border bg-blue-50 text-blue-600 border-blue-200">
+                                                                MUITO DESENVOLVIDO
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                    <tr className="hover:bg-slate-50 transition-colors group">
+                                                        <td className="p-4 text-center text-sm font-medium text-slate-400">3</td>
+                                                        <td className="p-4 text-sm font-bold text-slate-700 border-r border-slate-100 uppercase">CARLA OLIVEIRA COSTA</td>
+                                                        <td className="p-4 text-center bg-slate-50/30">
+                                                            <button className="w-8 h-8 rounded-lg font-black text-xs flex items-center justify-center mx-auto transition-colors bg-emerald-500 text-white shadow-sm shadow-emerald-500/20">ED</button>
+                                                        </td>
+                                                        <td className="p-4 text-center bg-slate-50/30">
+                                                            <button className="w-8 h-8 rounded-lg font-black text-xs flex items-center justify-center mx-auto transition-colors bg-emerald-500 text-white shadow-sm shadow-emerald-500/20">ED</button>
+                                                        </td>
+                                                        <td className="p-4 text-center bg-slate-50/30">
+                                                            <button className="w-8 h-8 rounded-lg font-black text-xs flex items-center justify-center mx-auto transition-colors bg-slate-400 text-white shadow-sm shadow-slate-400/20">ND</button>
+                                                        </td>
+                                                        <td className="p-4 text-center bg-slate-50/30">
+                                                            <button className="w-8 h-8 rounded-lg font-black text-xs flex items-center justify-center mx-auto transition-colors bg-emerald-500 text-white shadow-sm shadow-emerald-500/20">ED</button>
+                                                        </td>
+                                                        <td className="p-4 text-center">
+                                                            <span className="px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider shadow-sm border bg-emerald-50 text-emerald-600 border-emerald-200">
+                                                                EM DESENVOLVIMENTO
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-between items-center rounded-b-2xl">
+                                            <button
+                                                onClick={() => setIsAddingStudent(true)}
+                                                className="text-sm font-bold text-purple-500 flex items-center gap-2 hover:text-purple-600 transition-colors"
+                                            >
+                                                <Users className="w-4 h-4" /> Adicionar Est. Observação
+                                            </button>
+                                            <div className="flex items-center gap-4 text-xs font-bold text-slate-400">
+                                                <span>EXIBINDO 3 DE 20 REGISTROS</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="bg-amber-50 rounded-2xl border border-amber-200 p-12 text-center flex flex-col items-center justify-center animate-fade-in">
+                                    <div className="w-16 h-16 bg-amber-100 text-amber-500 rounded-full flex items-center justify-center mb-4 shadow-sm border border-amber-200">
+                                        <Lock className="w-8 h-8" />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-slate-800 mb-2">Etapa Não Liberada</h3>
+                                    <p className="text-slate-500 max-w-md mx-auto mb-6">
+                                        O preenchimento desta etapa será liberado de acordo com o calendário acadêmico da rede educacional definido pela Secretaria.
+                                    </p>
+                                    <button className="bg-white border border-slate-200 text-slate-600 px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-50 flex items-center gap-2 transition-all">
+                                        <Calendar className="w-4 h-4" /> Ver Calendário Letivo
+                                    </button>
                                 </div>
-                            </>
-                        )}
+                            )}
                     </div>
                 );
             case 'acompanhamento':
                 return (
-                    <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm text-left">
-                        <div className="flex justify-between items-start mb-8">
-                            <div>
-                                <h3 className="text-2xl font-bold text-slate-800">
-                                    ACOMPANHAMENTO DOCENTE{acompEtapa === 'infantil' ? ' — EDUCAÇÃO INFANTIL' : ''}
-                                </h3>
-                                <p className="text-sm text-slate-500 mt-1">
-                                    {acompEtapa === 'infantil'
-                                        ? 'Registros de observação contínua, evidências de aprendizagem e mediação pedagógica para o desenvolvimento integral da criança.'
-                                        : 'Registros de acompanhamento contínuo e feedback para os professores.'}
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                {!isEditingAcomp && !isEditingAcompInfantil && (
-                                    <button
-                                        onClick={() => {
-                                            if (acompEtapa === 'infantil') {
-                                                setAcompInfantilForm({ id: '', professor: '', agrupamento: '', periodoLetivo: '1º Bimestre', data: '', campoExperiencia: '', crianca: '', tipoInteracao: '', evidencias: '', intencionalidade: '' });
-                                                setIsEditingAcompInfantil(true);
-                                            } else {
-                                                setAcompForm({ id: '', professor: '', componente: '', turma: '', periodoLetivo: '1º Bimestre', data: '', estudante: '', lider: '', dificuldades: '', intervencao: '' });
-                                                setIsEditingAcomp(true);
-                                            }
-                                        }}
-                                        className="bg-brand-orange hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2"
-                                    >
-                                        <UserCheck size={18} /> Novo Acompanhamento
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Seletor de Etapa (apenas para escolas com ambas as etapas) */}
-                        {(schoolLevels.hasBoth || (!schoolLevels.hasInfantil && !schoolLevels.hasFundamental)) && (
-                            <div className="flex gap-2 mb-6 bg-slate-100 p-1.5 rounded-xl w-fit">
-                                <button
-                                    onClick={() => setAcompEtapa('fundamental')}
-                                    className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${acompEtapa === 'fundamental'
-                                        ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
-                                        : 'text-slate-500 hover:text-slate-700'
-                                        }`}
-                                >
-                                    <School size={16} /> Ensino Fundamental
-                                </button>
-                                <button
-                                    onClick={() => setAcompEtapa('infantil')}
-                                    className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${acompEtapa === 'infantil'
-                                        ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
-                                        : 'text-slate-500 hover:text-slate-700'
-                                        }`}
-                                >
-                                    <Baby size={16} /> Educação Infantil
-                                </button>
-                            </div>
-                        )}
-
-                        {/* ===== FORMULÁRIO ENSINO FUNDAMENTAL ===== */}
-                        {acompEtapa === 'fundamental' && isEditingAcomp && (
-                            <div className="p-8 border border-slate-200 rounded-2xl bg-white shadow-sm mb-8 animate-fade-in">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Professor(a) Responsável</label>
-                                        <input type="text" value={acompForm.professor} onChange={e => setAcompForm({ ...acompForm, professor: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Nome do(a) professor(a)..." />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Componente Curricular</label>
-                                        <input type="text" value={acompForm.componente} onChange={e => setAcompForm({ ...acompForm, componente: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Ex: Português" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Turma</label>
-                                        <input type="text" value={acompForm.turma} onChange={e => setAcompForm({ ...acompForm, turma: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Ex: 8º Ano A" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Período Letivo</label>
-                                        <select value={acompForm.periodoLetivo || '1º Bimestre'} onChange={e => setAcompForm({ ...acompForm, periodoLetivo: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 appearance-none">
-                                            <option>1º Bimestre</option><option>2º Bimestre</option><option>3º Bimestre</option><option>4º Bimestre</option>
-                                            <option>1º Semestre</option><option>2º Semestre</option><option>Anual</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Data</label>
-                                        <input type="date" value={acompForm.data} onChange={e => setAcompForm({ ...acompForm, data: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Líder de Turma</label>
-                                        <input type="text" value={acompForm.lider} onChange={e => setAcompForm({ ...acompForm, lider: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Nome do líder da turma..." />
-                                    </div>
-                                    <div className="md:col-span-2">
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Estudante com Dificuldade</label>
-                                        <input type="text" value={acompForm.estudante} onChange={e => setAcompForm({ ...acompForm, estudante: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Nome do estudante..." />
-                                    </div>
-                                    <div className="md:col-span-2">
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Dificuldades Encontradas</label>
-                                        <textarea value={acompForm.dificuldades} onChange={e => setAcompForm({ ...acompForm, dificuldades: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 h-24 resize-none" placeholder="Descreva as dificuldades..." />
-                                    </div>
-                                    <div className="md:col-span-2">
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Intervenção Pedagógica do Professor</label>
-                                        <textarea value={acompForm.intervencao} onChange={e => setAcompForm({ ...acompForm, intervencao: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 h-24 resize-none" placeholder="Descreva a intervenção aplicada..." />
-                                    </div>
+                    <div className="space-y-6">
+                        <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm text-left">
+                            <div className="flex justify-between items-start mb-8">
+                                <div>
+                                    <h3 className="text-2xl font-bold text-slate-800">
+                                        ACOMPANHAMENTO DOCENTE{acompEtapa === 'infantil' ? ' — EDUCAÇÃO INFANTIL' : ''}
+                                    </h3>
+                                    <p className="text-sm text-slate-500 mt-1">
+                                        {acompEtapa === 'infantil'
+                                            ? 'Registros de observação contínua, evidências de aprendizagem e mediação pedagógica para o desenvolvimento integral da criança.'
+                                            : 'Registros de acompanhamento contínuo e feedback para os professores.'}
+                                    </p>
                                 </div>
-                                <div className="flex gap-3 pt-6 border-t border-slate-100 mt-6">
-                                    <button onClick={handleSaveAcomp} className="bg-brand-orange hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-colors flex items-center gap-2">Salvar Registro</button>
-                                    <button onClick={() => setIsEditingAcomp(false)} className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-6 py-2.5 rounded-xl font-semibold transition-colors">Cancelar</button>
+                                <div className="flex items-center gap-3">
+                                    {!isEditingAcomp && !isEditingAcompInfantil && (
+                                        <button
+                                            onClick={() => {
+                                                if (acompEtapa === 'infantil') {
+                                                    setAcompInfantilForm({ id: '', professor: '', agrupamento: '', periodoLetivo: '1º Bimestre', data: '', campoExperiencia: '', crianca: '', tipoInteracao: '', evidencias: '', intencionalidade: '' });
+                                                    setIsEditingAcompInfantil(true);
+                                                } else {
+                                                    setAcompForm({ id: '', professor: '', componente: '', turma: '', periodoLetivo: '1º Bimestre', data: '', estudante: '', lider: '', dificuldades: '', intervencao: '' });
+                                                    setIsEditingAcomp(true);
+                                                }
+                                            }}
+                                            className="bg-brand-orange hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2"
+                                        >
+                                            <UserCheck size={18} /> Novo Acompanhamento
+                                        </button>
+                                    )}
                                 </div>
                             </div>
-                        )}
 
-                        {/* ===== FORMULÁRIO EDUCAÇÃO INFANTIL ===== */}
-                        {acompEtapa === 'infantil' && isEditingAcompInfantil && (
-                            <div className="p-8 border border-slate-200 rounded-2xl bg-white shadow-sm mb-8 animate-fade-in">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Professor(a) Responsável</label>
-                                        <input type="text" value={acompInfantilForm.professor} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, professor: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Nome completo do docente" />
+                            {/* Seletor de Etapa */}
+                            {
+                                (schoolLevels.hasBoth || (!schoolLevels.hasInfantil && !schoolLevels.hasFundamental)) && (
+                                    <div className="flex gap-2 mb-6 bg-slate-100 p-1.5 rounded-xl w-fit">
+                                        <button
+                                            onClick={() => setAcompEtapa('fundamental')}
+                                            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${acompEtapa === 'fundamental'
+                                                ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
+                                                : 'text-slate-500 hover:text-slate-700'
+                                                }`}
+                                        >
+                                            <School size={16} /> Ensino Fundamental
+                                        </button>
+                                        <button
+                                            onClick={() => setAcompEtapa('infantil')}
+                                            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${acompEtapa === 'infantil'
+                                                ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
+                                                : 'text-slate-500 hover:text-slate-700'
+                                                }`}
+                                        >
+                                            <Baby size={16} /> Educação Infantil
+                                        </button>
                                     </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Agrupamento/Turma</label>
-                                        <input type="text" value={acompInfantilForm.agrupamento} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, agrupamento: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Ex: Berçário II A" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Período Letivo</label>
-                                        <select value={acompInfantilForm.periodoLetivo} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, periodoLetivo: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20">
-                                            <option>1º Bimestre</option><option>2º Bimestre</option><option>3º Bimestre</option><option>4º Bimestre</option>
-                                            <option>1º Semestre</option><option>2º Semestre</option><option>Anual</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Data</label>
-                                        <input type="date" value={acompInfantilForm.data} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, data: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" />
-                                    </div>
-                                </div>
+                                )
+                            }
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Campo de Experiência (BNCC)</label>
-                                        <select value={acompInfantilForm.campoExperiencia} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, campoExperiencia: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20">
-                                            <option value="">Selecione o campo principal</option>
-                                            {CAMPOS_EXPERIENCIA_BNCC.map(c => <option key={c} value={c}>{c}</option>)}
-                                        </select>
+                            {/* Form Fundamental */}
+                            {
+                                acompEtapa === 'fundamental' && isEditingAcomp && (
+                                    <div className="p-8 border border-slate-200 rounded-2xl bg-white shadow-sm mb-8 animate-fade-in">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Professor(a) Responsável</label>
+                                                <input type="text" value={acompForm.professor} onChange={e => setAcompForm({ ...acompForm, professor: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Nome do(a) professor(a)..." />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Componente Curricular</label>
+                                                <input type="text" value={acompForm.componente} onChange={e => setAcompForm({ ...acompForm, componente: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Ex: Português" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Turma</label>
+                                                <input type="text" value={acompForm.turma} onChange={e => setAcompForm({ ...acompForm, turma: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Ex: 8º Ano A" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Período Letivo</label>
+                                                <select value={acompForm.periodoLetivo || '1º Bimestre'} onChange={e => setAcompForm({ ...acompForm, periodoLetivo: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 appearance-none">
+                                                    <option>1º Bimestre</option><option>2º Bimestre</option><option>3º Bimestre</option><option>4º Bimestre</option>
+                                                    <option>1º Semestre</option><option>2º Semestre</option><option>Anual</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Data</label>
+                                                <input type="date" value={acompForm.data} onChange={e => setAcompForm({ ...acompForm, data: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Líder de Turma</label>
+                                                <input type="text" value={acompForm.lider} onChange={e => setAcompForm({ ...acompForm, lider: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Nome do líder da turma..." />
+                                            </div>
+                                            <div className="md:col-span-2">
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Estudante com Dificuldade</label>
+                                                <input type="text" value={acompForm.estudante} onChange={e => setAcompForm({ ...acompForm, estudante: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Nome do estudante..." />
+                                            </div>
+                                            <div className="md:col-span-2">
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Dificuldades Encontradas</label>
+                                                <textarea value={acompForm.dificuldades} onChange={e => setAcompForm({ ...acompForm, dificuldades: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 h-24 resize-none" placeholder="Descreva as dificuldades..." />
+                                            </div>
+                                            <div className="md:col-span-2">
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Intervenção Pedagógica do Professor</label>
+                                                <textarea value={acompForm.intervencao} onChange={e => setAcompForm({ ...acompForm, intervencao: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 h-24 resize-none" placeholder="Descreva a intervenção aplicada..." />
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-3 pt-6 border-t border-slate-100 mt-6">
+                                            <button onClick={handleSaveAcomp} className="bg-brand-orange hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-colors flex items-center gap-2">Salvar Registro</button>
+                                            <button onClick={() => setIsEditingAcomp(false)} className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-6 py-2.5 rounded-xl font-semibold transition-colors">Cancelar</button>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Criança em Observação</label>
-                                        <input type="text" value={acompInfantilForm.crianca} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, crianca: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Nome da criança" />
-                                    </div>
-                                </div>
+                                )
+                            }
 
-                                <div className="mt-6">
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Tipo de Interação Predominante</label>
-                                    <div className="flex gap-4 flex-wrap">
-                                        {['Criança-Criança', 'Criança-Adulto', 'Criança-Ambiente'].map(tipo => (
-                                            <label key={tipo} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border cursor-pointer transition-all text-sm font-medium ${acompInfantilForm.tipoInteracao === tipo
-                                                ? 'bg-orange-50 border-orange-300 text-orange-700'
-                                                : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300'
-                                                }`}>
-                                                <input type="radio" name="tipoInteracao" value={tipo} checked={acompInfantilForm.tipoInteracao === tipo} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, tipoInteracao: e.target.value })} className="sr-only" />
-                                                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${acompInfantilForm.tipoInteracao === tipo ? 'border-orange-500' : 'border-slate-300'
-                                                    }`}>
-                                                    {acompInfantilForm.tipoInteracao === tipo && <div className="w-2 h-2 rounded-full bg-orange-500" />}
+                            {/* Form Infantil */}
+                            {
+                                acompEtapa === 'infantil' && isEditingAcompInfantil && (
+                                    <div className="p-8 border border-slate-200 rounded-2xl bg-white shadow-sm mb-8 animate-fade-in">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Professor(a) Responsável</label>
+                                                <input type="text" value={acompInfantilForm.professor} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, professor: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Nome completo do docente" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Agrupamento/Turma</label>
+                                                <input type="text" value={acompInfantilForm.agrupamento} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, agrupamento: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Ex: Berçário II A" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Período Letivo</label>
+                                                <select value={acompInfantilForm.periodoLetivo} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, periodoLetivo: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20">
+                                                    <option>1º Bimestre</option><option>2º Bimestre</option><option>3º Bimestre</option><option>4º Bimestre</option>
+                                                    <option>1º Semestre</option><option>2º Semestre</option><option>Anual</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Data</label>
+                                                <input type="date" value={acompInfantilForm.data} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, data: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" />
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Campo de Experiência (BNCC)</label>
+                                                <select value={acompInfantilForm.campoExperiencia} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, campoExperiencia: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20">
+                                                    <option value="">Selecione o campo principal</option>
+                                                    {CAMPOS_EXPERIENCIA_BNCC.map(c => <option key={c} value={c}>{c}</option>)}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Criança em Observação</label>
+                                                <input type="text" value={acompInfantilForm.crianca} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, crianca: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Nome da criança" />
+                                            </div>
+                                        </div>
+                                        <div className="mt-6">
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Tipo de Interação Predominante</label>
+                                            <div className="flex gap-4 flex-wrap">
+                                                {['Criança-Criança', 'Criança-Adulto', 'Criança-Ambiente'].map(tipo => (
+                                                    <label key={tipo} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border cursor-pointer transition-all text-sm font-medium ${acompInfantilForm.tipoInteracao === tipo
+                                                        ? 'bg-orange-50 border-orange-300 text-orange-700'
+                                                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300'
+                                                        }`}>
+                                                        <input type="radio" name="tipoInteracao" value={tipo} checked={acompInfantilForm.tipoInteracao === tipo} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, tipoInteracao: e.target.value })} className="sr-only" />
+                                                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${acompInfantilForm.tipoInteracao === tipo ? 'border-orange-500' : 'border-slate-300'}`}>
+                                                            {acompInfantilForm.tipoInteracao === tipo && <div className="w-2 h-2 rounded-full bg-orange-500" />}
+                                                        </div>
+                                                        {tipo}
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="mt-6">
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Evidências de Aprendizagem e Desenvolvimento</label>
+                                            <textarea value={acompInfantilForm.evidencias} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, evidencias: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 h-28 resize-none" placeholder="Descreva os processos observados, as falas, as conquistas e as descobertas da criança durante a vivência..." />
+                                        </div>
+                                        <div className="mt-6">
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Intencionalidade Pedagógica / Mediação do Professor</label>
+                                            <textarea value={acompInfantilForm.intencionalidade} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, intencionalidade: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 h-28 resize-none" placeholder="Descreva qual foi o seu papel como mediador, as intervenções feitas e como o ambiente foi preparado para potencializar a experiênci..." />
+                                        </div>
+                                        <div className="flex gap-3 pt-6 border-t border-slate-100 mt-6">
+                                            <button onClick={handleSaveAcompInfantil} className="bg-brand-orange hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-colors flex items-center gap-2">Salvar Registro</button>
+                                            <button onClick={() => setIsEditingAcompInfantil(false)} className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-6 py-2.5 rounded-xl font-semibold transition-colors">Cancelar</button>
+                                        </div>
+                                    </div>
+                                )
+                            }
+
+                            {/* List Fundamental */}
+                            {
+                                acompEtapa === 'fundamental' && (
+                                    <div className="space-y-4">
+                                        {mockAcompanhamentos.filter(a => a.etapa !== 'infantil').map(acomp => (
+                                            <div key={acomp.id} className="p-6 border border-slate-100 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all flex flex-col lg:flex-row justify-between lg:items-start gap-6 group">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-3 mb-2 flex-wrap">
+                                                        <span className="px-3 py-1 text-xs font-bold uppercase rounded-full border border-slate-200 text-slate-500">{acomp.turma}</span>
+                                                        <span className="px-3 py-1 text-xs font-bold uppercase rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100">{acomp.componente}</span>
+                                                        {acomp.data && <span className="text-xs font-medium text-slate-400">Data: {acomp.data}</span>}
+                                                        {acomp.periodoLetivo && <span className="text-xs font-medium text-slate-400 border-l border-slate-200 pl-3">Período: {acomp.periodoLetivo}</span>}
+                                                    </div>
+                                                    <h4 className="text-lg font-bold text-slate-900 leading-tight mb-1">Prof. {acomp.professor}</h4>
+                                                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                                            <div className="mb-3">
+                                                                <p className="text-xs font-bold text-slate-400 uppercase mb-1">Estudante c/ Dificuldade</p>
+                                                                <p className="text-sm font-semibold text-slate-700">{acomp.estudante}</p>
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-xs font-bold text-slate-400 uppercase mb-1">Dificuldades</p>
+                                                                <p className="text-sm text-slate-600 line-clamp-3">{acomp.dificuldades}</p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100/50">
+                                                            <div className="mb-3">
+                                                                <p className="text-xs font-bold text-emerald-600/80 uppercase mb-1">Intervenção Pedagógica</p>
+                                                                <p className="text-sm text-slate-700 line-clamp-3">{acomp.intervencao}</p>
+                                                            </div>
+                                                            {acomp.lider && (
+                                                                <div className="pt-3 border-t border-emerald-100/50">
+                                                                    <p className="text-xs font-bold text-emerald-600/80 uppercase mb-1 flex items-center gap-1"><UserCheck size={12} /> Líder de Turma</p>
+                                                                    <p className="text-sm text-slate-600">{acomp.lider}</p>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                {tipo}
-                                            </label>
+                                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity flex-row lg:flex-col justify-center">
+                                                    <button title="Editar" onClick={() => handleEditAcomp(acomp)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-orange-50 hover:text-brand-orange hover:border-orange-200 transition-all flex-shrink-0"><Edit size={16} /></button>
+                                                    <button title="Excluir" onClick={() => handleDeleteAcomp(acomp.id)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all flex-shrink-0"><Trash2 size={16} /></button>
+                                                </div>
+                                            </div>
                                         ))}
-                                    </div>
-                                </div>
-
-                                <div className="mt-6">
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Evidências de Aprendizagem e Desenvolvimento</label>
-                                    <textarea value={acompInfantilForm.evidencias} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, evidencias: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 h-28 resize-none" placeholder="Descreva os processos observados, as falas, as conquistas e as descobertas da criança durante a vivência..." />
-                                </div>
-
-                                <div className="mt-6">
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Intencionalidade Pedagógica / Mediação do Professor</label>
-                                    <textarea value={acompInfantilForm.intencionalidade} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, intencionalidade: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 h-28 resize-none" placeholder="Descreva qual foi o seu papel como mediador, as intervenções feitas e como o ambiente foi preparado para potencializar a experiência..." />
-                                </div>
-
-                                <div className="flex gap-3 pt-6 border-t border-slate-100 mt-6">
-                                    <button onClick={handleSaveAcompInfantil} className="bg-brand-orange hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-colors flex items-center gap-2">Salvar Registro</button>
-                                    <button onClick={() => setIsEditingAcompInfantil(false)} className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-6 py-2.5 rounded-xl font-semibold transition-colors">Cancelar</button>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* ===== LISTA DE REGISTROS ===== */}
-                        {acompEtapa === 'fundamental' && (
-                            <div className="space-y-4">
-                                {mockAcompanhamentos.filter(a => a.etapa !== 'infantil').map(acomp => (
-                                    <div key={acomp.id} className="p-6 border border-slate-100 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all flex flex-col lg:flex-row justify-between lg:items-start gap-6 group">
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-3 mb-2 flex-wrap">
-                                                <span className="px-3 py-1 text-xs font-bold uppercase rounded-full border border-slate-200 text-slate-500">{acomp.turma}</span>
-                                                <span className="px-3 py-1 text-xs font-bold uppercase rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100">{acomp.componente}</span>
-                                                {acomp.data && <span className="text-xs font-medium text-slate-400">Data: {acomp.data}</span>}
-                                                {acomp.periodoLetivo && <span className="text-xs font-medium text-slate-400 border-l border-slate-200 pl-3">Período: {acomp.periodoLetivo}</span>}
+                                        {mockAcompanhamentos.filter(a => a.etapa !== 'infantil').length === 0 && !isEditingAcomp && (
+                                            <div className="text-center p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                                                <UserCheck className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                                                <p className="text-slate-500">Nenhum acompanhamento docente registrado.</p>
                                             </div>
-                                            <h4 className="text-lg font-bold text-slate-900 leading-tight mb-1">Prof. {acomp.professor}</h4>
-                                            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                                                    <div className="mb-3">
-                                                        <p className="text-xs font-bold text-slate-400 uppercase mb-1">Estudante c/ Dificuldade</p>
-                                                        <p className="text-sm font-semibold text-slate-700">{acomp.estudante}</p>
+                                        )}
+                                    </div>
+                                )
+                            }
+
+                            {/* List Infantil */}
+                            {
+                                acompEtapa === 'infantil' && (
+                                    <div className="space-y-4">
+                                        {mockAcompInfantil.map(acomp => (
+                                            <div key={acomp.id} className="p-6 border border-slate-100 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all flex flex-col lg:flex-row justify-between lg:items-start gap-6 group">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-3 mb-2 flex-wrap">
+                                                        <span className="px-3 py-1 text-xs font-bold uppercase rounded-full border border-slate-200 text-slate-500">{acomp.agrupamento}</span>
+                                                        <span className="px-3 py-1 text-xs font-bold uppercase rounded-full bg-purple-50 text-purple-600 border border-purple-100">{acomp.campoExperiencia}</span>
+                                                        {acomp.data && <span className="text-xs font-medium text-slate-400">Data: {acomp.data}</span>}
+                                                        {acomp.periodoLetivo && <span className="text-xs font-medium text-slate-400 border-l border-slate-200 pl-3">Período: {acomp.periodoLetivo}</span>}
                                                     </div>
-                                                    <div>
-                                                        <p className="text-xs font-bold text-slate-400 uppercase mb-1">Dificuldades</p>
-                                                        <p className="text-sm text-slate-600 line-clamp-3">{acomp.dificuldades}</p>
-                                                    </div>
-                                                </div>
-                                                <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100/50">
-                                                    <div className="mb-3">
-                                                        <p className="text-xs font-bold text-emerald-600/80 uppercase mb-1">Intervenção Pedagógica</p>
-                                                        <p className="text-sm text-slate-700 line-clamp-3">{acomp.intervencao}</p>
-                                                    </div>
-                                                    {acomp.lider && (
-                                                        <div className="pt-3 border-t border-emerald-100/50">
-                                                            <p className="text-xs font-bold text-emerald-600/80 uppercase mb-1 flex items-center gap-1"><UserCheck size={12} /> Líder de Turma</p>
-                                                            <p className="text-sm text-slate-600">{acomp.lider}</p>
+                                                    <h4 className="text-lg font-bold text-slate-900 leading-tight mb-1">Prof. {acomp.professor}</h4>
+                                                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                                            <div className="mb-3">
+                                                                <p className="text-xs font-bold text-slate-400 uppercase mb-1">Criança em Observação</p>
+                                                                <p className="text-sm font-semibold text-slate-700">{acomp.crianca}</p>
+                                                            </div>
+                                                            {acomp.tipoInteracao && (
+                                                                <div className="mb-3">
+                                                                    <p className="text-xs font-bold text-slate-400 uppercase mb-1">Tipo de Interação</p>
+                                                                    <span className="px-2.5 py-1 text-xs font-bold rounded-lg bg-orange-50 text-orange-600 border border-orange-100">{acomp.tipoInteracao}</span>
+                                                                </div>
+                                                            )}
+                                                            <div>
+                                                                <p className="text-xs font-bold text-slate-400 uppercase mb-1">Evidências de Aprendizagem</p>
+                                                                <p className="text-sm text-slate-600 line-clamp-3">{acomp.evidencias}</p>
+                                                            </div>
                                                         </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity flex-row lg:flex-col justify-center">
-                                            <button title="Editar" onClick={() => handleEditAcomp(acomp)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-orange-50 hover:text-brand-orange hover:border-orange-200 transition-all flex-shrink-0"><Edit size={16} /></button>
-                                            <button title="Excluir" onClick={() => handleDeleteAcomp(acomp.id)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all flex-shrink-0"><Trash2 size={16} /></button>
-                                        </div>
-                                    </div>
-                                ))}
-                                {mockAcompanhamentos.filter(a => a.etapa !== 'infantil').length === 0 && !isEditingAcomp && (
-                                    <div className="text-center p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                                        <UserCheck className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                                        <p className="text-slate-500">Nenhum acompanhamento docente registrado.</p>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {acompEtapa === 'infantil' && (
-                            <div className="space-y-4">
-                                {mockAcompInfantil.map(acomp => (
-                                    <div key={acomp.id} className="p-6 border border-slate-100 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all flex flex-col lg:flex-row justify-between lg:items-start gap-6 group">
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-3 mb-2 flex-wrap">
-                                                <span className="px-3 py-1 text-xs font-bold uppercase rounded-full border border-slate-200 text-slate-500">{acomp.agrupamento}</span>
-                                                <span className="px-3 py-1 text-xs font-bold uppercase rounded-full bg-purple-50 text-purple-600 border border-purple-100">{acomp.campoExperiencia}</span>
-                                                {acomp.data && <span className="text-xs font-medium text-slate-400">Data: {acomp.data}</span>}
-                                                {acomp.periodoLetivo && <span className="text-xs font-medium text-slate-400 border-l border-slate-200 pl-3">Período: {acomp.periodoLetivo}</span>}
-                                            </div>
-                                            <h4 className="text-lg font-bold text-slate-900 leading-tight mb-1">Prof. {acomp.professor}</h4>
-                                            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                                                    <div className="mb-3">
-                                                        <p className="text-xs font-bold text-slate-400 uppercase mb-1">Criança em Observação</p>
-                                                        <p className="text-sm font-semibold text-slate-700">{acomp.crianca}</p>
-                                                    </div>
-                                                    {acomp.tipoInteracao && (
-                                                        <div className="mb-3">
-                                                            <p className="text-xs font-bold text-slate-400 uppercase mb-1">Tipo de Interação</p>
-                                                            <span className="px-2.5 py-1 text-xs font-bold rounded-lg bg-orange-50 text-orange-600 border border-orange-100">{acomp.tipoInteracao}</span>
+                                                        <div className="bg-purple-50/50 p-4 rounded-xl border border-purple-100/50">
+                                                            <div>
+                                                                <p className="text-xs font-bold text-purple-600/80 uppercase mb-1">Intencionalidade Pedagógica / Mediação</p>
+                                                                <p className="text-sm text-slate-700 line-clamp-4">{acomp.intencionalidade}</p>
+                                                            </div>
                                                         </div>
-                                                    )}
-                                                    <div>
-                                                        <p className="text-xs font-bold text-slate-400 uppercase mb-1">Evidências de Aprendizagem</p>
-                                                        <p className="text-sm text-slate-600 line-clamp-3">{acomp.evidencias}</p>
-                                                    </div>
-                                                </div>
-                                                <div className="bg-purple-50/50 p-4 rounded-xl border border-purple-100/50">
-                                                    <div>
-                                                        <p className="text-xs font-bold text-purple-600/80 uppercase mb-1">Intencionalidade Pedagógica / Mediação</p>
-                                                        <p className="text-sm text-slate-700 line-clamp-4">{acomp.intencionalidade}</p>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity flex-row lg:flex-col justify-center">
-                                            <button title="Editar" onClick={() => handleEditAcompInfantil(acomp)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-orange-50 hover:text-brand-orange hover:border-orange-200 transition-all flex-shrink-0"><Edit size={16} /></button>
-                                            <button title="Excluir" onClick={() => handleDeleteAcompInfantil(acomp.id)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all flex-shrink-0"><Trash2 size={16} /></button>
-                                        </div>
+                                        ))}
+                                        {mockAcompInfantil.length === 0 && !isEditingAcompInfantil && (
+                                            <div className="text-center p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                                                <Baby className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                                                <p className="text-slate-500">Nenhum registro de acompanhamento infantil.</p>
+                                            </div>
+                                        )}
                                     </div>
-                                ))}
-                                {mockAcompInfantil.length === 0 && !isEditingAcompInfantil && (
-                                    <div className="text-center p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                                        <Baby className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                                        <p className="text-slate-500">Nenhum registro de observação da Educação Infantil.</p>
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                                )
+                            }
+                        </div>
                     </div>
                 );
             case 'encaminhamentos':
@@ -1373,8 +1512,8 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
                                 <button
                                     onClick={() => setEncEtapa('fundamental')}
                                     className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${encEtapa === 'fundamental'
-                                            ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
-                                            : 'text-slate-500 hover:text-slate-700'
+                                        ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
+                                        : 'text-slate-500 hover:text-slate-700'
                                         }`}
                                 >
                                     <School size={16} /> Ensino Fundamental
@@ -1382,8 +1521,8 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
                                 <button
                                     onClick={() => setEncEtapa('infantil')}
                                     className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${encEtapa === 'infantil'
-                                            ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
-                                            : 'text-slate-500 hover:text-slate-700'
+                                        ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
+                                        : 'text-slate-500 hover:text-slate-700'
                                         }`}
                                 >
                                     <Baby size={16} /> Educação Infantil
@@ -1707,13 +1846,45 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
                 context={avaliacaoBimestre}
             />
 
-            {/* Success Toast */}
-            <div className={`fixed bottom-4 right-4 z-50 transition-all duration-300 transform ${showSuccessToast ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0 pointer-events-none'}`}>
-                <div className="bg-emerald-500 text-white px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 font-bold text-sm">
-                    <CheckCircle2 className="w-5 h-5" />
-                    <span>Turma salva com sucesso!</span>
+            {isAddingStudent && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-scale-in">
+                        <div className="bg-emerald-600 p-6 text-white flex justify-between items-center">
+                            <div>
+                                <h3 className="text-xl font-bold flex items-center gap-2">
+                                    <Users className="w-5 h-5" /> Novo Estudante
+                                </h3>
+                                <p className="text-emerald-100 text-xs mt-1">O estudante será adicionado com conceitos padrão (B).</p>
+                            </div>
+                            <button onClick={() => { setIsAddingStudent(false); setNewStudentName(''); }} className="w-8 h-8 rounded-full bg-emerald-700 hover:bg-emerald-800 text-emerald-200 flex items-center justify-center transition-colors">
+                                &times;
+                            </button>
+                        </div>
+                        <div className="p-6">
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Nome Completo do Estudante</label>
+                            <input
+                                type="text"
+                                value={newStudentName}
+                                onChange={e => setNewStudentName(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') handleAddStudent(); }}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 uppercase"
+                                placeholder="Ex: JOÃO PEDRO SILVA"
+                                autoFocus
+                            />
+                        </div>
+                        <div className="bg-slate-50 px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
+                            <button onClick={() => { setIsAddingStudent(false); setNewStudentName(''); }} className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-5 py-2.5 rounded-xl font-semibold text-sm transition-colors">
+                                Cancelar
+                            </button>
+                            <button onClick={handleAddStudent} className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-semibold text-sm shadow-lg shadow-emerald-500/20 transition-colors">
+                                Adicionar
+                            </button>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 };
+
+export default ConselhoClasse;

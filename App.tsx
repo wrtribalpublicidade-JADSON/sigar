@@ -1015,12 +1015,10 @@ export default function App() {
           />
         );
       case 'AUDIT_LOGS':
-        if (!isAdmin) return <div>Acesso restrito.</div>;
         return (
           <AuditLogDashboard onBack={() => setCurrentView('DASHBOARD')} />
         )
       case 'GESTAO_USUARIOS':
-        if (!isAdmin && effectiveUser?.funcao !== 'Coordenador Regional') return <div>Acesso restrito.</div>;
         return (
           <UserManagement
             userEmail={userEmail}
@@ -1032,7 +1030,6 @@ export default function App() {
           />
         );
       case 'PERMISSOES':
-        if (!isAdmin) return <div>Acesso restrito.</div>;
         return <PermissoesManager />;
       default:
         return <div>Página não encontrada</div>;

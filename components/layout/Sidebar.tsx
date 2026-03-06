@@ -101,14 +101,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
         { icon: FileStack, label: 'Instrumentais de Gestão', view: 'INSTRUMENTAIS_GESTAO' as ViewState },
         { icon: Library, label: 'Conselho de Classe', view: 'CONSELHO_CLASSE' as ViewState },
         { icon: Bell, label: 'Notificações', view: 'NOTIFICACOES' as ViewState, isHighlighted: true, hasNotification: notificationCount > 0 },
+        { icon: Shield, label: 'Auditoria', view: 'AUDIT_LOGS' as ViewState },
+        { icon: KeyRound, label: 'Permissões', view: 'PERMISSOES' as ViewState },
     ];
-
-
-
-    if (isAdmin) {
-        managementNavItems.push({ icon: Shield, label: 'Auditoria', view: 'AUDIT_LOGS' as ViewState });
-        managementNavItems.push({ icon: KeyRound, label: 'Permissões', view: 'PERMISSOES' as ViewState });
-    }
 
     // Filter items based on user role permissions (admins bypass)
     const effectiveRole = isAdmin ? undefined : userRole;

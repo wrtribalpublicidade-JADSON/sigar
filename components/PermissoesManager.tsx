@@ -2,56 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Shield, Lock, Eye, Edit3, Save, CheckCircle, X, ChevronDown, ChevronRight, Info, Loader2 } from 'lucide-react';
 import { PageHeader } from './ui/PageHeader';
 import { loadPermissions as loadPermissionsFromDB, savePermissions as savePermissionsToDB } from '../services/permissoesService';
-
-type AccessLevel = 'none' | 'readonly' | 'full';
-
-interface ModulePermission {
-    moduleId: string;
-    moduleName: string;
-    access: AccessLevel;
-}
-
-interface RolePermissions {
-    role: string;
-    modules: ModulePermission[];
-}
-
-const ALL_MODULES = [
-    { id: 'dashboard', name: 'Visão Geral (Dashboard)', group: 'Menu' },
-    { id: 'escolas', name: 'Escolas', group: 'Menu' },
-    { id: 'equipe', name: 'Equipe / Gestão de Usuários', group: 'Gestão' },
-    { id: 'relatorios', name: 'Relatórios', group: 'Gestão' },
-    { id: 'analise_parc', name: 'Análise PARC', group: 'Análises' },
-    { id: 'analise_seama', name: 'Análise SEAMA', group: 'Análises' },
-    { id: 'analise_saeb', name: 'Análise SAEB', group: 'Análises' },
-    { id: 'analise_cnca', name: 'Análise CNCA/PNRA', group: 'Análises' },
-    { id: 'indicadores', name: 'Indicadores', group: 'Gestão' },
-    { id: 'instrumentais', name: 'Instrumentais de Gestão', group: 'Gestão' },
-    { id: 'conselho', name: 'Conselho de Classe', group: 'Gestão' },
-    { id: 'notificacoes', name: 'Notificações', group: 'Sistema' },
-    { id: 'auditoria', name: 'Auditoria', group: 'Sistema' },
-    { id: 'registrar_visita', name: 'Registrar Visita', group: 'Sistema' },
-];
-
-const ALL_ROLES = [
-    'Administrador',
-    'Coordenador Regional',
-    'Técnico Pedagógico',
-    'Professor',
-    'Coordenador Pedagógico',
-    'Gestor Geral',
-    'Gestor Pedagógico',
-];
-
-const DEFAULT_PERMISSIONS: Record<string, Record<string, AccessLevel>> = {
-    'Administrador': Object.fromEntries(ALL_MODULES.map(m => [m.id, 'full'])),
-    'Coordenador Regional': Object.fromEntries(ALL_MODULES.map(m => [m.id, m.id === 'auditoria' ? 'none' : 'full'])),
-    'Técnico Pedagógico': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['equipe', 'auditoria'].includes(m.id) ? 'none' : 'full'])),
-    'Professor': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['dashboard', 'conselho', 'notificacoes'].includes(m.id) ? 'readonly' : 'none'])),
-    'Coordenador Pedagógico': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['auditoria', 'equipe'].includes(m.id) ? 'none' : 'full'])),
-    'Gestor Geral': Object.fromEntries(ALL_MODULES.map(m => [m.id, m.id === 'auditoria' ? 'readonly' : 'full'])),
-    'Gestor Pedagógico': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['auditoria', 'equipe'].includes(m.id) ? 'readonly' : 'full'])),
-};
+import { AccessLevel, ALL_MODULES, ALL_ROLES, DEFAULT_PERMISSIONS } from '../utils/permissions';
 
 const STORAGE_KEY = 'sigar_permissions';
 

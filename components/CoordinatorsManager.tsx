@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Coordenador, Escola, StatusMeta, Visita } from '../types';
 import {
   UserPlus, Edit2, Trash2, MapPin, Mail, School as SchoolIcon,
@@ -30,13 +30,61 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
   const loggedInCoord = loggedInCoordId ? coordenadores.find(c => c.id === loggedInCoordId) : null;
   const mySchoolIds = loggedInCoord?.escolasIds || [];
 
-  const displayCoordenadores = isAdmin
+  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState<string>('ALL');
+  const [regionFilter, setRegionFilter] = useState<string>('ALL');
+  const [schoolFilter, setSchoolFilter] = useState<string>('ALL');
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+
+  const baseCoordenadores = isAdmin
     ? coordenadores
     : coordenadores.filter(c => {
       // Show users that share at least one school with the logged-in coordinator
       if (c.id === loggedInCoordId) return true; // always show self
       return c.escolasIds.some(eid => mySchoolIds.includes(eid));
     });
+
+  const regions = useMemo(() => Array.from(new Set(baseCoordenadores.map(u => u.regiao).filter(Boolean))), [baseCoordenadores]);
+
+  const displayCoordenadores = useMemo(() => {
+    let result = baseCoordenadores.filter(user => {
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch = user.nome.toLowerCase().includes(searchLower) || user.contato.toLowerCase().includes(searchLower);
+      const matchesRole = roleFilter === 'ALL' || user.funcao === roleFilter;
+      const matchesRegion = regionFilter === 'ALL' || user.regiao === regionFilter;
+      const matchesSchool = schoolFilter === 'ALL' || user.escolasIds.includes(schoolFilter);
+      return matchesSearch && matchesRole && matchesRegion && matchesSchool;
+    });
+
+    if (sortConfig !== null) {
+      result.sort((a, b) => {
+        let aValue: any = '';
+        let bValue: any = '';
+
+        switch (sortConfig.key) {
+          case 'nome': aValue = a.nome; bValue = b.nome; break;
+          case 'funcao': aValue = a.funcao || ''; bValue = b.funcao || ''; break;
+          case 'regiao': aValue = a.regiao || ''; bValue = b.regiao || ''; break;
+          case 'escolas': aValue = a.escolasIds.length; bValue = b.escolasIds.length; break;
+          case 'pendencias':
+            aValue = escolas.filter(e => a.escolasIds.includes(e.id)).reduce((sum, esc) => sum + checkSchoolPendencies(esc).length, 0);
+            bValue = escolas.filter(e => b.escolasIds.includes(e.id)).reduce((sum, esc) => sum + checkSchoolPendencies(esc).length, 0);
+            break;
+        }
+
+        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    return result;
+  }, [baseCoordenadores, searchTerm, roleFilter, regionFilter, schoolFilter, sortConfig, escolas]);
+
+  const requestSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
+    setSortConfig({ key, direction });
+  };
 
   // Roles available for Coordenador Regional to assign
   const coordRoles = ['Gestor Geral', 'Gestor Pedagógico', 'Coordenador Pedagógico', 'Professor'];
@@ -332,18 +380,73 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
         </div>
       </div>
 
+      <div className="flex flex-col md:flex-row gap-4 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
+        <input
+          type="text"
+          placeholder="Buscar por nome ou e-mail..."
+          value={searchTerm}
+          onChange={e => setSearchTerm(e.target.value)}
+          className="flex-shrink-0 w-full md:w-64 px-4 py-2.5 rounded-xl border border-slate-200 focus:border-brand-orange focus:ring-4 focus:ring-brand-orange/10 outline-none transition-all text-sm"
+        />
+
+        <select
+          value={roleFilter}
+          onChange={(e) => setRoleFilter(e.target.value)}
+          className="flex-shrink-0 px-4 py-2.5 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/20 cursor-pointer"
+        >
+          <option value="ALL">Todas as Funções</option>
+          <option value="Administrador">Administrador</option>
+          <option value="Coordenador Regional">Coordenador Regional</option>
+          <option value="Gestor Geral">Gestor Geral</option>
+          <option value="Gestor Pedagógico">Gestor Pedagógico</option>
+          <option value="Coordenador Pedagógico">Coordenador Pedagógico</option>
+          <option value="Professor">Professor</option>
+          <option value="TÉCNICO PEDAGÓGICO">Técnico Pedagógico</option>
+        </select>
+
+        <select
+          value={regionFilter}
+          onChange={(e) => setRegionFilter(e.target.value)}
+          className="flex-shrink-0 px-4 py-2.5 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/20 cursor-pointer max-w-[160px] truncate"
+          title="Filtrar por Região"
+        >
+          <option value="ALL">Todas as Regiões</option>
+          {regions.map(r => <option key={r} value={r}>{r}</option>)}
+        </select>
+
+        <select
+          value={schoolFilter}
+          onChange={(e) => setSchoolFilter(e.target.value)}
+          className="flex-shrink-0 px-4 py-2.5 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/20 cursor-pointer max-w-[200px] truncate"
+          title="Filtrar por Escola"
+        >
+          <option value="ALL">Todas as Escolas</option>
+          {escolas.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+        </select>
+      </div>
+
       {/* Table */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left text-slate-600">
             <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-6 py-4 font-semibold">Usuário</th>
+                <th className="px-6 py-4 font-semibold cursor-pointer hover:bg-slate-100 transition" onClick={() => requestSort('nome')}>
+                  Usuário {sortConfig?.key === 'nome' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                </th>
                 <th className="px-6 py-4 font-semibold">E-mail</th>
-                <th className="px-6 py-4 font-semibold">Função</th>
-                <th className="px-6 py-4 font-semibold">Região</th>
-                <th className="px-6 py-4 font-semibold text-center">Escolas</th>
-                <th className="px-6 py-4 font-semibold text-center">Pendências</th>
+                <th className="px-6 py-4 font-semibold cursor-pointer hover:bg-slate-100 transition" onClick={() => requestSort('funcao')}>
+                  Função {sortConfig?.key === 'funcao' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                </th>
+                <th className="px-6 py-4 font-semibold cursor-pointer hover:bg-slate-100 transition" onClick={() => requestSort('regiao')}>
+                  Região {sortConfig?.key === 'regiao' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                </th>
+                <th className="px-6 py-4 font-semibold text-center cursor-pointer hover:bg-slate-100 transition" onClick={() => requestSort('escolas')}>
+                  Escolas {sortConfig?.key === 'escolas' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                </th>
+                <th className="px-6 py-4 font-semibold text-center cursor-pointer hover:bg-slate-100 transition" onClick={() => requestSort('pendencias')}>
+                  Pendências {sortConfig?.key === 'pendencias' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                </th>
                 <th className="px-6 py-4 text-center font-semibold">Ações</th>
               </tr>
             </thead>
