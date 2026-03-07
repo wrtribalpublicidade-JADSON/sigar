@@ -1,11 +1,108 @@
 import React, { useState, useMemo } from 'react';
 import { PageHeader } from './ui/PageHeader';
-import { Users, BookOpen, UserCheck, AlertTriangle, GraduationCap, Edit, Trash2, Calendar, Hand, Book, CheckSquare, MessageCircle, Search, Printer, Lock, Send, CheckCircle2, FileText, LayoutDashboard, TrendingUp, TrendingDown, Minus, ArrowUpRight, ArrowDownRight, AlertCircle, FileDown, Download, Baby, School } from 'lucide-react';
+import { Users, BookOpen, UserCheck, AlertTriangle, GraduationCap, Edit, Trash2, Calendar, Hand, Book, CheckSquare, MessageCircle, Search, Printer, Lock, Send, CheckCircle2, FileText, LayoutDashboard, TrendingUp, TrendingDown, Minus, ArrowUpRight, ArrowDownRight, AlertCircle, FileDown, Download, Baby, School, ArrowRight } from 'lucide-react';
 import { CadastroTurmaModal, TurmaData } from './modals/CadastroTurmaModal';
 import { StudentReportModal } from './modals/StudentReportModal';
 import { ReuniaoEstudantilForm } from './ReuniaoEstudantilForm';
 import { ccAcompanhamentoDocenteService, ccEncaminhamentosService } from '../services/gestaoConselhoService';
 import { Escola, Segmento } from '../types';
+
+const BNCC_INFANTIL = {
+    'O EU, O OUTRO E O NÓS': {
+        'Crianças bem pequenas': [
+            { code: 'EI02EO01', short: 'Cuidado e Solidariedade', desc: 'Demonstrar atitudes de cuidado e solidariedade na interação com crianças e adultos.' },
+            { code: 'EI02EO02', short: 'Imagem Positiva e Confiança', desc: 'Demonstrar imagem positiva de si e confiança em sua capacidade para enfrentar dificuldades e desafios.' },
+            { code: 'EI02EO03', short: 'Compartilhar e Interagir', desc: 'Compartilhar os objetos e os espaços com crianças da mesma faixa etária e adultos.' },
+            { code: 'EI02EO04', short: 'Comunicação', desc: 'Comunicar-se com os colegas e os adultos, buscando compreendê-los e fazendo-se compreender.' },
+            { code: 'EI02EO05', short: 'Respeito às Diferenças', desc: 'Perceber que as pessoas têm características físicas diferentes, respeitando essas diferenças.' },
+            { code: 'EI02EO06', short: 'Regras de Convívio', desc: 'Respeitar regras básicas de convívio social nas interações e brincadeiras.' },
+            { code: 'EI02EO07', short: 'Resolução de Conflitos', desc: 'Resolver conflitos nas interações e brincadeiras, com a orientação de um adulto.' },
+        ],
+        'Crianças pequenas': [
+            { code: 'EI03EO01', short: 'Empatia e Respeito', desc: 'Demonstrar empatia pelos outros, percebendo que as pessoas têm diferentes sentimentos.' },
+            { code: 'EI03EO02', short: 'Independência e Confiança', desc: 'Agir de maneira independente, com confiança em suas capacidades.' },
+            { code: 'EI03EO03', short: 'Relações Interpessoais', desc: 'Ampliar as relações interpessoais, desenvolvendo atitudes de participação e cooperação.' },
+            { code: 'EI03EO04', short: 'Comunicação de Ideias', desc: 'Comunicar suas ideias e sentimentos a pessoas e grupos diversos.' },
+            { code: 'EI03EO05', short: 'Valorização e Respeito', desc: 'Demonstrar valorização das características do seu corpo e respeitar as dos outros.' },
+            { code: 'EI03EO06', short: 'Culturas e Modos de Vida', desc: 'Manifestar interesse e respeito por diferentes culturas e modos de vida.' },
+            { code: 'EI03EO07', short: 'Resolução de Conflitos', desc: 'Usar estratégias pautadas no respeito mútuo para lidar com conflitos.' },
+        ]
+    },
+    'CORPO, GESTOS E MOVIMENTOS': {
+        'Crianças bem pequenas': [
+            { code: 'EI02CG01', short: 'Gestos e Movimentos', desc: 'Apropriar-se de gestos e movimentos de sua cultura.' },
+            { code: 'EI02CG02', short: 'Deslocamento e Orientação', desc: 'Deslocar-se seu corpo no espaço, orientando-se por noções espaciais.' },
+            { code: 'EI02CG03', short: 'Exploração de Movimentos', desc: 'Explorar formas de deslocamento no espaço, combinando movimentos.' },
+            { code: 'EI02CG04', short: 'Independência no Cuidado', desc: 'Demonstrar progressiva independência no cuidado do seu corpo.' },
+            { code: 'EI02CG05', short: 'Habilidades Manuais', desc: 'Desenvolver progressivamente as habilidades manuais.' },
+        ],
+        'Crianças pequenas': [
+            { code: 'EI03CG01', short: 'Expressão Corporal', desc: 'Criar com o corpo formas diversificadas de expressão de sentimentos, sensações e emoções.' },
+            { code: 'EI03CG02', short: 'Controle Corporal', desc: 'Demonstrar controle e adequação do uso de seu corpo em brincadeiras e jogos.' },
+            { code: 'EI03CG03', short: 'Criação de Movimentos', desc: 'Criar movimentos, gestos, olhares e mímicas em brincadeiras.' },
+            { code: 'EI03CG04', short: 'Hábitos de Autocuidado', desc: 'Adotar hábitos de autocuidado relacionados a higiene, alimentação e conforto.' },
+            { code: 'EI03CG05', short: 'Coordenação Manual', desc: 'Coordenar suas habilidades manuais no atendimento adequado a seus interesses.' },
+        ]
+    },
+    'TRAÇOS, SONS, CORES E FORMAS': {
+        'Crianças bem pequenas': [
+            { code: 'EI02TS01', short: 'Criação Sonora', desc: 'Criar sons com materiais, objetos e instrumentos musicais.' },
+            { code: 'EI02TS02', short: 'Exploração de Materiais', desc: 'Utilizar materiais variados com possibilidades de manipulação explorando cores e texturas.' },
+            { code: 'EI02TS03', short: 'Fontes Sonoras', desc: 'Utilizar diferentes fontes sonoras disponíveis no ambiente.' },
+        ],
+        'Crianças pequenas': [
+            { code: 'EI03TS01', short: 'Produção Sonora', desc: 'Utilizar sons produzidos por materiais, objetos e instrumentos musicais.' },
+            { code: 'EI03TS02', short: 'Expressão Artística', desc: 'Expressar-se livremente por meio de desenho, pintura, colagem, dobradura e escultura.' },
+            { code: 'EI03TS03', short: 'Qualidades do Som', desc: 'Reconhecer as qualidades do som (intensidade, duração, altura e timbre).' },
+        ]
+    },
+    'ESCUTA, FALA, PENSAMENTO E IMAGINAÇÃO': {
+        'Crianças bem pequenas': [
+            { code: 'EI02EF01', short: 'Diálogo e Expressão', desc: 'Dialogar com crianças e adultos, expressando seus desejos, necessidades, sentimentos e opiniões.' },
+            { code: 'EI02EF02', short: 'Sons e Rimas', desc: 'Identificar e criar diferentes sons e reconhecer rimas e aliterações.' },
+            { code: 'EI02EF03', short: 'Interesse pela Leitura', desc: 'Demonstrar interesse e atenção ao ouvir a leitura de histórias e outros textos.' },
+            { code: 'EI02EF04', short: 'Compreensão de Histórias', desc: 'Formular e responder perguntas sobre fatos da história narrada.' },
+            { code: 'EI02EF05', short: 'Relato de Experiências', desc: 'Relatar experiências e fatos acontecidos, histórias ouvidas, filmes ou peças teatrais assistidos.' },
+            { code: 'EI02EF06', short: 'Criação de Histórias', desc: 'Criar e contar histórias oralmente, com base em imagens ou temas sugeridos.' },
+            { code: 'EI02EF07', short: 'Manuseio de Textos', desc: 'Manusear diferentes portadores textuais, demonstrando reconhecer seus usos sociais.' },
+            { code: 'EI02EF08', short: 'Gêneros Textuais', desc: 'Manipular textos e participar de situações de escuta.' },
+            { code: 'EI02EF09', short: 'Suportes de Escrita', desc: 'Manusear instrumentos e suportes de escrita para desenhar, traçar letras e outros sinais gráficos.' },
+        ],
+        'Crianças pequenas': [
+            { code: 'EI03EF01', short: 'Expressão de Ideias', desc: 'Expressar ideias, desejos e sentimentos sobre suas vivências.' },
+            { code: 'EI03EF02', short: 'Invenção Musical/Poética', desc: 'Inventar brincadeiras cantadas, poemas e canções, criando rimas.' },
+            { code: 'EI03EF03', short: 'Exploração de Livros', desc: 'Escolher e folhear livros, procurando orientar-se por temas e ilustrações.' },
+            { code: 'EI03EF04', short: 'Reconto e Planej.', desc: 'Recontar histórias ouvidas e planejar coletivamente roteiros de vídeos.' },
+            { code: 'EI03EF05', short: 'Reconto Escrito', desc: 'Recontar histórias ouvidas para produção de reconto escrito.' },
+            { code: 'EI03EF06', short: 'Produção de Histórias', desc: 'Produzir suas próprias histórias orais e escritas.' },
+            { code: 'EI03EF07', short: 'Hipóteses/Gêneros', desc: 'Levantar hipóteses sobre gêneros textuais veiculados em portadores conhecidos.' },
+            { code: 'EI03EF08', short: 'Seleção de Textos', desc: 'Selecionar livros e textos de gêneros conhecidos para a leitura.' },
+            { code: 'EI03EF09', short: 'Hipóteses de Escrita', desc: 'Levantar hipóteses em relação à linguagem escrita.' },
+        ]
+    },
+    'ESPAÇOS, TEMPOS, QUANTIDADES, RELAÇÕES E TRANSFORMAÇÕES': {
+        'Crianças bem pequenas': [
+            { code: 'EI02ET01', short: 'Propriedades / Objetos', desc: 'Explorar e descrever semelhanças e diferenças entre objetos.' },
+            { code: 'EI02ET02', short: 'Observação/Fenômenos', desc: 'Observar, relatar e descrever incidentes do cotidiano e fenômenos naturais.' },
+            { code: 'EI02ET03', short: 'Cuidado da Natureza', desc: 'Compartilhar situações de cuidado de plantas e animais.' },
+            { code: 'EI02ET04', short: 'Relações Espaciais', desc: 'Identificar relações espaciais e temporais.' },
+            { code: 'EI02ET05', short: 'Classificação/Objetos', desc: 'Classificar objetos, considerando determinado atributo.' },
+            { code: 'EI02ET06', short: 'Conceitos de Tempo', desc: 'Utilizar conceitos básicos de tempo.' },
+            { code: 'EI02ET07', short: 'Contagem Oral', desc: 'Contar oralmente objetos, pessoas, livros etc., em contextos diversos.' },
+            { code: 'EI02ET08', short: 'Registro Numérico', desc: 'Registrar com números a quantidade de crianças.' },
+        ],
+        'Crianças pequenas': [
+            { code: 'EI03ET01', short: 'Comparação de Objetos', desc: 'Estabelecer relações de comparação entre objetos, observando suas propriedades.' },
+            { code: 'EI03ET02', short: 'Mudanças em Materiais', desc: 'Observar e descrever mudanças em diferentes materiais.' },
+            { code: 'EI03ET03', short: 'Fontes de Informação', desc: 'Identificar e selecionar fontes de informações para responder a questões sobre a natureza.' },
+            { code: 'EI03ET04', short: 'Regs. de Observação', desc: 'Registrar observações, manipulações e medidas, usando múltiplas linguagens.' },
+            { code: 'EI03ET05', short: 'Classif. Objetos/Fig.', desc: 'Classificar objetos e figuras de acordo com suas semelhanças e diferenças.' },
+            { code: 'EI03ET06', short: 'Hist. Pessoal/Familiar', desc: 'Relatar fatos importantes sobre seu nascimento e desenvolvimento.' },
+            { code: 'EI03ET07', short: 'Rel. Número-Quant.', desc: 'Relacionar números às suas respectivas quantidades.' },
+            { code: 'EI03ET08', short: 'Medidas e Gráficos', desc: 'Expressar medidas, construindo gráficos básicos.' },
+        ]
+    }
+};
 
 type Tab = 'estudantil' | 'avaliacao' | 'acompanhamento' | 'encaminhamentos';
 
@@ -176,6 +273,55 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
                 <div className="w-4 bg-slate-700 rounded-sm" style={{ height: `${(student.b4 / 10) * 100}%` }}></div>
             </div>
         );
+    };
+
+    const [studentsAvaliacaoInfantil, setStudentsAvaliacaoInfantil] = useState<any[]>([
+        {
+            id: 1,
+            name: 'ANA BEATRIZ SILVA SANTOS',
+            concepts_b1: ['D', 'ED', 'ND', 'D', 'ED', 'ND', 'D', 'ED', 'ND', 'D', 'ED', 'ND', 'D', 'ED', 'ND'],
+            concepts_b2: ['ED', 'ED', 'ED', 'ED', 'ED', 'ED', 'ED', 'ED', 'ED', 'ED', 'ED', 'ED', 'ED', 'ED', 'ED'],
+            concepts_b3: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'],
+            concepts_b4: []
+        },
+        {
+            id: 2,
+            name: 'BRUNO FERREIRA LIMA',
+            concepts_b1: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'],
+            concepts_b2: ['ED', 'D', 'D', 'ED', 'D', 'ED', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'],
+            concepts_b3: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'],
+            concepts_b4: []
+        },
+        {
+            id: 3,
+            name: 'CARLA OLIVEIRA COSTA',
+            concepts_b1: ['ED', 'ND', 'ED', 'ED', 'ND', 'ED', 'ED', 'ND', 'ED', 'ED', 'ND', 'ED', 'ED', 'ND', 'ED'],
+            concepts_b2: ['D', 'ED', 'D', 'D', 'ED', 'D', 'D', 'ED', 'D', 'D', 'ED', 'D', 'D', 'ED', 'D'],
+            concepts_b3: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'],
+            concepts_b4: []
+        }
+    ]);
+
+    const toggleInfantilConcept = (studentId: number, conceptIndex: number) => {
+        setStudentsAvaliacaoInfantil(prev => prev.map(student => {
+            if (student.id === studentId) {
+                let field = 'concepts_b1';
+                if (avaliacaoBimestre === '2º Bimestre') field = 'concepts_b2';
+                if (avaliacaoBimestre === '3º Bimestre') field = 'concepts_b3';
+                if (avaliacaoBimestre === '4º Bimestre') field = 'concepts_b4';
+
+                const newConcepts = [...(student[field] || [])];
+                const current = newConcepts[conceptIndex] || 'D';
+                let nextConcept = 'D';
+                if (current === 'D') nextConcept = 'ED';
+                else if (current === 'ED') nextConcept = 'ND';
+                else if (current === 'ND') nextConcept = 'D';
+
+                newConcepts[conceptIndex] = nextConcept;
+                return { ...student, [field]: newConcepts };
+            }
+            return student;
+        }));
     };
 
     const toggleConcept = (studentId: number, field: string) => {
@@ -635,6 +781,10 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
     }, []);
 
     const renderTabContent = () => {
+        const isBemPequena = ['Creche II', 'Creche III'].includes(activeTurma?.anoSerie || '');
+        const currentAgeGroup = isBemPequena ? 'Crianças bem pequenas' : 'Crianças pequenas';
+        const currentObjectives = BNCC_INFANTIL[avaliacaoInfantilCampo.toUpperCase() as keyof typeof BNCC_INFANTIL]?.[currentAgeGroup as 'Crianças bem pequenas' | 'Crianças pequenas'] || [];
+
         switch (activeTab) {
             case 'estudantil':
                 return (
@@ -777,14 +927,181 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
                         {
                             avaliacaoBimestre === 'Resultado Consolidado' ? (
                                 avaliacaoEtapa === 'infantil' ? (
-                                    <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center flex flex-col items-center justify-center shadow-sm">
-                                        <div className="w-16 h-16 bg-purple-50 text-purple-500 rounded-full flex items-center justify-center mb-4 border border-purple-100">
-                                            <Baby className="w-8 h-8" />
+                                    <div className="space-y-6 animate-fade-in">
+                                        {/* Overview Cards Infantil */}
+                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <h4 className="text-xs font-bold text-slate-500 uppercase">Evolução Média</h4>
+                                                    <TrendingUp className="w-4 h-4 text-emerald-500" />
+                                                </div>
+                                                <div className="flex items-baseline gap-2 flex-col">
+                                                    <span className="text-2xl font-black text-slate-800">+12.5%</span>
+                                                    <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md flex items-center">Bimestre 02 vs 01</span>
+                                                </div>
+                                            </div>
+                                            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <h4 className="text-xs font-bold text-slate-500 uppercase">Acima da Média</h4>
+                                                    <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600"><CheckCircle2 className="w-3 h-3" /></div>
+                                                </div>
+                                                <div className="flex items-baseline gap-2 flex-col">
+                                                    <span className="text-2xl font-black text-slate-800">84%</span>
+                                                    <span className="text-xs font-medium text-emerald-500">+2.1% em relação à rede</span>
+                                                </div>
+                                            </div>
+                                            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <h4 className="text-xs font-bold text-slate-500 uppercase">Média Geral</h4>
+                                                    <LayoutDashboard className="w-4 h-4 text-emerald-500" />
+                                                </div>
+                                                <div className="flex items-baseline gap-2 flex-col">
+                                                    <span className="text-2xl font-black text-slate-800">7.8</span>
+                                                    <span className="text-xs font-medium text-emerald-500">+0.4 na última semana</span>
+                                                </div>
+                                            </div>
+                                            <div className="bg-red-50 rounded-2xl p-5 border border-red-100 shadow-sm flex flex-col justify-between relative overflow-hidden">
+                                                <div className="absolute -right-4 -top-4 w-16 h-16 bg-red-100 rounded-full opacity-50"></div>
+                                                <div className="flex justify-between items-start mb-2 relative z-10">
+                                                    <h4 className="text-xs font-bold text-red-800 uppercase">Alertas de Atenção</h4>
+                                                    <AlertTriangle className="w-4 h-4 text-red-500" />
+                                                </div>
+                                                <div className="flex items-baseline gap-2 flex-col relative z-10">
+                                                    <span className="text-2xl font-black text-red-600">06 crianças</span>
+                                                    <span className="text-xs font-medium text-red-500">Ação necessária em 2 campos</span>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <h3 className="text-xl font-bold text-slate-800 mb-2">Resultado Consolidado da Educação Infantil</h3>
-                                        <p className="text-slate-500 max-w-md mx-auto">
-                                            A visão consolidada para Educação Infantil foca na evolução contínua dos campos de experiência e será gerada ao final do ciclo letivo, reunindo o acompanhamento pedagógico.
-                                        </p>
+
+                                        {/* Campos de Experiência Tabs */}
+                                        <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-2">
+                                            {CAMPOS_EXPERIENCIA_BNCC.map(campo => (
+                                                <button
+                                                    key={campo}
+                                                    onClick={() => setAvaliacaoInfantilCampo(campo)}
+                                                    className={`px-4 py-2 rounded-xl text-sm font-bold min-w-max border transition-all ${avaliacaoInfantilCampo === campo ? 'bg-emerald-500 text-white border-emerald-600 shadow-sm' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
+                                                >
+                                                    {campo}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {/* Tabela */}
+                                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-left border-collapse min-w-max">
+                                                    <thead>
+                                                        <tr className="border-b border-slate-100 bg-slate-50/50">
+                                                            <th className="p-4 font-bold text-xs tracking-wider text-slate-500 uppercase">ESTUDANTE</th>
+                                                            <th className="p-4 font-bold text-xs tracking-wider text-slate-500 uppercase text-center w-[16%]">1º BIMESTRE</th>
+                                                            <th className="p-4 font-bold text-xs tracking-wider text-slate-500 uppercase text-center w-[16%]">2º BIMESTRE</th>
+                                                            <th className="p-4 font-bold text-xs tracking-wider text-slate-500 uppercase text-center w-[16%]">3º BIMESTRE</th>
+                                                            <th className="p-4 font-bold text-xs tracking-wider text-slate-500 uppercase text-center w-[16%]">4º BIMESTRE</th>
+                                                            <th className="p-4 font-bold text-xs tracking-wider text-slate-500 uppercase text-right w-32">TRAJETÓRIA</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100">
+                                                        {studentsAvaliacaoInfantil.map((student) => {
+                                                            const getConsolidatedStatus = (field: string) => {
+                                                                const concepts = student[field] || [];
+                                                                if (concepts.length === 0) return null;
+
+                                                                let score = 0;
+                                                                const sConcepts = currentObjectives.map((_, i) => concepts[i] || 'ND');
+                                                                sConcepts.forEach(c => {
+                                                                    if (c === 'D') score += 2;
+                                                                    else if (c === 'ED') score += 1;
+                                                                });
+
+                                                                const max = sConcepts.length * 2;
+                                                                const pct = max > 0 ? (score / max) * 100 : 0;
+
+                                                                if (pct > 70) return 'D';
+                                                                if (pct >= 50) return 'ED';
+                                                                return 'ND';
+                                                            };
+
+                                                            const b1Status = getConsolidatedStatus('concepts_b1');
+                                                            const b2Status = getConsolidatedStatus('concepts_b2');
+                                                            const b3Status = getConsolidatedStatus('concepts_b3');
+                                                            const b4Status = getConsolidatedStatus('concepts_b4');
+
+                                                            const initials = student.name.split(' ').slice(0, 2).map((n: string) => n[0]).join('');
+                                                            const color = student.id % 2 === 0 ? 'bg-blue-100 text-blue-600' : 'bg-emerald-100 text-emerald-600';
+
+                                                            const renderBadge = (status: string | null) => {
+                                                                if (!status) return <span className="text-sm font-medium text-slate-300 italic">Aguardando...</span>;
+                                                                if (status === 'D') return <span className="bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg text-[10px] font-black flex items-center justify-center gap-1.5 w-max mx-auto shadow-sm uppercase tracking-wider">Desenvolvido <ArrowUpRight className="w-3 h-3" /></span>;
+                                                                if (status === 'ED') return <span className="bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-[10px] font-black flex items-center justify-center gap-1.5 w-max mx-auto shadow-sm uppercase tracking-wider">Em Desenvol. <ArrowRight className="w-3 h-3" /></span>;
+                                                                if (status === 'ND') return <span className="bg-orange-100 text-orange-700 px-3 py-1.5 rounded-lg text-[10px] font-black flex items-center justify-center gap-1.5 w-max mx-auto shadow-sm uppercase tracking-wider">Não Desenvolvido <ArrowDownRight className="w-3 h-3" /></span>;
+                                                                return null;
+                                                            };
+
+                                                            const getH = (s: string | null) => s === 'D' ? 'h-6 bg-emerald-500' : s === 'ED' ? 'h-4 bg-blue-500' : s === 'ND' ? 'h-2 bg-orange-500' : 'h-1 bg-slate-200';
+
+                                                            return (
+                                                                <tr key={student.id} className="hover:bg-slate-50 transition-colors">
+                                                                    <td className="p-4">
+                                                                        <div className="flex items-center gap-3">
+                                                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${color}`}>
+                                                                                {initials}
+                                                                            </div>
+                                                                            <div>
+                                                                                <p className="text-sm font-bold text-slate-800">{student.name}</p>
+                                                                                <p className="text-xs text-slate-400">ID: #00{student.id}</p>
+                                                                            </div>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="p-4 text-center">{renderBadge(b1Status)}</td>
+                                                                    <td className="p-4 text-center">{renderBadge(b2Status)}</td>
+                                                                    <td className="p-4 text-center">{renderBadge(b3Status)}</td>
+                                                                    <td className="p-4 text-center">{renderBadge(b4Status)}</td>
+                                                                    <td className="p-4">
+                                                                        <div className="flex items-end justify-end gap-1 h-6">
+                                                                            <div className={`w-2.5 rounded-sm ${getH(b1Status)}`}></div>
+                                                                            <div className={`w-2.5 rounded-sm ${getH(b2Status)}`}></div>
+                                                                            <div className={`w-2.5 rounded-sm ${getH(b3Status)}`}></div>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-between items-center rounded-b-2xl">
+                                                <div className="text-xs text-slate-500 font-medium">Exibindo 4 de 24 estudantes</div>
+                                                <div className="flex gap-2">
+                                                    <button className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-600 font-bold text-xs shadow-sm hover:bg-slate-50 transition-colors">Anterior</button>
+                                                    <button className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-600 font-bold text-xs shadow-sm hover:bg-slate-50 transition-colors">Próximo</button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Legenda */}
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex gap-3 shadow-sm">
+                                                <div className="w-4 h-4 rounded bg-emerald-500 mt-0.5 shrink-0 shadow-sm border border-emerald-600"></div>
+                                                <div>
+                                                    <p className="text-sm font-bold text-slate-800">Desenvolvido</p>
+                                                    <p className="text-xs text-slate-500 mt-1">Atingiu plenamente os objetivos do período.</p>
+                                                </div>
+                                            </div>
+                                            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex gap-3 shadow-sm">
+                                                <div className="w-4 h-4 rounded bg-blue-500 mt-0.5 shrink-0 shadow-sm border border-blue-600"></div>
+                                                <div>
+                                                    <p className="text-sm font-bold text-slate-800">Em Desenvolvimento</p>
+                                                    <p className="text-xs text-slate-500 mt-1">Apresenta progresso, requer acompanhamento.</p>
+                                                </div>
+                                            </div>
+                                            <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex gap-3 shadow-sm">
+                                                <div className="w-4 h-4 rounded bg-orange-500 mt-0.5 shrink-0 shadow-sm border border-orange-600"></div>
+                                                <div>
+                                                    <p className="text-sm font-bold text-slate-800">Não Desenvolvido</p>
+                                                    <p className="text-xs text-slate-500 mt-1">Objetivos ainda não alcançados.</p>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 ) : (
                                     <div className="space-y-6">
@@ -1065,22 +1382,26 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
                                     <div className="bg-white rounded-2xl border border-slate-200 p-4 mt-6 flex justify-between items-center shadow-sm animate-fade-in">
                                         <div className="flex items-center gap-6 overflow-x-auto">
                                             <span className="text-xs font-bold text-slate-400 uppercase flex items-center gap-2 whitespace-nowrap">
-                                                <AlertCircle className="w-4 h-4" /> LEGENDA DE CONCEITOS:
+                                                <AlertTriangle className="w-4 h-4" /> LEGENDA DE CONCEITOS:
                                             </span>
                                             <div className="flex gap-4 text-xs font-bold">
-                                                <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 px-3 py-1.5 rounded-full flex items-center gap-2 whitespace-nowrap">
-                                                    <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center text-[10px] text-emerald-600">ED</div>
+                                                <span className="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-full flex items-center gap-2 whitespace-nowrap">
+                                                    <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center text-[10px] text-white">D</div>
+                                                    DESENVOLVIDO
+                                                </span>
+                                                <span className="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full flex items-center gap-2 whitespace-nowrap">
+                                                    <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-[10px] text-white">ED</div>
                                                     EM DESENVOLVIMENTO
                                                 </span>
-                                                <span className="bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1.5 rounded-full flex items-center gap-2 whitespace-nowrap">
-                                                    <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-[10px] text-blue-600">MD</div>
-                                                    MUITO DESENVOLVIDO
-                                                </span>
-                                                <span className="bg-slate-50 text-slate-500 border border-slate-200 px-3 py-1.5 rounded-full flex items-center gap-2 whitespace-nowrap">
-                                                    <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center text-[10px] text-slate-400">ND</div>
+                                                <span className="bg-slate-50 text-slate-500 px-3 py-1.5 rounded-full flex items-center gap-2 whitespace-nowrap">
+                                                    <div className="w-5 h-5 rounded-full bg-slate-400 flex items-center justify-center text-[10px] text-white">ND</div>
                                                     NÃO DESENVOLVIDO
                                                 </span>
                                             </div>
+                                        </div>
+                                        <div className="hidden md:flex items-center gap-2 text-[10px] font-medium text-slate-400 italic">
+                                            <Lock className="w-3 h-3" />
+                                            <span>Edição bloqueada pelo sistema após envio</span>
                                         </div>
                                     </div>
 
@@ -1097,85 +1418,85 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-left border-collapse min-w-max">
                                                 <thead>
-                                                    <tr className="bg-slate-800 text-white border-b border-slate-700">
-                                                        <th className="p-4 w-16 text-center text-slate-400 font-medium">Nº</th>
-                                                        <th className="p-4 font-bold text-sm tracking-wide bg-white text-slate-800 min-w-[200px] border-r border-slate-200">ESTUDANTE</th>
-                                                        {/* Objetivos de Aprendizagem */}
-                                                        <th colSpan={4} className="p-4 text-center border-l bg-slate-50 border-slate-200 h-16">
-                                                            <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-                                                                Objetivos de aprendizagem e desenvolvimento de cada campo de experiência de acordo com a faixa etária, segundo a bncc
-                                                            </span>
-                                                        </th>
-                                                        <th className="p-4 text-center bg-purple-700/80 w-32">
-                                                            <span className="text-[10px] font-bold uppercase tracking-wider block">Progresso<br />do Campo</span>
+                                                    <tr className="bg-[#141B2D] text-white">
+                                                        <th className="p-4 w-16 text-center font-bold text-xs uppercase border-r border-[#1e273b]">#</th>
+                                                        <th className="p-4 font-bold text-xs tracking-wide min-w-[200px] border-r border-[#1e273b] uppercase">ESTUDANTE</th>
+                                                        {/* Objetivos de Aprendizagem Dinâmicos da BNCC */}
+                                                        {currentObjectives.map((obj) => (
+                                                            <th key={obj.code} className="p-3 text-center border-r border-[#1e273b] min-w-[120px]" title={obj.desc}>
+                                                                <span className="text-xs font-bold text-[#23B38A] block mb-1">{obj.code}</span>
+                                                                <span className="text-[10px] text-slate-300 block leading-tight font-medium">{obj.short}</span>
+                                                            </th>
+                                                        ))}
+                                                        <th className="p-4 text-center w-36">
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider block text-white">Progresso do Campo</span>
                                                         </th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-100">
-                                                    {/* Mock Rows */}
-                                                    <tr className="hover:bg-slate-50 transition-colors group">
-                                                        <td className="p-4 text-center text-sm font-medium text-slate-400">1</td>
-                                                        <td className="p-4 text-sm font-bold text-slate-700 border-r border-slate-100 uppercase">ANA BEATRIZ SILVA SANTOS</td>
-                                                        <td className="p-4 text-center bg-slate-50/30">
-                                                            <button className="w-8 h-8 rounded-lg font-black text-xs flex items-center justify-center mx-auto transition-colors bg-blue-500 text-white shadow-sm shadow-blue-500/20">MD</button>
-                                                        </td>
-                                                        <td className="p-4 text-center bg-slate-50/30">
-                                                            <button className="w-8 h-8 rounded-lg font-black text-xs flex items-center justify-center mx-auto transition-colors bg-emerald-500 text-white shadow-sm shadow-emerald-500/20">ED</button>
-                                                        </td>
-                                                        <td className="p-4 text-center bg-slate-50/30">
-                                                            <button className="w-8 h-8 rounded-lg font-black text-xs flex items-center justify-center mx-auto transition-colors bg-slate-400 text-white shadow-sm shadow-slate-400/20">ND</button>
-                                                        </td>
-                                                        <td className="p-4 text-center bg-slate-50/30">
-                                                            <button className="w-8 h-8 rounded-lg font-black text-xs flex items-center justify-center mx-auto transition-colors bg-blue-500 text-white shadow-sm shadow-blue-500/20">MD</button>
-                                                        </td>
-                                                        <td className="p-4 text-center">
-                                                            <span className="px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider shadow-sm border bg-blue-50 text-blue-600 border-blue-200">
-                                                                MUITO DESENVOLVIDO
-                                                            </span>
-                                                        </td>
-                                                    </tr>
-                                                    <tr className="hover:bg-slate-50 transition-colors group">
-                                                        <td className="p-4 text-center text-sm font-medium text-slate-400">2</td>
-                                                        <td className="p-4 text-sm font-bold text-slate-700 border-r border-slate-100 uppercase">BRUNO FERREIRA LIMA</td>
-                                                        <td className="p-4 text-center bg-slate-50/30">
-                                                            <button className="w-8 h-8 rounded-lg font-black text-xs flex items-center justify-center mx-auto transition-colors bg-blue-500 text-white shadow-sm shadow-blue-500/20">MD</button>
-                                                        </td>
-                                                        <td className="p-4 text-center bg-slate-50/30">
-                                                            <button className="w-8 h-8 rounded-lg font-black text-xs flex items-center justify-center mx-auto transition-colors bg-blue-500 text-white shadow-sm shadow-blue-500/20">MD</button>
-                                                        </td>
-                                                        <td className="p-4 text-center bg-slate-50/30">
-                                                            <button className="w-8 h-8 rounded-lg font-black text-xs flex items-center justify-center mx-auto transition-colors bg-blue-500 text-white shadow-sm shadow-blue-500/20">MD</button>
-                                                        </td>
-                                                        <td className="p-4 text-center bg-slate-50/30">
-                                                            <button className="w-8 h-8 rounded-lg font-black text-xs flex items-center justify-center mx-auto transition-colors bg-blue-500 text-white shadow-sm shadow-blue-500/20">MD</button>
-                                                        </td>
-                                                        <td className="p-4 text-center">
-                                                            <span className="px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider shadow-sm border bg-blue-50 text-blue-600 border-blue-200">
-                                                                MUITO DESENVOLVIDO
-                                                            </span>
-                                                        </td>
-                                                    </tr>
-                                                    <tr className="hover:bg-slate-50 transition-colors group">
-                                                        <td className="p-4 text-center text-sm font-medium text-slate-400">3</td>
-                                                        <td className="p-4 text-sm font-bold text-slate-700 border-r border-slate-100 uppercase">CARLA OLIVEIRA COSTA</td>
-                                                        <td className="p-4 text-center bg-slate-50/30">
-                                                            <button className="w-8 h-8 rounded-lg font-black text-xs flex items-center justify-center mx-auto transition-colors bg-emerald-500 text-white shadow-sm shadow-emerald-500/20">ED</button>
-                                                        </td>
-                                                        <td className="p-4 text-center bg-slate-50/30">
-                                                            <button className="w-8 h-8 rounded-lg font-black text-xs flex items-center justify-center mx-auto transition-colors bg-emerald-500 text-white shadow-sm shadow-emerald-500/20">ED</button>
-                                                        </td>
-                                                        <td className="p-4 text-center bg-slate-50/30">
-                                                            <button className="w-8 h-8 rounded-lg font-black text-xs flex items-center justify-center mx-auto transition-colors bg-slate-400 text-white shadow-sm shadow-slate-400/20">ND</button>
-                                                        </td>
-                                                        <td className="p-4 text-center bg-slate-50/30">
-                                                            <button className="w-8 h-8 rounded-lg font-black text-xs flex items-center justify-center mx-auto transition-colors bg-emerald-500 text-white shadow-sm shadow-emerald-500/20">ED</button>
-                                                        </td>
-                                                        <td className="p-4 text-center">
-                                                            <span className="px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider shadow-sm border bg-emerald-50 text-emerald-600 border-emerald-200">
-                                                                EM DESENVOLVIMENTO
-                                                            </span>
-                                                        </td>
-                                                    </tr>
+                                                    {/* Mock Rows Dinâmicas */}
+                                                    {studentsAvaliacaoInfantil.map((student) => {
+                                                        // Cálculo do progresso
+                                                        let totalScore = 0;
+
+                                                        let activeField = 'concepts_b1';
+                                                        if (avaliacaoBimestre === '2º Bimestre') activeField = 'concepts_b2';
+                                                        if (avaliacaoBimestre === '3º Bimestre') activeField = 'concepts_b3';
+                                                        if (avaliacaoBimestre === '4º Bimestre') activeField = 'concepts_b4';
+
+                                                        const activeConcepts = student[activeField] || [];
+                                                        const studentConcepts = currentObjectives.map((_, i) => activeConcepts[i] || 'D');
+                                                        const maxScore = studentConcepts.length * 2;
+
+                                                        studentConcepts.forEach(c => {
+                                                            if (c === 'D') totalScore += 2;
+                                                            else if (c === 'ED') totalScore += 1;
+                                                        });
+
+                                                        const percentage = maxScore > 0 ? (totalScore / maxScore) * 100 : 0;
+
+                                                        let progressText = 'NÃO CONSOLIDADO';
+                                                        let progressColor = 'bg-red-50 text-red-600 border-red-200';
+                                                        if (activeConcepts.length === 0) {
+                                                            progressText = 'AGUARDANDO...';
+                                                            progressColor = 'bg-slate-50 text-slate-400 border-slate-200';
+                                                        } else if (percentage > 70) {
+                                                            progressText = 'CONSOLIDADO';
+                                                            progressColor = 'bg-blue-50 text-blue-600 border-blue-200';
+                                                        } else if (percentage >= 50) {
+                                                            progressText = 'EM ATENÇÃO';
+                                                            progressColor = 'bg-yellow-50 text-yellow-600 border-yellow-200';
+                                                        }
+
+                                                        return (
+                                                            <tr key={student.id} className="hover:bg-slate-50 transition-colors group">
+                                                                <td className="p-4 text-center text-sm font-medium text-slate-400">{student.id}</td>
+                                                                <td className="p-4 text-sm font-bold text-slate-700 border-r border-slate-100 uppercase">{student.name}</td>
+                                                                {studentConcepts.map((concept, i) => {
+                                                                    const isD = concept === 'D';
+                                                                    const isED = concept === 'ED';
+                                                                    const isND = concept === 'ND';
+
+                                                                    let colors = 'bg-slate-50 text-slate-500 border-slate-200';
+                                                                    if (isD) colors = 'bg-emerald-50 text-emerald-500 border-emerald-200';
+                                                                    if (isED) colors = 'bg-blue-50 text-blue-500 border-blue-200';
+
+                                                                    return (
+                                                                        <td key={currentObjectives[i].code} className="p-4 text-center bg-transparent border-r border-slate-100/50">
+                                                                            <div onClick={() => toggleInfantilConcept(student.id, i)} className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold mx-auto transition-transform hover:scale-110 cursor-pointer select-none ${colors}`}>
+                                                                                {concept}
+                                                                            </div>
+                                                                        </td>
+                                                                    );
+                                                                })}
+                                                                <td className="p-4 text-center">
+                                                                    <span className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider shadow-sm border ${progressColor}`}>
+                                                                        {progressText}
+                                                                    </span>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
                                                 </tbody>
                                             </table>
                                         </div>
