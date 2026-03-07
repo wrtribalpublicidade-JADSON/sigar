@@ -172,18 +172,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       )}
 
-
-      {/* Pending Alerts System */}
-      {currentUser && onNavigateToDetail && (
-        <div id="pending-alerts-section">
-          <PendingAlerts
-            escolas={escolas}
-            coordenador={currentUser}
-            onNavigateToEscola={onNavigateToDetail}
-          />
-        </div>
-      )}
-
       {/* KPI Cards - Modern Soft */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {kpiList.map((kpi, idx) => (
