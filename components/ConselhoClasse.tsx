@@ -811,21 +811,21 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
                             </div>
                         </div>
 
-                        {/* Seletor de Etapas para Avaliação Docente (Mesmo de Encaminhamentos) */}
+                        {/* Seletor de Etapas para Avaliação Docente */}
                         {
                             schoolLevels.hasBoth && (
-                                <div className="bg-white rounded-2xl border border-slate-200 p-2 flex gap-2">
+                                <div className="bg-slate-100 p-1.5 rounded-2xl flex gap-2 w-fit">
                                     <button
                                         onClick={() => isFundamentalAllowed && setAvaliacaoEtapa('fundamental')}
                                         disabled={!isFundamentalAllowed}
-                                        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all shadow-sm ${avaliacaoEtapa === 'fundamental' ? 'bg-sky-600 text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-transparent'} ${!isFundamentalAllowed ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                        className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${avaliacaoEtapa === 'fundamental' ? 'bg-white text-slate-800 shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-700'} ${!isFundamentalAllowed ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     >
                                         <BookOpen className="w-4 h-4" /> Ensino Fundamental
                                     </button>
                                     <button
                                         onClick={() => isInfantilAllowed && setAvaliacaoEtapa('infantil')}
                                         disabled={!isInfantilAllowed}
-                                        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all shadow-sm ${avaliacaoEtapa === 'infantil' ? 'bg-purple-600 text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-transparent'} ${!isInfantilAllowed ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                        className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${avaliacaoEtapa === 'infantil' ? 'bg-white text-slate-800 shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-700'} ${!isInfantilAllowed ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     >
                                         <Baby className="w-4 h-4" /> Educação Infantil
                                     </button>
@@ -1567,11 +1567,11 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
                             {/* Seletor de Etapa */}
                             {
                                 (schoolLevels.hasBoth || (!schoolLevels.hasInfantil && !schoolLevels.hasFundamental)) && (
-                                    <div className="flex gap-2 mb-6 bg-slate-100 p-1.5 rounded-xl w-fit">
+                                    <div className="flex gap-2 mb-6 bg-slate-100 p-1.5 rounded-2xl w-fit">
                                         <button
                                             onClick={() => isFundamentalAllowed && setAcompEtapa('fundamental')}
                                             disabled={!isFundamentalAllowed}
-                                            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${acompEtapa === 'fundamental'
+                                            className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${acompEtapa === 'fundamental'
                                                 ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
                                                 : 'text-slate-500 hover:text-slate-700'
                                                 } ${!isFundamentalAllowed ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -1581,7 +1581,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
                                         <button
                                             onClick={() => isInfantilAllowed && setAcompEtapa('infantil')}
                                             disabled={!isInfantilAllowed}
-                                            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${acompEtapa === 'infantil'
+                                            className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${acompEtapa === 'infantil'
                                                 ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
                                                 : 'text-slate-500 hover:text-slate-700'
                                                 } ${!isInfantilAllowed ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -1860,11 +1860,11 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
 
                         {/* Seletor de Etapa */}
                         {(schoolLevels.hasBoth || (!schoolLevels.hasInfantil && !schoolLevels.hasFundamental)) && (
-                            <div className="flex gap-2 mb-6 bg-slate-100 p-1.5 rounded-xl w-fit">
+                            <div className="flex gap-2 mb-6 bg-slate-100 p-1.5 rounded-2xl w-fit">
                                 <button
                                     onClick={() => isFundamentalAllowed && setEncEtapa('fundamental')}
                                     disabled={!isFundamentalAllowed}
-                                    className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${encEtapa === 'fundamental'
+                                    className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${encEtapa === 'fundamental'
                                         ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
                                         : 'text-slate-500 hover:text-slate-700'
                                         } ${!isFundamentalAllowed ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -1874,7 +1874,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
                                 <button
                                     onClick={() => isInfantilAllowed && setEncEtapa('infantil')}
                                     disabled={!isInfantilAllowed}
-                                    className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${encEtapa === 'infantil'
+                                    className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${encEtapa === 'infantil'
                                         ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
                                         : 'text-slate-500 hover:text-slate-700'
                                         } ${!isInfantilAllowed ? 'opacity-50 cursor-not-allowed' : ''}`}

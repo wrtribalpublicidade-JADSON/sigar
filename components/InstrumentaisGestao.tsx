@@ -21,6 +21,12 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
     const [activeTab, setActiveTab] = useState<Tab>('reunioes');
     const [isLoading, setIsLoading] = useState(true);
 
+    // Helper to get school name by ID
+    const getEscolaNome = (id: string | null) => {
+        if (!id) return '-';
+        return escolas.find(e => e.id === id)?.nome || 'Unidade não identificada';
+    };
+
     // IDs das escolas vinculadas ao usuário logado
     const escolaIds = React.useMemo(() => escolas.map(e => e.id), [escolas]);
 
@@ -228,7 +234,10 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
     const handleSaveMeta = async () => {
         if (!metaForm.descricao) return;
         try {
-            let metaToSave = { ...metaForm };
+            let metaToSave = {
+                ...metaForm,
+                escola_id: escolas.length > 0 ? escolas[0].id : null
+            };
             if (!metaToSave.id) delete (metaToSave as any).id;
 
             // Format dates simply
@@ -290,7 +299,8 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
                 data_formacao: formacaoForm.data,
                 publico_alvo: formacaoForm.publicoAlvo,
                 responsavel: formacaoForm.responsavel,
-                custo: formacaoForm.custo
+                custo: formacaoForm.custo,
+                escola_id: escolas.length > 0 ? escolas[0].id : null
             };
             if (!saveForm.id) delete (saveForm as any).id;
 
@@ -440,7 +450,8 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
                 usuario: currentUser || 'Usuário logado',
                 coordenador_regional: 'Ana Silva',
                 status: 'Aguardando Análise',
-                tamanho_kb: sizeFormatted
+                tamanho_kb: sizeFormatted,
+                escola_id: escolas.length > 0 ? escolas[0].id : null
             };
 
             const result = await igPppService.save(newPpp);
@@ -730,6 +741,9 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
                                         <h4 className="text-lg font-bold text-slate-900 leading-tight">{reuniao.pauta}</h4>
                                         <div className="flex items-center gap-4 mt-2">
                                             <p className="text-xs font-medium text-blue-600 tracking-wide">Responsável: {reuniao.responsavel}</p>
+                                            <p className="text-xs font-medium text-slate-400 tracking-wide flex items-center gap-1 border-l border-slate-200 pl-4">
+                                                <FileStack size={12} /> {getEscolaNome(reuniao.escola_id)}
+                                            </p>
                                             {reuniao.participantes && reuniao.participantes.length > 0 && (
                                                 <p className="text-xs font-medium text-slate-500 tracking-wide flex items-center gap-1">
                                                     <Users size={12} /> {reuniao.participantes.length} Participante{reuniao.participantes.length > 1 ? 's' : ''}
@@ -866,9 +880,12 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
                                         </div>
                                         <h4 className="text-lg font-bold text-slate-900 leading-tight mb-1">{formacao.especificacao}</h4>
                                         <p className="text-sm text-slate-500 mb-3">{formacao.objetivo}</p>
-                                        <div className="flex items-center gap-4">
-                                            <p className="text-xs font-medium text-purple-600 tracking-wide">Resp: {formacao.responsavel}</p>
-                                            <p className="text-xs font-medium text-slate-500 tracking-wide flex items-center gap-1">
+                                        <div className="flex items-center gap-4 mt-2">
+                                            <p className="text-xs font-medium text-blue-600 tracking-wide">Responsável: {formacao.responsavel}</p>
+                                            <p className="text-xs font-medium text-slate-400 tracking-wide flex items-center gap-1 border-l border-slate-200 pl-4">
+                                                <FileStack size={12} /> {getEscolaNome(formacao.escola_id)}
+                                            </p>
+                                            <p className="text-xs font-medium text-slate-500 tracking-wide flex items-center gap-1 border-l border-slate-200 pl-4">
                                                 <Users size={12} /> Público: {formacao.publicoAlvo}
                                             </p>
                                         </div>
@@ -903,7 +920,7 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
                             {!isEditingMeta && (
                                 <button
                                     onClick={() => {
-                                        setMetaForm({ id: '', descricao: '', prazo: '', status: 'Não Iniciado', responsavel: '' });
+                                        setMetaForm({ id: '', descricao: '', prazo: '', status: 'Não Iniciado', responsavel: currentUser || '' });
                                         setIsEditingMeta(true);
                                     }}
                                     className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2"
@@ -977,21 +994,24 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
                                         meta.status === 'Atrasado' ? 'bg-rose-500' :
                                             meta.status === 'Em Andamento' ? 'bg-blue-500' : 'bg-slate-300'
                                         }`} />
-                                    <div className="flex-1 pl-4">
-                                        <h4 className="text-lg font-bold text-slate-900 leading-tight mb-2">{meta.descricao}</h4>
-                                        <div className="flex flex-wrap items-center gap-4">
+                                    <div className="flex-1 pl-4 text-left">
+                                        <div className="flex items-center gap-3 mb-2">
                                             <span className={`px-2.5 py-1 text-xs font-bold uppercase rounded-md ${meta.status === 'Concluído' ? 'bg-emerald-100 text-emerald-700' :
                                                 meta.status === 'Atrasado' ? 'bg-rose-100 text-rose-700' :
                                                     meta.status === 'Em Andamento' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
                                                 }`}>
                                                 {meta.status}
                                             </span>
-                                            <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
-                                                <Calendar size={14} /> Prazo: {meta.prazo}
+                                            <span className="text-xs font-medium text-slate-400 flex items-center gap-1">
+                                                <Calendar size={12} /> Prazo: {meta.prazo}
                                             </span>
-                                            <span className="text-xs font-medium text-slate-500 flex items-center gap-1 border-l border-slate-200 pl-4">
-                                                <Users size={14} /> Resp: {meta.responsavel}
-                                            </span>
+                                        </div>
+                                        <h4 className="text-lg font-bold text-slate-900 leading-tight mb-2">{meta.descricao}</h4>
+                                        <div className="flex items-center gap-4 mt-2">
+                                            <p className="text-xs font-medium text-blue-600 tracking-wide">Responsável: {meta.responsavel}</p>
+                                            <p className="text-xs font-medium text-slate-400 tracking-wide flex items-center gap-1 border-l border-slate-200 pl-4">
+                                                <FileStack size={12} /> {getEscolaNome(meta.escola_id)}
+                                            </p>
                                         </div>
                                     </div>
                                     <div className="flex gap-2">
