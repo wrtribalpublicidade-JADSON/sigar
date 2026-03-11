@@ -124,7 +124,7 @@ export interface RecursoHumano {
   telefone: string;
   email: string;
   dataNomeacao: string;
-  tipoVinculo: 'Efetivo' | 'Contratado';
+  tipoVinculo: 'Efetivo' | 'Contratado' | 'Permutado';
   // Campos condicionais para Professores
   etapaAtuacao?: 'Educação Infantil' | 'Anos Iniciais' | 'Anos Finais' | 'EJA' | 'Sala de Recurso' | 'Outros';
   componenteCurricular?: 'Língua Portuguesa' | 'Matemática' | 'Geografia' | 'História' | 'Ciências' | 'Educação Física' | 'Língua Inglesa' | 'Arte' | 'Ensino Religioso' | '';

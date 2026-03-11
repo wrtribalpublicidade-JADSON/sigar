@@ -530,6 +530,16 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                         <div className="w-2.5 h-2.5 bg-orange-500 rounded-full" />
                         <span className="text-sm font-bold text-orange-700">{contratados} Contratado{contratados !== 1 ? 's' : ''}</span>
                       </div>
+                      {(() => {
+                        const permutados = escola.recursosHumanos?.filter(r => r.tipoVinculo === 'Permutado').length || 0;
+                        if (permutados === 0) return null;
+                        return (
+                          <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5">
+                            <div className="w-2.5 h-2.5 bg-blue-500 rounded-full" />
+                            <span className="text-sm font-bold text-blue-700">{permutados} Permutado{permutados !== 1 ? 's' : ''}</span>
+                          </div>
+                        );
+                      })()}
                       <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5">
                         <Users size={14} className="text-slate-500" />
                         <span className="text-sm font-bold text-slate-600">{escola.recursosHumanos?.length || 0} Total</span>
@@ -563,6 +573,9 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                           <option value="Porteiro">Porteiro</option>
                           <option value="Auxiliar de Creche">Auxiliar de Creche</option>
                           <option value="Monitor(a) de Atividade Complementar">Monitor(a) de Atividade Complementar</option>
+                          <option value="Profissional de Apoio">Profissional de Apoio</option>
+                          <option value="Monitor de Transporte Escolar">Monitor de Transporte Escolar</option>
+                          <option value="Professor do AEE">Professor do AEE</option>
                           <option value="Outros">Outros</option>
                         </select>
                       </div>
@@ -571,6 +584,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                         <select value={rhForm.tipoVinculo} onChange={e => setRhForm({ ...rhForm, tipoVinculo: e.target.value as any })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all">
                           <option value="Efetivo">Efetivo</option>
                           <option value="Contratado">Contratado</option>
+                          <option value="Permutado">Permutado</option>
                         </select>
                       </div>
                       <div className="space-y-2">
@@ -644,8 +658,8 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                               {rh.email && <div className="text-xs text-orange-500 mt-0.5">{rh.email}</div>}
                             </td>
                             <td className="px-4 py-4 text-center">
-                              <span className={`inline-block px-3 py-1 rounded-lg text-xs font-bold ${rh.tipoVinculo === 'Efetivo' ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'}`}>
-                                {rh.tipoVinculo === 'Efetivo' ? 'Efetivo' : 'Contrato'}
+                              <span className={`inline-block px-3 py-1 rounded-lg text-xs font-bold ${rh.tipoVinculo === 'Efetivo' ? 'bg-emerald-100 text-emerald-700' : rh.tipoVinculo === 'Permutado' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
+                                {rh.tipoVinculo}
                               </span>
                             </td>
                             <td className="px-4 py-4 text-center text-sm text-slate-600">

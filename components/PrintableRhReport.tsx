@@ -72,6 +72,10 @@ export const PrintableRhReport: React.FC<PrintableRhReportProps> = ({ escola, co
                     <p style={{ fontSize: '7pt', fontWeight: 800, color: '#c2410c', textTransform: 'uppercase', marginBottom: '2pt' }}>Contratados</p>
                     <p style={{ fontSize: '14pt', fontWeight: 900, color: '#9a3412' }}>{servidores.filter(s => s.tipoVinculo === 'Contratado').length}</p>
                 </div>
+                <div style={{ flex: 1, padding: '8pt', border: '0.5pt solid #e2e8f0', background: '#eff6ff' }}>
+                    <p style={{ fontSize: '7pt', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', marginBottom: '2pt' }}>Permutados</p>
+                    <p style={{ fontSize: '14pt', fontWeight: 900, color: '#1e40af' }}>{servidores.filter(s => s.tipoVinculo === 'Permutado').length}</p>
+                </div>
             </div>
 
             {/* ====== LIST OF SERVERS ====== */}
