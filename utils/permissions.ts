@@ -23,6 +23,7 @@ const VIEW_TO_MODULE: Record<string, string> = {
     'NOVA_VISITA': 'registrar_visita',
     'GESTAO_USUARIOS': 'equipe',
     'PERMISSOES': 'auditoria',
+    'ATIVIDADES_COMPLEMENTARES': 'atividades_comp',
 };
 
 // Sidebar label → moduleId mapping
@@ -42,6 +43,7 @@ const SIDEBAR_LABEL_TO_MODULE: Record<string, string> = {
     'Auditoria': 'auditoria',
     'Registrar Visita': 'registrar_visita',
     'Permissões': 'auditoria',
+    'Atividades Complementares': 'atividades_comp',
 };
 
 export const ALL_MODULES = [
@@ -59,6 +61,7 @@ export const ALL_MODULES = [
     { id: 'notificacoes', name: 'Notificações', group: 'Sistema' },
     { id: 'auditoria', name: 'Auditoria', group: 'Sistema' },
     { id: 'registrar_visita', name: 'Registrar Visita', group: 'Sistema' },
+    { id: 'atividades_comp', name: 'Atividades Complementares', group: 'Gestão' },
 ];
 
 export const ALL_ROLES = [
@@ -75,7 +78,7 @@ export const DEFAULT_PERMISSIONS: Record<string, Record<string, AccessLevel>> = 
     'Administrador': Object.fromEntries(ALL_MODULES.map(m => [m.id, 'full'])),
     'Coordenador Regional': Object.fromEntries(ALL_MODULES.map(m => [m.id, m.id === 'auditoria' ? 'none' : 'full'])),
     'Técnico Pedagógico': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['equipe', 'auditoria'].includes(m.id) ? 'none' : 'full'])),
-    'Professor': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['dashboard', 'conselho', 'notificacoes'].includes(m.id) ? 'readonly' : 'none'])),
+    'Professor': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['dashboard', 'conselho', 'notificacoes', 'atividades_comp'].includes(m.id) ? 'readonly' : 'none'])),
     'Coordenador Pedagógico': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['auditoria', 'equipe'].includes(m.id) ? 'none' : 'full'])),
     'Gestor Geral': Object.fromEntries(ALL_MODULES.map(m => [m.id, m.id === 'auditoria' ? 'readonly' : 'full'])),
     'Gestor Pedagógico': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['auditoria', 'equipe'].includes(m.id) ? 'readonly' : 'full'])),

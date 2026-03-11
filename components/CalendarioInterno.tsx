@@ -120,14 +120,22 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
     const [showModal, setShowModal] = useState(false);
     const [selectedDate, setSelectedDate] = useState('');
     const [editingEvento, setEditingEvento] = useState<EventoInterno | null>(null);
-    const [form, setForm] = useState({
+    const [form, setForm] = useState<any>({
         titulo: '', tipo: 'reuniao_pedagogica', classificacao: 'letivo',
-        descricao: '', responsavel: currentUser || '', data_fim: ''
+        descricao: '', responsavel: currentUser || '', data_fim: '',
+        escola_id: ''
     });
 
     // Escola filter
     const escolaIds = React.useMemo(() => escolas.map(e => e.id), [escolas]);
     const [filtroEscola, setFiltroEscola] = useState<string>(isAdmin ? 'todas' : (escolas.length === 1 ? escolas[0].id : 'todas'));
+
+    // Update filter when schools change (crucial for initial load)
+    useEffect(() => {
+        if (!isAdmin && escolas.length === 1 && filtroEscola === 'todas') {
+            setFiltroEscola(escolas[0].id);
+        }
+    }, [escolas, isAdmin]);
 
     // Filters
     const [filtroTipo, setFiltroTipo] = useState<string>('todos');
@@ -172,7 +180,10 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
         eventosOficiais.filter(e => isDateInRange(dateKey, e.data, e.data_fim));
     const getInternosForDate = (dateKey: string) => {
         let filtered = eventosInternos;
-        if (filtroEscola !== 'todas') filtered = filtered.filter(e => e.escola_id === filtroEscola);
+        if (filtroEscola !== 'todas') {
+            // Se filtrado por uma escola, mostramos os eventos daquela escola + globais (escola_id null)
+            filtered = filtered.filter(e => e.escola_id === filtroEscola || !e.escola_id);
+        }
         return filtered.filter(e => isDateInRange(dateKey, e.data, e.data_fim));
     };
 
@@ -212,7 +223,11 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
     const openNewEvent = (dateKey: string) => {
         setSelectedDate(dateKey);
         setEditingEvento(null);
-        setForm({ titulo: '', tipo: 'reuniao_pedagogica', classificacao: 'letivo', descricao: '', responsavel: currentUser || '', data_fim: '' });
+        setForm({
+            titulo: '', tipo: 'reuniao_pedagogica', classificacao: 'letivo',
+            descricao: '', responsavel: currentUser || '', data_fim: '',
+            escola_id: filtroEscola !== 'todas' ? filtroEscola : (escolas.length > 0 ? escolas[0].id : '')
+        });
         setShowModal(true);
     };
     const openEditEvent = (ev: EventoInterno) => {
@@ -220,7 +235,8 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
         setEditingEvento(ev);
         setForm({
             titulo: ev.titulo, tipo: ev.tipo, classificacao: ev.classificacao,
-            descricao: ev.descricao || '', responsavel: ev.responsavel || '', data_fim: ev.data_fim || ''
+            descricao: ev.descricao || '', responsavel: ev.responsavel || '',
+            data_fim: ev.data_fim || '', escola_id: ev.escola_id || ''
         });
         setShowModal(true);
         setDetailDate(null);
@@ -232,7 +248,7 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
                 titulo: form.titulo, tipo: form.tipo, classificacao: form.classificacao,
                 descricao: form.descricao, responsavel: form.responsavel,
                 data: selectedDate, data_fim: form.data_fim || null,
-                escola_id: filtroEscola !== 'todas' ? filtroEscola : (escolas.length > 0 ? escolas[0].id : null)
+                escola_id: form.escola_id || (filtroEscola !== 'todas' ? filtroEscola : (escolas.length > 0 ? escolas[0].id : null))
             };
             if (editingEvento) payload.id = editingEvento.id;
             const result = await igCalendarioInternoService.save(payload);
@@ -294,7 +310,9 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
     const handlePrint = () => window.print();
 
     // ---- Filtered events for sidebar list ----
-    const baseInternos = filtroEscola === 'todas' ? eventosInternos : eventosInternos.filter(e => e.escola_id === filtroEscola);
+    const baseInternos = filtroEscola === 'todas'
+        ? eventosInternos
+        : eventosInternos.filter(e => e.escola_id === filtroEscola || !e.escola_id);
     const filteredInternos = filtroTipo === 'todos'
         ? baseInternos
         : baseInternos.filter(e => e.tipo === filtroTipo);
@@ -541,6 +559,7 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
                                         <span className={`w-2.5 h-2.5 rounded-full ${info?.dotColor || 'bg-slate-400'}`} />
                                         <p className="text-sm font-bold text-slate-800">{ev.titulo}</p>
                                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${classInfo?.badge || ''}`}>{classInfo?.label}</span>
+                                        {!ev.escola_id && <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold">Comum</span>}
                                     </div>
                                     <div className="flex gap-1">
                                         <button onClick={() => openEditEvent(ev)} className="p-1 text-slate-400 hover:text-blue-500 transition-colors"><Edit size={14} /></button>
@@ -632,6 +651,23 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
                             <div className="bg-blue-50 rounded-xl px-4 py-2 text-sm text-blue-700 font-semibold flex items-center gap-2">
                                 <Calendar size={16} /> Data: {parseDateStr(selectedDate).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
                             </div>
+
+                            {/* School Selector in Modal */}
+                            {isAdmin && (
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Unidade Escolar *</label>
+                                    <select
+                                        value={form.escola_id}
+                                        onChange={e => setForm({ ...form, escola_id: e.target.value })}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                    >
+                                        <option value="">Selecione uma escola</option>
+                                        {escolas.map(esc => (
+                                            <option key={esc.id} value={esc.id}>{esc.nome}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Título do Evento *</label>
                                 <input type="text" value={form.titulo} onChange={e => setForm({ ...form, titulo: e.target.value })}

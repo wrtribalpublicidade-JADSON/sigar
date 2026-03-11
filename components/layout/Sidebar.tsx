@@ -101,6 +101,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
         { icon: FileStack, label: 'Instrumentais de Gestão', view: 'INSTRUMENTAIS_GESTAO' as ViewState },
         { icon: Library, label: 'Conselho de Classe', view: 'CONSELHO_CLASSE' as ViewState },
         { icon: Bell, label: 'Notificações', view: 'NOTIFICACOES' as ViewState, isHighlighted: true, hasNotification: notificationCount > 0 },
+        { icon: Library, label: 'Atividades Complementares', view: 'ATIVIDADES_COMPLEMENTARES' as ViewState },
         { icon: Shield, label: 'Auditoria', view: 'AUDIT_LOGS' as ViewState },
         { icon: KeyRound, label: 'Permissões', view: 'PERMISSOES' as ViewState },
     ];

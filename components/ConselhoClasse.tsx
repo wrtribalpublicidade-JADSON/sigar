@@ -1,11 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { PageHeader } from './ui/PageHeader';
 import { Users, BookOpen, UserCheck, AlertTriangle, GraduationCap, Edit, Trash2, Calendar, Hand, Book, CheckSquare, MessageCircle, Search, Printer, Lock, Send, CheckCircle2, FileText, LayoutDashboard, TrendingUp, TrendingDown, Minus, ArrowUpRight, ArrowDownRight, AlertCircle, FileDown, Download, Baby, School, ArrowRight } from 'lucide-react';
 import { CadastroTurmaModal, TurmaData } from './modals/CadastroTurmaModal';
 import { StudentReportModal } from './modals/StudentReportModal';
 import { ReuniaoEstudantilForm } from './ReuniaoEstudantilForm';
-import { ccAcompanhamentoDocenteService, ccEncaminhamentosService } from '../services/gestaoConselhoService';
-import { Escola, Segmento } from '../types';
+import { ccAvaliacaoDocenteService, ccAcompanhamentoDocenteService, ccEncaminhamentosService, ccAvaliacaoEtapaService, ccSolicitacaoDesbloqueioService, ccAvaliacaoInfantilService, ccEstudanteService } from '../services/gestaoConselhoService';
+import { Escola, Segmento, Coordenador } from '../types';
 
 const BNCC_INFANTIL = {
     'O EU, O OUTRO E O NÓS': {
@@ -108,9 +108,17 @@ type Tab = 'estudantil' | 'avaliacao' | 'acompanhamento' | 'encaminhamentos';
 
 interface ConselhoClasseProps {
     escolas?: Escola[];
+    isAdmin?: boolean;
+    userEmail?: string | null;
+    currentUser?: Coordenador | null;
 }
 
-export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) => {
+export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
+    escolas = [],
+    isAdmin = false,
+    userEmail = null,
+    currentUser = null
+}) => {
     const [activeTab, setActiveTab] = useState<Tab>('estudantil');
     const [isLoading, setIsLoading] = useState(true);
 
@@ -141,9 +149,10 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
     ]);
     const [activeTurma, setActiveTurma] = useState<TurmaData>(turmasCadastradas[0]);
     const [showSuccessToast, setShowSuccessToast] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
 
     // Sync active tabs based on selected class stage
-    React.useEffect(() => {
+    useEffect(() => {
         if (activeTurma?.etapa === 'Educação Infantil') {
             setAvaliacaoEtapa('infantil');
             setAcompEtapa('infantil');
@@ -154,6 +163,211 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
             setEncEtapa('fundamental');
         }
     }, [activeTurma]);
+
+    const loadStudents = async () => {
+        if (!activeTurma) return [];
+        try {
+            const data = await ccEstudanteService.getByTurma(activeTurma.identificacao);
+            return data || [];
+        } catch (error) {
+            console.error('Erro ao carregar estudantes:', error);
+            return [];
+        }
+    };
+
+    const loadAvaliacoesDocente = async () => {
+        if (!activeTurma || avaliacaoBimestre === 'Resultado Consolidado' || avaliacaoEtapa !== 'fundamental') return;
+
+        setIsLoading(true);
+        try {
+            const students = await loadStudents();
+            const evalData = await ccAvaliacaoDocenteService.getAll(
+                escolas[0]?.id || '',
+                activeTurma.identificacao,
+                avaliacaoBimestre
+            );
+
+            // Mapper students to local state format
+            const formatted = students.map((stu: any) => {
+                const saved = evalData?.find((d: any) => d.estudante_id === stu.id.toString());
+                return {
+                    id: stu.id,
+                    dbId: saved?.id,
+                    name: stu.name,
+                    fre: saved?.frequencia_conceito || 'B',
+                    par: saved?.participacao_conceito || 'B',
+                    mat: saved?.material_conceito || 'B',
+                    atv: saved?.atividades_conceito || 'B',
+                    com: saved?.comunicacao_conceito || 'B',
+                    pes: saved?.pesquisa_conceito || 'B',
+                    con: saved?.conduta_conceito || 'B',
+                    notas: saved?.notas_json || { av1: 0, av2: 0, av3: 0, rec: null },
+                    media: saved?.media_final ? Number(saved.media_final) : 0,
+                    parecer: saved?.parecer_etapa || 'BOM'
+                };
+            });
+
+            setStudentsAvaliacao(formatted);
+        } catch (error) {
+            console.error('Erro ao carregar avaliações docente:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const loadAvaliacoesInfantil = async () => {
+        if (!activeTurma || avaliacaoEtapa !== 'infantil') return;
+
+        setIsLoading(true);
+        try {
+            const studentsList = await loadStudents();
+            const studentIds = studentsList.map((s: any) => s.id);
+
+            // Fetch ALL evaluations for these students to support "Resultado Consolidado"
+            const evalData = await ccAvaliacaoInfantilService.getByStudents(studentIds);
+
+            const formatted = studentsList.map((stu: any) => {
+                const stuEvals = evalData?.filter((d: any) => d.student_id === stu.id) || [];
+
+                // Group by period
+                const groupByPeriod = (period: number) => {
+                    const periodEvals = stuEvals.filter((e: any) => e.period === period);
+                    // Map to objectives of the current field
+                    const objectives = BNCC_INFANTIL[avaliacaoInfantilCampo as keyof typeof BNCC_INFANTIL] || [];
+                    return objectives.map(obj => {
+                        const saved = periodEvals.find((e: any) => e.skill_code === obj.code);
+                        return saved?.status || 'ND';
+                    });
+                };
+
+                return {
+                    id: stu.id,
+                    name: stu.name,
+                    evaluations: stuEvals, // Keep raw list for other uses
+                    concepts_b1: groupByPeriod(1),
+                    concepts_b2: groupByPeriod(2),
+                    concepts_b3: groupByPeriod(3),
+                    concepts_b4: groupByPeriod(4)
+                };
+            });
+
+            setStudentsAvaliacaoInfantil(formatted);
+        } catch (error) {
+            console.error('Erro ao carregar avaliações infantil:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const loadVisaoGeralFundamental = async () => {
+        if (!activeTurma || avaliacaoEtapa !== 'fundamental') return;
+
+        setIsLoading(true);
+        try {
+            const students = await loadStudents();
+            const evalData = await ccAvaliacaoDocenteService.getAll(
+                escolas[0]?.id || '',
+                activeTurma.identificacao,
+                null // Fetch all bimestres
+            );
+
+            const formatted = students.map((stu: any) => {
+                const stuEvals = evalData?.filter((d: any) => d.estudante_id === stu.id.toString()) || [];
+
+                const getMedia = (bimestre: string) => {
+                    const ev = stuEvals.find((e: any) => e.periodo_letivo === bimestre);
+                    return ev?.media_final ? Number(ev.media_final) : 0;
+                };
+
+                const b1 = getMedia('1º Bimestre');
+                const b2 = getMedia('2º Bimestre');
+                const b3 = getMedia('3º Bimestre');
+                const b4 = getMedia('4º Bimestre');
+
+                // Calculate media final based on available bimestres
+                const filled = [b1, b2, b3, b4].filter(v => v > 0);
+                const mediaFinal = filled.length > 0 ? filled.reduce((a, b) => a + b, 0) / filled.length : 0;
+
+                return {
+                    id: stu.id,
+                    name: stu.name,
+                    b1, b2, b3, b4,
+                    mediaFinal: parseFloat(mediaFinal.toFixed(1)),
+                    alert: mediaFinal < 5 // Example threshold
+                };
+            });
+
+            setVisaoGeralData(formatted);
+        } catch (error) {
+            console.error('Erro ao carregar visão geral fundamental:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (avaliacaoBimestre === 'Resultado Consolidado') {
+            if (avaliacaoEtapa === 'fundamental') loadVisaoGeralFundamental();
+            else loadAvaliacoesInfantil();
+        } else {
+            if (avaliacaoEtapa === 'fundamental') loadAvaliacoesDocente();
+            else loadAvaliacoesInfantil();
+        }
+    }, [activeTurma, avaliacaoBimestre, avaliacaoEtapa, avaliacaoInfantilCampo]);
+
+    const persistAvaliacaoDocente = async (student: any) => {
+        if (isEtapaReadOnly) return;
+
+        setIsSaving(true);
+        try {
+            const payload = {
+                id: student.dbId,
+                escola_id: escolas[0]?.id || '',
+                turma_id: activeTurma?.identificacao || '',
+                estudante_id: student.id.toString(),
+                nome_estudante: student.name,
+                periodo_letivo: avaliacaoBimestre,
+                frequencia_conceito: student.fre,
+                participacao_conceito: student.par,
+                material_conceito: student.mat,
+                atividades_conceito: student.atv,
+                comunicacao_conceito: student.com,
+                pesquisa_conceito: student.pes,
+                conduta_conceito: student.con,
+                notas_json: student.notas,
+                media_final: student.media,
+                parecer_etapa: calculateParecerEtapaRaw(student)
+            };
+
+            const saved = await ccAvaliacaoDocenteService.save(payload);
+            if (saved) {
+                setStudentsAvaliacao(prev => prev.map(s =>
+                    s.id === student.id ? { ...s, dbId: saved.id } : s
+                ));
+            }
+        } catch (error) {
+            console.error('Erro ao persistir avaliação:', error);
+        } finally {
+            setTimeout(() => setIsSaving(false), 800);
+        }
+    };
+
+    const calculateParecerEtapaRaw = (student: any) => {
+        const getConceptValue = (c: string) => {
+            if (c === 'E') return 3;
+            if (c === 'B') return 2;
+            if (c === 'R') return 1;
+            return 0; // 'I'
+        };
+        const total = getConceptValue(student.fre) + getConceptValue(student.par) + getConceptValue(student.mat) +
+            getConceptValue(student.atv) + getConceptValue(student.com) + getConceptValue(student.pes) + getConceptValue(student.con);
+
+        const avg = Math.round(total / 7);
+        if (avg === 1) return 'REGULAR';
+        if (avg === 2) return 'BOM';
+        if (avg === 3) return 'EXCELENTE';
+        return 'INSUFICIENTE';
+    };
 
     const isInfantilAllowed = !activeTurma || activeTurma.etapa === 'Educação Infantil';
     const isFundamentalAllowed = !activeTurma || activeTurma.etapa !== 'Educação Infantil';
@@ -166,46 +380,57 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
         setTimeout(() => setShowSuccessToast(false), 3000);
     };
 
-    const [studentsAvaliacao, setStudentsAvaliacao] = useState<any[]>([
-        { id: 1, name: 'ANA BEATRIZ SILVA SANTOS', fre: 'E', par: 'B', mat: 'R', atv: 'I', com: 'E', pes: 'B', con: 'R', notas: { av1: 7, av2: 8, av3: 7.5, rec: null }, media: 7.5, parecer: 'PLENO' },
-        { id: 2, name: 'BRUNO FERREIRA LIMA', fre: 'B', par: 'R', mat: 'I', atv: 'E', com: 'B', pes: 'R', con: 'I', notas: { av1: 7, av2: 8, av3: 7.5, rec: null }, media: 7.5, parecer: 'PLENO' },
-        { id: 3, name: 'CARLA OLIVEIRA COSTA', fre: 'R', par: 'I', mat: 'E', atv: 'B', com: 'R', pes: 'I', con: 'E', notas: { av1: 7, av2: 8, av3: 7.5, rec: null }, media: 7.5, parecer: 'PLENO' },
-        { id: 4, name: 'DANIEL SOUZA REIS', fre: 'I', par: 'E', mat: 'B', atv: 'R', com: 'I', pes: 'E', con: 'B', notas: { av1: 7, av2: 8, av3: 7.5, rec: null }, media: 7.5, parecer: 'PLENO' },
-        { id: 5, name: 'ELIANA COSTA MENDES', fre: 'E', par: 'B', mat: 'R', atv: 'I', com: 'E', pes: 'B', con: 'R', notas: { av1: 7, av2: 8, av3: 7.5, rec: null }, media: 7.5, parecer: 'PLENO' },
-        { id: 6, name: 'FABIO SANTOS JUNIOR', fre: 'B', par: 'R', mat: 'I', atv: 'E', com: 'B', pes: 'R', con: 'I', notas: { av1: 7, av2: 8, av3: 7.5, rec: null }, media: 7.5, parecer: 'PLENO' },
-        { id: 7, name: 'GABRIELA LIMA VIANA', fre: 'R', par: 'I', mat: 'E', atv: 'B', com: 'R', pes: 'I', con: 'E', notas: { av1: 7, av2: 8, av3: 7.5, rec: null }, media: 7.5, parecer: 'PLENO' },
-        { id: 8, name: 'HUGO ALMEIDA PRADO', fre: 'I', par: 'E', mat: 'B', atv: 'R', com: 'I', pes: 'E', con: 'B', notas: { av1: 7, av2: 8, av3: 7.5, rec: null }, media: 7.5, parecer: 'PLENO' },
-        { id: 9, name: 'IARA GOMES MOTA', fre: 'E', par: 'B', mat: 'R', atv: 'I', com: 'E', pes: 'B', con: 'R', notas: { av1: 7, av2: 8, av3: 7.5, rec: null }, media: 7.5, parecer: 'PLENO' },
-        { id: 10, name: 'JOÃO PEREIRA NETO', fre: 'B', par: 'R', mat: 'I', atv: 'E', com: 'B', pes: 'R', con: 'I', notas: { av1: 7, av2: 8, av3: 7.5, rec: null }, media: 7.5, parecer: 'PLENO' },
-        { id: 11, name: 'KEILA ROCHA SILVA', fre: 'R', par: 'I', mat: 'E', atv: 'B', com: 'R', pes: 'I', con: 'E', notas: { av1: 7, av2: 8, av3: 7.5, rec: null }, media: 7.5, parecer: 'PLENO' },
-        { id: 12, name: 'LUCAS MARTINS DIAS', fre: 'I', par: 'E', mat: 'B', atv: 'R', com: 'I', pes: 'E', con: 'B', notas: { av1: 7, av2: 8, av3: 7.5, rec: null }, media: 7.5, parecer: 'PLENO' },
-        { id: 13, name: 'MARIA EDUARDA GOMES', fre: 'E', par: 'B', mat: 'R', atv: 'I', com: 'E', pes: 'B', con: 'R', notas: { av1: 7, av2: 8, av3: 7.5, rec: null }, media: 7.5, parecer: 'PLENO' },
-    ]);
+    const [studentsAvaliacao, setStudentsAvaliacao] = useState<any[]>([]);
+    const [studentsAvaliacaoInfantil, setStudentsAvaliacaoInfantil] = useState<any[]>([]);
+    const [visaoGeralData, setVisaoGeralData] = useState<any[]>([]);
 
     const [editingGradesStudentId, setEditingGradesStudentId] = useState<number | null>(null);
     const [gradeForm, setGradeForm] = useState({ av1: '', av2: '', av3: '', rec: '' });
     const [isAddingStudent, setIsAddingStudent] = useState(false);
     const [newStudentName, setNewStudentName] = useState('');
 
-    const handleAddStudent = () => {
-        if (!newStudentName.trim()) return;
-        const newId = studentsAvaliacao.length > 0 ? Math.max(...studentsAvaliacao.map(s => s.id)) + 1 : 1;
-        const newStudent = {
-            id: newId,
-            name: newStudentName.trim().toUpperCase(),
-            fre: 'B', par: 'B', mat: 'B', atv: 'B', com: 'B', pes: 'B', con: 'B',
-            notas: { av1: 0, av2: 0, av3: 0, rec: null },
-            media: 0,
-            parecer: 'BOM'
-        };
-        setStudentsAvaliacao(prev => [...prev, newStudent]);
-        setNewStudentName('');
-        setIsAddingStudent(false);
+    const handleAddStudent = async () => {
+        if (!newStudentName.trim() || !activeTurma) return;
+
+        setIsSaving(true);
+        try {
+            const newStudent = {
+                name: newStudentName.trim().toUpperCase(),
+                class_id: activeTurma.identificacao,
+                status: 'active'
+            };
+
+            await ccEstudanteService.add(newStudent);
+            setNewStudentName('');
+            setIsAddingStudent(false);
+
+            // Reload based on active stage
+            if (avaliacaoEtapa === 'fundamental') loadAvaliacoesDocente();
+            else loadAvaliacoesInfantil();
+        } catch (error) {
+            console.error('Erro ao adicionar estudante:', error);
+        } finally {
+            setIsSaving(false);
+        }
     };
 
-    const handleDeleteStudent = (id: number) => {
-        if (confirm('Tem certeza que deseja remover este estudante?')) {
-            setStudentsAvaliacao(prev => prev.filter(s => s.id !== id));
+    const handleDeleteStudent = async (id: string | number) => {
+        if (confirm('Tem certeza que deseja remover este estudante do conselho de classe?')) {
+            setIsSaving(true);
+            try {
+                // We mark as inactive in alunos table
+                await ccEstudanteService.remove(id.toString());
+
+                // Optionally delete evaluations for this bimestre/turma to be absolutely sure
+                // but usually status='inactive' is enough if we filter it in getAllByTurma
+
+                if (avaliacaoEtapa === 'fundamental') loadAvaliacoesDocente();
+                else loadAvaliacoesInfantil();
+            } catch (error) {
+                console.error('Erro ao excluir estudante:', error);
+            } finally {
+                setIsSaving(false);
+            }
         }
     };
 
@@ -220,43 +445,98 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
     };
 
     const handleSaveGrades = () => {
-        setStudentsAvaliacao(prev => prev.map(student => {
-            if (student.id === editingGradesStudentId) {
-                const av1 = parseFloat(gradeForm.av1) || 0;
-                const av2 = parseFloat(gradeForm.av2) || 0;
-                const av3 = parseFloat(gradeForm.av3) || 0;
-                const rec = gradeForm.rec ? parseFloat(gradeForm.rec) : null;
+        let updatedStudent: any = null;
+        setStudentsAvaliacao(prev => {
+            const next = prev.map(student => {
+                if (student.id === editingGradesStudentId) {
+                    const av1 = parseFloat(gradeForm.av1) || 0;
+                    const av2 = parseFloat(gradeForm.av2) || 0;
+                    const av3 = parseFloat(gradeForm.av3) || 0;
+                    const rec = gradeForm.rec ? parseFloat(gradeForm.rec) : null;
 
-                let media = (av1 + av2 + av3) / 3;
-                if (rec !== null && rec > media) {
-                    media = rec;
+                    let media = (av1 + av2 + av3) / 3;
+                    if (rec !== null && rec > media) {
+                        media = rec;
+                    }
+
+                    updatedStudent = {
+                        ...student,
+                        notas: { av1, av2, av3, rec },
+                        media: parseFloat(media.toFixed(1))
+                    };
+                    return updatedStudent;
                 }
+                return student;
+            });
+            return next;
+        });
 
-                return {
-                    ...student,
-                    notas: { av1, av2, av3, rec },
-                    media: parseFloat(media.toFixed(1))
-                };
-            }
-            return student;
-        }));
+        if (updatedStudent) {
+            persistAvaliacaoDocente(updatedStudent);
+        }
         setEditingGradesStudentId(null);
     };
 
     const avaliacaoTabsList = ['Resultado Consolidado', '1º Bimestre', '2º Bimestre', '3º Bimestre', '4º Bimestre'];
 
-    const [visaoGeralData, setVisaoGeralData] = useState([
-        { id: 1, name: 'ANA BEATRIZ SILVA SANTOS', b1: 6.5, b2: 7.2, b3: 8.0, b4: 8.5, mediaFinal: 7.5 },
-        { id: 2, name: 'BRUNO FERREIRA LIMA', b1: 5.0, b2: 4.5, b3: 5.5, b4: 6.0, mediaFinal: 5.3, alert: true },
-        { id: 3, name: 'CARLA OLIVEIRA COSTA', b1: 8.5, b2: 8.8, b3: 9.2, b4: 9.5, mediaFinal: 9.0 },
-        { id: 4, name: 'DANIEL SOUZA REIS', b1: 7.0, b2: 7.0, b3: 6.8, b4: 7.5, mediaFinal: 7.1, alert: true },
-        { id: 5, name: 'ELIANA COSTA MENDES', b1: 9.0, b2: 8.5, b3: 8.0, b4: 8.2, mediaFinal: 8.4, alert: true },
-        { id: 6, name: 'FABIO SANTOS JUNIOR', b1: 4.0, b2: 5.5, b3: 6.5, b4: 7.0, mediaFinal: 5.8 },
-        { id: 7, name: 'GABRIELA LIMA VIANA', b1: 7.5, b2: 8.0, b3: 8.5, b4: 9.0, mediaFinal: 8.3 },
-        { id: 8, name: 'HUGO ALMEIDA PRADO', b1: 6.0, b2: 6.5, b3: 6.0, b4: 6.5, mediaFinal: 6.3, alert: true },
-        { id: 9, name: 'IARA GOMES MOTA', b1: 8.2, b2: 8.2, b3: 8.5, b4: 8.8, mediaFinal: 8.4 },
-        { id: 10, name: 'JOÃO PEREIRA NETO', b1: 5.5, b2: 6.0, b3: 6.2, b4: 5.8, mediaFinal: 5.9, alert: true },
-    ]);
+    const toggleInfantilConcept = async (studentId: number, conceptIndex: number) => {
+        if (isEtapaReadOnly) return;
+
+        const periodMap: Record<string, number> = { '1º Bimestre': 1, '2º Bimestre': 2, '3º Bimestre': 3, '4º Bimestre': 4 };
+        const period = periodMap[avaliacaoBimestre];
+        if (!period) return;
+
+        // Get current selected skill from BNCC_INFANTIL
+        const objectives = BNCC_INFANTIL[avaliacaoInfantilCampo as keyof typeof BNCC_INFANTIL] || [];
+        const skill = objectives[conceptIndex];
+        if (!skill) return;
+
+        setStudentsAvaliacaoInfantil(prev => prev.map(student => {
+            if (student.id === studentId) {
+                const currentEval = student.evaluations?.find((e: any) => e.skill_code === skill.code);
+                const currentStatus = currentEval?.status || 'ND';
+
+                let nextStatus = 'D';
+                if (currentStatus === 'D') nextStatus = 'ED';
+                else if (currentStatus === 'ED') nextStatus = 'ND';
+                else if (currentStatus === 'ND') nextStatus = 'D';
+
+                const newEval = {
+                    student_id: studentId,
+                    skill_code: skill.code,
+                    period: period,
+                    status: nextStatus,
+                    field_of_experience: avaliacaoInfantilCampo
+                };
+
+                // Add or update in student.evaluations
+                const updatedEvals = [...(student.evaluations || [])];
+                const existingIdx = updatedEvals.findIndex((e: any) => e.skill_code === skill.code);
+                if (existingIdx >= 0) {
+                    updatedEvals[existingIdx] = { ...updatedEvals[existingIdx], status: nextStatus };
+                } else {
+                    updatedEvals.push(newEval);
+                }
+
+                // Persist
+                persistAvaliacaoInfantil(newEval);
+
+                return { ...student, evaluations: updatedEvals };
+            }
+            return student;
+        }));
+    };
+
+    const persistAvaliacaoInfantil = async (evaluation: any) => {
+        setIsSaving(true);
+        try {
+            await ccAvaliacaoInfantilService.save(evaluation);
+        } catch (error) {
+            console.error('Erro ao salvar avaliação infantil:', error);
+        } finally {
+            setTimeout(() => setIsSaving(false), 800);
+        }
+    };
 
     const renderVisaoGeralTrend = (current: number, previous: number) => {
         if (current > previous) return <span className="text-emerald-500 font-bold flex items-center gap-1 justify-center"><ArrowUpRight className="w-3 h-3" /></span>;
@@ -275,69 +555,31 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
         );
     };
 
-    const [studentsAvaliacaoInfantil, setStudentsAvaliacaoInfantil] = useState<any[]>([
-        {
-            id: 1,
-            name: 'ANA BEATRIZ SILVA SANTOS',
-            concepts_b1: ['D', 'ED', 'ND', 'D', 'ED', 'ND', 'D', 'ED', 'ND', 'D', 'ED', 'ND', 'D', 'ED', 'ND'],
-            concepts_b2: ['ED', 'ED', 'ED', 'ED', 'ED', 'ED', 'ED', 'ED', 'ED', 'ED', 'ED', 'ED', 'ED', 'ED', 'ED'],
-            concepts_b3: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'],
-            concepts_b4: []
-        },
-        {
-            id: 2,
-            name: 'BRUNO FERREIRA LIMA',
-            concepts_b1: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'],
-            concepts_b2: ['ED', 'D', 'D', 'ED', 'D', 'ED', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'],
-            concepts_b3: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'],
-            concepts_b4: []
-        },
-        {
-            id: 3,
-            name: 'CARLA OLIVEIRA COSTA',
-            concepts_b1: ['ED', 'ND', 'ED', 'ED', 'ND', 'ED', 'ED', 'ND', 'ED', 'ED', 'ND', 'ED', 'ED', 'ND', 'ED'],
-            concepts_b2: ['D', 'ED', 'D', 'D', 'ED', 'D', 'D', 'ED', 'D', 'D', 'ED', 'D', 'D', 'ED', 'D'],
-            concepts_b3: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'],
-            concepts_b4: []
-        }
-    ]);
-
-    const toggleInfantilConcept = (studentId: number, conceptIndex: number) => {
-        setStudentsAvaliacaoInfantil(prev => prev.map(student => {
-            if (student.id === studentId) {
-                let field = 'concepts_b1';
-                if (avaliacaoBimestre === '2º Bimestre') field = 'concepts_b2';
-                if (avaliacaoBimestre === '3º Bimestre') field = 'concepts_b3';
-                if (avaliacaoBimestre === '4º Bimestre') field = 'concepts_b4';
-
-                const newConcepts = [...(student[field] || [])];
-                const current = newConcepts[conceptIndex] || 'D';
-                let nextConcept = 'D';
-                if (current === 'D') nextConcept = 'ED';
-                else if (current === 'ED') nextConcept = 'ND';
-                else if (current === 'ND') nextConcept = 'D';
-
-                newConcepts[conceptIndex] = nextConcept;
-                return { ...student, [field]: newConcepts };
-            }
-            return student;
-        }));
-    };
-
     const toggleConcept = (studentId: number, field: string) => {
-        setStudentsAvaliacao(prev => prev.map(student => {
-            if (student.id === studentId) {
-                const currentConcept = student[field];
-                let nextConcept = 'E';
-                if (currentConcept === 'E') nextConcept = 'B';
-                else if (currentConcept === 'B') nextConcept = 'R';
-                else if (currentConcept === 'R') nextConcept = 'I';
-                else if (currentConcept === 'I') nextConcept = 'E';
+        if (isEtapaReadOnly) return;
 
-                return { ...student, [field]: nextConcept };
-            }
-            return student;
-        }));
+        let updatedStudent: any = null;
+        setStudentsAvaliacao(prev => {
+            const next = prev.map(student => {
+                if (student.id === studentId) {
+                    const currentConcept = student[field];
+                    let nextConcept = 'E';
+                    if (currentConcept === 'E') nextConcept = 'B';
+                    else if (currentConcept === 'B') nextConcept = 'R';
+                    else if (currentConcept === 'R') nextConcept = 'I';
+                    else if (currentConcept === 'I') nextConcept = 'E';
+
+                    updatedStudent = { ...student, [field]: nextConcept };
+                    return updatedStudent;
+                }
+                return student;
+            });
+            return next;
+        });
+
+        if (updatedStudent) {
+            persistAvaliacaoDocente(updatedStudent);
+        }
     };
 
     const renderConceptBadge = (studentId: number, field: string, concept: string) => {
@@ -434,6 +676,65 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
 
     const [isEditingAcompInfantil, setIsEditingAcompInfantil] = useState(false);
     const [mockAcompInfantil, setMockAcompInfantil] = useState<any[]>([]);
+
+    // ============================================
+    // ESTADOS: STATUS DA ETAPA E DESBLOQUEIO
+    // ============================================
+    const [etapaDoc, setEtapaDoc] = useState<any>(null);
+    const [isSubmittingEtapa, setIsSubmittingEtapa] = useState(false);
+    const [isRequestingUnlock, setIsRequestingUnlock] = useState(false);
+    const [showUnlockModal, setShowUnlockModal] = useState(false);
+    const [unlockJustification, setUnlockJustification] = useState('');
+    const [allPendingRequests, setAllPendingRequests] = useState<any[]>([]);
+    const [showAdminPanel, setShowAdminPanel] = useState(false);
+
+    const isEtapaReadOnly = useMemo(() => {
+        if (isAdmin) return false;
+        return etapaDoc?.bloqueada || false;
+    }, [etapaDoc, isAdmin]);
+
+    const hasPendingUnlockRequest = useMemo(() => {
+        return etapaDoc?.solicitacoes_desbloqueio?.some((r: any) => r.status === 'pendente');
+    }, [etapaDoc]);
+
+    const loadEtapaStatus = async () => {
+        if (!activeTurma || avaliacaoBimestre === 'Resultado Consolidado') {
+            setEtapaDoc(null);
+            return;
+        }
+
+        try {
+            const status = await ccAvaliacaoEtapaService.getStatus(
+                escolas[0]?.id || '', // Simplificando para a primeira escola se não houver contexto claro
+                activeTurma.identificacao,
+                avaliacaoBimestre,
+                avaliacaoEtapa
+            );
+            setEtapaDoc(status);
+        } catch (error) {
+            console.error('Erro ao carregar status da etapa:', error);
+        }
+    };
+
+    useEffect(() => {
+        loadEtapaStatus();
+    }, [activeTurma, avaliacaoBimestre, avaliacaoEtapa]);
+
+    const loadAllPendingRequests = async () => {
+        if (!isAdmin && currentUser?.funcao !== 'Coordenador Regional') return;
+        try {
+            const requests = await ccSolicitacaoDesbloqueioService.getTodasPendentes();
+            setAllPendingRequests(requests);
+        } catch (error) {
+            console.error('Erro ao carregar solicitações pendentes:', error);
+        }
+    };
+
+    useEffect(() => {
+        if (showAdminPanel) {
+            loadAllPendingRequests();
+        }
+    }, [showAdminPanel]);
 
     const handleSaveAcompInfantil = async () => {
         if (!acompInfantilForm.professor || !acompInfantilForm.crianca) return;
@@ -562,9 +863,92 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
         }
     };
 
-    // ============================================
-    // ESTADOS: ENCAMINHAMENTOS E INTERVENÇÕES
-    // ============================================
+    const handleImprimir = () => {
+        window.print();
+    };
+
+    const handleSolicitarDesbloqueio = async () => {
+        if (!unlockJustification.trim()) {
+            alert('Por favor, informe a justificativa.');
+            return;
+        }
+
+        setIsRequestingUnlock(true);
+        try {
+            await ccSolicitacaoDesbloqueioService.solicitar({
+                escola_id: escolas[0]?.id || '',
+                turma_id: activeTurma?.identificacao || '',
+                periodo: avaliacaoBimestre,
+                etapa: avaliacaoEtapa,
+                justificativa: unlockJustification,
+                solicitado_por: userEmail
+            });
+
+            setShowUnlockModal(false);
+            setUnlockJustification('');
+            alert('Solicitação enviada com sucesso!');
+            loadEtapaStatus();
+        } catch (error) {
+            console.error('Erro ao solicitar desbloqueio:', error);
+            alert('Erro ao enviar solicitação.');
+        } finally {
+            setIsRequestingUnlock(false);
+        }
+    };
+
+    const handleFinalizarEtapa = async () => {
+        if (avaliacaoBimestre === 'Resultado Consolidado') {
+            alert('Não é possível finalizar o Resultado Consolidado diretamente. Finalize cada bimestre individualmente.');
+            return;
+        }
+
+        // Validação
+        let pendencias = false;
+        if (avaliacaoEtapa === 'fundamental') {
+            pendencias = studentsAvaliacao.some(s =>
+                (s.fre === null || s.fre === undefined || s.fre === '') ||
+                !s.par ||
+                (s.mat === null || s.mat === undefined || s.mat === '') ||
+                (s.atv === null || s.atv === undefined || s.atv === '') ||
+                (s.com === null || s.com === undefined || s.com === '') ||
+                (s.pes === null || s.pes === undefined || s.pes === '') ||
+                (s.con === null || s.con === undefined || s.con === '')
+            );
+        } else {
+            const field = avaliacaoBimestre === '1º Bimestre' ? 'concepts_b1' :
+                avaliacaoBimestre === '2º Bimestre' ? 'concepts_b2' :
+                    avaliacaoBimestre === '3º Bimestre' ? 'concepts_b3' : 'concepts_b4';
+
+            // Supondo que currentObjectives está acessível ou fixo em 7 objetivos para validação básica
+            pendencias = studentsAvaliacaoInfantil.some(s => (s[field] || []).length === 0);
+        }
+
+        if (pendencias) {
+            alert('Existem avaliações pendentes. Preencha todos os campos obrigatórios antes de finalizar.');
+            return;
+        }
+
+        if (!confirm('Tem certeza que deseja finalizar esta etapa? Após o envio, você não poderá mais editá-la.')) return;
+
+        setIsSubmittingEtapa(true);
+        try {
+            await ccAvaliacaoEtapaService.enviar({
+                escola_id: escolas[0]?.id || '',
+                turma_id: activeTurma?.identificacao || '',
+                periodo: avaliacaoBimestre,
+                etapa: avaliacaoEtapa,
+                enviada_por: userEmail
+            });
+
+            alert('Etapa finalizada e enviada com sucesso!');
+            loadEtapaStatus();
+        } catch (error) {
+            console.error('Erro ao finalizar etapa:', error);
+            alert('Erro ao enviar etapa.');
+        } finally {
+            setIsSubmittingEtapa(false);
+        }
+    };
     const [isEditingEnc, setIsEditingEnc] = useState(false);
     const [encForm, setEncForm] = useState({
         id: '',
@@ -857,20 +1241,59 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
                                         <span className="text-slate-500">Filtro Ativo: <strong className="text-emerald-600">
                                             {avaliacaoBimestre.toUpperCase()}
                                         </strong></span>
-                                        <span className="text-amber-500 font-bold flex items-center gap-1"><Lock className="w-3 h-3" /> SOMENTE LEITURA</span>
+                                        {isEtapaReadOnly ? (
+                                            <span className="text-amber-500 font-bold flex items-center gap-1"><Lock className="w-3 h-3" /> SOMENTE LEITURA</span>
+                                        ) : (
+                                            <span className="text-emerald-500 font-bold flex items-center gap-1"><Edit className="w-3 h-3" /> EM EDIÇÃO</span>
+                                        )}
                                     </div>
                                 </div>
+                                {isSaving && (
+                                    <div className="flex items-center gap-2 text-[10px] font-bold text-emerald-600 animate-pulse bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100 shadow-sm ml-4">
+                                        <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce"></div>
+                                        <span>SALVANDO ALTERAÇÕES...</span>
+                                    </div>
+                                )}
                             </div>
                             <div className="flex gap-3">
-                                <button className="bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-xl font-bold text-sm hover:bg-slate-50 flex items-center gap-2 transition-all">
+                                <button
+                                    onClick={handleImprimir}
+                                    className="bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-xl font-bold text-sm hover:bg-slate-50 flex items-center gap-2 transition-all"
+                                >
                                     <Printer className="w-4 h-4" /> Imprimir {avaliacaoBimestre === 'Resultado Consolidado' ? 'Relatório' : avaliacaoBimestre}
                                 </button>
-                                <button className="border border-amber-200 bg-amber-50 text-amber-600 px-4 py-2 rounded-xl font-bold text-sm hover:bg-amber-100 flex items-center gap-2 transition-all">
-                                    <Lock className="w-4 h-4" /> Solicitar Desbloqueio
-                                </button>
-                                <button className="bg-slate-100 text-slate-400 px-4 py-2 rounded-xl font-bold text-sm cursor-not-allowed flex items-center gap-2">
-                                    <Send className="w-4 h-4" /> Finalizar e Enviar Etapa
-                                </button>
+
+                                {etapaDoc?.status === 'enviada' && !isAdmin && (
+                                    <button
+                                        onClick={() => setShowUnlockModal(true)}
+                                        disabled={hasPendingUnlockRequest}
+                                        className={`border px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-2 transition-all ${hasPendingUnlockRequest ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'border-amber-200 bg-amber-50 text-amber-600 hover:bg-amber-100'}`}
+                                    >
+                                        <Lock className="w-4 h-4" /> {hasPendingUnlockRequest ? 'Aguardando Desbloqueio' : 'Solicitar Desbloqueio'}
+                                    </button>
+                                )}
+
+                                {isAdmin && etapaDoc?.status === 'enviada' && (
+                                    <button
+                                        onClick={() => setShowAdminPanel(!showAdminPanel)}
+                                        className="bg-purple-600 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-purple-700 flex items-center gap-2 transition-all shadow-lg shadow-purple-200"
+                                    >
+                                        <GraduationCap className="w-4 h-4" /> Gestão de Desbloqueios
+                                    </button>
+                                )}
+
+                                {avaliacaoBimestre !== 'Resultado Consolidado' && !isEtapaReadOnly && (
+                                    <button
+                                        onClick={handleFinalizarEtapa}
+                                        disabled={isSubmittingEtapa}
+                                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md transition-all flex items-center gap-2"
+                                    >
+                                        {isSubmittingEtapa ? (
+                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                        ) : <Send className="w-4 h-4" />}
+                                        Finalizar e Enviar Etapa
+                                    </button>
+                                )}
                             </div>
                         </div>
 
@@ -878,11 +1301,11 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
                         <div className="bg-white rounded-2xl border border-slate-200 p-4 grid grid-cols-1 md:grid-cols-4 gap-4 shadow-sm divide-x divide-slate-100">
                             <div className="px-4">
                                 <p className="text-xs font-bold text-slate-400 uppercase mb-1">Unidade Escolar</p>
-                                <p className="text-sm font-semibold text-slate-800">Colégio Municipal Marechal Rondon</p>
+                                <p className="text-sm font-semibold text-slate-800">{escolas[0]?.nome || 'Colégio Municipal Rondon'}</p>
                             </div>
                             <div className="px-4">
                                 <p className="text-xs font-bold text-slate-400 uppercase mb-1">Responsável</p>
-                                <p className="text-sm font-semibold text-slate-800">Prof. Marcelo Fernandes</p>
+                                <p className="text-sm font-semibold text-slate-800">{currentUser?.nome || userEmail || 'Professor(a)'}</p>
                             </div>
                             <div className="px-4">
                                 <p className="text-xs font-bold text-slate-400 uppercase mb-1">
@@ -891,8 +1314,9 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
                                 {avaliacaoEtapa === 'infantil' ? (
                                     <select
                                         value={avaliacaoInfantilCampo}
-                                        onChange={(e) => setAvaliacaoInfantilCampo(e.target.value)}
-                                        className="w-full bg-transparent text-sm font-semibold text-slate-800 focus:outline-none cursor-pointer appearance-none truncate hover:text-blue-600 transition-colors"
+                                        onChange={(e) => !isEtapaReadOnly && setAvaliacaoInfantilCampo(e.target.value)}
+                                        disabled={isEtapaReadOnly}
+                                        className={`w-full bg-transparent text-sm font-semibold text-slate-800 focus:outline-none appearance-none truncate transition-colors ${isEtapaReadOnly ? 'cursor-default' : 'cursor-pointer hover:text-blue-600'}`}
                                     >
                                         {CAMPOS_EXPERIENCIA_BNCC.map(campo => (
                                             <option key={campo} value={campo}>{campo}</option>
@@ -906,21 +1330,30 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
                             </div>
                             <div className="px-4 flex items-center gap-3">
                                 <button
-                                    onClick={() => setIsTurmaModalOpen(true)}
-                                    className="group text-left"
+                                    onClick={() => !isEtapaReadOnly && setIsTurmaModalOpen(true)}
+                                    disabled={isEtapaReadOnly}
+                                    className={`group text-left ${isEtapaReadOnly ? 'cursor-default' : 'cursor-pointer'}`}
                                 >
-                                    <p className="text-xs font-bold text-slate-400 uppercase mb-1 group-hover:text-blue-500 transition-colors flex items-center gap-1">
+                                    <p className="text-xs font-bold text-slate-400 uppercase mb-1 flex items-center gap-1">
                                         {avaliacaoEtapa === 'infantil' ? 'Grupo de Faixa Etária' : 'Turma / Ano'}
-                                        <Edit className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        {!isEtapaReadOnly && <Edit className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />}
                                     </p>
-                                    <p className="text-sm font-semibold text-slate-800 group-hover:text-blue-600 transition-colors">
+                                    <p className={`text-sm font-semibold text-slate-800 transition-colors ${!isEtapaReadOnly && 'group-hover:text-blue-600'}`}>
                                         {activeTurma ? `${activeTurma.anoSerie} ${activeTurma.identificacao.replace('Turma ', '')} • ${activeTurma.turno}` : '5º Ano B • Matutino'}
                                     </p>
                                 </button>
-                                <div className="ml-auto flex items-center gap-2 text-[10px] font-bold text-slate-400 border border-slate-200 rounded-lg p-2 bg-slate-50">
-                                    <Lock className="w-3 h-3" />
-                                    <span>ETAPA BLOQUEADA<br />ENVIADA À COORDENAÇÃO</span>
-                                </div>
+                                {etapaDoc?.status === 'enviada' && (
+                                    <div className="ml-auto flex items-center gap-2 text-[10px] font-bold text-emerald-700 border border-emerald-200 rounded-lg p-2 bg-emerald-50">
+                                        <CheckCircle2 className="w-3 h-3" />
+                                        <span>ETAPA ENVIADA<br />{etapaDoc.enviada_em ? new Date(etapaDoc.enviada_em).toLocaleDateString() : ''}</span>
+                                    </div>
+                                )}
+                                {isEtapaReadOnly && etapaDoc?.status !== 'enviada' && (
+                                    <div className="ml-auto flex items-center gap-2 text-[10px] font-bold text-slate-400 border border-slate-200 rounded-lg p-2 bg-slate-50">
+                                        <Lock className="w-3 h-3" />
+                                        <span>ETAPA BLOQUEADA</span>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -929,49 +1362,142 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
                                 avaliacaoEtapa === 'infantil' ? (
                                     <div className="space-y-6 animate-fade-in">
                                         {/* Overview Cards Infantil */}
-                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <h4 className="text-xs font-bold text-slate-500 uppercase">Evolução Média</h4>
-                                                    <TrendingUp className="w-4 h-4 text-emerald-500" />
+                                        {(() => {
+                                            const bimestres = ['concepts_b1', 'concepts_b2', 'concepts_b3', 'concepts_b4'];
+                                            let lastBimIdx = -1;
+                                            for (let i = bimestres.length - 1; i >= 0; i--) {
+                                                if (studentsAvaliacaoInfantil.some(s => (s[bimestres[i]] || []).length > 0)) {
+                                                    lastBimIdx = i;
+                                                    break;
+                                                }
+                                            }
+
+                                            if (lastBimIdx === -1) {
+                                                return (
+                                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                                        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm col-span-4 text-center py-10">
+                                                            <p className="text-slate-400 font-medium">Sem dados avaliativos disponíveis para gerar indicadores.</p>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }
+
+                                            const getAverageForBim = (idx: number) => {
+                                                const field = bimestres[idx];
+                                                let totalScore = 0;
+                                                let count = 0;
+                                                studentsAvaliacaoInfantil.forEach(s => {
+                                                    const concepts = s[field] || [];
+                                                    if (concepts.length > 0) {
+                                                        let sScore = 0;
+                                                        concepts.forEach((c: string) => {
+                                                            if (c === 'D') sScore += 2;
+                                                            else if (c === 'ED') sScore += 1;
+                                                        });
+                                                        totalScore += (sScore / (concepts.length * 2)) * 10;
+                                                        count++;
+                                                    }
+                                                });
+                                                return count > 0 ? totalScore / count : 0;
+                                            };
+
+                                            const avgFirst = getAverageForBim(0);
+                                            const avgLast = getAverageForBim(lastBimIdx);
+                                            const avgPrev = lastBimIdx > 0 ? getAverageForBim(lastBimIdx - 1) : null;
+
+                                            // Evolução Média (1º vs Último)
+                                            let evolucaoMediaPct = 0;
+                                            if (avgFirst > 0) {
+                                                evolucaoMediaPct = ((avgLast - avgFirst) / avgFirst) * 100;
+                                            }
+
+                                            // Média Geral (Último vs Anterior)
+                                            let variacaoGeral = 0;
+                                            if (avgPrev !== null) {
+                                                variacaoGeral = avgLast - avgPrev;
+                                            }
+
+                                            // Acima da Média (Escola vs Turma)
+                                            // Simulando média da escola como 5% menor que a média do primeiro semestre da rede ou similar
+                                            const escolaRefAvg = avgLast * 0.95;
+                                            const acimaMediaCount = studentsAvaliacaoInfantil.filter(s => {
+                                                const concepts = s[bimestres[lastBimIdx]] || [];
+                                                if (concepts.length === 0) return false;
+                                                let sScore = 0;
+                                                concepts.forEach((c: string) => {
+                                                    if (c === 'D') sScore += 2;
+                                                    else if (c === 'ED') sScore += 1;
+                                                });
+                                                const sAvg = (sScore / (concepts.length * 2)) * 10;
+                                                return sAvg > escolaRefAvg;
+                                            }).length;
+                                            const acimaMediaPct = (acimaMediaCount / studentsAvaliacaoInfantil.length) * 100;
+
+                                            // Alertas (NDs no último bimestre)
+                                            const alertasCount = studentsAvaliacaoInfantil.filter(s => {
+                                                const concepts = s[bimestres[lastBimIdx]] || [];
+                                                return concepts.includes('ND');
+                                            }).length;
+
+                                            return (
+                                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                                    {/* EVOLUÇÃO MÉDIA */}
+                                                    <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <h4 className="text-xs font-bold text-slate-500 uppercase">Evolução Média</h4>
+                                                            {evolucaoMediaPct >= 0 ? <TrendingUp className="w-4 h-4 text-emerald-500" /> : <TrendingDown className="w-4 h-4 text-red-500" />}
+                                                        </div>
+                                                        <div className="flex items-baseline gap-2 flex-col">
+                                                            <span className={`text-2xl font-black ${evolucaoMediaPct >= 0 ? 'text-slate-800' : 'text-red-600'}`}>
+                                                                {evolucaoMediaPct >= 0 ? '+' : ''}{evolucaoMediaPct.toFixed(1)}%
+                                                            </span>
+                                                            <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md flex items-center">
+                                                                {lastBimIdx === 0 ? 'sem base comparativa anterior' : '1º bimes. vs último bimes.'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* ACIMA DA MÉDIA */}
+                                                    <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <h4 className="text-xs font-bold text-slate-500 uppercase">Acima da Média</h4>
+                                                            <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-blue-600"><CheckCircle2 className="w-3 h-3" /></div>
+                                                        </div>
+                                                        <div className="flex items-baseline gap-2 flex-col">
+                                                            <span className="text-2xl font-black text-slate-800">{acimaMediaPct.toFixed(0)}%</span>
+                                                            <span className="text-[10px] font-medium text-blue-500">em relação à própria escola</span>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* MÉDIA GERAL */}
+                                                    <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <h4 className="text-xs font-bold text-slate-500 uppercase">Média Geral</h4>
+                                                            <LayoutDashboard className="w-4 h-4 text-emerald-500" />
+                                                        </div>
+                                                        <div className="flex items-baseline gap-2 flex-col">
+                                                            <span className="text-2xl font-black text-slate-800">{avgLast.toFixed(1)}</span>
+                                                            <span className={`text-[10px] font-medium ${variacaoGeral >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                                                                {lastBimIdx === 0 ? 'sem base comparativa anterior' : `${variacaoGeral >= 0 ? '+' : ''}${variacaoGeral.toFixed(1)} em relação ao bimes. anterior`}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* ALERTAS */}
+                                                    <div className="bg-red-50 rounded-2xl p-5 border border-red-100 shadow-sm flex flex-col justify-between relative overflow-hidden">
+                                                        <div className="absolute -right-4 -top-4 w-16 h-16 bg-red-100 rounded-full opacity-50"></div>
+                                                        <div className="flex justify-between items-start mb-2 relative z-10">
+                                                            <h4 className="text-xs font-bold text-red-800 uppercase">Alertas de Atenção</h4>
+                                                            <AlertTriangle className="w-4 h-4 text-red-500" />
+                                                        </div>
+                                                        <div className="flex items-baseline gap-2 flex-col relative z-10">
+                                                            <span className="text-2xl font-black text-red-600">{alertasCount.toString().padStart(2, '0')} crianças</span>
+                                                            <span className="text-[10px] font-medium text-red-500">Ação necessária no último bimes.</span>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div className="flex items-baseline gap-2 flex-col">
-                                                    <span className="text-2xl font-black text-slate-800">+12.5%</span>
-                                                    <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md flex items-center">Bimestre 02 vs 01</span>
-                                                </div>
-                                            </div>
-                                            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <h4 className="text-xs font-bold text-slate-500 uppercase">Acima da Média</h4>
-                                                    <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600"><CheckCircle2 className="w-3 h-3" /></div>
-                                                </div>
-                                                <div className="flex items-baseline gap-2 flex-col">
-                                                    <span className="text-2xl font-black text-slate-800">84%</span>
-                                                    <span className="text-xs font-medium text-emerald-500">+2.1% em relação à rede</span>
-                                                </div>
-                                            </div>
-                                            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <h4 className="text-xs font-bold text-slate-500 uppercase">Média Geral</h4>
-                                                    <LayoutDashboard className="w-4 h-4 text-emerald-500" />
-                                                </div>
-                                                <div className="flex items-baseline gap-2 flex-col">
-                                                    <span className="text-2xl font-black text-slate-800">7.8</span>
-                                                    <span className="text-xs font-medium text-emerald-500">+0.4 na última semana</span>
-                                                </div>
-                                            </div>
-                                            <div className="bg-red-50 rounded-2xl p-5 border border-red-100 shadow-sm flex flex-col justify-between relative overflow-hidden">
-                                                <div className="absolute -right-4 -top-4 w-16 h-16 bg-red-100 rounded-full opacity-50"></div>
-                                                <div className="flex justify-between items-start mb-2 relative z-10">
-                                                    <h4 className="text-xs font-bold text-red-800 uppercase">Alertas de Atenção</h4>
-                                                    <AlertTriangle className="w-4 h-4 text-red-500" />
-                                                </div>
-                                                <div className="flex items-baseline gap-2 flex-col relative z-10">
-                                                    <span className="text-2xl font-black text-red-600">06 crianças</span>
-                                                    <span className="text-xs font-medium text-red-500">Ação necessária em 2 campos</span>
-                                                </div>
-                                            </div>
-                                        </div>
+                                            );
+                                        })()}
 
                                         {/* Campos de Experiência Tabs */}
                                         <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-2">
@@ -1106,50 +1632,95 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
                                 ) : (
                                     <div className="space-y-6">
 
-                                        {/* Overview Cards */}
-                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <h4 className="text-xs font-bold text-slate-500 uppercase">Evolução Média</h4>
-                                                    <TrendingUp className="w-4 h-4 text-emerald-500" />
+                                        {/* Overview Cards Fundamental */}
+                                        {(() => {
+                                            if (visaoGeralData.length === 0) return (
+                                                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm text-center py-10 col-span-4">
+                                                    <p className="text-slate-400 font-medium">Sem dados consolidados disponíveis.</p>
                                                 </div>
-                                                <div className="flex items-baseline gap-2">
-                                                    <span className="text-2xl font-black text-slate-800">+12.5%</span>
-                                                    <span className="text-xs font-bold text-emerald-500 flex items-center"><ArrowUpRight className="w-3 h-3" /> vs. ant.</span>
+                                            );
+
+                                            const bims: ('b1' | 'b2' | 'b3' | 'b4')[] = ['b1', 'b2', 'b3', 'b4'];
+                                            let lastBimIdx = -1;
+                                            for (let i = bims.length - 1; i >= 0; i--) {
+                                                if (visaoGeralData.some(s => s[bims[i]] > 0)) {
+                                                    lastBimIdx = i;
+                                                    break;
+                                                }
+                                            }
+
+                                            const getAvg = (bim: 'b1' | 'b2' | 'b3' | 'b4') => {
+                                                const filled = visaoGeralData.filter(s => s[bim] > 0);
+                                                return filled.length > 0 ? filled.reduce((a, b) => a + b[bim], 0) / filled.length : 0;
+                                            };
+
+                                            const avgFirst = getAvg('b1');
+                                            const avgLast = lastBimIdx >= 0 ? getAvg(bims[lastBimIdx]) : 0;
+                                            const avgPrev = lastBimIdx > 0 ? getAvg(bims[lastBimIdx - 1]) : null;
+
+                                            let evolucaoPct = 0;
+                                            if (avgFirst > 0) evolucaoPct = ((avgLast - avgFirst) / avgFirst) * 100;
+
+                                            let variacaoGeral = 0;
+                                            if (avgPrev !== null) variacaoGeral = avgLast - avgPrev;
+
+                                            const acimaMedia = visaoGeralData.filter(s => s.mediaFinal >= 6).length;
+                                            const acimaMediaPct = (acimaMedia / visaoGeralData.length) * 100;
+
+                                            const alertasCount = visaoGeralData.filter(s => s.alert).length;
+
+                                            return (
+                                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                                    <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <h4 className="text-xs font-bold text-slate-500 uppercase">Evolução Média</h4>
+                                                            {evolucaoPct >= 0 ? <TrendingUp className="w-4 h-4 text-emerald-500" /> : <TrendingDown className="w-4 h-4 text-red-500" />}
+                                                        </div>
+                                                        <div className="flex items-baseline gap-2 flex-col">
+                                                            <span className={`text-2xl font-black ${evolucaoPct >= 0 ? 'text-slate-800' : 'text-red-600'}`}>
+                                                                {evolucaoPct >= 0 ? '+' : ''}{evolucaoPct.toFixed(1)}%
+                                                            </span>
+                                                            <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md flex items-center">
+                                                                {lastBimIdx === 0 ? 'sem base comparativa anterior' : '1º bimes. vs último bimes.'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <h4 className="text-xs font-bold text-slate-500 uppercase">Acima da Média</h4>
+                                                            <Users className="w-4 h-4 text-blue-500" />
+                                                        </div>
+                                                        <div className="flex items-baseline gap-2 flex-col">
+                                                            <span className="text-2xl font-black text-slate-800">{acimaMediaPct.toFixed(0)}%</span>
+                                                            <span className="text-[10px] font-medium text-blue-500">em relação à própria escola</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <h4 className="text-xs font-bold text-slate-500 uppercase">Média Geral</h4>
+                                                            <LayoutDashboard className="w-4 h-4 text-amber-500" />
+                                                        </div>
+                                                        <div className="flex items-baseline gap-2 flex-col">
+                                                            <span className="text-2xl font-black text-slate-800">{avgLast.toFixed(1)}</span>
+                                                            <span className={`text-[10px] font-medium ${variacaoGeral >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                                                                {lastBimIdx === 0 ? 'sem base comparativa anterior' : `${variacaoGeral >= 0 ? '+' : ''}${variacaoGeral.toFixed(1)} em relação ao bimes. anterior`}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-red-50 rounded-2xl p-5 border border-red-100 shadow-sm flex flex-col justify-between relative overflow-hidden">
+                                                        <div className="absolute -right-4 -top-4 w-16 h-16 bg-red-100 rounded-full opacity-50"></div>
+                                                        <div className="flex justify-between items-start mb-2 relative z-10">
+                                                            <h4 className="text-xs font-bold text-red-800 uppercase">Alertas de Queda</h4>
+                                                            <AlertCircle className="w-4 h-4 text-red-500" />
+                                                        </div>
+                                                        <div className="flex items-baseline gap-2 relative z-10">
+                                                            <span className="text-2xl font-black text-red-600">{alertasCount.toString().padStart(2, '0')}</span>
+                                                            <span className="text-xs font-bold text-red-500">estudantes</span>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <h4 className="text-xs font-bold text-slate-500 uppercase">Acima da Média</h4>
-                                                    <Users className="w-4 h-4 text-blue-500" />
-                                                </div>
-                                                <div className="flex items-baseline gap-2">
-                                                    <span className="text-2xl font-black text-slate-800">84%</span>
-                                                    <span className="text-xs font-medium text-slate-400">21 / 25</span>
-                                                </div>
-                                            </div>
-                                            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <h4 className="text-xs font-bold text-slate-500 uppercase">Média Geral</h4>
-                                                    <LayoutDashboard className="w-4 h-4 text-amber-500" />
-                                                </div>
-                                                <div className="flex items-baseline gap-2">
-                                                    <span className="text-2xl font-black text-slate-800">7.8</span>
-                                                    <span className="text-xs font-medium text-slate-400 text-amber-500">Meta: 7.0</span>
-                                                </div>
-                                            </div>
-                                            <div className="bg-red-50 rounded-2xl p-5 border border-red-100 shadow-sm flex flex-col justify-between relative overflow-hidden">
-                                                <div className="absolute -right-4 -top-4 w-16 h-16 bg-red-100 rounded-full opacity-50"></div>
-                                                <div className="flex justify-between items-start mb-2 relative z-10">
-                                                    <h4 className="text-xs font-bold text-red-800 uppercase">Alertas de Queda</h4>
-                                                    <AlertCircle className="w-4 h-4 text-red-500" />
-                                                </div>
-                                                <div className="flex items-baseline gap-2 relative z-10">
-                                                    <span className="text-2xl font-black text-red-600">06</span>
-                                                    <span className="text-xs font-bold text-red-500">estudantes</span>
-                                                </div>
-                                            </div>
-                                        </div>
+                                            );
+                                        })()}
 
                                         {/* Tabela Consolidada */}
                                         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -2085,8 +2656,152 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({ escolas = [] }) 
         }
     };
 
+    const handleProcessarSolicitacao = async (requestId: string, aprovado: boolean) => {
+        const justificativaAnalise = prompt(aprovado ? 'Confirmar autorização (opcional):' : 'Motivo da negação (obrigatório):');
+        if (!aprovado && !justificativaAnalise) {
+            alert('A justificativa de negação é obrigatória.');
+            return;
+        }
+
+        try {
+            const status = aprovado ? 'autorizada' : 'negada';
+            const request = allPendingRequests.find(r => r.id === requestId);
+
+            await ccSolicitacaoDesbloqueioService.processar(requestId, {
+                status,
+                analisado_por: userEmail,
+                justificativa_analise: justificativaAnalise
+            });
+
+            if (aprovado && request?.avaliacoes_etapas?.id) {
+                await ccAvaliacaoEtapaService.atualizarStatus(request.avaliacoes_etapas.id, 'desbloqueada', false);
+            }
+
+            alert(`Solicitação ${status} com sucesso.`);
+            loadAllPendingRequests();
+            loadEtapaStatus();
+        } catch (error) {
+            console.error('Erro ao processar solicitação:', error);
+            alert('Erro ao processar.');
+        }
+    };
+
+    const renderAdminRequestsPanel = () => {
+        if (!showAdminPanel) return null;
+
+        return (
+            <div className="bg-white rounded-2xl border-2 border-purple-200 shadow-xl overflow-hidden mt-6 animate-scale-in">
+                <div className="bg-purple-900 p-4 text-white flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                        <GraduationCap className="w-5 h-5 text-purple-300" />
+                        <h3 className="font-bold">Gerenciamento de Solicitações de Desbloqueio</h3>
+                    </div>
+                    <button onClick={() => setShowAdminPanel(false)} className="text-purple-300 hover:text-white">&times;</button>
+                </div>
+                <div className="p-4">
+                    {allPendingRequests.length === 0 ? (
+                        <div className="text-center py-8 text-slate-400 font-medium">Não há solicitações pendentes no momento.</div>
+                    ) : (
+                        <div className="space-y-3">
+                            {allPendingRequests.map(req => (
+                                <div key={req.id} className="bg-slate-50 rounded-xl p-4 border border-slate-200 flex justify-between items-center group hover:bg-white hover:shadow-md transition-all">
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="bg-purple-100 text-purple-700 text-[10px] font-black px-2 py-0.5 rounded uppercase">{req.etapa}</span>
+                                            <span className="text-slate-400 text-[10px]">•</span>
+                                            <span className="text-slate-500 text-xs font-bold">{req.turma_id}</span>
+                                            <span className="text-slate-400 text-[10px]">•</span>
+                                            <span className="text-slate-500 text-xs">{req.periodo}</span>
+                                        </div>
+                                        <p className="text-sm font-bold text-slate-700 mb-1">Solicitado por: {req.solicitado_por}</p>
+                                        <div className="bg-white border border-slate-100 p-2 rounded-lg text-xs text-slate-600 italic">
+                                            &quot;{req.justificativa}&quot;
+                                        </div>
+                                        <p className="text-[10px] text-slate-400 mt-2 uppercase tracking-wide">Solicitado em: {new Date(req.solicitado_em).toLocaleString()}</p>
+                                    </div>
+                                    <div className="flex gap-2 ml-6">
+                                        <button
+                                            onClick={() => handleProcessarSolicitacao(req.id, false)}
+                                            className="bg-white border border-red-200 text-red-500 hover:bg-red-50 px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all"
+                                        >
+                                            Negar
+                                        </button>
+                                        <button
+                                            onClick={() => handleProcessarSolicitacao(req.id, true)}
+                                            className="bg-emerald-500 text-white hover:bg-emerald-600 px-4 py-2 rounded-xl text-xs font-bold shadow-lg shadow-emerald-200 transition-all"
+                                        >
+                                            Autorizar Desbloqueio
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
+    const renderUnlockModal = () => {
+        if (!showUnlockModal) return null;
+
+        return (
+            <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+                <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-scale-in">
+                    <div className="bg-amber-500 p-6 text-white flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                            <Lock className="w-6 h-6 text-amber-200" />
+                            <div>
+                                <h3 className="text-xl font-bold">Solicitar Desbloqueio da Etapa</h3>
+                                <p className="text-amber-100 text-xs font-medium uppercase tracking-wider">{avaliacaoBimestre} • {avaliacaoEtapa}</p>
+                            </div>
+                        </div>
+                        <button onClick={() => setShowUnlockModal(false)} className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors hover:rotate-90">
+                            &times;
+                        </button>
+                    </div>
+                    <div className="p-6">
+                        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 flex gap-3">
+                            <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                            <p className="text-xs text-amber-800 leading-relaxed">
+                                <strong>Atenção:</strong> A solicitação será enviada para a coordenação regional. Justifique o motivo da alteração necessária após o envio oficial.
+                            </p>
+                        </div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Justificativa da Edição</label>
+                        <textarea
+                            value={unlockJustification}
+                            onChange={e => setUnlockJustification(e.target.value)}
+                            placeholder="Descreva detalhadamente o motivo pelo qual você precisa editar esta etapa já enviada..."
+                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm focus:outline-none focus:ring-4 focus:ring-amber-500/10 min-h-[140px] resize-none text-slate-700"
+                        />
+                    </div>
+                    <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3">
+                        <button
+                            onClick={() => setShowUnlockModal(false)}
+                            className="flex-1 px-6 py-3 rounded-2xl text-sm font-bold text-slate-500 hover:bg-slate-200 transition-colors"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            onClick={handleSolicitarDesbloqueio}
+                            disabled={isRequestingUnlock}
+                            className="flex-[2] bg-amber-500 hover:bg-amber-600 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-lg shadow-amber-200 transition-all flex items-center justify-center gap-2"
+                        >
+                            {isRequestingUnlock ? (
+                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                            ) : <Send className="w-4 h-4" />}
+                            Enviar Solicitação
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div className="space-y-6 pb-12 animate-fade-in relative">
+            {renderAdminRequestsPanel()}
+            {renderUnlockModal()}
             <PageHeader
                 title="Conselho de Classe"
                 subtitle="Análise coletiva sobre o processo de ensino e aprendizagem"

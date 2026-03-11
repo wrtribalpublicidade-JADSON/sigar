@@ -306,6 +306,90 @@ export const ccAvaliacaoDocenteService = {
             if (error) throw error;
             return data;
         }
+    },
+
+    async deleteByEstudante(escolaId: string, turmaId: string, estudanteId: string) {
+        const { error } = await supabase
+            .from('cc_avaliacao_docente')
+            .delete()
+            .eq('escola_id', escolaId)
+            .eq('turma_id', turmaId)
+            .eq('estudante_id', estudanteId);
+
+        if (error) throw error;
+        return true;
+    }
+};
+
+// 7.1 Avaliacao Infantil (Campos de Experiência)
+export const ccAvaliacaoInfantilService = {
+    async getAllByTurma(classId: string, period?: number) {
+        let query = supabase
+            .from('avaliacoes_infantil')
+            .select('*')
+            .eq('student_id', (
+                supabase.from('alunos').select('id').eq('class_id', classId)
+            ));
+
+        // Note: The above filter is complex for a simple join. 
+        // Better load students separately and then their evaluations.
+        // Let's implement a more direct approach by loading by student list.
+        return null; // Placeholder, better implementation below
+    },
+
+    async getByStudents(studentIds: string[], period?: number) {
+        let query = supabase.from('avaliacoes_infantil').select('*').in('student_id', studentIds);
+        if (period) query = query.eq('period', period);
+
+        const { data, error } = await query;
+        if (error) throw error;
+        return data;
+    },
+
+    async save(evaluation: any) {
+        // Upsert logic: find if exists by student_id, period, skill_code
+        if (evaluation.id) {
+            const { data, error } = await supabase.from('avaliacoes_infantil').update(evaluation).eq('id', evaluation.id).select().single();
+            if (error) throw error;
+            return data;
+        } else {
+            const { data, error } = await supabase.from('avaliacoes_infantil').insert(evaluation).select().single();
+            if (error) throw error;
+            return data;
+        }
+    },
+
+    async saveMany(evaluations: any[]) {
+        const { data, error } = await supabase.from('avaliacoes_infantil').upsert(evaluations, { onConflict: 'student_id,period,skill_code' }).select();
+        if (error) throw error;
+        return data;
+    }
+};
+
+// 7.2 Estudante Service
+export const ccEstudanteService = {
+    async getByTurma(classId: string) {
+        const { data, error } = await supabase
+            .from('alunos')
+            .select('*')
+            .eq('class_id', classId)
+            .eq('status', 'active')
+            .order('name', { ascending: true });
+
+        if (error) throw error;
+        return data;
+    },
+
+    async add(student: any) {
+        const { data, error } = await supabase.from('alunos').insert(student).select().single();
+        if (error) throw error;
+        return data;
+    },
+
+    async remove(id: string) {
+        const { error } = await supabase.from('alunos').update({ status: 'inactive' }).eq('id', id);
+        if (error) throw error;
+        return true;
     }
 };
 
@@ -366,5 +450,93 @@ export const ccEncaminhamentosService = {
         const { error } = await supabase.from('cc_encaminhamentos_intervencoes').delete().eq('id', id);
         if (error) throw error;
         return true;
+    }
+};
+
+// 10. Status de Avaliação por Etapa e Solicitações de Desbloqueio
+export const ccAvaliacaoEtapaService = {
+    async getStatus(escolaId: string, turmaId: string, periodo: string, etapa: string) {
+        const { data, error } = await supabase
+            .from('avaliacoes_etapas')
+            .select('*, solicitacoes_desbloqueio(*)')
+            .eq('escola_id', escolaId)
+            .eq('turma_id', turmaId)
+            .eq('periodo', periodo)
+            .eq('etapa', etapa)
+            .maybeSingle();
+
+        if (error) throw error;
+        return data;
+    },
+
+    async enviar(etapaData: any) {
+        const { data, error } = await supabase
+            .from('avaliacoes_etapas')
+            .upsert({
+                ...etapaData,
+                status: 'enviada',
+                bloqueada: true,
+                enviada_em: new Date().toISOString()
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
+    async atualizarStatus(id: string, status: string, bloqueada: boolean) {
+        const { data, error } = await supabase
+            .from('avaliacoes_etapas')
+            .update({ status, bloqueada, updated_at: new Date().toISOString() })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    }
+};
+
+export const ccSolicitacaoDesbloqueioService = {
+    async solicitar(solicitacao: any) {
+        const { data, error } = await supabase
+            .from('solicitacoes_desbloqueio')
+            .insert({
+                ...solicitacao,
+                status: 'pendente',
+                solicitado_em: new Date().toISOString()
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
+    async getTodasPendentes() {
+        const { data, error } = await supabase
+            .from('solicitacoes_desbloqueio')
+            .select('*, avaliacoes_etapas(*)')
+            .eq('status', 'pendente')
+            .order('solicitado_em', { ascending: true });
+
+        if (error) throw error;
+        return data;
+    },
+
+    async processar(id: string, analise: any) {
+        const { data, error } = await supabase
+            .from('solicitacoes_desbloqueio')
+            .update({
+                ...analise,
+                analisado_em: new Date().toISOString()
+            })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
     }
 };

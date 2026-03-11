@@ -25,6 +25,7 @@ import { UserManagement } from './components/UserManagement';
 import { InstrumentaisGestao } from './components/InstrumentaisGestao';
 import { ConselhoClasse } from './components/ConselhoClasse';
 import { PermissoesManager } from './components/PermissoesManager';
+import { AtividadesComplementares } from './components/AtividadesComplementares';
 import { Preloader } from './components/ui/Preloader';
 import { ViewState, Escola, Visita, Coordenador } from './types';
 import { supabase } from './services/supabase';
@@ -1002,7 +1003,14 @@ export default function App() {
       case 'INSTRUMENTAIS_GESTAO':
         return <InstrumentaisGestao escolas={escolas} currentUser={userName} isAdmin={isAdmin} />;
       case 'CONSELHO_CLASSE':
-        return <ConselhoClasse escolas={escolas} />;
+        return (
+          <ConselhoClasse
+            escolas={escolas}
+            userEmail={userEmail}
+            isAdmin={isAdmin}
+            currentUser={effectiveUser}
+          />
+        );
       case 'NOTIFICACOES':
         return (
           <NotificationsPanel
@@ -1031,6 +1039,8 @@ export default function App() {
         );
       case 'PERMISSOES':
         return <PermissoesManager />;
+      case 'ATIVIDADES_COMPLEMENTARES':
+        return <AtividadesComplementares />;
       default:
         return <div>Página não encontrada</div>;
     }
