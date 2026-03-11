@@ -20,6 +20,13 @@ interface InstrumentaisGestaoProps {
 export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escolas = [], currentUser = '', isAdmin = false }) => {
     const [activeTab, setActiveTab] = useState<Tab>('reunioes');
     const [isLoading, setIsLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
+    const [selectedEscolaId, setSelectedEscolaId] = useState<string>(escolas[0]?.id || '');
+
+    const currentEscolaId = React.useMemo(() => {
+        if (!isAdmin && escolas.length > 0) return escolas[0].id;
+        return selectedEscolaId;
+    }, [isAdmin, escolas, selectedEscolaId]);
 
     // Helper to get school name by ID
     const getEscolaNome = (id: string | null) => {
@@ -102,7 +109,7 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
                 status: reuniaoForm.status,
                 responsavel: currentUser || '',
                 participantes: reuniaoForm.participantes,
-                escola_id: escolas.length > 0 ? escolas[0].id : null
+                escola_id: currentEscolaId
             };
 
             if (reuniaoForm.id) {
@@ -236,7 +243,7 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
         try {
             let metaToSave = {
                 ...metaForm,
-                escola_id: escolas.length > 0 ? escolas[0].id : null
+                escola_id: currentEscolaId
             };
             if (!metaToSave.id) delete (metaToSave as any).id;
 
@@ -300,7 +307,7 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
                 publico_alvo: formacaoForm.publicoAlvo,
                 responsavel: formacaoForm.responsavel,
                 custo: formacaoForm.custo,
-                escola_id: escolas.length > 0 ? escolas[0].id : null
+                escola_id: currentEscolaId
             };
             if (!saveForm.id) delete (saveForm as any).id;
 
@@ -358,12 +365,12 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
         const loadDados = async () => {
             setIsLoading(true);
             try {
-                const escolaFilter = !isAdmin && escolaIds.length > 0 ? escolaIds : undefined;
+                const filterId = isAdmin ? currentEscolaId : escolaIds;
                 const [reunioes, metas, formacoes, ppps] = await Promise.all([
-                    igCicloReunioesService.getAll(escolaFilter),
-                    igPlanoAcaoService.getAll(escolaFilter),
-                    igPlanoFormacaoService.getAll(escolaFilter),
-                    igPppService.getAll(escolaFilter)
+                    igCicloReunioesService.getAll(filterId),
+                    igPlanoAcaoService.getAll(filterId),
+                    igPlanoFormacaoService.getAll(filterId),
+                    igPppService.getAll(filterId)
                 ]);
 
                 if (reunioes) {
@@ -404,7 +411,7 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
         };
 
         loadDados();
-    }, [escolaIds]);
+    }, [escolaIds, currentEscolaId, isAdmin]);
 
     const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -451,7 +458,7 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
                 coordenador_regional: 'Ana Silva',
                 status: 'Aguardando Análise',
                 tamanho_kb: sizeFormatted,
-                escola_id: escolas.length > 0 ? escolas[0].id : null
+                escola_id: currentEscolaId
             };
 
             const result = await igPppService.save(newPpp);
@@ -1124,7 +1131,48 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
                 actions={[]}
             />
 
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-6 flex flex-wrap gap-2">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex-1 flex items-center gap-4 w-full">
+                    {isAdmin ? (
+                        <>
+                            <div className="bg-blue-50 p-2 rounded-xl border border-blue-100">
+                                <Calendar className="w-5 h-5 text-blue-600" />
+                            </div>
+                            <div className="flex-1">
+                                <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Unidade Escolar (Modo Admin)</p>
+                                <select
+                                    value={selectedEscolaId}
+                                    onChange={(e) => setSelectedEscolaId(e.target.value)}
+                                    className="w-full bg-transparent text-sm font-bold text-slate-800 focus:outline-none appearance-none cursor-pointer"
+                                >
+                                    {escolas.map(e => (
+                                        <option key={e.id} value={e.id}>{e.nome}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                                <FileStack className="w-5 h-5 text-slate-400" />
+                            </div>
+                            <div className="flex-1">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Unidade Escolar</p>
+                                <p className="text-sm font-bold text-slate-800">{getEscolaNome(currentEscolaId)}</p>
+                            </div>
+                        </>
+                    )}
+                </div>
+
+                {isSaving && (
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-blue-600 animate-pulse bg-blue-50 px-4 py-2 rounded-full border border-blue-100 shadow-sm whitespace-nowrap">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+                        <span>SALVANDO...</span>
+                    </div>
+                )}
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex flex-wrap gap-2">
                 {tabs.map(t => (
                     <button
                         key={t.id}

@@ -324,17 +324,17 @@ export const ccAvaliacaoDocenteService = {
 // 7.1 Avaliacao Infantil (Campos de Experiência)
 export const ccAvaliacaoInfantilService = {
     async getAllByTurma(classId: string, period?: number) {
-        let query = supabase
-            .from('avaliacoes_infantil')
-            .select('*')
-            .eq('student_id', (
-                supabase.from('alunos').select('id').eq('class_id', classId)
-            ));
+        // Load students of this class first
+        const { data: students, error: sError } = await supabase
+            .from('alunos')
+            .select('id')
+            .eq('class_id', classId);
+        
+        if (sError) throw sError;
+        if (!students || students.length === 0) return [];
 
-        // Note: The above filter is complex for a simple join. 
-        // Better load students separately and then their evaluations.
-        // Let's implement a more direct approach by loading by student list.
-        return null; // Placeholder, better implementation below
+        const studentIds = students.map(s => s.id);
+        return this.getByStudents(studentIds, period);
     },
 
     async getByStudents(studentIds: string[], period?: number) {
@@ -382,6 +382,12 @@ export const ccEstudanteService = {
 
     async add(student: any) {
         const { data, error } = await supabase.from('alunos').insert(student).select().single();
+        if (error) throw error;
+        return data;
+    },
+
+    async update(id: string, updates: any) {
+        const { data, error } = await supabase.from('alunos').update(updates).eq('id', id).select().single();
         if (error) throw error;
         return data;
     },

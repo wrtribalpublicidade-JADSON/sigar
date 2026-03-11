@@ -115,6 +115,7 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
     const [eventosOficiais, setEventosOficiais] = useState<EventoOficial[]>([]);
     const [eventosInternos, setEventosInternos] = useState<EventoInterno[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
 
     // Modal
     const [showModal, setShowModal] = useState(false);
@@ -251,6 +252,7 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
                 escola_id: form.escola_id || (filtroEscola !== 'todas' ? filtroEscola : (escolas.length > 0 ? escolas[0].id : null))
             };
             if (editingEvento) payload.id = editingEvento.id;
+            setIsSaving(true);
             const result = await igCalendarioInternoService.save(payload);
             if (editingEvento) {
                 setEventosInternos(prev => prev.map(e => e.id === editingEvento.id ? result : e));
@@ -261,6 +263,8 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
         } catch (err: any) {
             console.error('Erro ao salvar evento:', err);
             alert('Erro ao salvar evento: ' + (err?.message || ''));
+        } finally {
+            setTimeout(() => setIsSaving(false), 800);
         }
     };
     const handleDelete = async (id: string) => {
@@ -283,6 +287,7 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
     const handleSaveOficial = async () => {
         if (!oficialForm.titulo.trim() || !oficialForm.data) return;
         try {
+            setIsSaving(true);
             const result = await igCalendarioOficialService.save({
                 ...oficialForm,
                 data_fim: oficialForm.data_fim || null,
@@ -293,6 +298,8 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
             setOficialForm({ titulo: '', tipo: 'feriado', data: '', data_fim: '', obrigatorio: true, ano_letivo: String(currentYear) });
         } catch (err: any) {
             alert('Erro ao salvar evento oficial: ' + (err?.message || ''));
+        } finally {
+            setTimeout(() => setIsSaving(false), 800);
         }
     };
     const handleDeleteOficial = async (id: string) => {
@@ -341,6 +348,12 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
                     <div>
                         <h3 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
                             <Calendar className="w-6 h-6 text-orange-500" /> CALENDÁRIO INTERNO
+                            {isSaving && (
+                                <div className="ml-4 flex items-center gap-2 text-[10px] font-bold text-amber-600 animate-pulse bg-amber-50 px-3 py-1.5 rounded-full border border-amber-100 shadow-sm">
+                                    <div className="w-2 h-2 bg-amber-500 rounded-full animate-bounce"></div>
+                                    <span>SALVANDO...</span>
+                                </div>
+                            )}
                         </h3>
                         <p className="text-sm text-slate-500 mt-1">Gestão do calendário escolar e eventos da unidade</p>
                     </div>

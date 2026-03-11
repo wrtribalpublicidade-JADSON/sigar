@@ -3,6 +3,7 @@ import { PageHeader } from './ui/PageHeader';
 import { Users, BookOpen, UserCheck, AlertTriangle, GraduationCap, Edit, Trash2, Calendar, Hand, Book, CheckSquare, MessageCircle, Search, Printer, Lock, Send, CheckCircle2, FileText, LayoutDashboard, TrendingUp, TrendingDown, Minus, ArrowUpRight, ArrowDownRight, AlertCircle, FileDown, Download, Baby, School, ArrowRight } from 'lucide-react';
 import { CadastroTurmaModal, TurmaData } from './modals/CadastroTurmaModal';
 import { StudentReportModal } from './modals/StudentReportModal';
+import { CadastroEstudanteModal } from './modals/CadastroEstudanteModal';
 import { ReuniaoEstudantilForm } from './ReuniaoEstudantilForm';
 import { ccAvaliacaoDocenteService, ccAcompanhamentoDocenteService, ccEncaminhamentosService, ccAvaliacaoEtapaService, ccSolicitacaoDesbloqueioService, ccAvaliacaoInfantilService, ccEstudanteService } from '../services/gestaoConselhoService';
 import { Escola, Segmento, Coordenador } from '../types';
@@ -121,14 +122,22 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
 }) => {
     const [activeTab, setActiveTab] = useState<Tab>('estudantil');
     const [isLoading, setIsLoading] = useState(true);
+    const [selectedEscolaId, setSelectedEscolaId] = useState<string>(escolas[0]?.id || '');
+
+    // Get current school context
+    const currentEscola = useMemo(() => {
+        return escolas.find(e => e.id === selectedEscolaId) || escolas[0];
+    }, [escolas, selectedEscolaId]);
+
+    const currentEscolaId = currentEscola?.id || '';
 
     // Detectar etapas disponíveis na escola
     const schoolLevels = useMemo(() => {
-        const segs = escolas.flatMap(e => e.segmentos || []);
+        const segs = currentEscola?.segmentos || [];
         const hasInfantil = segs.includes(Segmento.INFANTIL);
         const hasFundamental = segs.includes(Segmento.FUNDAMENTAL_I) || segs.includes(Segmento.FUNDAMENTAL_II);
         return { hasInfantil, hasFundamental, hasBoth: hasInfantil && hasFundamental };
-    }, [escolas]);
+    }, [currentEscola]);
 
     const defaultEtapa = schoolLevels.hasInfantil && !schoolLevels.hasFundamental ? 'infantil' : 'fundamental';
     const [acompEtapa, setAcompEtapa] = useState<'fundamental' | 'infantil'>(defaultEtapa);
@@ -150,6 +159,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     const [activeTurma, setActiveTurma] = useState<TurmaData>(turmasCadastradas[0]);
     const [showSuccessToast, setShowSuccessToast] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [isCadastroEstudanteOpen, setIsCadastroEstudanteOpen] = useState(false);
 
     // Sync active tabs based on selected class stage
     useEffect(() => {
@@ -182,7 +192,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         try {
             const students = await loadStudents();
             const evalData = await ccAvaliacaoDocenteService.getAll(
-                escolas[0]?.id || '',
+                currentEscolaId,
                 activeTurma.identificacao,
                 avaliacaoBimestre
             );
@@ -266,7 +276,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         try {
             const students = await loadStudents();
             const evalData = await ccAvaliacaoDocenteService.getAll(
-                escolas[0]?.id || '',
+                currentEscolaId,
                 activeTurma.identificacao,
                 null // Fetch all bimestres
             );
@@ -322,7 +332,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         try {
             const payload = {
                 id: student.dbId,
-                escola_id: escolas[0]?.id || '',
+                escola_id: currentEscolaId,
                 turma_id: activeTurma?.identificacao || '',
                 estudante_id: student.id.toString(),
                 nome_estudante: student.name,
@@ -397,6 +407,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             const newStudent = {
                 name: newStudentName.trim().toUpperCase(),
                 class_id: activeTurma.identificacao,
+                escola_id: currentEscolaId,
                 status: 'active'
             };
 
@@ -502,6 +513,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                 else if (currentStatus === 'ND') nextStatus = 'D';
 
                 const newEval = {
+                    id: currentEval?.id,
                     student_id: studentId,
                     skill_code: skill.code,
                     period: period,
@@ -519,7 +531,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                 }
 
                 // Persist
-                persistAvaliacaoInfantil(newEval);
+                persistAvaliacaoInfantil(newEval, studentId);
 
                 return { ...student, evaluations: updatedEvals };
             }
@@ -527,10 +539,22 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         }));
     };
 
-    const persistAvaliacaoInfantil = async (evaluation: any) => {
+    const persistAvaliacaoInfantil = async (evaluation: any, studentId: number) => {
         setIsSaving(true);
         try {
-            await ccAvaliacaoInfantilService.save(evaluation);
+            const saved = await ccAvaliacaoInfantilService.save(evaluation);
+            if (saved && !evaluation.id) {
+                // If it was a new record, we should update the local evaluations list with the new ID
+                setStudentsAvaliacaoInfantil(prev => prev.map(student => {
+                    if (student.id === studentId) {
+                        const updatedEvals = (student.evaluations || []).map((e: any) => 
+                            e.skill_code === saved.skill_code && e.period === saved.period ? saved : e
+                        );
+                        return { ...student, evaluations: updatedEvals };
+                    }
+                    return student;
+                }));
+            }
         } catch (error) {
             console.error('Erro ao salvar avaliação infantil:', error);
         } finally {
@@ -579,6 +603,47 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
 
         if (updatedStudent) {
             persistAvaliacaoDocente(updatedStudent);
+        }
+    };
+
+    const handleSaveRascunho = async () => {
+        if (isEtapaReadOnly) return;
+        
+        setIsSaving(true);
+        try {
+            if (avaliacaoEtapa === 'fundamental') {
+                const promises = studentsAvaliacao.map(student => {
+                    const payload = {
+                        id: student.dbId,
+                        escola_id: currentEscolaId,
+                        turma_id: activeTurma?.identificacao || '',
+                        estudante_id: student.id.toString(),
+                        nome_estudante: student.name,
+                        periodo_letivo: avaliacaoBimestre,
+                        frequencia_conceito: student.fre,
+                        participacao_conceito: student.par,
+                        material_conceito: student.mat,
+                        atividades_conceito: student.atv,
+                        comunicacao_conceito: student.com,
+                        pesquisa_conceito: student.pes,
+                        conduta_conceito: student.con,
+                        notas_json: student.notas,
+                        media_final: student.media,
+                        parecer_etapa: calculateParecerEtapaRaw(student)
+                    };
+                    return ccAvaliacaoDocenteService.save(payload);
+                });
+                await Promise.all(promises);
+                await loadAvaliacoesDocente();
+            } else {
+                await loadAvaliacoesInfantil();
+            }
+            alert('Rascunho salvo com sucesso!');
+        } catch (error) {
+            console.error('Erro ao salvar rascunho:', error);
+            alert('Erro ao salvar rascunho.');
+        } finally {
+            setTimeout(() => setIsSaving(false), 800);
         }
     };
 
@@ -705,7 +770,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
 
         try {
             const status = await ccAvaliacaoEtapaService.getStatus(
-                escolas[0]?.id || '', // Simplificando para a primeira escola se não houver contexto claro
+                currentEscolaId,
                 activeTurma.identificacao,
                 avaliacaoBimestre,
                 avaliacaoEtapa
@@ -741,6 +806,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         try {
             let acToSave = {
                 id: acompInfantilForm.id,
+                escola_id: currentEscolaId,
                 professor: acompInfantilForm.professor,
                 componente_curricular: acompInfantilForm.campoExperiencia,
                 turma_nome: acompInfantilForm.agrupamento,
@@ -754,6 +820,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             };
             if (!acToSave.id) delete (acToSave as any).id;
 
+            setIsSaving(true);
             const result = await ccAcompanhamentoDocenteService.save(acToSave);
 
             const formattedResult = {
@@ -780,6 +847,8 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         } catch (error) {
             console.error("Erro ao salvar acompanhamento infantil:", error);
             alert("Erro ao salvar acompanhamento");
+        } finally {
+            setTimeout(() => setIsSaving(false), 800);
         }
     };
 
@@ -805,6 +874,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         try {
             let acToSave = {
                 id: acompForm.id,
+                escola_id: currentEscolaId,
                 professor: acompForm.professor,
                 componente_curricular: acompForm.componente,
                 turma_nome: acompForm.turma,
@@ -818,6 +888,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
 
             if (!acToSave.id) delete (acToSave as any).id;
 
+            setIsSaving(true);
             const result = await ccAcompanhamentoDocenteService.save(acToSave);
 
             const formattedResult = {
@@ -840,9 +911,8 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             }
             setIsEditingAcomp(false);
             setAcompForm({ id: '', professor: '', componente: '', turma: '', periodoLetivo: '1º Bimestre', data: '', estudante: '', lider: '', dificuldades: '', intervencao: '' });
-        } catch (error) {
-            console.error("Erro ao salvar acompanhamento:", error);
-            alert("Erro ao salvar acompanhamento");
+        } finally {
+            setTimeout(() => setIsSaving(false), 800);
         }
     };
 
@@ -876,7 +946,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         setIsRequestingUnlock(true);
         try {
             await ccSolicitacaoDesbloqueioService.solicitar({
-                escola_id: escolas[0]?.id || '',
+                escola_id: currentEscolaId,
                 turma_id: activeTurma?.identificacao || '',
                 periodo: avaliacaoBimestre,
                 etapa: avaliacaoEtapa,
@@ -933,7 +1003,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         setIsSubmittingEtapa(true);
         try {
             await ccAvaliacaoEtapaService.enviar({
-                escola_id: escolas[0]?.id || '',
+                escola_id: currentEscolaId,
                 turma_id: activeTurma?.identificacao || '',
                 periodo: avaliacaoBimestre,
                 etapa: avaliacaoEtapa,
@@ -977,11 +1047,13 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                 encaminhamento_proposto: encForm.encaminhamento,
                 data_registro: encForm.data,
                 periodo_letivo: encForm.periodoLetivo,
+                escola_id: currentEscolaId,
                 status: encForm.status,
                 responsavel_acao: encForm.responsavel
             };
             if (!encToSave.id) delete (encToSave as any).id;
 
+            setIsSaving(true);
             const result = await ccEncaminhamentosService.save(encToSave);
 
             const formattedResult = {
@@ -1007,6 +1079,8 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         } catch (error) {
             console.error("Erro ao salvar encaminhamento:", error);
             alert("Erro ao salvar acompanhamento");
+        } finally {
+            setTimeout(() => setIsSaving(false), 800);
         }
     };
 
@@ -1059,10 +1133,12 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                 periodo_letivo: encInfantilForm.periodoLetivo,
                 status: encInfantilForm.status,
                 responsavel_acao: encInfantilForm.professor,
+                escola_id: currentEscolaId,
                 etapa: 'infantil'
             };
             if (!encToSave.id) delete (encToSave as any).id;
 
+            setIsSaving(true);
             const result = await ccEncaminhamentosService.save(encToSave);
 
             const formattedResult = {
@@ -1086,9 +1162,8 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             }
             setIsEditingEncInfantil(false);
             setEncInfantilForm({ id: '', crianca: '', agrupamento: '', campoExperiencia: '', periodoLetivo: '1º Bimestre', data: '', evidencias: '', estrategia: '', professor: '', status: 'Pendente' });
-        } catch (error) {
-            console.error("Erro ao salvar encaminhamento infantil:", error);
-            alert("Erro ao salvar encaminhamento");
+        } finally {
+            setTimeout(() => setIsSaving(false), 800);
         }
     };
 
@@ -1121,8 +1196,8 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             setIsLoading(true);
             try {
                 const [acomp, encs] = await Promise.all([
-                    ccAcompanhamentoDocenteService.getAll(),
-                    ccEncaminhamentosService.getAll()
+                    ccAcompanhamentoDocenteService.getAll(currentEscolaId),
+                    ccEncaminhamentosService.getAll(currentEscolaId)
                 ]);
 
                 if (acomp) {
@@ -1162,7 +1237,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         };
 
         loadDocs();
-    }, []);
+    }, [currentEscolaId]);
 
     const renderTabContent = () => {
         const isBemPequena = ['Creche II', 'Creche III'].includes(activeTurma?.anoSerie || '');
@@ -1283,16 +1358,26 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                 )}
 
                                 {avaliacaoBimestre !== 'Resultado Consolidado' && !isEtapaReadOnly && (
-                                    <button
-                                        onClick={handleFinalizarEtapa}
-                                        disabled={isSubmittingEtapa}
-                                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md transition-all flex items-center gap-2"
-                                    >
-                                        {isSubmittingEtapa ? (
-                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                        ) : <Send className="w-4 h-4" />}
-                                        Finalizar e Enviar Etapa
-                                    </button>
+                                    <>
+                                        <button
+                                            onClick={handleSaveRascunho}
+                                            disabled={isSaving}
+                                            className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl font-bold text-sm hover:bg-slate-50 flex items-center gap-2 transition-all"
+                                        >
+                                            <FileText className="w-4 h-4 text-blue-500" />
+                                            Salvar Rascunho
+                                        </button>
+                                        <button
+                                            onClick={handleFinalizarEtapa}
+                                            disabled={isSubmittingEtapa}
+                                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md transition-all flex items-center gap-2"
+                                        >
+                                            {isSubmittingEtapa ? (
+                                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                            ) : <Send className="w-4 h-4" />}
+                                            Finalizar e Enviar Etapa
+                                        </button>
+                                    </>
                                 )}
                             </div>
                         </div>
@@ -1301,7 +1386,19 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                         <div className="bg-white rounded-2xl border border-slate-200 p-4 grid grid-cols-1 md:grid-cols-4 gap-4 shadow-sm divide-x divide-slate-100">
                             <div className="px-4">
                                 <p className="text-xs font-bold text-slate-400 uppercase mb-1">Unidade Escolar</p>
-                                <p className="text-sm font-semibold text-slate-800">{escolas[0]?.nome || 'Colégio Municipal Rondon'}</p>
+                                {isAdmin ? (
+                                    <select
+                                        value={selectedEscolaId}
+                                        onChange={(e) => setSelectedEscolaId(e.target.value)}
+                                        className="w-full bg-transparent text-sm font-semibold text-slate-800 focus:outline-none appearance-none cursor-pointer hover:text-blue-600 transition-colors"
+                                    >
+                                        {escolas.map(e => (
+                                            <option key={e.id} value={e.id}>{e.nome}</option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <p className="text-sm font-semibold text-slate-800">{currentEscola?.nome || 'Escola'}</p>
+                                )}
                             </div>
                             <div className="px-4">
                                 <p className="text-xs font-bold text-slate-400 uppercase mb-1">Responsável</p>
@@ -1945,6 +2042,19 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                             </tbody>
                                         </table>
                                     </div>
+                                    {!isEtapaReadOnly && (
+                                        <div className="mt-4 flex justify-center">
+                                            <button
+                                                onClick={() => setIsCadastroEstudanteOpen(true)}
+                                                className="bg-white border border-slate-200 text-slate-600 px-6 py-3 rounded-2xl font-bold text-sm hover:bg-slate-50 hover:border-emerald-200 hover:text-emerald-600 transition-all flex items-center gap-3 shadow-sm group"
+                                            >
+                                                <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
+                                                    <Users className="w-4 h-4 text-slate-500 group-hover:text-emerald-600" />
+                                                </div>
+                                                CADASTRAR E GERENCIAR ESTUDANTES
+                                            </button>
+                                        </div>
+                                    )}
                                 </>
                             ) : avaliacaoEtapa === 'infantil' ? (
                                 // ===== TABELA EDUCAÇÃO INFANTIL =====
@@ -2046,6 +2156,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                                 {studentConcepts.map((concept, i) => {
                                                                     const isD = concept === 'D';
                                                                     const isED = concept === 'ED';
+                                                                    
                                                                     const isND = concept === 'ND';
 
                                                                     let colors = 'bg-slate-50 text-slate-500 border-slate-200';
@@ -2073,13 +2184,13 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                         </div>
                                         <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-between items-center rounded-b-2xl">
                                             <button
-                                                onClick={() => setIsAddingStudent(true)}
-                                                className="text-sm font-bold text-purple-500 flex items-center gap-2 hover:text-purple-600 transition-colors"
+                                                onClick={() => setIsCadastroEstudanteOpen(true)}
+                                                className="text-sm font-bold text-purple-600 flex items-center gap-2 hover:bg-purple-100 px-3 py-1.5 rounded-lg transition-colors border border-purple-100 bg-purple-50"
                                             >
-                                                <Users className="w-4 h-4" /> Adicionar Est. Observação
+                                                <Users className="w-4 h-4" /> Cadastrar Estudante
                                             </button>
                                             <div className="flex items-center gap-4 text-xs font-bold text-slate-400">
-                                                <span>EXIBINDO 3 DE 20 REGISTROS</span>
+                                                <span>GERENCIAMENTO DE ESTUDANTES POR CONTEXTO</span>
                                             </div>
                                         </div>
                                     </div>
@@ -2915,42 +3026,23 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                 context={avaliacaoBimestre}
             />
 
-            {isAddingStudent && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-scale-in">
-                        <div className="bg-emerald-600 p-6 text-white flex justify-between items-center">
-                            <div>
-                                <h3 className="text-xl font-bold flex items-center gap-2">
-                                    <Users className="w-5 h-5" /> Novo Estudante
-                                </h3>
-                                <p className="text-emerald-100 text-xs mt-1">O estudante será adicionado com conceitos padrão (B).</p>
-                            </div>
-                            <button onClick={() => { setIsAddingStudent(false); setNewStudentName(''); }} className="w-8 h-8 rounded-full bg-emerald-700 hover:bg-emerald-800 text-emerald-200 flex items-center justify-center transition-colors">
-                                &times;
-                            </button>
-                        </div>
-                        <div className="p-6">
-                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Nome Completo do Estudante</label>
-                            <input
-                                type="text"
-                                value={newStudentName}
-                                onChange={e => setNewStudentName(e.target.value)}
-                                onKeyDown={e => { if (e.key === 'Enter') handleAddStudent(); }}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 uppercase"
-                                placeholder="Ex: JOÃO PEDRO SILVA"
-                                autoFocus
-                            />
-                        </div>
-                        <div className="bg-slate-50 px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
-                            <button onClick={() => { setIsAddingStudent(false); setNewStudentName(''); }} className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-5 py-2.5 rounded-xl font-semibold text-sm transition-colors">
-                                Cancelar
-                            </button>
-                            <button onClick={handleAddStudent} className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-semibold text-sm shadow-lg shadow-emerald-500/20 transition-colors">
-                                Adicionar
-                            </button>
-                        </div>
-                    </div>
-                </div>
+            {/* Modal de Cadastro de Estudante */}
+            {isCadastroEstudanteOpen && (
+                <CadastroEstudanteModal
+                    isOpen={isCadastroEstudanteOpen}
+                    onClose={() => setIsCadastroEstudanteOpen(false)}
+                    context={{
+                        schoolName: currentEscola?.nome || '',
+                        schoolId: currentEscolaId,
+                        responsibleName: currentUser?.nome || userEmail || 'PROFESSOR(A)',
+                        contextName: avaliacaoEtapa === 'fundamental' ? avaliacaoBimestre : avaliacaoInfantilCampo,
+                        groupName: `${activeTurma?.anoSerie} - ${activeTurma?.identificacao}`,
+                        classId: activeTurma?.identificacao || ''
+                    }}
+                    onSuccess={() => {
+                        loadInitialData();
+                    }}
+                />
             )}
         </div>
     );
