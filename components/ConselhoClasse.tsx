@@ -243,8 +243,12 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                 const groupByPeriod = (period: number) => {
                     const periodEvals = stuEvals.filter((e: any) => e.period === period);
                     // Map to objectives of the current field
-                    const objectives = BNCC_INFANTIL[avaliacaoInfantilCampo as keyof typeof BNCC_INFANTIL] || [];
-                    return objectives.map(obj => {
+                    const isBemPequena = ['Creche II', 'Creche III'].includes(activeTurma?.anoSerie || '');
+                    const currentAgeGroup = isBemPequena ? 'Crianças bem pequenas' : 'Crianças pequenas';
+                    const field = BNCC_INFANTIL[avaliacaoInfantilCampo.toUpperCase() as keyof typeof BNCC_INFANTIL];
+                    const objectives = (field as any)?.[currentAgeGroup] || [];
+                    
+                    return objectives.map((obj: any) => {
                         const saved = periodEvals.find((e: any) => e.skill_code === obj.code);
                         return saved?.status || 'ND';
                     });
@@ -278,7 +282,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             const evalData = await ccAvaliacaoDocenteService.getAll(
                 currentEscolaId,
                 activeTurma.identificacao,
-                null // Fetch all bimestres
+                undefined // Fetch all bimestres
             );
 
             const formatted = students.map((stu: any) => {
@@ -312,6 +316,16 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             console.error('Erro ao carregar visão geral fundamental:', error);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const loadInitialData = () => {
+        if (avaliacaoBimestre === 'Resultado Consolidado') {
+            if (avaliacaoEtapa === 'fundamental') loadVisaoGeralFundamental();
+            else loadAvaliacoesInfantil();
+        } else {
+            if (avaliacaoEtapa === 'fundamental') loadAvaliacoesDocente();
+            else loadAvaliacoesInfantil();
         }
     };
 
@@ -498,7 +512,11 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         if (!period) return;
 
         // Get current selected skill from BNCC_INFANTIL
-        const objectives = BNCC_INFANTIL[avaliacaoInfantilCampo as keyof typeof BNCC_INFANTIL] || [];
+        const isBemPequena = ['Creche II', 'Creche III'].includes(activeTurma?.anoSerie || '');
+        const currentAgeGroup = isBemPequena ? 'Crianças bem pequenas' : 'Crianças pequenas';
+        const field = BNCC_INFANTIL[avaliacaoInfantilCampo.toUpperCase() as keyof typeof BNCC_INFANTIL];
+        const objectives = (field as any)?.[currentAgeGroup] || [];
+        
         const skill = objectives[conceptIndex];
         if (!skill) return;
 
