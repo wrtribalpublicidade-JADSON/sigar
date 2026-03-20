@@ -4,6 +4,7 @@ import { PageHeader } from './ui/PageHeader';
 import { PrintableVisitReport } from './PrintableVisitReport';
 import { PrintableRhReport } from './PrintableRhReport';
 import { PrintableChecklistReport } from './PrintableChecklistReport';
+import { PrintableCartaApresentacao } from './PrintableCartaApresentacao';
 import {
   BarChart,
   Bar,
@@ -40,6 +41,7 @@ const COLORS = {
 export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadores = [], historicoVisitas, onBack, onUpdate, onUpdateVisitStatus }) => {
   const [activeTab, setActiveTab] = useState<'plano' | 'visitas' | 'turmas' | 'rh' | 'acompanhamento'>('acompanhamento');
   const [selectedVisitForPrint, setSelectedVisitForPrint] = useState<Visita | null>(null);
+  const [selectedServidorForCarta, setSelectedServidorForCarta] = useState<RecursoHumano | null>(null);
   const [formData, setFormData] = useState<DadosEducacionais>(escola.dadosEducacionais);
 
   const regionalCoordinator = useMemo(() => {
@@ -52,6 +54,24 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
       window.print();
       setSelectedVisitForPrint(null);
     }, 100);
+  };
+
+  // helper: check if servidor is eligible for a letter
+  const servidorElegivelCarta = (funcao: string) => {
+    const f = funcao.toLowerCase();
+    return (
+      f.includes('professor') ||
+      f.includes('gestor') ||
+      f.includes('coordenador')
+    );
+  };
+
+  const handlePrintCarta = (rh: RecursoHumano) => {
+    setSelectedServidorForCarta(rh);
+    setTimeout(() => {
+      window.print();
+      setSelectedServidorForCarta(null);
+    }, 300);
   };
 
   const [isPrintingRh, setIsPrintingRh] = useState(false);
@@ -695,6 +715,15 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                             </td>
                             <td className="px-4 py-4 text-center">
                               <div className="flex items-center justify-center gap-1">
+                                {servidorElegivelCarta(rh.funcao) && (
+                                  <button
+                                    title="Imprimir Carta de Apresentação"
+                                    onClick={() => handlePrintCarta(rh)}
+                                    className="text-slate-300 hover:text-indigo-500 transition-colors p-1.5 hover:bg-indigo-50 rounded-lg"
+                                  >
+                                    <Printer size={16} />
+                                  </button>
+                                )}
                                 <button onClick={() => handleEditRh(rh)} className="text-slate-300 hover:text-orange-500 transition-colors p-1.5 hover:bg-orange-50 rounded-lg"><Edit size={16} /></button>
                                 <button onClick={() => handleDeleteRh(rh.id)} className="text-slate-300 hover:text-red-500 transition-colors p-1.5 hover:bg-red-50 rounded-lg"><Trash2 size={16} /></button>
                               </div>
@@ -865,6 +894,14 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
         <PrintableChecklistReport
           escola={escola}
           acompanhamentoMensal={localAcompanhamento}
+        />
+      )}
+
+      {selectedServidorForCarta && (
+        <PrintableCartaApresentacao
+          escola={escola}
+          servidor={selectedServidorForCarta}
+          coordenadorRegional={regionalCoordinator}
         />
       )}
     </div>

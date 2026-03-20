@@ -47,6 +47,13 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({
         return escolas.find(e => e.id === id)?.nome || 'Unidade não identificada';
     };
 
+    // Helper to get the regional coordinator linked to a school
+    const getCoordenadorByEscolaId = (escolaId: string | null | undefined): string => {
+        if (!escolaId) return '-';
+        const coord = coordenadores.find(c => c.escolasIds?.includes(escolaId));
+        return coord?.nome || '-';
+    };
+
     // IDs das escolas vinculadas ao usuário logado
     const escolaIds = React.useMemo(() => escolas.map(e => e.id), [escolas]);
 
@@ -438,7 +445,10 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({
                         dataEnvio: p.data_envio ? new Date(p.data_envio).toLocaleString('pt-BR') : '',
                         tamanho: p.tamanho_kb,
                         usuario: p.usuario || 'Sistema',
-                        coordenadorRegional: p.coordenador_regional || '-'
+                        // Use stored value if available, otherwise look up from coordenadores prop
+                        coordenadorRegional: p.coordenador_regional && p.coordenador_regional !== 'Ana Silva'
+                            ? p.coordenador_regional
+                            : getCoordenadorByEscolaId(p.escola_id)
                     })));
                 }
             } catch (error) {
@@ -493,7 +503,7 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({
                 arquivo_url: urlData.publicUrl || filePath,
                 data_envio: now.toISOString(),
                 usuario: currentUser || 'Usuário logado',
-                coordenador_regional: 'Ana Silva',
+                coordenador_regional: getCoordenadorByEscolaId(currentEscolaId),
                 status: 'Aguardando Análise',
                 tamanho_kb: sizeFormatted,
                 escola_id: currentEscolaId

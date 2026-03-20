@@ -491,7 +491,7 @@ export default function App() {
             etapa_aplicacao: r.etapaAplicacao, tipo_turma: r.tipoTurma, turma: r.turma,
             participacao: r.participacao, classificacao: r.classificacao,
             data_registro: r.dataRegistro, responsavel: r.responsavel
-          })));
+          })), { onConflict: 'escola_id,ano,edicao,polo,tipo_turma,turma', ignoreDuplicates: false });
         }
       }
 
@@ -509,7 +509,7 @@ export default function App() {
             estudantes_avaliados: r.estudantesAvaliados, estudantes_previstos: r.estudantesPrevistos,
             defasagem: r.defasagem, aprendizado_intermediario: r.aprendizadoIntermediario,
             aprendizado_adequado: r.aprendizadoAdequado, data_registro: r.dataRegistro, responsavel: r.responsavel
-          })));
+          })), { onConflict: 'escola_id,ano,tipo_avaliacao,componente_curricular,ano_serie', ignoreDuplicates: false });
         }
       }
 
@@ -527,7 +527,7 @@ export default function App() {
             estudantes_avaliados: r.estudantesAvaliados, estudantes_previstos: r.estudantesPrevistos,
             abaixo_basico: r.abaixoBasico, basico: r.basico, adequado: r.adequado, avancado: r.avançado,
             proficiencia_media: r.proficienciaMedia, data_registro: r.dataRegistro, responsavel: r.responsavel
-          })));
+          })), { onConflict: 'escola_id,ano,tipo_avaliacao,componente_curricular,ano_serie', ignoreDuplicates: false });
         }
       }
 
@@ -548,7 +548,7 @@ export default function App() {
             proficiencia_mat: r.proficienciaMat, nota_padronizada_lp: r.notaPadronizadaLp,
             nota_padronizada_mat: r.notaPadronizadaMat, nota_saeb: r.notaSaeb,
             data_registro: r.dataRegistro, responsavel: r.responsavel
-          })));
+          })), { onConflict: 'escola_id,ano,tipo_avaliacao,componente_curricular,ano_serie', ignoreDuplicates: false });
         }
       }
 
@@ -563,7 +563,7 @@ export default function App() {
           await supabase.from('registros_ideb').upsert(registros.map(r => ({
             id: r.id, escola_id: updatedEscola.id, ano: r.ano, anos_iniciais: r.anosIniciais,
             anos_finais: r.anosFinais, data_registro: r.dataRegistro, responsavel: r.responsavel
-          })));
+          })), { onConflict: 'escola_id,ano', ignoreDuplicates: false });
         }
       }
 
