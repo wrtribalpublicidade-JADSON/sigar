@@ -942,7 +942,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         try {
             const status = await ccAvaliacaoEtapaService.getStatus(
                 currentEscolaId,
-                activeTurma.id,
+                activeTurma.id || '',
                 avaliacaoBimestre,
                 avaliacaoEtapa,
                 avaliacaoEtapa === 'fundamental' ? selectedComponenteCurricular : undefined
