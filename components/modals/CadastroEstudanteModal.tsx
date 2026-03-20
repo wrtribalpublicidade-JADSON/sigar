@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Check, Trash2, Edit, Users, Calendar, AlertTriangle, Search, Info, Lock } from 'lucide-react';
 import { ccEstudanteService } from '../../services/gestaoConselhoService';
+import { supabase } from '../../services/supabase';
 
 interface CadastroEstudanteModalProps {
     isOpen: boolean;
@@ -13,6 +14,8 @@ interface CadastroEstudanteModalProps {
         groupName: string;   // Age Group or Turma/Ano
         classId: string;
     };
+    escolas: any[];
+    onOpenTurmaModal: () => void;
     onSuccess: () => void;
 }
 
@@ -20,6 +23,8 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
     isOpen,
     onClose,
     context,
+    escolas,
+    onOpenTurmaModal,
     onSuccess
 }) => {
     // Form state
@@ -30,6 +35,12 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
     const [status, setStatus] = useState('active');
     const [observations, setObservations] = useState('');
     
+    // Interactive context state
+    const [selectedSchoolId, setSelectedSchoolId] = useState(context.schoolId);
+    const [selectedResponsible, setSelectedResponsible] = useState(context.responsibleName);
+    const [teachers, setTeachers] = useState<any[]>([]);
+    const [isLoadingTeachers, setIsLoadingTeachers] = useState(false);
+
     // UI state
     const [students, setStudents] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -42,6 +53,31 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
             loadStudents();
         }
     }, [isOpen, context.classId]);
+
+    useEffect(() => {
+        if (isOpen && selectedSchoolId) {
+            loadTeachers();
+        }
+    }, [isOpen, selectedSchoolId]);
+
+    const loadTeachers = async () => {
+        setIsLoadingTeachers(true);
+        try {
+            // Fetching from ccRecursosHumanosService if available or direct query
+            const { data, error } = await supabase
+                .from('recursos_humanos')
+                .select('nome')
+                .eq('escola_id', selectedSchoolId)
+                .order('nome');
+            
+            if (error) throw error;
+            setTeachers(data || []);
+        } catch (err) {
+            console.error('Error loading teachers:', err);
+        } finally {
+            setIsLoadingTeachers(false);
+        }
+    };
 
     const loadStudents = async () => {
         setIsLoading(true);
@@ -64,6 +100,18 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
             return;
         }
 
+        if (!selectedSchoolId) {
+            setError('Selecione uma Unidade Escolar.');
+            setIsSaving(false);
+            return;
+        }
+
+        if (!context.classId) {
+            setError('Uma turma/grupo deve estar selecionada.');
+            setIsSaving(false);
+            return;
+        }
+
         setIsSaving(true);
         setError(null);
 
@@ -73,8 +121,10 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
             gender: gender || null,
             status,
             observations: observations.trim() || null,
+            stage: context.groupName.split('-')[0].trim(), 
             class_id: context.classId,
-            escola_id: context.schoolId
+            escola_id: selectedSchoolId,
+            professor_responsavel: selectedResponsible
         };
 
         try {
@@ -181,12 +231,62 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar bg-slate-50/30">
-                    {/* Context Contextual Information - Locked */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <ContextCard icon={<div className="w-4 h-4 bg-blue-100 rounded flex items-center justify-center text-[10px] text-blue-600 font-bold">UE</div>} label="Unidade Escolar" value={context.schoolName} />
-                        <ContextCard icon={<div className="w-4 h-4 bg-emerald-100 rounded flex items-center justify-center text-[10px] text-emerald-600 font-bold"><Info className="w-3 h-3" /></div>} label="Responsável" value={context.responsibleName} />
-                        <ContextCard icon={<div className="w-4 h-4 bg-purple-100 rounded flex items-center justify-center text-[10px] text-purple-600 font-bold">CP</div>} label="Componente" value={context.contextName} />
-                        <ContextCard icon={<div className="w-4 h-4 bg-orange-100 rounded flex items-center justify-center text-[10px] text-orange-600 font-bold">TR</div>} label="Turma/Grupo" value={context.groupName} />
+                    {/* Interactive Context Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="cursor-pointer group relative">
+                            <ContextCard 
+                                icon={<div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-[10px] text-blue-600 font-bold">UE</div>} 
+                                label="Unidade Escolar" 
+                                value={escolas.find(e => e.id === selectedSchoolId)?.nome || context.schoolName} 
+                                isInteractive={true}
+                            />
+                            <select 
+                                value={selectedSchoolId}
+                                onChange={(e) => setSelectedSchoolId(e.target.value)}
+                                className="absolute inset-0 opacity-0 cursor-pointer w-full"
+                            >
+                                {escolas.map(e => (
+                                    <option key={e.id} value={e.id}>{e.nome}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="cursor-pointer group relative">
+                            <ContextCard 
+                                icon={<div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center text-[10px] text-emerald-600 font-bold"><Users className="w-4 h-4" /></div>} 
+                                label="Professor Responsável" 
+                                value={selectedResponsible} 
+                                isInteractive={true}
+                            />
+                            <select 
+                                value={selectedResponsible}
+                                onChange={(e) => setSelectedResponsible(e.target.value)}
+                                className="absolute inset-0 opacity-0 cursor-pointer w-full"
+                                disabled={isLoadingTeachers}
+                            >
+                                <option value="">Selecione um professor...</option>
+                                {teachers.map((t, idx) => (
+                                    <option key={idx} value={t.nome}>{t.nome}</option>
+                                ))}
+                            </select>
+                            {isLoadingTeachers && (
+                                <div className="absolute right-12 top-1/2 -translate-y-1/2">
+                                    <div className="w-4 h-4 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div 
+                            className="cursor-pointer group"
+                            onClick={onOpenTurmaModal}
+                        >
+                            <ContextCard 
+                                icon={<div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center text-[10px] text-orange-600 font-bold">TR</div>} 
+                                label="Turma/Grupo" 
+                                value={context.groupName} 
+                                isInteractive={true}
+                            />
+                        </div>
                     </div>
 
                     {/* Form Section - Full Width and Top */}
@@ -402,29 +502,29 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
                     <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
                         ESTUDANTES NESSE CONTEXTO: <span className="text-slate-800 ml-1">{students.length}</span>
                     </p>
-                    <button
-                        onClick={onClose}
-                        className="bg-white border border-slate-200 text-slate-600 px-10 py-3 rounded-2xl font-black text-xs uppercase hover:bg-slate-50 transition-all shadow-sm tracking-widest"
-                    >
-                        Fechar Modal
-                    </button>
+
                 </div>
             </div>
         </div>
     );
 };
 
-const ContextCard = ({ icon, label, value }: { icon: React.ReactNode, label: string, value: string }) => (
-    <div className="bg-white border border-slate-100 rounded-[1.5rem] p-5 flex items-center gap-4 transition-all hover:shadow-md hover:-translate-y-1 duration-300 shadow-sm border-b-2 border-b-slate-50 group">
-        <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center shadow-inner group-hover:bg-white transition-colors">
+const ContextCard = ({ icon, label, value, isInteractive }: { icon: React.ReactNode, label: string, value: string, isInteractive?: boolean }) => (
+    <div className={`bg-white border border-slate-100 rounded-[2rem] p-6 flex items-center gap-5 transition-all duration-300 shadow-sm border-b-4 border-b-slate-50 relative group ${isInteractive ? 'hover:shadow-xl hover:-translate-y-1 hover:border-emerald-500/30' : ''}`}>
+        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-colors ${isInteractive ? 'bg-emerald-50 border border-emerald-100 group-hover:bg-emerald-500 group-hover:text-white' : 'bg-slate-50 border border-slate-100'}`}>
             {icon}
         </div>
-        <div className="overflow-hidden">
-            <span className="block text-[10px] font-black tracking-widest text-slate-400 uppercase mb-0.5">{label}</span>
-            <span className="block text-sm font-black text-slate-800 uppercase truncate">{value || '-'}</span>
+        <div className="overflow-hidden flex-1">
+            <span className="block text-[10px] font-black tracking-widest text-slate-400 uppercase mb-1.5 group-hover:text-emerald-600 transition-colors">{label}</span>
+            <span className="block text-base font-black text-slate-800 uppercase truncate group-hover:text-slate-900 transition-colors">{value || '-'}</span>
         </div>
-        <div className="ml-auto opacity-30">
-            <Lock className="w-3.5 h-3.5 text-slate-400" />
+        {isInteractive && (
+            <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100">
+                <Edit className="w-4 h-4 text-emerald-600" />
+            </div>
+        )}
+        <div className="absolute right-6 top-6 opacity-10 group-hover:opacity-20 transition-opacity">
+            <Lock className="w-4 h-4 text-slate-400" />
         </div>
     </div>
 );

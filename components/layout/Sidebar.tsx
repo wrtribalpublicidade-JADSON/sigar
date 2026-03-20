@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     LayoutDashboard, School, Users, FileText,
-    ChevronLeft, ChevronRight, Menu, X, LogOut, PlusCircle, BarChart3, TrendingUp, ClipboardCheck, GraduationCap, ClipboardList, Bell, Shield, FileStack, Library, KeyRound
+    ChevronLeft, ChevronRight, Menu, X, LogOut, PlusCircle, BarChart3, TrendingUp, ClipboardCheck, GraduationCap, ClipboardList, Bell, Shield, FileStack, Library, KeyRound, Baby
 } from 'lucide-react';
 import { ViewState } from '../../types';
 import { getAccessForSidebarItem } from '../../utils/permissions';
@@ -99,7 +99,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
         { icon: ClipboardCheck, label: 'Análise CNCA/PNRA', view: 'ANALISE_CNCA_PNRA' as ViewState },
         { icon: BarChart3, label: 'Indicadores', view: 'INDICADORES' as ViewState },
         { icon: FileStack, label: 'Instrumentais de Gestão', view: 'INSTRUMENTAIS_GESTAO' as ViewState },
-        { icon: Library, label: 'Conselho de Classe', view: 'CONSELHO_CLASSE' as ViewState },
+        { icon: Library, label: 'Conselho - Fundamental', view: 'CONSELHO_CLASSE_FUNDAMENTAL' as ViewState },
+        { icon: Baby, label: 'Conselho - Infantil', view: 'CONSELHO_CLASSE_INFANTIL' as ViewState },
         { icon: Bell, label: 'Notificações', view: 'NOTIFICACOES' as ViewState, isHighlighted: true, hasNotification: notificationCount > 0 },
         { icon: Library, label: 'Atividades Complementares', view: 'ATIVIDADES_COMPLEMENTARES' as ViewState },
         { icon: Shield, label: 'Auditoria', view: 'AUDIT_LOGS' as ViewState },

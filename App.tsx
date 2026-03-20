@@ -27,13 +27,14 @@ import { ConselhoClasse } from './components/ConselhoClasse';
 import { PermissoesManager } from './components/PermissoesManager';
 import { AtividadesComplementares } from './components/AtividadesComplementares';
 import { Preloader } from './components/ui/Preloader';
-import { ViewState, Escola, Visita, Coordenador } from './types';
+import { ViewState, Escola, Visita, Coordenador, Segmento } from './types';
 import { supabase } from './services/supabase';
 import { useNotification } from './context/NotificationContext';
 import { generateUUID, checkSchoolPendencies } from './utils';
 import { hasAccess } from './utils/permissions';
 import { loadPermissions as preloadPermissions } from './services/permissoesService';
 import { ESCOLAS_MOCK, VISITAS_MOCK, COORDENADORES_MOCK } from './constants';
+import { igPlanoAcaoService } from './services/gestaoConselhoService';
 import { logAccess, logAudit } from './services/logService';
 const ADMIN_EMAIL = 'jadsoncsilv@gmail.com';
 
@@ -51,6 +52,8 @@ export default function App() {
 
   const [currentView, setCurrentView] = useState<ViewState>('DASHBOARD');
   const [selectedEscolaId, setSelectedEscolaId] = useState<string | null>(null);
+  const [ccFundamentalEscolaId, setCcFundamentalEscolaId] = useState<string>('');
+  const [ccInfantilEscolaId, setCcInfantilEscolaId] = useState<string>('');
   const [selectedVisit, setSelectedVisit] = useState<Visita | null>(null);
   const [selectedVisitForPrint, setSelectedVisitForPrint] = useState<Visita | null>(null);
 
@@ -99,6 +102,10 @@ export default function App() {
         if (currentUserCoord) {
           linkedSchoolIds = currentUserCoord.escolasIds;
           setLoggedInCoordId(currentUserCoord.id);
+          // Set isAdmin based on the role in the database
+          if (currentUserCoord.funcao === 'Administrador' || currentUserCoord.funcao === 'Gestor Geral') {
+            setIsAdmin(true);
+          }
         } else {
           setEscolas([]);
           setVisitas([]);
@@ -117,17 +124,9 @@ export default function App() {
 
       const activeSchoolIds = (escData || []).map(e => e.id);
 
-      const [
-        { data: metasData },
-        { data: rhData },
-        { data: acompData },
-        { data: parcData },
-        { data: cncaData },
-        { data: seamaData },
-        { data: saebData },
-        { data: idebData }
-      ] = await Promise.all([
-        supabase.from('metas_acao').select('*').in('escola_id', activeSchoolIds),
+      // Fetch related data in parallel with explicit error handling for each
+      const fetchResults = await Promise.allSettled([
+        igPlanoAcaoService.getAll(activeSchoolIds),
         supabase.from('recursos_humanos').select('*').in('escola_id', activeSchoolIds),
         supabase.from('acompanhamento_mensal').select('*').in('escola_id', activeSchoolIds),
         supabase.from('registros_fluencia_parc').select('*').in('escola_id', activeSchoolIds),
@@ -136,6 +135,26 @@ export default function App() {
         supabase.from('registros_saeb').select('*').in('escola_id', activeSchoolIds),
         supabase.from('registros_ideb').select('*').in('escola_id', activeSchoolIds)
       ]);
+
+      const getResultData = (index: number, label: string) => {
+        const res = fetchResults[index];
+        if (res.status === 'fulfilled') {
+          // igPlanoAcaoService returns data directly, others return {data, error}
+          return (index === 0) ? res.value : (res.value as any).data;
+        } else {
+          console.error(`Error fetching ${label}:`, res.reason);
+          return [];
+        }
+      };
+
+      const metasData = getResultData(0, 'Plano de Ação');
+      const rhData = getResultData(1, 'RH');
+      const acompData = getResultData(2, 'Acompanhamento');
+      const parcData = getResultData(3, 'Fluência PARC');
+      const cncaData = getResultData(4, 'CNCA/PNRA');
+      const seamaData = getResultData(5, 'SEAMA');
+      const saebData = getResultData(6, 'SAEB');
+      const idebData = getResultData(7, 'IDEB');
 
       const mappedEscolas: Escola[] = (escData || []).map((e: any) => ({
         id: e.id,
@@ -184,7 +203,7 @@ export default function App() {
             anosFinais: r.anos_finais, dataRegistro: r.data_registro, responsavel: r.responsavel
           })) || []
         },
-        planoAcao: metasData?.filter((m: any) => m.escola_id === e.id).map((m: any) => ({ ...m, status: m.status as any })) || [],
+        planoAcao: (metasData || []).filter((m: any) => (m.escola_id || m.schoolId) === e.id).map((m: any) => ({ ...m, status: m.status as any })),
         recursosHumanos: rhData?.filter((r: any) => r.escola_id === e.id).map((r: any) => ({
           id: r.id,
           funcao: r.funcao,
@@ -222,6 +241,12 @@ export default function App() {
       })) || [];
 
       setEscolas(mappedEscolas);
+      
+      // Initialize Class Council selections if not set
+      if (mappedEscolas.length > 0) {
+        setCcFundamentalEscolaId(prev => prev || mappedEscolas[0].id);
+        setCcInfantilEscolaId(prev => prev || mappedEscolas[0].id);
+      }
       setVisitas(mappedVisitas);
       setCoordenadores(mappedCoords);
 
@@ -377,18 +402,24 @@ export default function App() {
 
       if (error) throw error;
 
-      // --- Metas de Ação: only sync if changed ---
-      if (planoChanged) {
+      // --- Plano de Ação (ig_plano_acao): only sync if changed ---
+      // Robustness: Don't perform destructive sync if updatedEscola.planoAcao is empty 
+      // but oldEscola had items (this suggests a data loading failure)
+      const isSuspectedLoadingFailure = (currentEscola?.planoAcao?.length || 0) > 0 && updatedEscola.planoAcao.length === 0;
+
+      if (planoChanged && !isSuspectedLoadingFailure) {
         const currentMetaIds = updatedEscola.planoAcao.map(m => m.id);
-        const { data: existingMetas } = await supabase.from('metas_acao').select('id').eq('escola_id', updatedEscola.id);
+        const { data: existingMetas } = await supabase.from('ig_plano_acao').select('id').eq('escola_id', updatedEscola.id);
         const metaIdsToDelete = (existingMetas || []).map((m: any) => m.id).filter((id: string) => !currentMetaIds.includes(id));
+        
         if (metaIdsToDelete.length > 0) {
-          const { error: delErr } = await supabase.from('metas_acao').delete().in('id', metaIdsToDelete);
+          const { error: delErr } = await supabase.from('ig_plano_acao').delete().in('id', metaIdsToDelete);
           if (delErr) throw delErr;
         }
+        
         if (updatedEscola.planoAcao.length > 0) {
-          const { error: upsertErr } = await supabase.from('metas_acao').upsert(updatedEscola.planoAcao.map(m => ({
-            id: m.id,
+          const { error: upsertErr } = await supabase.from('ig_plano_acao').upsert(updatedEscola.planoAcao.map(m => ({
+            id: m.id.length > 10 ? m.id : undefined, // Ensure we don't upsert mock IDs
             escola_id: updatedEscola.id,
             descricao: m.descricao,
             prazo: m.prazo,
@@ -1001,7 +1032,7 @@ export default function App() {
           />
         );
       case 'INSTRUMENTAIS_GESTAO':
-        return <InstrumentaisGestao escolas={escolas} currentUser={userName} isAdmin={isAdmin} />;
+        return <InstrumentaisGestao escolas={escolas} coordenadores={coordenadores} currentUser={userName} isAdmin={isAdmin} onUpdateEscola={handleUpdateEscola} />;
       case 'CONSELHO_CLASSE':
         return (
           <ConselhoClasse
@@ -1009,6 +1040,35 @@ export default function App() {
             userEmail={userEmail}
             isAdmin={isAdmin}
             currentUser={effectiveUser}
+          />
+        );
+      case 'CONSELHO_CLASSE_FUNDAMENTAL':
+        return (
+          <ConselhoClasse
+            key="conselho-fundamental"
+            escolas={escolas.filter(e => 
+              e.segmentos.includes(Segmento.FUNDAMENTAL_I) || 
+              e.segmentos.includes(Segmento.FUNDAMENTAL_II)
+            )}
+            userEmail={userEmail}
+            isAdmin={isAdmin}
+            currentUser={effectiveUser}
+            forcedEtapa="fundamental"
+            externalSelectedEscolaId={ccFundamentalEscolaId}
+            onEscolaChange={setCcFundamentalEscolaId}
+          />
+        );
+      case 'CONSELHO_CLASSE_INFANTIL':
+        return (
+          <ConselhoClasse
+            key="conselho-infantil"
+            escolas={escolas.filter(e => e.segmentos.includes(Segmento.INFANTIL))}
+            userEmail={userEmail}
+            isAdmin={isAdmin}
+            currentUser={effectiveUser}
+            forcedEtapa="infantil"
+            externalSelectedEscolaId={ccInfantilEscolaId}
+            onEscolaChange={setCcInfantilEscolaId}
           />
         );
       case 'NOTIFICACOES':

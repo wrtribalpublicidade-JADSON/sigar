@@ -36,9 +36,10 @@ const getColors = (index: number) => {
 
 interface AcompanhamentoSalaDashboardProps {
     escolas?: Escola[];
+    selectedEscolaId?: string;
 }
 
-export const AcompanhamentoSalaDashboard: React.FC<AcompanhamentoSalaDashboardProps> = ({ escolas = [] }) => {
+export const AcompanhamentoSalaDashboard: React.FC<AcompanhamentoSalaDashboardProps> = ({ escolas = [], selectedEscolaId = 'all' }) => {
     const [activeFilterTab, setActiveFilterTab] = useState('todas');
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -49,8 +50,8 @@ export const AcompanhamentoSalaDashboard: React.FC<AcompanhamentoSalaDashboardPr
     const loadDados = async () => {
         setIsLoading(true);
         try {
-            const escolaIds = escolas.map(e => e.id);
-            const dados = await igAcompanhamentoSalaService.getAll(escolaIds.length > 0 ? escolaIds : undefined);
+            const filterIds = selectedEscolaId === 'all' ? escolas.map(e => e.id) : [selectedEscolaId];
+            const dados = await igAcompanhamentoSalaService.getAll(filterIds.length > 0 ? filterIds : undefined);
             setAcompanhamentos(dados || []);
         } catch (err) {
             console.error('Erro ao carregar acompanhamentos de sala:', err);
@@ -61,13 +62,17 @@ export const AcompanhamentoSalaDashboard: React.FC<AcompanhamentoSalaDashboardPr
 
     React.useEffect(() => {
         loadDados();
-    }, [escolas]);
+    }, [escolas, selectedEscolaId]);
 
     const allObservacoes = React.useMemo(() => {
         let obsList: Observacao[] = [];
         let index = 0;
 
-        escolas.forEach(escola => {
+        const filteredEscolas = selectedEscolaId === 'all' 
+            ? escolas 
+            : escolas.filter(e => e.id === selectedEscolaId);
+
+        filteredEscolas.forEach(escola => {
             if (escola.recursosHumanos) {
                 const professores = escola.recursosHumanos.filter((rh: RecursoHumano) =>
                     rh.funcao && rh.funcao.toLowerCase().includes('professor')

@@ -287,7 +287,7 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
                   <>
                     <option value="Coordenador Regional">Coordenador Regional</option>
                     <option value="Administrador">Administrador</option>
-                    <option value="Técnico">Técnico Pedagógico</option>
+                    <option value="Técnico Pedagógico">Técnico Pedagógico</option>
                     <option value="Professor">Professor</option>
                     <option value="Coordenador Pedagógico">Coordenador Pedagógico</option>
                     <option value="Gestor Geral">Gestor Geral</option>
@@ -401,7 +401,7 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
           <option value="Gestor Pedagógico">Gestor Pedagógico</option>
           <option value="Coordenador Pedagógico">Coordenador Pedagógico</option>
           <option value="Professor">Professor</option>
-          <option value="TÉCNICO PEDAGÓGICO">Técnico Pedagógico</option>
+          <option value="Técnico Pedagógico">Técnico Pedagógico</option>
         </select>
 
         <select

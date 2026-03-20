@@ -560,3 +560,82 @@ export const VISITAS_MOCK: Visita[] = [
     status: 'Relatório Pendente'
   }
 ];
+
+export const TURMAS_MOCK: any[] = [
+  { id: 't1', etapa: 'Ensino Fundamental I', anoSerie: '2º ANO', identificacao: 'Turma A', turno: 'Matutino', tipo: 'REGULAR', schoolId: '1' },
+  { id: 't2', etapa: 'Ensino Fundamental I', anoSerie: '5º ANO', identificacao: 'Turma B', turno: 'Vespertino', tipo: 'REGULAR', schoolId: '1' },
+  { id: 't3', etapa: 'Educação Infantil', anoSerie: 'Creche III', identificacao: 'Maternal', turno: 'Matutino', tipo: 'REGULAR', schoolId: '2' },
+  { id: 't4', etapa: 'Ensino Fundamental II', anoSerie: '9º ANO', identificacao: 'Turma C', turno: 'Matutino', tipo: 'REGULAR', schoolId: '8' }
+];
+
+export const ALUNOS_MOCK: any[] = [
+  { id: 'a1', name: 'Ana Beatriz Ferreira', class_id: 't1', status: 'active', escola_id: '1' },
+  { id: 'a2', name: 'Bruno Gomes Silva', class_id: 't1', status: 'active', escola_id: '1' },
+  { id: 'a3', name: 'Carla Souza Santos', class_id: 't1', status: 'active', escola_id: '1' },
+  { id: 'a4', name: 'Diego Oliveira Lima', class_id: 't1', status: 'active', escola_id: '1' },
+  { id: 'a5', name: 'Eduarda Costa Melo', class_id: 't1', status: 'active', escola_id: '1' },
+  { id: 'a6', name: 'Fabiano Rocha Junior', class_id: 't2', status: 'active', escola_id: '1' },
+  { id: 'a7', name: 'Giovanna Lopes', class_id: 't2', status: 'active', escola_id: '1' },
+  { id: 'a8', name: 'Heitor Almeida', class_id: 't3', status: 'active', escola_id: '2' },
+  { id: 'a9', name: 'Isabela Miranda', class_id: 't3', status: 'active', escola_id: '2' }
+];
+
+export const REUNIOES_IG_MOCK: any[] = [
+  {
+    id: 'r1', schoolId: '1', data_reuniao: '2024-03-15', hora_inicio: '08:00', hora_fim: '10:00',
+    tipo: 'Pedagógica', pauta: 'Planejamento do 1º Bimestre', local_reuniao: 'Sala dos Professores',
+    status: 'Realizada', responsavel: 'Fernanda Oliveira', participantes: ['Maria da Silva', 'João Souza', 'Prof. Ana']
+  },
+  {
+    id: 'r2', schoolId: '1', data_reuniao: '2024-04-05', hora_inicio: '14:00', hora_fim: '16:00',
+    tipo: 'Administrativa', pauta: 'Organização do Evento de Páscoa', local_reuniao: 'Pátio Central',
+    status: 'Agendada', responsavel: 'Maria da Silva', participantes: ['Equipe Gestora', 'Líderes de Turma']
+  }
+];
+
+export const METAS_ACAO_IG_MOCK: any[] = [
+  { id: 'm1', escola_id: '1', descricao: 'Elevar o IDEB para 5.2', prazo: '2024-12-31', status: 'Em Andamento', responsavel: 'Maria da Silva' },
+  { id: 'm2', escola_id: '1', descricao: 'Reduzir a evasão escolar em 10%', prazo: '2024-07-20', status: 'Não Iniciado', responsavel: 'João Souza' },
+  { id: 'm3', escola_id: '1', descricao: 'Implementar laboratório de informática', prazo: '2024-05-15', status: 'Atrasado', responsavel: 'Administrativo' }
+];
+
+export const FORMACAO_IG_MOCK: any[] = [
+  { id: 'f1', escola_id: '1', especificacao: 'Oficina de Letramento e Alfabetização', objetivo: 'Capacitar professores para novas metodologias', data_formacao: '2024-03-22', publico_alvo: 'Professores do Ciclo de Alfabetização', responsavel: 'SME', custo: 'R$ 0,00' },
+  { id: 'f2', escola_id: '1', especificacao: 'Uso de Tecnologias em Sala', objetivo: 'Introduzir ferramentas digitais no ensino', data_formacao: '2024-04-10', publico_alvo: 'Todos os docentes', responsavel: 'Equipe de TI', custo: 'R$ 500,00' }
+];
+
+export const AVALIACOES_DOCENTE_MOCK: any[] = [
+  {
+    id: 'ev1', escola_id: '1', turma_id: 't1', estudante_id: 'a1', periodo_letivo: '1º Bimestre', 
+    componente_curricular: 'Língua Portuguesa - BNCC', frequencia_conceito: 'B', participacao_conceito: 'B',
+    material_conceito: 'B', atividades_conceito: 'B', comunicacao_conceito: 'B', pesquisa_conceito: 'B', 
+    conduta_conceito: 'B', notas_json: { av1: 8.5, av2: 7.0, av3: 9.0, rec: null }, media_final: 8.2, parecer_etapa: 'BOM'
+  },
+  {
+    id: 'ev2', escola_id: '1', turma_id: 't1', estudante_id: 'a2', periodo_letivo: '1º Bimestre',
+    componente_curricular: 'Língua Portuguesa - BNCC', frequencia_conceito: 'B', participacao_conceito: 'R',
+    material_conceito: 'B', atividades_conceito: 'R', comunicacao_conceito: 'B', pesquisa_conceito: 'R',
+    conduta_conceito: 'B', notas_json: { av1: 5.5, av2: 6.0, av3: 5.0, rec: 7.5 }, media_final: 6.5, parecer_etapa: 'REGULAR'
+  }
+];
+
+export const AVALIACOES_INFANTIL_MOCK: any[] = [
+  { id: 'ei1', student_id: 'a8', period: 1, skill_code: 'EI02EO01', status: 'D' },
+  { id: 'ei2', student_id: 'a8', period: 1, skill_code: 'EI02EO02', status: 'ED' },
+  { id: 'ei3', student_id: 'a8', period: 1, skill_code: 'EI02EO03', status: 'D' },
+  { id: 'ei4', student_id: 'a9', period: 1, skill_code: 'EI02EO01', status: 'ND' }
+];
+
+export const PPP_MOCK: any[] = [
+  { id: 'p1', escola_id: '1', arquivo: 'PPP_2024_Humberto.pdf', arquivo_url: '#', data_envio: '2024-01-10T10:00:00Z', usuario: 'Maria da Silva', coordenador_regional: 'Fernanda Oliveira', status: 'Aprovado', tamanho_kb: '1.2 MB' }
+];
+
+export const ACOMP_SALA_MOCK: any[] = [
+  { id: 'as1', escola_id: '1', data_observacao: '2024-03-12', professor: 'Carlos Souza', turma: '2º Ano A', componente: 'Matemática', objetivos_alcancados: true, observacoes: 'Boa interação com a turma.', pontos_atencao: 'Melhorar gestão de tempo.' }
+];
+
+export const CALENDARIO_MOCK: any[] = [
+  { id: 'c1', escola_id: '1', data: '2024-03-28', evento: 'Reunião de Pais', tipo: 'Pedagógica', descricao: 'Entrega de resultados do 1º Bimestre', local: 'Auditório' },
+  { id: 'c2', escola_id: '1', data: '2024-04-15', evento: 'Conselho de Classe', tipo: 'Avaliação', descricao: 'Fechamento do Bimestre', local: 'Sala de Reuniões' }
+];
+

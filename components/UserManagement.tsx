@@ -297,7 +297,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
                         <option value="Coordenador Regional">Coordenador Regional</option>
                         <option value="Gestor">Gestor</option>
                         <option value="Coordenador Pedagógico">Coordenador Pedagógico</option>
-                        <option value="TÉCNICO PEDAGÓGICO">Técnico Pedagógico</option>
+                        <option value="Técnico Pedagógico">Técnico Pedagógico</option>
                     </select>
 
                     <select
@@ -485,7 +485,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
                                         <option value="Coordenador Regional">Coordenador Regional</option>
                                         <option value="Gestor">Gestor(a)</option>
                                         <option value="Coordenador Pedagógico">Coordenador(a) Pedagógico (Local)</option>
-                                        <option value="TÉCNICO PEDAGÓGICO">Técnico Pedagógico</option>
+                                        <option value="Técnico Pedagógico">Técnico Pedagógico</option>
                                     </select>
                                 </div>
 

@@ -18,6 +18,7 @@ import { generateUUID } from '../utils';
 import { generateAcompanhamentoMensal } from '../constants';
 import { Button } from './ui/Button';
 import { Escola, Visita, DadosEducacionais, ItemAcompanhamento, RecursoHumano, MetaAcao, StatusMeta, Coordenador, Segmento } from '../types';
+import { igPlanoAcaoService } from '../services/gestaoConselhoService';
 
 interface SchoolDetailProps {
   escola: Escola;
@@ -110,6 +111,30 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
   const [metaForm, setMetaForm] = useState<MetaAcao>({
     id: '', descricao: '', prazo: '', status: StatusMeta.NAO_INICIADO, responsavel: ''
   });
+
+  // Local state for plano de ação, fetched directly to ensure freshness
+  const [localPlanoAcao, setLocalPlanoAcao] = useState<MetaAcao[]>(escola.planoAcao || []);
+  const [isLoadingPlano, setIsLoadingPlano] = useState(false);
+
+  useEffect(() => {
+    const fetchPlano = async () => {
+      if (!escola.id) return;
+      setIsLoadingPlano(true);
+      try {
+        const data = await igPlanoAcaoService.getAll(escola.id);
+        if (data && Array.isArray(data)) {
+          setLocalPlanoAcao(data.map((m: any) => ({ ...m, status: m.status as StatusMeta })));
+        }
+      } catch (e) {
+        console.error('Erro ao carregar plano de ação:', e);
+        // fallback to prop data
+        setLocalPlanoAcao(escola.planoAcao || []);
+      } finally {
+        setIsLoadingPlano(false);
+      }
+    };
+    fetchPlano();
+  }, [escola.id]);
 
   const handleInputChange = (section: keyof DadosEducacionais, field: string, value: string) => {
     setFormData(prev => ({
@@ -210,11 +235,12 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
     if (!metaForm.descricao || !metaForm.prazo) return;
     let updatedPlano;
     if (metaForm.id) {
-      updatedPlano = escola.planoAcao.map(m => m.id === metaForm.id ? metaForm : m);
+      updatedPlano = localPlanoAcao.map(m => m.id === metaForm.id ? metaForm : m);
     } else {
       const newMeta = { ...metaForm, id: generateUUID() };
-      updatedPlano = [...escola.planoAcao, newMeta];
+      updatedPlano = [...localPlanoAcao, newMeta];
     }
+    setLocalPlanoAcao(updatedPlano);
     onUpdate({ ...escola, planoAcao: updatedPlano });
     setIsEditingMeta(false);
     setMetaForm({ id: '', descricao: '', prazo: '', status: StatusMeta.NAO_INICIADO, responsavel: '' });
@@ -227,7 +253,8 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
 
   const handleDeleteMeta = (id: string) => {
     if (confirm('Tem certeza que deseja excluir esta meta?')) {
-      const updatedPlano = escola.planoAcao.filter(m => m.id !== id);
+      const updatedPlano = localPlanoAcao.filter(m => m.id !== id);
+      setLocalPlanoAcao(updatedPlano);
       onUpdate({ ...escola, planoAcao: updatedPlano });
     }
   };
@@ -733,7 +760,12 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                 )}
 
                 <div className="space-y-4">
-                  {escola.planoAcao.map(meta => (
+                  {isLoadingPlano ? (
+                    <div className="py-12 text-center text-slate-400 text-sm">Carregando ações...</div>
+                  ) : localPlanoAcao.length === 0 ? (
+                    <div className="py-12 text-center text-slate-400 text-sm">Nenhuma meta cadastrada.</div>
+                  ) : null}
+                  {!isLoadingPlano && localPlanoAcao.map(meta => (
                     <div key={meta.id} className="p-6 border border-slate-100 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row justify-between items-center gap-6 group">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">

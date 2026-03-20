@@ -5,7 +5,8 @@ import { CadastroTurmaModal, TurmaData } from './modals/CadastroTurmaModal';
 import { StudentReportModal } from './modals/StudentReportModal';
 import { CadastroEstudanteModal } from './modals/CadastroEstudanteModal';
 import { ReuniaoEstudantilForm } from './ReuniaoEstudantilForm';
-import { ccAvaliacaoDocenteService, ccAcompanhamentoDocenteService, ccEncaminhamentosService, ccAvaliacaoEtapaService, ccSolicitacaoDesbloqueioService, ccAvaliacaoInfantilService, ccEstudanteService } from '../services/gestaoConselhoService';
+import { ccAvaliacaoDocenteService, ccAcompanhamentoDocenteService, ccEncaminhamentosService, ccAvaliacaoEtapaService, ccSolicitacaoDesbloqueioService, ccAvaliacaoInfantilService, ccEstudanteService, ccTurmaService } from '../services/gestaoConselhoService';
+import { PrintableConselhoReport } from './PrintableConselhoReport';
 import { Escola, Segmento, Coordenador } from '../types';
 
 const BNCC_INFANTIL = {
@@ -112,17 +113,37 @@ interface ConselhoClasseProps {
     isAdmin?: boolean;
     userEmail?: string | null;
     currentUser?: Coordenador | null;
+    forcedEtapa?: 'fundamental' | 'infantil';
+    externalSelectedEscolaId?: string;
+    onEscolaChange?: (id: string) => void;
 }
 
 export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     escolas = [],
     isAdmin = false,
     userEmail = null,
-    currentUser = null
+    currentUser = null,
+    forcedEtapa,
+    externalSelectedEscolaId,
+    onEscolaChange
 }) => {
     const [activeTab, setActiveTab] = useState<Tab>('estudantil');
     const [isLoading, setIsLoading] = useState(true);
-    const [selectedEscolaId, setSelectedEscolaId] = useState<string>(escolas[0]?.id || '');
+    const [selectedEscolaId, setSelectedEscolaId] = useState<string>(externalSelectedEscolaId || escolas[0]?.id || '');
+
+    // Sync with external school ID
+    useEffect(() => {
+        if (externalSelectedEscolaId && externalSelectedEscolaId !== selectedEscolaId) {
+            setSelectedEscolaId(externalSelectedEscolaId);
+        }
+    }, [externalSelectedEscolaId]);
+
+    // Notify external parent of school change
+    useEffect(() => {
+        if (onEscolaChange && selectedEscolaId) {
+            onEscolaChange(selectedEscolaId);
+        }
+    }, [selectedEscolaId, onEscolaChange]);
 
     // Get current school context
     const currentEscola = useMemo(() => {
@@ -139,24 +160,60 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         return { hasInfantil, hasFundamental, hasBoth: hasInfantil && hasFundamental };
     }, [currentEscola]);
 
-    const defaultEtapa = schoolLevels.hasInfantil && !schoolLevels.hasFundamental ? 'infantil' : 'fundamental';
+    const defaultEtapa = forcedEtapa || (schoolLevels.hasInfantil && !schoolLevels.hasFundamental ? 'infantil' : 'fundamental');
     const [acompEtapa, setAcompEtapa] = useState<'fundamental' | 'infantil'>(defaultEtapa);
     const [encEtapa, setEncEtapa] = useState<'fundamental' | 'infantil'>(defaultEtapa);
 
     // ============================================
     // ESTADOS: AVALIAÇÃO DOCENTE
     // ============================================
-    const defaultAvaliacaoEtapa = schoolLevels.hasInfantil && !schoolLevels.hasFundamental ? 'infantil' : 'fundamental';
+    const defaultAvaliacaoEtapa = forcedEtapa || (schoolLevels.hasInfantil && !schoolLevels.hasFundamental ? 'infantil' : 'fundamental');
     const [avaliacaoEtapa, setAvaliacaoEtapa] = useState<'fundamental' | 'infantil'>(defaultAvaliacaoEtapa);
     const [avaliacaoInfantilCampo, setAvaliacaoInfantilCampo] = useState('O EU, O OUTRO E O NÓS');
     const [avaliacaoBimestre, setAvaliacaoBimestre] = useState('Resultado Consolidado');
+    const [selectedComponenteCurricular, setSelectedComponenteCurricular] = useState('Língua Portuguesa - BNCC');
+
+    const COMPONENTES_CURRICULARES = [
+        'Língua Portuguesa - BNCC',
+        'Matemática - BNCC',
+        'Ciências - BNCC',
+        'Geografia - BNCC',
+        'História - BNCC',
+        'Educação Física - BNCC',
+        'Arte - BNCC',
+        'Ensino Religioso - BNCC',
+        'Língua Inglesa - BNCC'
+    ];
     const [isTurmaModalOpen, setIsTurmaModalOpen] = useState(false);
     const [isStudentReportOpen, setIsStudentReportOpen] = useState(false);
     const [activeStudentReport, setActiveStudentReport] = useState<any>(null);
-    const [turmasCadastradas, setTurmasCadastradas] = useState<TurmaData[]>([
-        { etapa: 'Anos Iniciais', anoSerie: '5º ANO', identificacao: 'Turma B', turno: 'MANHÃ', tipo: 'REGULAR' }
-    ]);
-    const [activeTurma, setActiveTurma] = useState<TurmaData>(turmasCadastradas[0]);
+    const [turmasCadastradas, setTurmasCadastradas] = useState<TurmaData[]>([]);
+    const [activeTurma, setActiveTurma] = useState<TurmaData | null>(null);
+    const [isLoadingTurmas, setIsLoadingTurmas] = useState(false);
+    const [loadError, setLoadError] = useState<string | null>(null);
+    const [isLoadingStudents, setIsLoadingStudents] = useState(false);
+
+    // Load turmas from DB when school changes
+    useEffect(() => {
+        const loadTurmas = async () => {
+            if (!currentEscolaId) return;
+            setIsLoadingTurmas(true);
+            try {
+                const turmas = await ccTurmaService.getBySchool(currentEscolaId);
+                setTurmasCadastradas(turmas);
+                if (turmas.length > 0) {
+                    setActiveTurma(turmas[0]);
+                } else {
+                    setActiveTurma(null);
+                }
+            } catch (err) {
+                console.error('Erro ao carregar turmas:', err);
+            } finally {
+                setIsLoadingTurmas(false);
+            }
+        };
+        loadTurmas();
+    }, [currentEscolaId]);
     const [showSuccessToast, setShowSuccessToast] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isCadastroEstudanteOpen, setIsCadastroEstudanteOpen] = useState(false);
@@ -175,13 +232,18 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     }, [activeTurma]);
 
     const loadStudents = async () => {
-        if (!activeTurma) return [];
+        if (!activeTurma?.id) return [];
+        setIsLoadingStudents(true);
+        setLoadError(null);
         try {
-            const data = await ccEstudanteService.getByTurma(activeTurma.identificacao);
+            const data = await ccEstudanteService.getByTurma(activeTurma.id);
             return data || [];
         } catch (error) {
             console.error('Erro ao carregar estudantes:', error);
+            setLoadError('Erro ao carregar estudantes. Verifique sua conexão e tente novamente.');
             return [];
+        } finally {
+            setIsLoadingStudents(false);
         }
     };
 
@@ -193,8 +255,10 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             const students = await loadStudents();
             const evalData = await ccAvaliacaoDocenteService.getAll(
                 currentEscolaId,
-                activeTurma.identificacao,
-                avaliacaoBimestre
+                activeTurma.id,
+                avaliacaoBimestre,
+                'fundamental',
+                selectedComponenteCurricular
             );
 
             // Mapper students to local state format
@@ -231,10 +295,20 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         setIsLoading(true);
         try {
             const studentsList = await loadStudents();
+            
+            if (studentsList.length === 0) {
+                setStudentsAvaliacaoInfantil([]);
+                return;
+            }
+
             const studentIds = studentsList.map((s: any) => s.id);
 
-            // Fetch ALL evaluations for these students to support "Resultado Consolidado"
-            const evalData = await ccAvaliacaoInfantilService.getByStudents(studentIds);
+            // Fetch evaluations with context for these students
+            const evalData = await ccAvaliacaoInfantilService.getByStudents(studentIds, undefined, {
+                escola_id: currentEscolaId,
+                turma_id: activeTurma.id,
+                campo_experiencia: avaliacaoInfantilCampo
+            });
 
             const formatted = studentsList.map((stu: any) => {
                 const stuEvals = evalData?.filter((d: any) => d.student_id === stu.id) || [];
@@ -266,8 +340,9 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             });
 
             setStudentsAvaliacaoInfantil(formatted);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Erro ao carregar avaliações infantil:', error);
+            setLoadError(error.message || 'Erro ao carregar avaliações. Tente novamente.');
         } finally {
             setIsLoading(false);
         }
@@ -281,8 +356,10 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             const students = await loadStudents();
             const evalData = await ccAvaliacaoDocenteService.getAll(
                 currentEscolaId,
-                activeTurma.identificacao,
-                undefined // Fetch all bimestres
+                activeTurma.id,
+                undefined, // Fetch all bimestres
+                'fundamental',
+                selectedComponenteCurricular
             );
 
             const formatted = students.map((stu: any) => {
@@ -337,7 +414,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             if (avaliacaoEtapa === 'fundamental') loadAvaliacoesDocente();
             else loadAvaliacoesInfantil();
         }
-    }, [activeTurma, avaliacaoBimestre, avaliacaoEtapa, avaliacaoInfantilCampo]);
+    }, [activeTurma, avaliacaoBimestre, avaliacaoEtapa, avaliacaoInfantilCampo, selectedComponenteCurricular]);
 
     const persistAvaliacaoDocente = async (student: any) => {
         if (isEtapaReadOnly) return;
@@ -347,10 +424,11 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             const payload = {
                 id: student.dbId,
                 escola_id: currentEscolaId,
-                turma_id: activeTurma?.identificacao || '',
+                turma_id: activeTurma?.id || '',
                 estudante_id: student.id.toString(),
                 nome_estudante: student.name,
                 periodo_letivo: avaliacaoBimestre,
+                componente_curricular: selectedComponenteCurricular,
                 frequencia_conceito: student.fre,
                 participacao_conceito: student.par,
                 material_conceito: student.mat,
@@ -396,12 +474,38 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     const isInfantilAllowed = !activeTurma || activeTurma.etapa === 'Educação Infantil';
     const isFundamentalAllowed = !activeTurma || activeTurma.etapa !== 'Educação Infantil';
 
-    const handleSalvarTurma = (novaTurma: TurmaData) => {
-        setTurmasCadastradas([...turmasCadastradas, novaTurma]);
-        setActiveTurma(novaTurma);
-        setIsTurmaModalOpen(false);
-        setShowSuccessToast(true);
-        setTimeout(() => setShowSuccessToast(false), 3000);
+    const handleSalvarTurma = async (novaTurma: TurmaData) => {
+        try {
+            if (novaTurma.id) {
+                // Update existing
+                const updated = await ccTurmaService.update(novaTurma.id, novaTurma);
+                setTurmasCadastradas(prev => prev.map(t => t.id === updated.id ? updated : t));
+                setActiveTurma(updated);
+            } else {
+                // Create new
+                const saved = await ccTurmaService.add({ ...novaTurma, schoolId: currentEscolaId });
+                setTurmasCadastradas(prev => [...prev, saved]);
+                setActiveTurma(saved);
+            }
+            setIsTurmaModalOpen(false);
+            setShowSuccessToast(true);
+            setTimeout(() => setShowSuccessToast(false), 3000);
+        } catch (err) {
+            console.error('Erro ao salvar turma:', err);
+        }
+    };
+
+    const handleDeleteTurma = async (id: string) => {
+        try {
+            await ccTurmaService.remove(id);
+            const remaining = turmasCadastradas.filter(t => t.id !== id);
+            setTurmasCadastradas(remaining);
+            if (activeTurma?.id === id) {
+                setActiveTurma(remaining[0] || null);
+            }
+        } catch (err) {
+            console.error('Erro ao excluir turma:', err);
+        }
     };
 
     const [studentsAvaliacao, setStudentsAvaliacao] = useState<any[]>([]);
@@ -420,7 +524,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         try {
             const newStudent = {
                 name: newStudentName.trim().toUpperCase(),
-                class_id: activeTurma.identificacao,
+                class_id: activeTurma.id,
                 escola_id: currentEscolaId,
                 status: 'active'
             };
@@ -504,7 +608,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
 
     const avaliacaoTabsList = ['Resultado Consolidado', '1º Bimestre', '2º Bimestre', '3º Bimestre', '4º Bimestre'];
 
-    const toggleInfantilConcept = async (studentId: number, conceptIndex: number) => {
+    const toggleInfantilConcept = async (studentId: any, conceptIndex: number) => {
         if (isEtapaReadOnly) return;
 
         const periodMap: Record<string, number> = { '1º Bimestre': 1, '2º Bimestre': 2, '3º Bimestre': 3, '4º Bimestre': 4 };
@@ -536,7 +640,10 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                     skill_code: skill.code,
                     period: period,
                     status: nextStatus,
-                    field_of_experience: avaliacaoInfantilCampo
+                    campo_experiencia: avaliacaoInfantilCampo,
+                    escola_id: currentEscolaId,
+                    turma_id: activeTurma?.id || '',
+                    responsavel_id: currentUser?.id || ''
                 };
 
                 // Add or update in student.evaluations
@@ -548,16 +655,25 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                     updatedEvals.push(newEval);
                 }
 
+                // Sincronizar campo concepts_bX para atualização imediata na UI
+                const conceptField = `concepts_b${period}` as keyof typeof student;
+                const updatedConcepts = [...((student[conceptField] as any[]) || [])];
+                updatedConcepts[conceptIndex] = nextStatus;
+
                 // Persist
                 persistAvaliacaoInfantil(newEval, studentId);
 
-                return { ...student, evaluations: updatedEvals };
+                return { 
+                    ...student, 
+                    evaluations: updatedEvals,
+                    [conceptField]: updatedConcepts
+                };
             }
             return student;
         }));
     };
 
-    const persistAvaliacaoInfantil = async (evaluation: any, studentId: number) => {
+    const persistAvaliacaoInfantil = async (evaluation: any, studentId: any) => {
         setIsSaving(true);
         try {
             const saved = await ccAvaliacaoInfantilService.save(evaluation);
@@ -568,6 +684,26 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                         const updatedEvals = (student.evaluations || []).map((e: any) => 
                             e.skill_code === saved.skill_code && e.period === saved.period ? saved : e
                         );
+                        
+                        // Também sincronizar concepts_bX aqui caso tenha mudado
+                        const conceptField = `concepts_b${saved.period}` as keyof typeof student;
+                        const field = BNCC_INFANTIL[avaliacaoInfantilCampo.toUpperCase() as keyof typeof BNCC_INFANTIL];
+                        
+                        const isBemPequena = ['Creche II', 'Creche III'].includes(activeTurma?.anoSerie || '');
+                        const currentAgeGroup = isBemPequena ? 'Crianças bem pequenas' : 'Crianças pequenas';
+                        const objectives = (field as any)?.[currentAgeGroup] || [];
+                        const skillIdx = objectives.findIndex((obj: any) => obj.code === saved.skill_code);
+                        
+                        if (skillIdx >= 0) {
+                            const updatedConcepts = [...((student[conceptField] as any[]) || [])];
+                            updatedConcepts[skillIdx] = saved.status;
+                            return { 
+                                ...student, 
+                                evaluations: updatedEvals,
+                                [conceptField]: updatedConcepts
+                            };
+                        }
+
                         return { ...student, evaluations: updatedEvals };
                     }
                     return student;
@@ -634,10 +770,11 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                     const payload = {
                         id: student.dbId,
                         escola_id: currentEscolaId,
-                        turma_id: activeTurma?.identificacao || '',
+                        turma_id: activeTurma?.id || '',
                         estudante_id: student.id.toString(),
                         nome_estudante: student.name,
                         periodo_letivo: avaliacaoBimestre,
+                        componente_curricular: selectedComponenteCurricular,
                         frequencia_conceito: student.fre,
                         participacao_conceito: student.par,
                         material_conceito: student.mat,
@@ -654,6 +791,22 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                 await Promise.all(promises);
                 await loadAvaliacoesDocente();
             } else {
+                // Collect evaluations for the current field from all students
+                const allEvals = studentsAvaliacaoInfantil.flatMap(s => 
+                    (s.evaluations || [])
+                        .filter((e: any) => (e.campo_experiencia || '').toUpperCase() === avaliacaoInfantilCampo.toUpperCase())
+                        .map((e: any) => ({
+                            ...e,
+                            escola_id: currentEscolaId,
+                            turma_id: activeTurma?.id,
+                            responsavel_id: currentUser?.id,
+                            campo_experiencia: avaliacaoInfantilCampo
+                        }))
+                );
+
+                if (allEvals.length > 0) {
+                    await ccAvaliacaoInfantilService.saveMany(allEvals);
+                }
                 await loadAvaliacoesInfantil();
             }
             alert('Rascunho salvo com sucesso!');
@@ -789,9 +942,10 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         try {
             const status = await ccAvaliacaoEtapaService.getStatus(
                 currentEscolaId,
-                activeTurma.identificacao,
+                activeTurma.id,
                 avaliacaoBimestre,
-                avaliacaoEtapa
+                avaliacaoEtapa,
+                avaliacaoEtapa === 'fundamental' ? selectedComponenteCurricular : undefined
             );
             setEtapaDoc(status);
         } catch (error) {
@@ -801,7 +955,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
 
     useEffect(() => {
         loadEtapaStatus();
-    }, [activeTurma, avaliacaoBimestre, avaliacaoEtapa]);
+    }, [activeTurma, avaliacaoBimestre, avaliacaoEtapa, selectedComponenteCurricular]);
 
     const loadAllPendingRequests = async () => {
         if (!isAdmin && currentUser?.funcao !== 'Coordenador Regional') return;
@@ -965,7 +1119,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         try {
             await ccSolicitacaoDesbloqueioService.solicitar({
                 escola_id: currentEscolaId,
-                turma_id: activeTurma?.identificacao || '',
+                turma_id: activeTurma?.id || '',
                 periodo: avaliacaoBimestre,
                 etapa: avaliacaoEtapa,
                 justificativa: unlockJustification,
@@ -1022,7 +1176,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         try {
             await ccAvaliacaoEtapaService.enviar({
                 escola_id: currentEscolaId,
-                turma_id: activeTurma?.identificacao || '',
+                turma_id: activeTurma?.id || '',
                 periodo: avaliacaoBimestre,
                 etapa: avaliacaoEtapa,
                 enviada_por: userEmail
@@ -1266,7 +1420,12 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             case 'estudantil':
                 return (
                     <div className="animate-in fade-in zoom-in-95 duration-200">
-                        <ReuniaoEstudantilForm />
+                        <ReuniaoEstudantilForm 
+                            escolas={escolas}
+                            currentUser={currentUser}
+                            initialEscolaId={currentEscolaId}
+                            initialTurmaId={activeTurma?.id}
+                        />
                     </div>
                 );
             case 'avaliacao':
@@ -1290,7 +1449,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
 
                         {/* Seletor de Etapas para Avaliação Docente */}
                         {
-                            schoolLevels.hasBoth && (
+                            schoolLevels.hasBoth && !activeTurma && (
                                 <div className="bg-slate-100 p-1.5 rounded-2xl flex gap-2 w-fit">
                                     <button
                                         onClick={() => isFundamentalAllowed && setAvaliacaoEtapa('fundamental')}
@@ -1429,7 +1588,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                 {avaliacaoEtapa === 'infantil' ? (
                                     <select
                                         value={avaliacaoInfantilCampo}
-                                        onChange={(e) => !isEtapaReadOnly && setAvaliacaoInfantilCampo(e.target.value)}
+                                        onChange={(e) => !isEtapaReadOnly && setAvaliacaoInfantilCampo(e.target.value.toUpperCase())}
                                         disabled={isEtapaReadOnly}
                                         className={`w-full bg-transparent text-sm font-semibold text-slate-800 focus:outline-none appearance-none truncate transition-colors ${isEtapaReadOnly ? 'cursor-default' : 'cursor-pointer hover:text-blue-600'}`}
                                     >
@@ -1438,25 +1597,42 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                         ))}
                                     </select>
                                 ) : (
-                                    <p className="text-sm font-semibold text-slate-800">
-                                        Língua Portuguesa - BNCC
-                                    </p>
+                                    <select
+                                        value={selectedComponenteCurricular}
+                                        onChange={(e) => !isEtapaReadOnly && setSelectedComponenteCurricular(e.target.value)}
+                                        disabled={isEtapaReadOnly}
+                                        className={`w-full bg-transparent text-sm font-semibold text-slate-800 focus:outline-none appearance-none truncate transition-colors ${isEtapaReadOnly ? 'cursor-default' : 'cursor-pointer hover:text-blue-600'}`}
+                                    >
+                                        {COMPONENTES_CURRICULARES.map(comp => (
+                                            <option key={comp} value={comp}>{comp}</option>
+                                        ))}
+                                    </select>
                                 )}
                             </div>
                             <div className="px-4 flex items-center gap-3">
-                                <button
-                                    onClick={() => !isEtapaReadOnly && setIsTurmaModalOpen(true)}
-                                    disabled={isEtapaReadOnly}
-                                    className={`group text-left ${isEtapaReadOnly ? 'cursor-default' : 'cursor-pointer'}`}
-                                >
-                                    <p className="text-xs font-bold text-slate-400 uppercase mb-1 flex items-center gap-1">
+                                <div className="text-left">
+                                    <p className="text-xs font-bold text-slate-400 uppercase mb-1">
                                         {avaliacaoEtapa === 'infantil' ? 'Grupo de Faixa Etária' : 'Turma / Ano'}
-                                        {!isEtapaReadOnly && <Edit className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />}
                                     </p>
-                                    <p className={`text-sm font-semibold text-slate-800 transition-colors ${!isEtapaReadOnly && 'group-hover:text-blue-600'}`}>
-                                        {activeTurma ? `${activeTurma.anoSerie} ${activeTurma.identificacao.replace('Turma ', '')} • ${activeTurma.turno}` : '5º Ano B • Matutino'}
-                                    </p>
-                                </button>
+                                    {turmasCadastradas.length > 0 ? (
+                                        <select
+                                            value={activeTurma?.id || ''}
+                                            onChange={(e) => {
+                                                const selected = turmasCadastradas.find(t => t.id === e.target.value);
+                                                if (selected) setActiveTurma(selected);
+                                            }}
+                                            className="w-full bg-transparent text-sm font-semibold text-slate-800 focus:outline-none appearance-none cursor-pointer hover:text-blue-600 transition-colors"
+                                        >
+                                            {turmasCadastradas.map(t => (
+                                                <option key={t.id} value={t.id}>
+                                                    {t.anoSerie} {t.identificacao.replace('Turma ', '')} • {t.turno}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <p className="text-sm font-semibold text-slate-400 italic">Nenhuma turma cadastrada</p>
+                                    )}
+                                </div>
                                 {etapaDoc?.status === 'enviada' && (
                                     <div className="ml-auto flex items-center gap-2 text-[10px] font-bold text-emerald-700 border border-emerald-200 rounded-lg p-2 bg-emerald-50">
                                         <CheckCircle2 className="w-3 h-3" />
@@ -1642,8 +1818,36 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-slate-100">
-                                                        {studentsAvaliacaoInfantil.map((student) => {
-                                                            const getConsolidatedStatus = (field: string) => {
+                                                        {isLoadingStudents || isLoading ? (
+                                                            <tr>
+                                                                <td colSpan={6} className="p-12 text-center text-slate-400">
+                                                                    <div className="flex flex-col items-center gap-3">
+                                                                        <div className="w-8 h-8 border-3 border-slate-200 border-t-emerald-500 rounded-full animate-spin"></div>
+                                                                        <span className="text-sm font-medium">Carregando estudantes...</span>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        ) : loadError ? (
+                                                            <tr>
+                                                                <td colSpan={6} className="p-12 text-center">
+                                                                    <div className="flex flex-col items-center gap-4">
+                                                                        <AlertTriangle className="w-8 h-8 text-red-500" />
+                                                                        <p className="text-sm font-medium text-red-600">{loadError}</p>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        ) : studentsAvaliacaoInfantil.length === 0 ? (
+                                                            <tr>
+                                                                <td colSpan={6} className="p-12 text-center text-slate-400">
+                                                                    <div className="flex flex-col items-center gap-4">
+                                                                        <Users className="w-12 h-12 opacity-10" />
+                                                                        <p className="text-sm font-medium">Nenhum estudante matriculado nesta turma.</p>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        ) : (
+                                                            studentsAvaliacaoInfantil.map((student) => {
+                                                                const getConsolidatedStatus = (field: string) => {
                                                                 const concepts = student[field] || [];
                                                                 if (concepts.length === 0) return null;
 
@@ -1706,7 +1910,8 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                                     </td>
                                                                 </tr>
                                                             );
-                                                        })}
+                                                        })
+                                                    )}
                                                     </tbody>
                                                 </table>
                                             </div>
@@ -1866,7 +2071,48 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-slate-100">
-                                                        {visaoGeralData.map(student => (
+                                                        {isLoadingStudents || isLoading ? (
+                                                            <tr>
+                                                                <td colSpan={8} className="p-12 text-center">
+                                                                    <div className="flex flex-col items-center gap-3">
+                                                                        <div className="w-8 h-8 border-3 border-slate-200 border-t-emerald-500 rounded-full animate-spin"></div>
+                                                                        <span className="text-sm font-medium text-slate-400">Carregando estudantes...</span>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        ) : loadError ? (
+                                                            <tr>
+                                                                <td colSpan={8} className="p-12 text-center">
+                                                                    <div className="flex flex-col items-center gap-4">
+                                                                        <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                                                                            <AlertTriangle className="w-6 h-6 text-red-500" />
+                                                                        </div>
+                                                                        <p className="text-sm font-medium text-red-600">{loadError}</p>
+                                                                        <button
+                                                                            onClick={() => loadInitialData()}
+                                                                            className="bg-red-50 border border-red-200 text-red-600 px-4 py-2 rounded-xl font-bold text-sm hover:bg-red-100 transition-colors"
+                                                                        >
+                                                                            Tentar novamente
+                                                                        </button>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        ) : visaoGeralData.length === 0 ? (
+                                                            <tr>
+                                                                <td colSpan={8} className="p-12 text-center">
+                                                                    <div className="flex flex-col items-center gap-4">
+                                                                        <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center">
+                                                                            <Users className="w-7 h-7 text-slate-400" />
+                                                                        </div>
+                                                                        <div>
+                                                                            <p className="text-sm font-bold text-slate-600 mb-1">Não existe nenhum estudante cadastrado para esta turma.</p>
+                                                                            <p className="text-xs text-slate-400">Cadastre estudantes para visualizar o resultado consolidado.</p>
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        ) : (
+                                                        visaoGeralData.map(student => (
                                                             <tr key={student.id} className={`transition-colors group ${student.alert ? 'bg-red-50/30' : 'hover:bg-slate-50'}`}>
                                                                 <td className="p-4 text-center text-sm font-medium text-slate-400 group-hover:text-blue-500 transition-colors">{student.id}</td>
                                                                 <td className="p-4 text-sm font-bold text-slate-700">
@@ -1911,13 +2157,14 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                                     {renderVisaoGeralTrajectory(student)}
                                                                 </td>
                                                             </tr>
-                                                        ))}
+                                                        ))
+                                                        )}
                                                     </tbody>
                                                 </table>
                                             </div>
                                             <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-between items-center rounded-b-2xl">
                                                 <div className="text-xs text-slate-500 font-medium">
-                                                    Exibindo {visaoGeralData.length} de 25 alunos matriculados nesta turma
+                                                    Exibindo {visaoGeralData.length} alunos matriculados nesta turma
                                                 </div>
                                                 <div className="flex gap-1">
                                                     <button className="w-6 h-6 rounded flex items-center justify-center hover:bg-slate-200 text-slate-400 disabled:opacity-50" disabled>&laquo;</button>
@@ -2026,7 +2273,57 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100">
-                                                {studentsAvaliacao.map(student => (
+                                                {isLoadingStudents || isLoading ? (
+                                                    <tr>
+                                                        <td colSpan={10} className="p-12 text-center">
+                                                            <div className="flex flex-col items-center gap-3">
+                                                                <div className="w-8 h-8 border-3 border-slate-200 border-t-emerald-500 rounded-full animate-spin"></div>
+                                                                <span className="text-sm font-medium text-slate-400">Carregando estudantes...</span>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ) : loadError ? (
+                                                    <tr>
+                                                        <td colSpan={10} className="p-12 text-center">
+                                                            <div className="flex flex-col items-center gap-4">
+                                                                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                                                                    <AlertTriangle className="w-6 h-6 text-red-500" />
+                                                                </div>
+                                                                <p className="text-sm font-medium text-red-600">{loadError}</p>
+                                                                <button
+                                                                    onClick={() => loadInitialData()}
+                                                                    className="bg-red-50 border border-red-200 text-red-600 px-4 py-2 rounded-xl font-bold text-sm hover:bg-red-100 transition-colors"
+                                                                >
+                                                                    Tentar novamente
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ) : studentsAvaliacao.length === 0 ? (
+                                                    <tr>
+                                                        <td colSpan={10} className="p-12 text-center">
+                                                            <div className="flex flex-col items-center gap-4">
+                                                                <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center">
+                                                                    <Users className="w-7 h-7 text-slate-400" />
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-sm font-bold text-slate-600 mb-1">Não existe nenhum estudante cadastrado para esta turma.</p>
+                                                                    <p className="text-xs text-slate-400">Cadastre estudantes para iniciar a avaliação docente.</p>
+                                                                </div>
+                                                                {!isEtapaReadOnly && (
+                                                                    <button
+                                                                        onClick={() => setIsCadastroEstudanteOpen(true)}
+                                                                        className="bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-emerald-700 transition-colors flex items-center gap-2 shadow-md"
+                                                                    >
+                                                                        <Users className="w-4 h-4" />
+                                                                        Cadastrar Estudante
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ) : (
+                                                    studentsAvaliacao.map(student => (
                                                     <tr key={student.id} className="hover:bg-slate-50 transition-colors group">
                                                         <td className="p-4 text-center text-sm font-medium text-slate-400 group-hover:text-emerald-500 transition-colors">{student.id}</td>
                                                         <td className="p-4 text-sm font-bold text-slate-700 border-r border-slate-100">
@@ -2056,11 +2353,12 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                             {calculateParecerEtapa(student)}
                                                         </td>
                                                     </tr>
-                                                ))}
+                                                    ))
+                                                )}
                                             </tbody>
                                         </table>
                                     </div>
-                                    {!isEtapaReadOnly && (
+                                    {!isEtapaReadOnly && studentsAvaliacao.length > 0 && (
                                         <div className="mt-4 flex justify-center">
                                             <button
                                                 onClick={() => setIsCadastroEstudanteOpen(true)}
@@ -2133,70 +2431,98 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-100">
-                                                    {/* Mock Rows Dinâmicas */}
-                                                    {studentsAvaliacaoInfantil.map((student) => {
-                                                        // Cálculo do progresso
-                                                        let totalScore = 0;
+                                                    {isLoadingStudents || isLoading ? (
+                                                        <tr>
+                                                            <td colSpan={currentObjectives.length + 3} className="p-12 text-center text-slate-400">
+                                                                <div className="flex flex-col items-center gap-3">
+                                                                    <div className="w-8 h-8 border-3 border-slate-200 border-t-emerald-500 rounded-full animate-spin"></div>
+                                                                    <span className="text-sm font-medium">Carregando estudantes...</span>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ) : loadError ? (
+                                                        <tr>
+                                                            <td colSpan={currentObjectives.length + 3} className="p-12 text-center">
+                                                                <div className="flex flex-col items-center gap-4">
+                                                                    <AlertTriangle className="w-8 h-8 text-red-500" />
+                                                                    <p className="text-sm font-medium text-red-600">{loadError}</p>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ) : studentsAvaliacaoInfantil.length === 0 ? (
+                                                        <tr>
+                                                            <td colSpan={currentObjectives.length + 3} className="p-12 text-center text-slate-400">
+                                                                <div className="flex flex-col items-center gap-4">
+                                                                    <Users className="w-12 h-12 opacity-10" />
+                                                                    <p className="text-sm font-medium">Não existe nenhum estudante cadastrado para esta turma.</p>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ) : (
+                                                        studentsAvaliacaoInfantil.map((student) => {
+                                                            // Cálculo do progresso
+                                                            let totalScore = 0;
 
-                                                        let activeField = 'concepts_b1';
-                                                        if (avaliacaoBimestre === '2º Bimestre') activeField = 'concepts_b2';
-                                                        if (avaliacaoBimestre === '3º Bimestre') activeField = 'concepts_b3';
-                                                        if (avaliacaoBimestre === '4º Bimestre') activeField = 'concepts_b4';
+                                                            let activeField = 'concepts_b1';
+                                                            if (avaliacaoBimestre === '2º Bimestre') activeField = 'concepts_b2';
+                                                            if (avaliacaoBimestre === '3º Bimestre') activeField = 'concepts_b3';
+                                                            if (avaliacaoBimestre === '4º Bimestre') activeField = 'concepts_b4';
 
-                                                        const activeConcepts = student[activeField] || [];
-                                                        const studentConcepts = currentObjectives.map((_, i) => activeConcepts[i] || 'D');
-                                                        const maxScore = studentConcepts.length * 2;
+                                                            const activeConcepts = student[activeField] || [];
+                                                            const studentConcepts = currentObjectives.map((_, i) => activeConcepts[i] || 'ND');
+                                                            const maxScore = studentConcepts.length * 2;
 
-                                                        studentConcepts.forEach(c => {
-                                                            if (c === 'D') totalScore += 2;
-                                                            else if (c === 'ED') totalScore += 1;
-                                                        });
+                                                            studentConcepts.forEach(c => {
+                                                                if (c === 'D') totalScore += 2;
+                                                                else if (c === 'ED') totalScore += 1;
+                                                            });
 
-                                                        const percentage = maxScore > 0 ? (totalScore / maxScore) * 100 : 0;
+                                                            const percentage = maxScore > 0 ? (totalScore / maxScore) * 100 : 0;
 
-                                                        let progressText = 'NÃO CONSOLIDADO';
-                                                        let progressColor = 'bg-red-50 text-red-600 border-red-200';
-                                                        if (activeConcepts.length === 0) {
-                                                            progressText = 'AGUARDANDO...';
-                                                            progressColor = 'bg-slate-50 text-slate-400 border-slate-200';
-                                                        } else if (percentage > 70) {
-                                                            progressText = 'CONSOLIDADO';
-                                                            progressColor = 'bg-blue-50 text-blue-600 border-blue-200';
-                                                        } else if (percentage >= 50) {
-                                                            progressText = 'EM ATENÇÃO';
-                                                            progressColor = 'bg-yellow-50 text-yellow-600 border-yellow-200';
-                                                        }
+                                                            let progressText = 'NÃO CONSOLIDADO';
+                                                            let progressColor = 'bg-red-50 text-red-600 border-red-200';
+                                                            if (activeConcepts.length === 0) {
+                                                                progressText = 'AGUARDANDO...';
+                                                                progressColor = 'bg-slate-50 text-slate-400 border-slate-200';
+                                                            } else if (percentage > 70) {
+                                                                progressText = 'CONSOLIDADO';
+                                                                progressColor = 'bg-blue-50 text-blue-600 border-blue-200';
+                                                            } else if (percentage >= 50) {
+                                                                progressText = 'EM ATENÇÃO';
+                                                                progressColor = 'bg-yellow-50 text-yellow-600 border-yellow-200';
+                                                            }
 
-                                                        return (
-                                                            <tr key={student.id} className="hover:bg-slate-50 transition-colors group">
-                                                                <td className="p-4 text-center text-sm font-medium text-slate-400">{student.id}</td>
-                                                                <td className="p-4 text-sm font-bold text-slate-700 border-r border-slate-100 uppercase">{student.name}</td>
-                                                                {studentConcepts.map((concept, i) => {
-                                                                    const isD = concept === 'D';
-                                                                    const isED = concept === 'ED';
-                                                                    
-                                                                    const isND = concept === 'ND';
+                                                            return (
+                                                                <tr key={student.id} className="hover:bg-slate-50 transition-colors group">
+                                                                    <td className="p-4 text-center text-sm font-medium text-slate-400">{student.id}</td>
+                                                                    <td className="p-4 text-sm font-bold text-slate-700 border-r border-slate-100 uppercase">{student.name}</td>
+                                                                    {studentConcepts.map((concept, i) => {
+                                                                        const isD = concept === 'D';
+                                                                        const isED = concept === 'ED';
+                                                                        
+                                                                        const isND = concept === 'ND';
 
-                                                                    let colors = 'bg-slate-50 text-slate-500 border-slate-200';
-                                                                    if (isD) colors = 'bg-emerald-50 text-emerald-500 border-emerald-200';
-                                                                    if (isED) colors = 'bg-blue-50 text-blue-500 border-blue-200';
+                                                                        let colors = 'bg-slate-50 text-slate-500 border-slate-200';
+                                                                        if (isD) colors = 'bg-emerald-50 text-emerald-500 border-emerald-200';
+                                                                        if (isED) colors = 'bg-blue-50 text-blue-500 border-blue-200';
 
-                                                                    return (
-                                                                        <td key={currentObjectives[i].code} className="p-4 text-center bg-transparent border-r border-slate-100/50">
-                                                                            <div onClick={() => toggleInfantilConcept(student.id, i)} className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold mx-auto transition-transform hover:scale-110 cursor-pointer select-none ${colors}`}>
-                                                                                {concept}
-                                                                            </div>
-                                                                        </td>
-                                                                    );
-                                                                })}
-                                                                <td className="p-4 text-center">
-                                                                    <span className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider shadow-sm border ${progressColor}`}>
-                                                                        {progressText}
-                                                                    </span>
-                                                                </td>
-                                                            </tr>
-                                                        );
-                                                    })}
+                                                                        return (
+                                                                            <td key={currentObjectives[i].code} className="p-4 text-center bg-transparent border-r border-slate-100/50">
+                                                                                <div onClick={() => toggleInfantilConcept(student.id, i)} className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold mx-auto transition-transform hover:scale-110 cursor-pointer select-none ${colors}`}>
+                                                                                    {concept}
+                                                                                </div>
+                                                                            </td>
+                                                                        );
+                                                                    })}
+                                                                    <td className="p-4 text-center">
+                                                                        <span className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider shadow-sm border ${progressColor}`}>
+                                                                            {progressText}
+                                                                        </span>
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })
+                                                    )}
                                                 </tbody>
                                             </table>
                                         </div>
@@ -2266,7 +2592,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
 
                             {/* Seletor de Etapa */}
                             {
-                                (schoolLevels.hasBoth || (!schoolLevels.hasInfantil && !schoolLevels.hasFundamental)) && (
+                                (schoolLevels.hasBoth || (!schoolLevels.hasInfantil && !schoolLevels.hasFundamental)) && !activeTurma && (
                                     <div className="flex gap-2 mb-6 bg-slate-100 p-1.5 rounded-2xl w-fit">
                                         <button
                                             onClick={() => isFundamentalAllowed && setAcompEtapa('fundamental')}
@@ -2559,7 +2885,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                         </div>
 
                         {/* Seletor de Etapa */}
-                        {(schoolLevels.hasBoth || (!schoolLevels.hasInfantil && !schoolLevels.hasFundamental)) && (
+                        {(schoolLevels.hasBoth || (!schoolLevels.hasInfantil && !schoolLevels.hasFundamental)) && !activeTurma && (
                             <div className="flex gap-2 mb-6 bg-slate-100 p-1.5 rounded-2xl w-fit">
                                 <button
                                     onClick={() => isFundamentalAllowed && setEncEtapa('fundamental')}
@@ -3034,6 +3360,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                 isOpen={isTurmaModalOpen}
                 onClose={() => setIsTurmaModalOpen(false)}
                 onSave={handleSalvarTurma}
+                onDelete={handleDeleteTurma}
                 turmasExistentes={turmasCadastradas}
             />
 
@@ -3055,13 +3382,25 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                         responsibleName: currentUser?.nome || userEmail || 'PROFESSOR(A)',
                         contextName: avaliacaoEtapa === 'fundamental' ? avaliacaoBimestre : avaliacaoInfantilCampo,
                         groupName: `${activeTurma?.anoSerie} - ${activeTurma?.identificacao}`,
-                        classId: activeTurma?.identificacao || ''
+                        classId: activeTurma?.id || ''
                     }}
+                    escolas={escolas}
+                    onOpenTurmaModal={() => { setIsCadastroEstudanteOpen(false); setIsTurmaModalOpen(true); }}
                     onSuccess={() => {
                         loadInitialData();
                     }}
                 />
             )}
+
+            <PrintableConselhoReport
+                escola={currentEscola}
+                turma={activeTurma}
+                etapa={avaliacaoEtapa}
+                context={avaliacaoBimestre}
+                componenteCurricular={selectedComponenteCurricular}
+                data={avaliacaoBimestre === 'Resultado Consolidado' ? visaoGeralData : studentsAvaliacao}
+                coordenador={currentUser}
+            />
         </div>
     );
 };

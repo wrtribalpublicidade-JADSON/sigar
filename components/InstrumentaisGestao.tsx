@@ -3,7 +3,7 @@ import { PageHeader } from './ui/PageHeader';
 import { AcompanhamentoSalaDashboard } from './AcompanhamentoSalaDashboard';
 import { CalendarioInterno } from './CalendarioInterno';
 import { FileStack, Users, BookOpen, Target, FileText, Presentation, Upload, Clock, Edit, Trash2, Calendar, Settings, Plus, Check, X, Printer, FileDown, Eye } from 'lucide-react';
-import { Escola } from '../types';
+import { Escola, Coordenador } from '../types';
 import { generateAtaDocx } from '../utils/docxUtils';
 import { PrintableAta } from './PrintableAta';
 import { igCicloReunioesService, igPlanoFormacaoService, igPlanoAcaoService, igPppService } from '../services/gestaoConselhoService';
@@ -13,20 +13,33 @@ type Tab = 'reunioes' | 'formacao' | 'acao' | 'pedagogica' | 'sala' | 'calendari
 
 interface InstrumentaisGestaoProps {
     escolas?: Escola[];
+    coordenadores?: Coordenador[];
     currentUser?: string | null;
     isAdmin?: boolean;
+    onUpdateEscola?: (updatedEscola: Escola) => Promise<void>;
 }
 
-export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escolas = [], currentUser = '', isAdmin = false }) => {
+export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ 
+    escolas = [], 
+    coordenadores = [], 
+    currentUser = '', 
+    isAdmin = false,
+    onUpdateEscola 
+}) => {
     const [activeTab, setActiveTab] = useState<Tab>('reunioes');
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
-    const [selectedEscolaId, setSelectedEscolaId] = useState<string>(escolas[0]?.id || '');
+    const [selectedEscolaId, setSelectedEscolaId] = useState<string>(escolas.length > 1 ? 'all' : (escolas[0]?.id || ''));
 
     const currentEscolaId = React.useMemo(() => {
-        if (!isAdmin && escolas.length > 0) return escolas[0].id;
+        if (selectedEscolaId === 'all') return escolas[0]?.id || '';
         return selectedEscolaId;
-    }, [isAdmin, escolas, selectedEscolaId]);
+    }, [escolas, selectedEscolaId]);
+
+    const filterId = React.useMemo(() => {
+        if (selectedEscolaId === 'all') return escolas.map(e => e.id);
+        return selectedEscolaId;
+    }, [escolas, selectedEscolaId]);
 
     // Helper to get school name by ID
     const getEscolaNome = (id: string | null) => {
@@ -62,6 +75,7 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
         encaminhamentos: '',
         status: 'Agendada',
         responsavel: currentUser || '',
+        escola_id: '',
         participantes: [] as string[]
     });
     const [novoParticipante, setNovoParticipante] = useState('');
@@ -107,9 +121,9 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
                 registro: reuniaoForm.registro || null,
                 encaminhamentos: reuniaoForm.encaminhamentos || null,
                 status: reuniaoForm.status,
-                responsavel: currentUser || '',
+                responsavel: reuniaoForm.responsavel || currentUser || '',
                 participantes: reuniaoForm.participantes,
-                escola_id: currentEscolaId
+                escola_id: reuniaoForm.escola_id || currentEscolaId
             };
 
             if (reuniaoForm.id) {
@@ -135,7 +149,7 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
             }
 
             setIsEditingReuniao(false);
-            setReuniaoForm({ id: '', dataReuniao: '', horaInicio: '', horaFim: '', tipo: 'Pedagógica', pauta: '', local: '', registro: '', encaminhamentos: '', status: 'Agendada', responsavel: currentUser || '', participantes: [] });
+            setReuniaoForm({ id: '', dataReuniao: '', horaInicio: '', horaFim: '', tipo: 'Pedagógica', pauta: '', local: '', registro: '', encaminhamentos: '', status: 'Agendada', responsavel: currentUser || '', escola_id: '', participantes: [] });
 
             setShowAtaModal(mappedResult);
         } catch (error) {
@@ -150,6 +164,7 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
             local: reuniao.local || '',
             registro: reuniao.registro || '',
             encaminhamentos: reuniao.encaminhamentos || '',
+            escola_id: reuniao.escola_id || ''
         });
         setIsEditingReuniao(true);
     };
@@ -256,6 +271,21 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
             } else {
                 setMockMetas(prev => [...prev, result]);
             }
+
+            // Update global state if callback provided
+            if (onUpdateEscola) {
+                const escola = escolas.find(e => e.id === currentEscolaId);
+                if (escola) {
+                    let newPlanoAcao = [...(escola.planoAcao || [])];
+                    if (metaForm.id) {
+                        newPlanoAcao = newPlanoAcao.map(m => m.id === metaForm.id ? result : m);
+                    } else {
+                        newPlanoAcao = [...newPlanoAcao, result];
+                    }
+                    onUpdateEscola({ ...escola, planoAcao: newPlanoAcao });
+                }
+            }
+
             setIsEditingMeta(false);
             setMetaForm({ id: '', descricao: '', prazo: '', status: 'Não Iniciado', responsavel: '' });
         } catch (error) {
@@ -274,6 +304,15 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
             try {
                 await igPlanoAcaoService.delete(id);
                 setMockMetas(prev => prev.filter(m => m.id !== id));
+
+                // Update global state if callback provided
+                if (onUpdateEscola) {
+                    const escola = escolas.find(e => e.id === currentEscolaId);
+                    if (escola) {
+                        const newPlanoAcao = (escola.planoAcao || []).filter(m => m.id !== id);
+                        onUpdateEscola({ ...escola, planoAcao: newPlanoAcao });
+                    }
+                }
             } catch (error) {
                 console.error("Erro ao excluir meta:", error);
                 alert("Erro ao excluir meta.");
@@ -365,7 +404,6 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
         const loadDados = async () => {
             setIsLoading(true);
             try {
-                const filterId = isAdmin ? currentEscolaId : escolaIds;
                 const [reunioes, metas, formacoes, ppps] = await Promise.all([
                     igCicloReunioesService.getAll(filterId),
                     igPlanoAcaoService.getAll(filterId),
@@ -411,7 +449,7 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
         };
 
         loadDados();
-    }, [escolaIds, currentEscolaId, isAdmin]);
+    }, [filterId]);
 
     const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -523,7 +561,7 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
                             {!isEditingReuniao && (
                                 <button
                                     onClick={() => {
-                                        setReuniaoForm({ id: '', dataReuniao: '', horaInicio: '', horaFim: '', local: '', registro: '', encaminhamentos: '', tipo: 'Pedagógica', pauta: '', status: 'Agendada', responsavel: currentUser || '', participantes: [] });
+                                        setReuniaoForm({ id: '', dataReuniao: '', horaInicio: '', horaFim: '', local: '', registro: '', encaminhamentos: '', tipo: 'Pedagógica', pauta: '', status: 'Agendada', responsavel: currentUser || '', escola_id: currentEscolaId, participantes: [] });
                                         setIsEditingReuniao(true);
                                     }}
                                     className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2"
@@ -647,12 +685,27 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
                                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Responsável/Convocante</label>
                                                 <input
                                                     type="text"
-                                                    value={reuniaoForm.responsavel || currentUser || ''}
-                                                    readOnly
-                                                    className="w-full bg-slate-100 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-500 cursor-not-allowed focus:outline-none"
+                                                    value={reuniaoForm.responsavel}
+                                                    onChange={e => setReuniaoForm({ ...reuniaoForm, responsavel: e.target.value })}
+                                                    readOnly={!isAdmin}
+                                                    className={`w-full ${!isAdmin ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-slate-50'} border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20`}
                                                     placeholder="Nome do responsável"
                                                 />
                                             </div>
+                                            {isAdmin && (
+                                                <div>
+                                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Escola Responsável</label>
+                                                    <select
+                                                        value={reuniaoForm.escola_id || currentEscolaId}
+                                                        onChange={e => setReuniaoForm({ ...reuniaoForm, escola_id: e.target.value })}
+                                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                                    >
+                                                        {escolas.map(escola => (
+                                                            <option key={escola.id} value={escola.id}>{escola.nome}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            )}
                                             <div>
                                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Status</label>
                                                 <select
@@ -1113,9 +1166,9 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
                     </div>
                 );
             case 'sala':
-                return <AcompanhamentoSalaDashboard escolas={escolas} />;
+                return <AcompanhamentoSalaDashboard escolas={escolas} selectedEscolaId={selectedEscolaId} />;
             case 'calendario':
-                return <CalendarioInterno escolas={escolas} currentUser={currentUser} isAdmin={isAdmin} />;
+                return <CalendarioInterno escolas={escolas} currentUser={currentUser} isAdmin={isAdmin} parentSelectedEscolaId={selectedEscolaId} />;
             default:
                 return null;
         }
@@ -1133,18 +1186,21 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
 
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex-1 flex items-center gap-4 w-full">
-                    {isAdmin ? (
+                    {escolas.length > 1 ? (
                         <>
                             <div className="bg-blue-50 p-2 rounded-xl border border-blue-100">
                                 <Calendar className="w-5 h-5 text-blue-600" />
                             </div>
                             <div className="flex-1">
-                                <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Unidade Escolar (Modo Admin)</p>
+                                <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">
+                                    Unidade Escolar {isAdmin ? '(Modo Admin)' : ''}
+                                </p>
                                 <select
                                     value={selectedEscolaId}
                                     onChange={(e) => setSelectedEscolaId(e.target.value)}
                                     className="w-full bg-transparent text-sm font-bold text-slate-800 focus:outline-none appearance-none cursor-pointer"
                                 >
+                                    <option value="all">TODAS AS UNIDADES</option>
                                     {escolas.map(e => (
                                         <option key={e.id} value={e.id}>{e.nome}</option>
                                     ))}
@@ -1158,7 +1214,9 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({ escola
                             </div>
                             <div className="flex-1">
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Unidade Escolar</p>
-                                <p className="text-sm font-bold text-slate-800">{getEscolaNome(currentEscolaId)}</p>
+                                <p className="text-sm font-bold text-slate-800">
+                                    {selectedEscolaId === 'all' ? 'TODAS AS UNIDADES' : getEscolaNome(selectedEscolaId)}
+                                </p>
                             </div>
                         </>
                     )}

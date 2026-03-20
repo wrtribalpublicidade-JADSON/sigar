@@ -1,13 +1,96 @@
-import React, { useState } from 'react';
-import { Printer, BookOpen, ClipboardList, CalendarClock, Info, ArrowLeft, ArrowRight, Save, LayoutTemplate, School, Calendar, FileText, X, Users, CheckCircle2, Lock, Send, BarChart3, Hand, CheckSquare, MessageCircle, AlertTriangle, UserPlus, PenLine } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Printer, BookOpen, ClipboardList, CalendarClock, Info, ArrowLeft, ArrowRight, Save, LayoutTemplate, School, Calendar, FileText, X, Users, CheckCircle2, Lock, Send, BarChart3, Hand, CheckSquare, MessageCircle, AlertTriangle, UserPlus, PenLine, Loader2 } from 'lucide-react';
+import { Escola, Coordenador } from '../types';
+import { ccTurmaService, ccEstudanteService } from '../services/gestaoConselhoService';
 
 interface ReuniaoEstudantilFormProps {
     onClose?: () => void;
+    escolas?: Escola[];
+    currentUser?: Coordenador | null;
+    initialEscolaId?: string;
+    initialTurmaId?: string;
 }
 
-export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({ onClose }) => {
+export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({ 
+    onClose, 
+    escolas = [], 
+    currentUser,
+    initialEscolaId,
+    initialTurmaId
+}) => {
     const [currentStep, setCurrentStep] = useState(1);
     const [autoAvaliacao, setAutoAvaliacao] = useState<{ [key: number]: string }>({});
+    
+    // Selection States
+    const [selectedEscolaId, setSelectedEscolaId] = useState<string>(initialEscolaId || escolas[0]?.id || '');
+    const [turmas, setTurmas] = useState<any[]>([]);
+    const [selectedTurmaId, setSelectedTurmaId] = useState<string>(initialTurmaId || '');
+    const [estudantes, setEstudantes] = useState<any[]>([]);
+    
+    // Loading States
+    const [isLoadingTurmas, setIsLoadingTurmas] = useState(false);
+    const [isLoadingEstudantes, setIsLoadingEstudantes] = useState(false);
+    
+    // Active Turma Detection
+    const activeTurma = useMemo(() => {
+        return turmas.find(t => t.id === selectedTurmaId);
+    }, [turmas, selectedTurmaId]);
+
+    const isInfantil = activeTurma?.etapa === 'Educação Infantil';
+
+    const CAMPOS_EXPERIENCIA = [
+        'O Eu, o Outro e o Nós',
+        'Corpo, Gestos e Movimentos',
+        'Traços, Sons, Cores e Formas',
+        'Escuta, Fala, Pensamento e Imaginação',
+        'Espaços, Tempos, Quantidades, Relações e Transformações'
+    ];
+
+    // Fetch Turmas when School changes
+    useEffect(() => {
+        const loadTurmas = async () => {
+            if (!selectedEscolaId) {
+                setTurmas([]);
+                return;
+            }
+            setIsLoadingTurmas(true);
+            try {
+                const data = await ccTurmaService.getBySchool(selectedEscolaId);
+                setTurmas(data || []);
+                // If initialTurmaId matches one of the new turmas, keep it, otherwise clear it
+                if (initialTurmaId && data.some((t: any) => t.id === initialTurmaId)) {
+                    setSelectedTurmaId(initialTurmaId);
+                } else {
+                    setSelectedTurmaId('');
+                }
+            } catch (error) {
+                console.error('Erro ao carregar turmas:', error);
+            } finally {
+                setIsLoadingTurmas(false);
+            }
+        };
+        loadTurmas();
+    }, [selectedEscolaId, initialTurmaId]);
+
+    // Fetch Students when Turma changes
+    useEffect(() => {
+        const loadStudents = async () => {
+            if (!selectedTurmaId) {
+                setEstudantes([]);
+                return;
+            }
+            setIsLoadingEstudantes(true);
+            try {
+                const data = await ccEstudanteService.getByTurma(selectedTurmaId);
+                setEstudantes(data || []);
+            } catch (error) {
+                console.error('Erro ao carregar estudantes:', error);
+            } finally {
+                setIsLoadingEstudantes(false);
+            }
+        };
+        loadStudents();
+    }, [selectedTurmaId]);
 
     const handleAutoAvaliacaoToggle = (idx: number) => {
         setAutoAvaliacao(prev => {
@@ -161,11 +244,18 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({ on
                                     <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-2">
                                         <School className="w-3.5 h-3.5" /> UNIDADE ESCOLAR
                                     </label>
-                                    <input
-                                        type="text"
-                                        className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400 placeholder:font-medium"
-                                        placeholder="Informe o nome completo da escola"
-                                    />
+                                    <select
+                                        value={selectedEscolaId}
+                                        onChange={(e) => setSelectedEscolaId(e.target.value)}
+                                        className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+                                    >
+                                        <option value="">Selecione a Unidade Escolar</option>
+                                        {escolas.map(escola => (
+                                            <option key={escola.id} value={escola.id}>
+                                                {escola.nome}
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -173,11 +263,26 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({ on
                                         <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-2">
                                             <Users className="w-3.5 h-3.5" /> TURMA / AGRUPAMENTO
                                         </label>
-                                        <input
-                                            type="text"
-                                            className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400 placeholder:font-medium"
-                                            placeholder="Ex: 9º Ano B"
-                                        />
+                                        <div className="relative">
+                                            <select
+                                                value={selectedTurmaId}
+                                                onChange={(e) => setSelectedTurmaId(e.target.value)}
+                                                disabled={!selectedEscolaId || isLoadingTurmas}
+                                                className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed appearance-none"
+                                            >
+                                                <option value="">{isLoadingTurmas ? 'Carregando turmas...' : 'Selecione a Turma'}</option>
+                                                {turmas.map(turma => (
+                                                    <option key={turma.id} value={turma.id}>
+                                                        {turma.identificacao} - {turma.anoSerie} ({turma.turno})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            {isLoadingTurmas && (
+                                                <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                                                    <Loader2 className="w-4 h-4 text-emerald-500 animate-spin" />
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-2">
@@ -247,10 +352,10 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({ on
                                 <div className="bg-white/20 p-1.5 rounded-lg">
                                     <BookOpen className="w-5 h-5 text-white" strokeWidth={2.5} />
                                 </div>
-                                ETAPA 2: COMPONENTES CURRICULARES (BNCC)
+                                {isInfantil ? 'ETAPA 2: CAMPOS DE EXPERIÊNCIA (BNCC INFANTIL)' : 'ETAPA 2: COMPONENTES CURRICULARES (BNCC)'}
                             </div>
                             <div className="bg-white/20 text-white text-[10px] px-3 py-1.5 rounded-full uppercase tracking-wider font-bold hidden md:block">
-                                Foco na Aprendizagem
+                                {isInfantil ? 'Direitos de Aprendizagem' : 'Foco na Aprendizagem'}
                             </div>
                         </div>
 
@@ -262,7 +367,10 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({ on
                                     <Info className="w-3.5 h-3.5" strokeWidth={3} />
                                 </div>
                                 <div className="text-sm text-emerald-800">
-                                    Marque a coluna <strong>Dificuldade</strong> para os componentes onde a turma encontrou obstáculos e detalhe os motivos e sugestões.
+                                    {isInfantil 
+                                        ? <span>Marque a coluna <strong>Dificuldade</strong> para os campos onde a turma encontrou desafios no desenvolvimento das experiências.</span>
+                                        : <span>Marque a coluna <strong>Dificuldade</strong> para os componentes onde a turma encontrou obstáculos e detalhe os motivos e sugestões.</span>
+                                    }
                                 </div>
                             </div>
 
@@ -271,88 +379,113 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({ on
                                 <table className="w-full text-sm text-left">
                                     <thead className="text-[10px] text-slate-500 uppercase bg-slate-50/80 border-b border-slate-200">
                                         <tr>
-                                            <th className="px-6 py-4 font-bold w-48 tracking-wider">Áreas de Conhecimento</th>
-                                            <th className="px-6 py-4 font-bold w-48 tracking-wider">Componentes</th>
+                                            {isInfantil ? (
+                                                <th className="px-6 py-4 font-bold w-96 tracking-wider">Campos de Experiência</th>
+                                            ) : (
+                                                <>
+                                                    <th className="px-6 py-4 font-bold w-48 tracking-wider">Áreas de Conhecimento</th>
+                                                    <th className="px-6 py-4 font-bold w-48 tracking-wider">Componentes</th>
+                                                </>
+                                            )}
                                             <th className="px-6 py-4 font-bold text-center w-32 tracking-wider">Dificuldade</th>
                                             <th className="px-6 py-4 font-bold min-w-[200px] tracking-wider">Por Quê? (Motivos)</th>
                                             <th className="px-6 py-4 font-bold min-w-[200px] tracking-wider">Sugestões de Melhoria</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 text-slate-600 font-medium">
-                                        {/* Linguagens */}
-                                        <tr>
-                                            <td rowSpan={4} className="px-6 py-4 align-top font-bold text-slate-700 bg-white border-r border-slate-100">Linguagens</td>
-                                            <td className="px-6 py-4 font-bold text-slate-800">Língua Portuguesa</td>
-                                            <td className="px-6 py-4 text-center">
-                                                <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer" />
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400 placeholder:font-medium" placeholder="Descreva os desafios..." />
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400 placeholder:font-medium" placeholder="Como podemos melhorar?" />
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td className="px-6 py-4 font-bold text-slate-800">Arte</td>
-                                            <td className="px-6 py-4 text-center"><input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer" /></td>
-                                            <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
-                                            <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
-                                        </tr>
-                                        <tr>
-                                            <td className="px-6 py-4 font-bold text-slate-800">Educação Física</td>
-                                            <td className="px-6 py-4 text-center"><input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer" /></td>
-                                            <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
-                                            <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
-                                        </tr>
-                                        <tr>
-                                            <td className="px-6 py-4 font-bold text-slate-800">Língua Inglesa</td>
-                                            <td className="px-6 py-4 text-center"><input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer" /></td>
-                                            <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
-                                            <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
-                                        </tr>
+                                        {isInfantil ? (
+                                            CAMPOS_EXPERIENCIA.map((campo, idx) => (
+                                                <tr key={idx}>
+                                                    <td className="px-6 py-5 font-bold text-slate-800">{campo}</td>
+                                                    <td className="px-6 py-5 text-center">
+                                                        <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer" />
+                                                    </td>
+                                                    <td className="px-6 py-5">
+                                                        <input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400 placeholder:font-medium" placeholder="Desafios observados..." />
+                                                    </td>
+                                                    <td className="px-6 py-5">
+                                                        <input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400 placeholder:font-medium" placeholder="Sugestões pedagógicas..." />
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <>
+                                                {/* Linguagens */}
+                                                <tr>
+                                                    <td rowSpan={4} className="px-6 py-4 align-top font-bold text-slate-700 bg-white border-r border-slate-100">Linguagens</td>
+                                                    <td className="px-6 py-4 font-bold text-slate-800">Língua Portuguesa</td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer" />
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400 placeholder:font-medium" placeholder="Descreva os desafios..." />
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400 placeholder:font-medium" placeholder="Como podemos melhorar?" />
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td className="px-6 py-4 font-bold text-slate-800">Arte</td>
+                                                    <td className="px-6 py-4 text-center"><input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer" /></td>
+                                                    <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
+                                                    <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
+                                                </tr>
+                                                <tr>
+                                                    <td className="px-6 py-4 font-bold text-slate-800">Educação Física</td>
+                                                    <td className="px-6 py-4 text-center"><input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer" /></td>
+                                                    <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
+                                                    <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
+                                                </tr>
+                                                <tr>
+                                                    <td className="px-6 py-4 font-bold text-slate-800">Língua Inglesa</td>
+                                                    <td className="px-6 py-4 text-center"><input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer" /></td>
+                                                    <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
+                                                    <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
+                                                </tr>
 
-                                        {/* Matemática */}
-                                        <tr className="border-t border-slate-200">
-                                            <td className="px-6 py-4 align-top font-bold text-slate-700 bg-white border-r border-slate-100">Matemática</td>
-                                            <td className="px-6 py-4 font-bold text-slate-800">Matemática</td>
-                                            <td className="px-6 py-4 text-center"><input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer" /></td>
-                                            <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
-                                            <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
-                                        </tr>
+                                                {/* Matemática */}
+                                                <tr className="border-t border-slate-200">
+                                                    <td className="px-6 py-4 align-top font-bold text-slate-700 bg-white border-r border-slate-100">Matemática</td>
+                                                    <td className="px-6 py-4 font-bold text-slate-800">Matemática</td>
+                                                    <td className="px-6 py-4 text-center"><input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer" /></td>
+                                                    <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
+                                                    <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
+                                                </tr>
 
-                                        {/* Ciências Naturais */}
-                                        <tr className="border-t border-slate-200">
-                                            <td className="px-6 py-4 align-top font-bold text-slate-700 bg-white border-r border-slate-100">Ciências Nat.</td>
-                                            <td className="px-6 py-4 font-bold text-slate-800">Ciências</td>
-                                            <td className="px-6 py-4 text-center"><input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer" /></td>
-                                            <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
-                                            <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
-                                        </tr>
+                                                {/* Ciências Naturais */}
+                                                <tr className="border-t border-slate-200">
+                                                    <td className="px-6 py-4 align-top font-bold text-slate-700 bg-white border-r border-slate-100">Ciências Nat.</td>
+                                                    <td className="px-6 py-4 font-bold text-slate-800">Ciências</td>
+                                                    <td className="px-6 py-4 text-center"><input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer" /></td>
+                                                    <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
+                                                    <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
+                                                </tr>
 
-                                        {/* Humanas */}
-                                        <tr className="border-t border-slate-200">
-                                            <td rowSpan={2} className="px-6 py-4 align-top font-bold text-slate-700 bg-white border-r border-slate-100">Humanas</td>
-                                            <td className="px-6 py-4 font-bold text-slate-800">História</td>
-                                            <td className="px-6 py-4 text-center"><input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer" /></td>
-                                            <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
-                                            <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
-                                        </tr>
-                                        <tr>
-                                            <td className="px-6 py-4 font-bold text-slate-800">Geografia</td>
-                                            <td className="px-6 py-4 text-center"><input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer" /></td>
-                                            <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
-                                            <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
-                                        </tr>
+                                                {/* Humanas */}
+                                                <tr className="border-t border-slate-200">
+                                                    <td rowSpan={2} className="px-6 py-4 align-top font-bold text-slate-700 bg-white border-r border-slate-100">Humanas</td>
+                                                    <td className="px-6 py-4 font-bold text-slate-800">História</td>
+                                                    <td className="px-6 py-4 text-center"><input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer" /></td>
+                                                    <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
+                                                    <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
+                                                </tr>
+                                                <tr>
+                                                    <td className="px-6 py-4 font-bold text-slate-800">Geografia</td>
+                                                    <td className="px-6 py-4 text-center"><input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer" /></td>
+                                                    <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
+                                                    <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
+                                                </tr>
 
-                                        {/* Ensino Religioso */}
-                                        <tr className="border-t border-slate-200">
-                                            <td className="px-6 py-4 align-top font-bold text-slate-700 bg-white border-r border-slate-100">Ens. Religioso</td>
-                                            <td className="px-6 py-4 font-bold text-slate-800">Ensino Religioso</td>
-                                            <td className="px-6 py-4 text-center"><input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer" /></td>
-                                            <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
-                                            <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
-                                        </tr>
+                                                {/* Ensino Religioso */}
+                                                <tr className="border-t border-slate-200">
+                                                    <td className="px-6 py-4 align-top font-bold text-slate-700 bg-white border-r border-slate-100">Ens. Religioso</td>
+                                                    <td className="px-6 py-4 font-bold text-slate-800">Ensino Religioso</td>
+                                                    <td className="px-6 py-4 text-center"><input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer" /></td>
+                                                    <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
+                                                    <td className="px-6 py-4"><input type="text" className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" /></td>
+                                                </tr>
+                                            </>
+                                        )}
                                     </tbody>
                                 </table>
                             </div>
@@ -384,7 +517,7 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({ on
                             <div className="space-y-4">
                                 <h3 className="flex items-center gap-2 text-sm font-bold text-slate-800 uppercase tracking-wide">
                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                    1. AUTOAVALIAÇÃO DA TURMA
+                                    {isInfantil ? '1. AUTOAVALIAÇÃO DOS PAIS/RESPONSÁVEIS' : '1. AUTOAVALIAÇÃO DA TURMA'}
                                 </h3>
                                 <div className="border border-slate-200 rounded-xl overflow-hidden">
                                     <div className="overflow-x-auto">
@@ -396,12 +529,17 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({ on
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100 text-slate-600 font-medium">
-                                                {[
+                                                {(isInfantil ? [
+                                                    'Participação nas atividades escolares',
+                                                    'Acompanhamento do desenvolvimento em casa',
+                                                    'Comunicação com a escola/professores',
+                                                    'Pontualidade e frequência da criança'
+                                                ] : [
                                                     'Pontualidade nas aulas/atividades',
                                                     'Rendimento Acadêmico',
                                                     'Relação com Professor/Colegas',
                                                     'Comportamento'
-                                                ].map((criterio, idx) => {
+                                                ]).map((criterio, idx) => {
                                                     const btnConfig = getAutoAvaliacaoButtonConfig(autoAvaliacao[idx]);
                                                     return (
                                                         <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
@@ -427,11 +565,11 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({ on
                             <div className="space-y-4">
                                 <h3 className="flex items-center gap-2 text-sm font-bold text-slate-800 uppercase tracking-wide">
                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                    2. COMPROMISSOS DA TURMA
+                                    {isInfantil ? '2. COMPROMISSOS DA FAMÍLIA' : '2. COMPROMISSOS DA TURMA'}
                                 </h3>
                                 <textarea
                                     className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-5 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium text-slate-700 placeholder:text-slate-400 min-h-[140px] resize-y"
-                                    placeholder="Quais ações e compromissos a turma assume para o próximo período?"
+                                    placeholder={isInfantil ? "Quais compromissos a família assume para o próximo período?" : "Quais ações e compromissos a turma assume para o próximo período?"}
                                 ></textarea>
                             </div>
 
@@ -439,11 +577,11 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({ on
                             <div className="space-y-4">
                                 <h3 className="flex items-center gap-2 text-sm font-bold text-slate-800 uppercase tracking-wide">
                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                    3. OUTRAS QUESTÕES (PEDAGÓGICAS/ESTRUTURAIS)
+                                    {isInfantil ? '3. OBSERVAÇÕES E SUGESTÕES (PEDAGÓGICAS/ESTRUTURAIS)' : '3. OUTRAS QUESTÕES (PEDAGÓGICAS/ESTRUTURAIS)'}
                                 </h3>
                                 <textarea
                                     className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-5 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium text-slate-700 placeholder:text-slate-400 min-h-[140px] resize-y"
-                                    placeholder="Observações sobre o ambiente escolar, recursos, suporte pedagógico, etc."
+                                    placeholder={isInfantil ? "Sugestões sobre o ambiente escolar, rotina, suporte pedagógico, etc." : "Observações sobre o ambiente escolar, recursos, suporte pedagógico, etc."}
                                 ></textarea>
                             </div>
 
@@ -491,30 +629,51 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({ on
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 text-slate-600 font-medium">
-                                        {[
-                                            { n: '01', nome: 'Ana Beatriz Silva', status: 'pending', active: true },
-                                            { n: '02', nome: 'Carlos Eduardo Oliveira', status: 'signed', active: true },
-                                            { n: '03', nome: 'Nome completo do estudante', status: 'pending', active: false },
-                                            { n: '04', nome: 'Nome completo do estudante', status: 'pending', active: false },
-                                        ].map((student, idx) => (
-                                            <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                                                <td className={`px-4 py-5 font-bold ${student.active ? 'text-slate-400' : 'text-slate-300'}`}>{student.n}</td>
-                                                <td className={`px-4 py-5 ${student.active ? 'font-medium text-slate-700' : 'font-medium text-slate-300'}`}>{student.nome}</td>
-                                                <td className="px-4 py-5 text-right">
-                                                    {student.status === 'signed' ? (
-                                                        <div className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-600 px-4 py-2 rounded-lg text-xs font-bold border border-emerald-100">
-                                                            <CheckCircle2 className="w-4 h-4" strokeWidth={2.5} />
-                                                            ASSINADO
-                                                        </div>
-                                                    ) : (
-                                                        <button className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold border transition-colors ${student.active ? 'border-emerald-500 text-emerald-600 hover:bg-emerald-50' : 'border-emerald-300 text-emerald-400 hover:bg-emerald-50'}`}>
-                                                            <PenLine className="w-4 h-4" strokeWidth={2} />
-                                                            Coletar Assinatura Digital
-                                                        </button>
-                                                    )}
+                                        {isLoadingEstudantes ? (
+                                            <tr>
+                                                <td colSpan={3} className="px-4 py-10 text-center">
+                                                    <div className="flex flex-col items-center gap-2">
+                                                        <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+                                                        <span className="text-slate-400 font-medium">Carregando estudantes...</span>
+                                                    </div>
                                                 </td>
                                             </tr>
-                                        ))}
+                                        ) : estudantes.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={3} className="px-4 py-10 text-center">
+                                                    <div className="flex flex-col items-center gap-2">
+                                                        <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center text-slate-300">
+                                                            <Users className="w-6 h-6" />
+                                                        </div>
+                                                        <span className="text-slate-400 font-medium">Nenhum estudante encontrado para esta turma.</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            estudantes.map((student, idx) => (
+                                                <tr key={student.id} className="hover:bg-slate-50/50 transition-colors">
+                                                    <td className="px-4 py-5 font-bold text-slate-400">
+                                                        {(idx + 1).toString().padStart(2, '0')}
+                                                    </td>
+                                                    <td className="px-4 py-5 font-medium text-slate-700">
+                                                        {student.name}
+                                                    </td>
+                                                    <td className="px-4 py-5 text-right">
+                                                        {student.status_assinatura === 'signed' ? (
+                                                            <div className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-600 px-4 py-2 rounded-lg text-xs font-bold border border-emerald-100">
+                                                                <CheckCircle2 className="w-4 h-4" strokeWidth={2.5} />
+                                                                ASSINADO
+                                                            </div>
+                                                        ) : (
+                                                            <button className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold border border-emerald-500 text-emerald-600 hover:bg-emerald-50 transition-colors">
+                                                                <PenLine className="w-4 h-4" strokeWidth={2} />
+                                                                Coletar Assinatura Digital
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
                                     </tbody>
                                 </table>
                             </div>
@@ -524,11 +683,13 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({ on
                                 <div className="flex items-center gap-8 border-r border-slate-200 pr-8">
                                     <div>
                                         <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total de Alunos na Turma</div>
-                                        <div className="text-2xl font-black text-slate-700">32</div>
+                                        <div className="text-2xl font-black text-slate-700">{estudantes.length.toString().padStart(2, '0')}</div>
                                     </div>
                                     <div>
                                         <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Presentes Registrados</div>
-                                        <div className="text-2xl font-black text-emerald-500">02</div>
+                                        <div className="text-2xl font-black text-emerald-500">
+                                            {estudantes.filter((s: any) => s.status_assinatura === 'signed').length.toString().padStart(2, '0')}
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3 text-slate-500 text-sm">

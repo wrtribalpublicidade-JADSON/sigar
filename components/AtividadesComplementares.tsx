@@ -2,20 +2,11 @@ import React, { useState } from 'react';
 import { 
     BookOpen, Trophy, Music, Palette, Code, Users, 
     Calendar, Search, Plus, Filter, ChevronRight, 
-    Clock, MapPin, Star
+    Clock, MapPin, Star, Pencil, Trash2
 } from 'lucide-react';
-
-interface Atividade {
-    id: string;
-    nome: string;
-    categoria: string;
-    instrutor: string;
-    vagas: number;
-    inscritos: number;
-    horario: string;
-    sala: string;
-    status: 'Ativa' | 'Encerrada' | 'Planejada';
-}
+import { AtividadeModal } from './AtividadeModal';
+import { DiarioAtividadeModal } from './DiarioAtividadeModal';
+import { activitiesService, Atividade } from '../services/activitiesService';
 
 const CATEGORIAS = [
     { id: 'esportes', name: 'Esportes', icon: Trophy, color: 'text-orange-500', bg: 'bg-orange-50' },
@@ -25,23 +16,89 @@ const CATEGORIAS = [
     { id: 'reforco', name: 'Reforço', icon: BookOpen, color: 'text-emerald-500', bg: 'bg-emerald-50' },
 ];
 
-const ATIVIDADES_MOCK: Atividade[] = [
-    { id: '1', nome: 'Futsal Masculino', categoria: 'esportes', instrutor: 'Prof. Carlos', vagas: 30, inscritos: 28, horario: 'Seg/Qua 14:00', sala: 'Quadra Poliesportiva', status: 'Ativa' },
-    { id: '2', nome: 'Artes Visuais', categoria: 'artes', instrutor: 'Profa. Marina', vagas: 20, inscritos: 15, horario: 'Ter/Qui 15:30', sala: 'Ateliê 02', status: 'Ativa' },
-    { id: '3', nome: 'Iniciação à Programação', categoria: 'tecnologia', instrutor: 'Prof. Ricardo', vagas: 15, inscritos: 12, horario: 'Sex 14:00', sala: 'Lab Informática', status: 'Ativa' },
-    { id: '4', nome: 'Fanfarra Municipal', categoria: 'musica', instrutor: 'Maestro Silas', vagas: 50, inscritos: 42, horario: 'Sáb 09:00', sala: 'Pátio Coberto', status: 'Ativa' },
-    { id: '5', nome: 'Reforço de Matemática', categoria: 'reforco', instrutor: 'Profa. Eliane', vagas: 25, inscritos: 10, horario: 'Qua 16:00', sala: 'Sala 05', status: 'Planejada' },
-];
-
 export const AtividadesComplementares: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCat, setSelectedCat] = useState('todas');
+    const [atividades, setAtividades] = useState<Atividade[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingAtividade, setEditingAtividade] = useState<Atividade | null>(null);
+    const [isDiarioOpen, setIsDiarioOpen] = useState(false);
+    const [activityForDiario, setActivityForDiario] = useState<Atividade | null>(null);
 
-    const filteredAtividades = ATIVIDADES_MOCK.filter(a => {
-        const matchesSearch = a.nome.toLowerCase().includes(searchTerm.toLowerCase()) || a.instrutor.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesCat = selectedCat === 'todas' || a.categoria === selectedCat;
+    const fetchAtividades = async () => {
+        setIsLoading(true);
+        try {
+            const data = await activitiesService.getAtividades();
+            setAtividades(data);
+        } catch (err) {
+            console.error('Error fetching activities:', err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    React.useEffect(() => {
+        fetchAtividades();
+    }, []);
+
+    const handleSaveAtividade = async (newAtv: Omit<Atividade, 'id' | 'inscritos'>) => {
+        try {
+            if (editingAtividade) {
+                await activitiesService.saveAtividade({ ...newAtv, id: editingAtividade.id });
+            } else {
+                await activitiesService.saveAtividade(newAtv);
+            }
+            fetchAtividades();
+            setEditingAtividade(null);
+            setIsModalOpen(false);
+        } catch (err) {
+            console.error('Error saving activity:', err);
+            alert('Erro ao salvar atividade. Tente novamente.');
+        }
+    };
+
+    const handleDeleteAtividade = async (id: string, nome: string) => {
+        if (confirm(`Tem certeza que deseja excluir a atividade "${nome}"?`)) {
+            try {
+                await activitiesService.deleteAtividade(id);
+                fetchAtividades();
+            } catch (err) {
+                console.error('Error deleting activity:', err);
+                alert('Erro ao excluir atividade.');
+            }
+        }
+    };
+
+    const openEditModal = (atv: Atividade) => {
+        setEditingAtividade(atv);
+        setIsModalOpen(true);
+    };
+
+    const openNewModal = () => {
+        setEditingAtividade(null);
+        setIsModalOpen(true);
+    };
+
+    const openDiario = (atv: Atividade) => {
+        setActivityForDiario(atv);
+        setIsDiarioOpen(true);
+    };
+
+    const filteredAtividades = atividades.filter(atv => {
+        if (!atv) return false;
+        const search = searchTerm.toLowerCase();
+        const matchesSearch = (atv.nome?.toLowerCase()?.includes(search) || 
+                               atv.instrutor?.toLowerCase()?.includes(search) || false);
+        const matchesCat = selectedCat === 'todas' || atv.categoria === selectedCat;
         return matchesSearch && matchesCat;
     });
+
+    // Dynamic Stats Calculation
+    const totalInscritos = atividades.reduce((sum: number, atv: Atividade) => sum + (atv?.inscritos || 0), 0);
+    const totalOficinasAtivas = atividades.filter(a => a?.status === 'Ativa').length;
+    const totalVagas = atividades.reduce((sum: number, atv: Atividade) => sum + (atv?.vagas || 0), 0);
+    const presencaMedia = totalVagas > 0 ? Math.round((totalInscritos / totalVagas) * 100) : 0;
 
     return (
         <div className="space-y-8 animate-fade-in pb-10">
@@ -56,7 +113,10 @@ export const AtividadesComplementares: React.FC = () => {
                     </h2>
                     <p className="text-slate-500 font-medium mt-1">Gestão de oficinas, esportes e projetos extracurriculares</p>
                 </div>
-                <button className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 transition-all shadow-lg shadow-indigo-200 active:scale-95 self-start md:self-center">
+                <button 
+                    onClick={openNewModal}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 transition-all shadow-lg shadow-indigo-200 active:scale-95 self-start md:self-center"
+                >
                     <Plus size={20} /> Nova Atividade
                 </button>
             </div>
@@ -69,7 +129,7 @@ export const AtividadesComplementares: React.FC = () => {
                     </div>
                     <div>
                         <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Alunos Inscritos</p>
-                        <p className="text-2xl font-black text-slate-800">107</p>
+                        <p className="text-2xl font-black text-slate-800">{totalInscritos}</p>
                     </div>
                 </div>
                 <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
@@ -78,7 +138,7 @@ export const AtividadesComplementares: React.FC = () => {
                     </div>
                     <div>
                         <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Oficinas Ativas</p>
-                        <p className="text-2xl font-black text-slate-800">12</p>
+                        <p className="text-2xl font-black text-slate-800">{totalOficinasAtivas}</p>
                     </div>
                 </div>
                 <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
@@ -87,7 +147,7 @@ export const AtividadesComplementares: React.FC = () => {
                     </div>
                     <div>
                         <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Média Presença</p>
-                        <p className="text-2xl font-black text-slate-800">84%</p>
+                        <p className="text-2xl font-black text-slate-800">{presencaMedia}%</p>
                     </div>
                 </div>
             </div>
@@ -133,7 +193,31 @@ export const AtividadesComplementares: React.FC = () => {
                     const percentInscritos = (atv.inscritos / atv.vagas) * 100;
                     
                     return (
-                        <div key={atv.id} className="group bg-white rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-300 overflow-hidden flex flex-col">
+                        <div key={atv.id} className="group bg-white rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-300 overflow-hidden flex flex-col relative">
+                            {/* Actions overlay */}
+                            <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                <button 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        openEditModal(atv);
+                                    }}
+                                    className="p-2 bg-white text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all shadow-sm border border-slate-100"
+                                    title="Editar Atividade"
+                                >
+                                    <Pencil size={16} />
+                                </button>
+                                <button 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteAtividade(atv.id, atv.nome);
+                                    }}
+                                    className="p-2 bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shadow-sm border border-slate-100"
+                                    title="Excluir Atividade"
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+                            </div>
+
                             <div className="p-6">
                                 <div className="flex justify-between items-start mb-6">
                                     <div className={`p-3 rounded-2xl ${cat?.bg || 'bg-slate-50'} ${cat?.color || 'text-slate-600'}`}>
@@ -153,7 +237,7 @@ export const AtividadesComplementares: React.FC = () => {
                                 <div className="space-y-3 mb-6">
                                     <div className="flex items-center gap-2 text-slate-500">
                                         <Clock size={16} className="text-indigo-400" />
-                                        <span className="text-xs font-bold">{atv.horario}</span>
+                                        <span className="text-xs font-bold">{atv.diasSemana?.join('/')} {atv.horarioInicio}</span>
                                     </div>
                                     <div className="flex items-center gap-2 text-slate-500">
                                         <MapPin size={16} className="text-indigo-400" />
@@ -175,7 +259,10 @@ export const AtividadesComplementares: React.FC = () => {
                                 </div>
                             </div>
                             
-                            <button className="mt-auto w-full py-4 bg-slate-50 group-hover:bg-indigo-600 transition-colors text-slate-400 group-hover:text-white font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 border-t border-slate-100/50">
+                            <button 
+                                onClick={() => openDiario(atv)}
+                                className="mt-auto w-full py-4 bg-slate-50 group-hover:bg-indigo-600 transition-colors text-slate-400 group-hover:text-white font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 border-t border-slate-100/50"
+                            >
                                 Visualizar Diário <ChevronRight size={16} />
                             </button>
                         </div>
@@ -192,6 +279,19 @@ export const AtividadesComplementares: React.FC = () => {
                     <p className="text-slate-500 font-medium">Tente ajustar seus filtros de busca.</p>
                 </div>
             )}
+
+            <AtividadeModal 
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                onSave={handleSaveAtividade}
+                atividadeToEdit={editingAtividade}
+            />
+
+            <DiarioAtividadeModal 
+                isOpen={isDiarioOpen}
+                onClose={() => setIsDiarioOpen(false)}
+                atividade={activityForDiario}
+            />
         </div>
     );
 };

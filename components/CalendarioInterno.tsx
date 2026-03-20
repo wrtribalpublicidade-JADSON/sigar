@@ -34,6 +34,7 @@ interface CalendarioInternoProps {
     escolas?: Escola[];
     currentUser?: string | null;
     isAdmin?: boolean;
+    parentSelectedEscolaId?: string;
 }
 
 // ========== Constants ==========
@@ -108,7 +109,12 @@ function isWeekend(year: number, month: number, day: number) {
 }
 
 // ========== Component ==========
-export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = [], currentUser = '', isAdmin = false }) => {
+export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ 
+    escolas = [], 
+    currentUser = '', 
+    isAdmin = false,
+    parentSelectedEscolaId
+}) => {
     const today = new Date();
     const [currentMonth, setCurrentMonth] = useState(today.getMonth());
     const [currentYear, setCurrentYear] = useState(today.getFullYear());
@@ -131,12 +137,14 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({ escolas = 
     const escolaIds = React.useMemo(() => escolas.map(e => e.id), [escolas]);
     const [filtroEscola, setFiltroEscola] = useState<string>(isAdmin ? 'todas' : (escolas.length === 1 ? escolas[0].id : 'todas'));
 
-    // Update filter when schools change (crucial for initial load)
+    // Update filter when schools change (crucial for initial load) or when parent selection changes
     useEffect(() => {
-        if (!isAdmin && escolas.length === 1 && filtroEscola === 'todas') {
+        if (parentSelectedEscolaId) {
+            setFiltroEscola(parentSelectedEscolaId === 'all' ? 'todas' : parentSelectedEscolaId);
+        } else if (!isAdmin && escolas.length === 1 && filtroEscola === 'todas') {
             setFiltroEscola(escolas[0].id);
         }
-    }, [escolas, isAdmin]);
+    }, [escolas, isAdmin, parentSelectedEscolaId]);
 
     // Filters
     const [filtroTipo, setFiltroTipo] = useState<string>('todos');
