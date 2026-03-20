@@ -99,8 +99,10 @@ export const PrintableCartaApresentacao: React.FC<PrintableCartaApresentacaoProp
             <div style={{ lineHeight: 1.85, fontSize: '10pt', color: '#1e293b', textAlign: 'justify' }}>
                 <p style={{ marginBottom: '14pt' }}>
                     Cumprimentando-o(a) cordialmente, venho por meio desta apresentar e encaminhar o(a) servidor(a){' '}
-                    <strong>{servidor.nome}</strong>, portador(a) do cargo/função de <strong>{servidor.funcao}</strong>,
-                    com tipo de vínculo <strong>{servidor.tipoVinculo}</strong>
+                    <strong>{servidor.nome}</strong>, portador(a) do cargo/função de <strong>{servidor.funcao}</strong>
+                    {servidor.cpf ? <>, inscrito(a) no CPF sob o nº <strong>{servidor.cpf}</strong></> : ''}, com tipo de vínculo{' '}
+                    <strong>{servidor.tipoVinculo}</strong>
+                    {servidor.cargaHoraria ? <>, carga horária de <strong>{servidor.cargaHoraria}</strong></> : ''}
                     {servidor.dataNomeacao
                         ? `, nomeado(a) em ${new Date(servidor.dataNomeacao + 'T12:00:00').toLocaleDateString('pt-BR')}`
                         : ''}

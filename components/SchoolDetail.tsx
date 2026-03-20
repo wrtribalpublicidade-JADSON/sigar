@@ -123,8 +123,11 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
 
   const [isAddingRh, setIsAddingRh] = useState(false);
   const [editingRhId, setEditingRhId] = useState<string | null>(null);
+  const [cpfError, setCpfError] = useState<string>('');
   const [rhForm, setRhForm] = useState<RecursoHumano>({
-    id: '', funcao: '', nome: '', telefone: '', email: '', dataNomeacao: '', tipoVinculo: 'Efetivo', etapaAtuacao: undefined, componenteCurricular: ''
+    id: '', funcao: '', nome: '', telefone: '', email: '', dataNomeacao: '',
+    tipoVinculo: 'Efetivo', cargaHoraria: '', cpf: '', dataNascimento: '',
+    etapaAtuacao: undefined, componenteCurricular: ''
   });
 
   const [isEditingMeta, setIsEditingMeta] = useState(false);
@@ -212,7 +215,8 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
       onUpdate({ ...escola, recursosHumanos: updatedList });
     }
     setIsAddingRh(false);
-    setRhForm({ id: '', funcao: '', nome: '', telefone: '', email: '', dataNomeacao: '', tipoVinculo: 'Efetivo', etapaAtuacao: undefined, componenteCurricular: '' });
+    setCpfError('');
+    setRhForm({ id: '', funcao: '', nome: '', telefone: '', email: '', dataNomeacao: '', tipoVinculo: 'Efetivo', cargaHoraria: '', cpf: '', dataNascimento: '', etapaAtuacao: undefined, componenteCurricular: '' });
   };
 
   const handleEditRh = (rh: RecursoHumano) => {
@@ -604,6 +608,60 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                           <input type="text" value={(rhForm as any)[f]} onChange={e => setRhForm({ ...rhForm, [f]: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all" placeholder={`Digite o ${f}...`} />
                         </div>
                       ))}
+
+                      {/* CPF com máscara e validação */}
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-slate-500 uppercase">CPF</label>
+                        <input
+                          type="text"
+                          maxLength={14}
+                          value={rhForm.cpf || ''}
+                          onChange={e => {
+                            // Aplica máscara CPF: xxx.xxx.xxx-xx
+                            const raw = e.target.value.replace(/\D/g, '').slice(0, 11);
+                            let masked = raw;
+                            if (raw.length > 9) {
+                              masked = `${raw.slice(0, 3)}.${raw.slice(3, 6)}.${raw.slice(6, 9)}-${raw.slice(9)}`;
+                            } else if (raw.length > 6) {
+                              masked = `${raw.slice(0, 3)}.${raw.slice(3, 6)}.${raw.slice(6)}`;
+                            } else if (raw.length > 3) {
+                              masked = `${raw.slice(0, 3)}.${raw.slice(3)}`;
+                            }
+                            setRhForm({ ...rhForm, cpf: masked });
+                            // Valida CPF
+                            if (raw.length === 11) {
+                              // Algoritmo de validação CPF
+                              const digits = raw.split('').map(Number);
+                              const calcDigit = (arr: number[], len: number) => {
+                                const sum = arr.slice(0, len).reduce((acc, d, i) => acc + d * (len + 1 - i), 0);
+                                const r = sum % 11;
+                                return r < 2 ? 0 : 11 - r;
+                              };
+                              const valid = calcDigit(digits, 9) === digits[9] && calcDigit(digits, 10) === digits[10]
+                                && !/^(\d)\1{10}$/.test(raw);
+                              setCpfError(valid ? '' : 'CPF inválido');
+                            } else {
+                              setCpfError('');
+                            }
+                          }}
+                          className={`w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all ${
+                            cpfError ? 'border-red-400 bg-red-50' : 'border-slate-200'
+                          }`}
+                          placeholder="000.000.000-00"
+                        />
+                        {cpfError && <p className="text-xs text-red-500 font-semibold mt-1">{cpfError}</p>}
+                      </div>
+
+                      {/* Data de Nascimento */}
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-slate-500 uppercase">Data de Nascimento</label>
+                        <input
+                          type="date"
+                          value={rhForm.dataNascimento || ''}
+                          onChange={e => setRhForm({ ...rhForm, dataNascimento: e.target.value })}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all"
+                        />
+                      </div>
                       <div className="space-y-2">
                         <label className="block text-xs font-bold text-slate-500 uppercase">Função</label>
                         <select value={rhForm.funcao} onChange={e => setRhForm({ ...rhForm, funcao: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all">
@@ -632,6 +690,15 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                           <option value="Efetivo">Efetivo</option>
                           <option value="Contratado">Contratado</option>
                           <option value="Permutado">Permutado</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-slate-500 uppercase">Carga Horária</label>
+                        <select value={rhForm.cargaHoraria || ''} onChange={e => setRhForm({ ...rhForm, cargaHoraria: e.target.value as any })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all">
+                          <option value="">Selecione a carga horária...</option>
+                          <option value="20h">20 horas</option>
+                          <option value="25h">25 horas</option>
+                          <option value="40h">40 horas</option>
                         </select>
                       </div>
                       <div className="space-y-2">

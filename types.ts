@@ -125,6 +125,9 @@ export interface RecursoHumano {
   email: string;
   dataNomeacao: string;
   tipoVinculo: 'Efetivo' | 'Contratado' | 'Permutado';
+  cargaHoraria?: '20h' | '25h' | '40h' | '';
+  cpf?: string;
+  dataNascimento?: string;
   // Campos condicionais para Professores
   etapaAtuacao?: 'Educação Infantil' | 'Anos Iniciais' | 'Anos Finais' | 'EJA' | 'Sala de Recurso' | 'Outros';
   componenteCurricular?: 'Língua Portuguesa' | 'Matemática' | 'Geografia' | 'História' | 'Ciências' | 'Educação Física' | 'Língua Inglesa' | 'Arte' | 'Ensino Religioso' | '';

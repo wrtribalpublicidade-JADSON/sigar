@@ -212,6 +212,9 @@ export default function App() {
           email: r.email,
           dataNomeacao: r.data_nomeacao,
           tipoVinculo: r.tipo_vinculo,
+          cargaHoraria: r.carga_horaria || '',
+          cpf: r.cpf || '',
+          dataNascimento: r.data_nascimento || '',
           etapaAtuacao: r.etapa_atuacao,
           componenteCurricular: r.componente_curricular
         })) || [],
@@ -449,6 +452,9 @@ export default function App() {
             email: r.email,
             data_nomeacao: r.dataNomeacao,
             tipo_vinculo: r.tipoVinculo,
+            carga_horaria: r.cargaHoraria || null,
+            cpf: r.cpf || null,
+            data_nascimento: r.dataNascimento || null,
             etapa_atuacao: r.etapaAtuacao,
             componente_curricular: r.componenteCurricular
           })));
