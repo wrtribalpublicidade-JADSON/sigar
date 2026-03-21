@@ -102,8 +102,8 @@ export default function App() {
         if (currentUserCoord) {
           linkedSchoolIds = currentUserCoord.escolasIds;
           setLoggedInCoordId(currentUserCoord.id);
-          // Set isAdmin based on the role in the database
-          if (currentUserCoord.funcao === 'Administrador' || currentUserCoord.funcao === 'Gestor Geral') {
+          // Only the dedicated Administrador role bypasses permission checks
+          if (currentUserCoord.funcao === 'Administrador') {
             setIsAdmin(true);
           }
         } else {
@@ -164,6 +164,8 @@ export default function App() {
         localizacao: e.localizacao,
         segmentos: e.segmentos || [],
         alunosMatriculados: e.alunos_matriculados,
+        ofertaAtividadeComplementar: !!e.oferta_atividade_complementar,
+        status: e.status || 'Ativo',
         indicadores: e.indicadores || { ideb: 0, frequenciaMedia: 0, fluenciaLeitora: 0, taxaAprovacao: 0 },
         // Construct dadosEducacionais combining the DB JSON + Relational Table arrays
         dadosEducacionais: {
@@ -394,6 +396,8 @@ export default function App() {
         localizacao: updatedEscola.localizacao,
         segmentos: updatedEscola.segmentos,
         alunos_matriculados: updatedEscola.alunosMatriculados,
+        oferta_atividade_complementar: updatedEscola.ofertaAtividadeComplementar,
+        status: updatedEscola.status,
         indicadores: updatedEscola.indicadores,
         dados_educacionais: cleanDadosEducacionais
       }).eq('id', updatedEscola.id);
@@ -597,6 +601,8 @@ export default function App() {
         localizacao: newSchool.localizacao,
         segmentos: newSchool.segmentos,
         alunos_matriculados: newSchool.alunosMatriculados,
+        oferta_atividade_complementar: newSchool.ofertaAtividadeComplementar,
+        status: newSchool.status,
         indicadores: newSchool.indicadores,
         dados_educacionais: newSchool.dadosEducacionais
       });

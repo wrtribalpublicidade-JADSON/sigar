@@ -90,7 +90,9 @@ export const SchoolList: React.FC<SchoolListProps> = ({ escolas, onSelectEscola,
     coordenador: '',
     localizacao: 'Sede',
     alunosMatriculados: 0,
-    segmentos: []
+    segmentos: [],
+    ofertaAtividadeComplementar: false,
+    status: 'Ativo'
   });
 
   const handleExport = () => {
@@ -128,7 +130,9 @@ export const SchoolList: React.FC<SchoolListProps> = ({ escolas, onSelectEscola,
       coordenador: escola.coordenador,
       localizacao: escola.localizacao,
       alunosMatriculados: escola.alunosMatriculados,
-      segmentos: escola.segmentos
+      segmentos: escola.segmentos,
+      ofertaAtividadeComplementar: escola.ofertaAtividadeComplementar,
+      status: escola.status
     });
     setEditingSchoolId(escola.id);
     setIsRegistering(true);
@@ -157,7 +161,9 @@ export const SchoolList: React.FC<SchoolListProps> = ({ escolas, onSelectEscola,
           coordenador: formData.coordenador || '',
           localizacao: formData.localizacao || 'Sede',
           alunosMatriculados: Number(formData.alunosMatriculados) || 0,
-          segmentos: formData.segmentos || []
+          segmentos: formData.segmentos || [],
+          ofertaAtividadeComplementar: !!formData.ofertaAtividadeComplementar,
+          status: formData.status || 'Ativo'
         };
         onUpdate(updatedSchool);
       }
@@ -170,6 +176,8 @@ export const SchoolList: React.FC<SchoolListProps> = ({ escolas, onSelectEscola,
         localizacao: formData.localizacao || 'Sede',
         alunosMatriculados: Number(formData.alunosMatriculados) || 0,
         segmentos: formData.segmentos || [],
+        ofertaAtividadeComplementar: !!formData.ofertaAtividadeComplementar,
+        status: formData.status || 'Ativo',
         indicadores: { ideb: 0, frequenciaMedia: 0, fluenciaLeitora: 0, taxaAprovacao: 0 },
         dadosEducacionais: createEmptyDadosEducacionais(),
         planoAcao: [],
@@ -182,7 +190,16 @@ export const SchoolList: React.FC<SchoolListProps> = ({ escolas, onSelectEscola,
     setIsRegistering(false);
     setEditingSchoolId(null);
     setShowConfirmModal(false);
-    setFormData({ nome: '', gestor: '', coordenador: '', localizacao: 'Sede', alunosMatriculados: 0, segmentos: [] });
+    setFormData({ 
+      nome: '', 
+      gestor: '', 
+      coordenador: '', 
+      localizacao: 'Sede', 
+      alunosMatriculados: 0, 
+      segmentos: [],
+      ofertaAtividadeComplementar: false,
+      status: 'Ativo'
+    });
   };
 
   const filteredEscolas = escolas.filter(e =>
@@ -239,6 +256,22 @@ export const SchoolList: React.FC<SchoolListProps> = ({ escolas, onSelectEscola,
               <div className="space-y-2">
                 <label className="text-sm font-bold text-slate-500">Capacidade de Alunos</label>
                 <input type="number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all" value={formData.alunosMatriculados} onChange={e => setFormData({ ...formData, alunosMatriculados: Number(e.target.value) })} />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-500">Oferta Atividade Complementar</label>
+                <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all" value={formData.ofertaAtividadeComplementar ? 'Sim' : 'Não'} onChange={e => setFormData({ ...formData, ofertaAtividadeComplementar: e.target.value === 'Sim' })}>
+                  <option value="Não">Não</option>
+                  <option value="Sim">Sim</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-500">Situação da Unidade</label>
+                <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as 'Ativo' | 'Inativo' })}>
+                  <option value="Ativo">Ativa</option>
+                  <option value="Inativo">Inativa</option>
+                </select>
               </div>
             </div>
 
@@ -315,43 +348,50 @@ export const SchoolList: React.FC<SchoolListProps> = ({ escolas, onSelectEscola,
                 <div className="w-10 h-10 bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl flex items-center justify-center text-orange-400 font-bold text-lg shadow-md">
                   {escola.nome.charAt(0)}
                 </div>
-                <div className="text-right flex items-center justify-end gap-2">
-                  {(() => {
-                    const regs = escola.dadosEducacionais?.registrosIDEB || [];
-                    const latest = [...regs].sort((a, b) => b.ano - a.ano)[0];
-                    if (!latest) {
-                      return (
-                        <div className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
-                          IDEB -
-                        </div>
-                      );
-                    }
-                    return (
-                      <>
-                        {latest.anosIniciais > 0 && (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[9px] text-slate-400 font-bold uppercase">IDEB 5º ANO</span>
-                            <span className={`inline-flex px-1.5 py-0.5 font-black text-[10px] border rounded ${latest.anosIniciais >= 4.5 ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
-                              {latest.anosIniciais.toFixed(1)}
-                            </span>
-                          </div>
-                        )}
-                        {latest.anosFinais > 0 && (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[9px] text-slate-400 font-bold uppercase">IDEB 9º ANO</span>
-                            <span className={`inline-flex px-1.5 py-0.5 font-black text-[10px] border rounded ${latest.anosFinais >= 4.5 ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
-                              {latest.anosFinais.toFixed(1)}
-                            </span>
-                          </div>
-                        )}
-                        {latest.anosIniciais <= 0 && latest.anosFinais <= 0 && (
+                <div className="text-right flex flex-col items-end gap-1">
+                  <div className="flex items-center justify-end gap-2">
+                    {escola.status === 'Inativo' && (
+                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-red-100 text-red-600 border border-red-200 uppercase">
+                        Inativa
+                      </span>
+                    )}
+                    {escola.ofertaAtividadeComplementar && (
+                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-blue-100 text-blue-600 border border-blue-200 uppercase">
+                        Atividade Compl.
+                      </span>
+                    )}
+                    {(() => {
+                      const regs = escola.dadosEducacionais?.registrosIDEB || [];
+                      const latest = [...regs].sort((a, b) => b.ano - a.ano)[0];
+                      if (!latest) {
+                        return (
                           <div className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
                             IDEB -
                           </div>
-                        )}
-                      </>
-                    );
-                  })()}
+                        );
+                      }
+                      return (
+                        <>
+                          {latest.anosIniciais > 0 && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[9px] text-slate-400 font-bold uppercase">IDEB 5º ANO</span>
+                              <span className={`inline-flex px-1.5 py-0.5 font-black text-[10px] border rounded ${latest.anosIniciais >= 4.5 ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                                {latest.anosIniciais.toFixed(1)}
+                              </span>
+                            </div>
+                          )}
+                          {latest.anosFinais > 0 && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[9px] text-slate-400 font-bold uppercase">IDEB 9º ANO</span>
+                              <span className={`inline-flex px-1.5 py-0.5 font-black text-[10px] border rounded ${latest.anosFinais >= 4.5 ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                                {latest.anosFinais.toFixed(1)}
+                              </span>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
                 </div>
               </div>
               <h3 className="text-base font-bold text-slate-800 leading-tight mb-2 group-hover:text-orange-600 transition-colors line-clamp-2 min-h-[2.5rem]">{escola.nome}</h3>

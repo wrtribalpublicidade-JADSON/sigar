@@ -124,28 +124,42 @@ export const activitiesService = {
     },
 
     async getEnrolledStudents(atividadeId: string): Promise<any[]> {
-        const { data, error } = await supabase
+        // Fetch activity links
+        const { data: links, error: lError } = await supabase
             .from('atividade_alunos')
-            .select(`
-                aluno_id,
-                alunos (*)
-            `)
+            .select('aluno_id')
             .eq('atividade_id', atividadeId);
 
-        if (error) throw error;
-        // Filter out cases where the student record (join) might be null
-        return (data || [])
-            .filter(item => item.alunos !== null)
-            .map(item => {
-                const al = item.alunos as any;
-                const displayTurma = [al.stage, al.class_id].filter(Boolean).join(' - ') || '-';
-                return {
-                    id: al.id,
-                    nome: al.name || al.nome,
-                    turma: displayTurma,
-                    status: al.status === 'active' ? 'Ativo' : 'Inativo'
-                };
-            });
+        if (lError) throw lError;
+        if (!links || links.length === 0) return [];
+
+        const studentIds = links.map(l => l.aluno_id);
+
+        // Fetch students, classes and schools separately for robustness
+        const [alunosRes, turmasRes, escolasRes] = await Promise.all([
+            supabase.from('alunos').select('*').in('id', studentIds),
+            supabase.from('turmas').select('id, name, year'),
+            supabase.from('escolas').select('id, name')
+        ]);
+
+        if (alunosRes.error) throw alunosRes.error;
+
+        const turmasMap = new Map((turmasRes.data || []).map(t => [t.id, t]));
+        const escolasMap = new Map((escolasRes.data || []).map(e => [e.id, e]));
+
+        return (alunosRes.data || []).map(al => {
+            const t = turmasMap.get(al.class_id);
+            const e = escolasMap.get(al.escola_id);
+
+            return {
+                id: al.id,
+                nome: al.name || 'Sem nome',
+                turma: t?.name || '-',
+                escola: e?.name || '-',
+                anoSerie: t?.year || al.stage || '-',
+                status: al.status === 'active' ? 'Ativo' : 'Inativo'
+            };
+        });
     },
 
     async getAttendanceStats(atividadeId: string): Promise<Record<number, number>> {

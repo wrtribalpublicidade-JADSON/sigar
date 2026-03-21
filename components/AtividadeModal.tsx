@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Save, Info, Calendar, Target, Briefcase, Clock, MapPin, Users, BookOpen, Edit } from 'lucide-react';
 
 import { Atividade } from '../services/activitiesService';
+import { supabase } from '../services/supabase';
 
 interface AtividadeModalProps {
     isOpen: boolean;
@@ -45,6 +46,47 @@ export const AtividadeModal: React.FC<AtividadeModalProps> = ({ isOpen, onClose,
         materiais: '',
         status: 'Ativa'
     });
+
+    const [escolasDisponiveis, setEscolasDisponiveis] = useState<string[]>([]);
+    const [monitoresDisponiveis, setMonitoresDisponiveis] = useState<string[]>([]);
+    const [isLoadingData, setIsLoadingData] = useState(false);
+
+    useEffect(() => {
+        const fetchRequiredData = async () => {
+            setIsLoadingData(true);
+            try {
+                // Fetch schools that offer complementary activities
+                const { data: schools } = await supabase
+                    .from('escolas')
+                    .select('nome')
+                    .eq('oferta_atividade_complementar', true)
+                    .order('nome');
+                
+                if (schools) {
+                    setEscolasDisponiveis(schools.map(s => s.nome));
+                }
+
+                // Fetch monitors (servidores in recursos_humanos with specific function)
+                const { data: personnel } = await supabase
+                    .from('recursos_humanos')
+                    .select('nome')
+                    .eq('funcao', 'Monitor(a) de Atividade Complementar')
+                    .order('nome');
+
+                if (personnel) {
+                    setMonitoresDisponiveis(personnel.map(p => p.nome));
+                }
+            } catch (error) {
+                console.error('Error fetching modal data:', error);
+            } finally {
+                setIsLoadingData(false);
+            }
+        };
+
+        if (isOpen) {
+            fetchRequiredData();
+        }
+    }, [isOpen]);
 
     useEffect(() => {
         if (atividadeToEdit) {
@@ -171,11 +213,15 @@ export const AtividadeModal: React.FC<AtividadeModalProps> = ({ isOpen, onClose,
                                         value={formData.unidadeEscolar}
                                         onChange={e => setFormData({ ...formData, unidadeEscolar: e.target.value })}
                                         className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-orange-500/10 focus:border-orange-500 outline-none transition-all cursor-pointer"
+                                        disabled={isLoadingData}
                                     >
-                                        <option value="" disabled>Selecione a unidade</option>
-                                        <option value="E.M. João Paulo II">E.M. João Paulo II</option>
-                                        <option value="E.M. Anita Garibaldi">E.M. Anita Garibaldi</option>
-                                        <option value="E.M. Castelo Branco">E.M. Castelo Branco</option>
+                                        <option value="" disabled>{isLoadingData ? 'Carregando unidades...' : 'Selecione a unidade'}</option>
+                                        {escolasDisponiveis.map(escola => (
+                                            <option key={escola} value={escola}>{escola}</option>
+                                        ))}
+                                        {!isLoadingData && escolasDisponiveis.length === 0 && (
+                                            <option value="" disabled>Nenhuma escola com oferta ativa</option>
+                                        )}
                                     </select>
                                 </div>
                             </div>
@@ -186,11 +232,15 @@ export const AtividadeModal: React.FC<AtividadeModalProps> = ({ isOpen, onClose,
                                     value={formData.instrutor}
                                     onChange={e => setFormData({ ...formData, instrutor: e.target.value })}
                                     className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-orange-500/10 focus:border-orange-500 outline-none transition-all cursor-pointer"
+                                    disabled={isLoadingData}
                                 >
-                                    <option value="" disabled>Selecione o monitor responsável</option>
-                                    <option value="Prof. Carlos">Prof. Carlos</option>
-                                    <option value="Profa. Marina">Profa. Marina</option>
-                                    <option value="Prof. Ricardo">Prof. Ricardo</option>
+                                    <option value="" disabled>{isLoadingData ? 'Carregando monitores...' : 'Selecione o monitor responsável'}</option>
+                                    {monitoresDisponiveis.map(monitor => (
+                                        <option key={monitor} value={monitor}>{monitor}</option>
+                                    ))}
+                                    {!isLoadingData && monitoresDisponiveis.length === 0 && (
+                                        <option value="" disabled>Nenhum monitor encontrado no RH</option>
+                                    )}
                                 </select>
                             </div>
                         </div>

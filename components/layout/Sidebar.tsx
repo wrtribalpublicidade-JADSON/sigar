@@ -193,6 +193,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
                             <div className="flex-1 min-w-0">
                                 <p className="text-[12px] font-bold text-slate-900 truncate">{userName || 'Usuário'}</p>
                                 <p className="text-[10px] text-slate-500 truncate font-medium">{userEmail || ''}</p>
+                                {userRole && (
+                                    <span className="inline-block mt-1 px-2 py-0.5 bg-orange-100 text-orange-700 text-[9px] font-bold uppercase tracking-widest rounded-full">
+                                        {userRole}
+                                    </span>
+                                )}
                             </div>
                         </div>
                     </div>

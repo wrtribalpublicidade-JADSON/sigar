@@ -10,6 +10,8 @@ interface Student {
     id: number;
     nome: string;
     turma: string;
+    escola: string;
+    anoSerie: string;
     status: 'Ativo' | 'Inativo';
 }
 
@@ -25,10 +27,11 @@ export const DiarioAtividadeModal: React.FC<{
     const [studentFrequency, setStudentFrequency] = useState<Record<number, number>>({});
     const [logs, setLogs] = useState<AtividadeLog[]>([]);
     const [isAddingStudent, setIsAddingStudent] = useState(false);
-    const [availableStudents, setAvailableStudents] = useState<Student[]>([]);
+    const [allStudents, setAllStudents] = useState<Student[]>([]);
     const [studentSearch, setStudentSearch] = useState('');
-    const [newLog, setNewLog] = useState('');
+    const [isLoadingStudents, setIsLoadingStudents] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [newLog, setNewLog] = useState('');
 
     const loadData = async () => {
         if (!atividade?.id) return;
@@ -39,9 +42,13 @@ export const DiarioAtividadeModal: React.FC<{
                 activitiesService.getLogs(atividade.id),
                 activitiesService.getAttendanceStats(atividade.id)
             ]);
-            setStudents(enrolled as Student[]);
+            const enrolledStudents = enrolled as Student[];
+            setStudents(enrolledStudents);
             setLogs(historyLogs);
             setStudentFrequency(stats);
+            
+            // Trigger loadAttendance with the loaded students to apply defaults
+            await loadAttendance(enrolledStudents);
         } catch (err) {
             console.error('Error loading diary data:', err);
         } finally {
@@ -49,70 +56,53 @@ export const DiarioAtividadeModal: React.FC<{
         }
     };
 
-    const loadAttendance = async () => {
+    const loadAttendance = async (enrolledList?: Student[]) => {
         if (!atividade?.id || !selectedDate) return;
         try {
             const data = await activitiesService.getAttendance(atividade.id, selectedDate);
+            // Default all enrolled students to present, then override with saved records
             const attMap: Record<number, boolean> = {};
-            data.forEach(a => attMap[a.aluno_id] = a.presente);
+            (enrolledList || students).forEach(s => { attMap[s.id] = true; });
+            data.forEach(a => { attMap[a.aluno_id] = a.presente; });
             setAttendance(attMap);
         } catch (err) {
             console.error('Error loading attendance:', err);
         }
     };
 
-    const searchAvailableStudents = async (query: string) => {
-        if (query.length < 2) {
-            setAvailableStudents([]);
-            return;
-        }
+    const loadAllStudents = async () => {
+        setIsLoadingStudents(true);
         try {
-            // Search in both alunos (Conselho de Classe) and cc_avaliacao_docente (Avaliação Docente)
-            const [alunosRes, docRes] = await Promise.all([
-                supabase
-                    .from('alunos')
-                    .select('id, name, class_id, status')
-                    .ilike('name', `%${query}%`)
-                    .limit(10),
-                supabase
-                    .from('cc_avaliacao_docente')
-                    .select('estudante_id, nome_estudante, turma_id')
-                    .ilike('nome_estudante', `%${query}%`)
-                    .limit(10)
+            // Fetch students, classes and schools separately to be 100% sure we get data
+            const [alunosRes, turmasRes, escolasRes] = await Promise.all([
+                supabase.from('alunos').select('id, name, class_id, status, stage, escola_id').order('name', { ascending: true }),
+                supabase.from('turmas').select('id, name, year'),
+                supabase.from('escolas').select('id, name')
             ]);
-            
-            if (alunosRes.error) throw alunosRes.error;
-            if (docRes.error) throw docRes.error;
 
-            // Standardize results
-            const fromAlunos = (alunosRes.data || []).map(a => {
-                const al = a as any;
-                const displayTurma = [al.stage, al.class_id].filter(Boolean).join(' - ') || '-';
+            if (alunosRes.error) throw alunosRes.error;
+
+            const turmasMap = new Map((turmasRes.data || []).map(t => [t.id, t]));
+            const escolasMap = new Map((escolasRes.data || []).map(e => [e.id, e]));
+
+            const mapped = (alunosRes.data || []).map((a: any) => {
+                const t = turmasMap.get(a.class_id);
+                const e = escolasMap.get(a.escola_id);
+
                 return {
-                    id: al.id,
-                    nome: al.name,
-                    turma: displayTurma,
-                    status: al.status === 'active' ? 'Ativo' : 'Inativo' as any
+                    id: a.id,
+                    nome: a.name || 'Sem nome',
+                    turma: t?.name || '-',
+                    escola: e?.name || '-',
+                    anoSerie: t?.year || a.stage || '-',
+                    status: a.status === 'active' ? 'Ativo' : 'Inativo' as any
                 };
             });
-
-            const fromDocente = (docRes.data || []).map(d => ({
-                id: d.estudante_id,
-                nome: d.nome_estudante,
-                turma: d.turma_id,
-                status: 'Ativo' as any
-            }));
-
-            // Merge and de-duplicate by ID
-            const merged = [...fromAlunos, ...fromDocente];
-            const unique = merged.reduce((acc: any[], curr) => {
-                if (!acc.find(s => s.id === curr.id)) acc.push(curr);
-                return acc;
-            }, []);
-
-            setAvailableStudents(unique);
+            setAllStudents(mapped);
         } catch (err) {
-            console.error('Error searching students:', err);
+            console.error('Error loading all students:', err);
+        } finally {
+            setIsLoadingStudents(false);
         }
     };
 
@@ -127,12 +117,15 @@ export const DiarioAtividadeModal: React.FC<{
         loadAttendance();
     }, [selectedDate]);
 
+    // Load all students from DB when picker opens
     React.useEffect(() => {
-        const timer = setTimeout(() => {
-            if (studentSearch) searchAvailableStudents(studentSearch);
-        }, 300);
-        return () => clearTimeout(timer);
-    }, [studentSearch]);
+        if (isAddingStudent && allStudents.length === 0) {
+            loadAllStudents();
+        }
+        if (!isAddingStudent) {
+            setStudentSearch('');
+        }
+    }, [isAddingStudent]);
 
     const handleAttendance = async (studentId: number, presente: boolean) => {
         try {
@@ -202,9 +195,16 @@ export const DiarioAtividadeModal: React.FC<{
         }
     };
 
-    const filteredAvailable = availableStudents.filter(s => 
-        !students.find(es => es.id === s.id)
-    );
+    // Students to show in picker: all from DB filtered by search
+    const pickerStudents = allStudents.filter(s => {
+        if (!studentSearch) return true;
+        const q = studentSearch.toLowerCase();
+        return s.nome.toLowerCase().includes(q) ||
+               (s.turma || '').toLowerCase().includes(q) ||
+               (s.escola || '').toLowerCase().includes(q) ||
+               (s.anoSerie || '').toLowerCase().includes(q);
+    });
+    const isEnrolled = (id: number) => !!students.find(s => s.id === id);
 
     if (!isOpen) return null;
 
@@ -242,30 +242,52 @@ export const DiarioAtividadeModal: React.FC<{
                                 </div>
                             </div>
                             <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-3">
-                                {filteredAvailable.length > 0 ? (
-                                    filteredAvailable.map(s => (
-                                        <button 
-                                            key={s.id}
-                                            onClick={() => handleAddStudent(s)}
-                                            className="w-full flex items-center justify-between p-4 bg-white border border-slate-50 hover:border-indigo-100 hover:bg-slate-50 rounded-2xl transition-all group"
-                                        >
-                                            <div className="flex items-center gap-4 text-left">
-                                                <div className="w-12 h-12 bg-white text-slate-400 group-hover:bg-indigo-600 group-hover:text-white rounded-xl shadow-sm flex items-center justify-center font-black transition-all">
-                                                    {s.nome?.charAt(0) || '?'}
+                                {isLoadingStudents ? (
+                                    <div className="py-10 text-center text-slate-400 font-bold">Carregando alunos...</div>
+                                ) : pickerStudents.length > 0 ? (
+                                    pickerStudents.map(s => {
+                                        const enrolled = isEnrolled(s.id);
+                                        return (
+                                            <button 
+                                                key={s.id}
+                                                onClick={() => !enrolled && handleAddStudent(s)}
+                                                disabled={enrolled}
+                                                className={`w-full flex items-center justify-between p-4 border rounded-2xl transition-all group ${
+                                                    enrolled
+                                                        ? 'bg-emerald-50 border-emerald-200 cursor-default'
+                                                        : 'bg-white border-slate-50 hover:border-indigo-100 hover:bg-slate-50 cursor-pointer'
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-4 text-left">
+                                                    <div className={`w-12 h-12 rounded-xl shadow-sm flex items-center justify-center font-black transition-all ${
+                                                        enrolled ? 'bg-emerald-500 text-white' : 'bg-white text-slate-400 group-hover:bg-indigo-600 group-hover:text-white'
+                                                    }`}>
+                                                        {s.nome?.charAt(0) || '?'}
+                                                    </div>
+                                                    <div>
+                                                        <p className={`font-black text-sm tracking-tight ${
+                                                            enrolled ? 'text-emerald-700' : 'text-slate-800'
+                                                        }`}>{s.nome || 'Sem nome'}</p>
+                                                        <div className="flex gap-2 items-center flex-wrap">
+                                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{s.escola}</span>
+                                                            <span className="w-1 h-1 bg-slate-200 rounded-full" />
+                                                            <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">{s.anoSerie} - {s.turma}</span>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <p className="font-black text-slate-800 text-sm tracking-tight">{s.nome || 'Sem nome'}</p>
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{s.turma || '-'}</p>
+                                                <div className={`p-2 rounded-lg transition-all ${
+                                                    enrolled
+                                                        ? 'bg-emerald-100 text-emerald-600'
+                                                        : 'bg-slate-100 text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600'
+                                                }`}>
+                                                    {enrolled ? <CheckCircle2 size={18} /> : <Plus size={18} />}
                                                 </div>
-                                            </div>
-                                            <div className="p-2 bg-slate-100 text-slate-400 rounded-lg group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-all">
-                                                <Plus size={18} />
-                                            </div>
-                                        </button>
-                                    ))
+                                            </button>
+                                        );
+                                    })
                                 ) : (
                                     <div className="py-10 text-center text-slate-400 font-bold italic">
-                                        Nenhum aluno disponível para vincular.
+                                        Nenhum aluno encontrado.
                                     </div>
                                 )}
                             </div>
@@ -395,7 +417,10 @@ export const DiarioAtividadeModal: React.FC<{
                                                         </div>
                                                     </td>
                                                     <td className="px-8 py-5">
-                                                        <span className="bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider">{student.turma || '-'}</span>
+                                                        <div className="flex flex-col">
+                                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">{student.escola}</span>
+                                                            <span className="bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider w-fit">{student.anoSerie} - {student.turma}</span>
+                                                        </div>
                                                     </td>
                                                     <td className="px-8 py-5">
                                                         <div className="flex justify-center gap-3">
@@ -457,7 +482,8 @@ export const DiarioAtividadeModal: React.FC<{
                                             </div>
                                             <div>
                                                 <h4 className="font-black text-slate-800 text-lg tracking-tight leading-tight">{student.nome || 'Sem nome'}</h4>
-                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{student.turma || '-'}</span>
+                                                <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-1">{student.escola}</p>
+                                                <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded-md">{student.anoSerie} - {student.turma}</span>
                                             </div>
                                         </div>
                                         <div className="flex justify-between items-center pt-4 border-t border-slate-50">
