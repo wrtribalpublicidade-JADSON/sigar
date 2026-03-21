@@ -120,6 +120,8 @@ export const ESCOLAS_MOCK: Escola[] = [
     segmentos: [Segmento.FUNDAMENTAL_I, Segmento.FUNDAMENTAL_II],
     alunosMatriculados: 450,
     localizacao: 'Sede',
+    ofertaAtividadeComplementar: true,
+    status: 'Ativo',
     indicadores: { ideb: 4.8, frequenciaMedia: 85, fluenciaLeitora: 62, taxaAprovacao: 92 },
     dadosEducacionais: {
       matricula: { infantil: 0, anosIniciais: 250, anosFinais: 200, eja: 0 },
@@ -179,6 +181,8 @@ export const ESCOLAS_MOCK: Escola[] = [
     segmentos: [Segmento.INFANTIL, Segmento.FUNDAMENTAL_I],
     alunosMatriculados: 120,
     localizacao: 'Zona Rural',
+    ofertaAtividadeComplementar: false,
+    status: 'Ativo',
     indicadores: { ideb: 3.9, frequenciaMedia: 78, fluenciaLeitora: 45, taxaAprovacao: 88 },
     dadosEducacionais: {
       matricula: { infantil: 40, anosIniciais: 80, anosFinais: 0, eja: 0 },
@@ -232,6 +236,8 @@ export const ESCOLAS_MOCK: Escola[] = [
     segmentos: [Segmento.FUNDAMENTAL_I],
     alunosMatriculados: 180,
     localizacao: 'Zona Rural',
+    ofertaAtividadeComplementar: false,
+    status: 'Ativo',
     indicadores: { ideb: 4.2, frequenciaMedia: 88, fluenciaLeitora: 55, taxaAprovacao: 90 },
     dadosEducacionais: {
       matricula: { infantil: 0, anosIniciais: 180, anosFinais: 0, eja: 0 },
@@ -272,6 +278,8 @@ export const ESCOLAS_MOCK: Escola[] = [
     segmentos: [Segmento.FUNDAMENTAL_I],
     alunosMatriculados: 150,
     localizacao: 'Zona Rural',
+    ofertaAtividadeComplementar: false,
+    status: 'Ativo',
     indicadores: { ideb: 4.0, frequenciaMedia: 82, fluenciaLeitora: 48, taxaAprovacao: 85 },
     dadosEducacionais: {
       matricula: { infantil: 0, anosIniciais: 150, anosFinais: 0, eja: 0 },
@@ -312,6 +320,8 @@ export const ESCOLAS_MOCK: Escola[] = [
     segmentos: [Segmento.FUNDAMENTAL_I],
     alunosMatriculados: 140,
     localizacao: 'Zona Rural',
+    ofertaAtividadeComplementar: false,
+    status: 'Ativo',
     indicadores: { ideb: 4.1, frequenciaMedia: 84, fluenciaLeitora: 50, taxaAprovacao: 88 },
     dadosEducacionais: {
       matricula: { infantil: 0, anosIniciais: 140, anosFinais: 0, eja: 0 },
@@ -352,6 +362,8 @@ export const ESCOLAS_MOCK: Escola[] = [
     segmentos: [Segmento.INFANTIL, Segmento.FUNDAMENTAL_I],
     alunosMatriculados: 110,
     localizacao: 'Zona Rural',
+    ofertaAtividadeComplementar: false,
+    status: 'Ativo',
     indicadores: { ideb: 3.8, frequenciaMedia: 75, fluenciaLeitora: 42, taxaAprovacao: 82 },
     dadosEducacionais: {
       matricula: { infantil: 30, anosIniciais: 80, anosFinais: 0, eja: 0 },
@@ -392,6 +404,8 @@ export const ESCOLAS_MOCK: Escola[] = [
     segmentos: [Segmento.FUNDAMENTAL_I],
     alunosMatriculados: 200,
     localizacao: 'Sede',
+    ofertaAtividadeComplementar: false,
+    status: 'Ativo',
     indicadores: { ideb: 5.5, frequenciaMedia: 95, fluenciaLeitora: 85, taxaAprovacao: 98 },
     dadosEducacionais: {
       matricula: { infantil: 0, anosIniciais: 200, anosFinais: 0, eja: 0 },
@@ -428,6 +442,8 @@ export const ESCOLAS_MOCK: Escola[] = [
     segmentos: [Segmento.FUNDAMENTAL_I],
     alunosMatriculados: 160,
     localizacao: 'Zona Rural',
+    ofertaAtividadeComplementar: false,
+    status: 'Ativo',
     indicadores: { ideb: 4.5, frequenciaMedia: 88, fluenciaLeitora: 60, taxaAprovacao: 92 },
     dadosEducacionais: {
       matricula: { infantil: 0, anosIniciais: 160, anosFinais: 0, eja: 0 },
@@ -464,6 +480,8 @@ export const ESCOLAS_MOCK: Escola[] = [
     segmentos: [Segmento.FUNDAMENTAL_I],
     alunosMatriculados: 130,
     localizacao: 'Zona Rural',
+    ofertaAtividadeComplementar: false,
+    status: 'Ativo',
     indicadores: { ideb: 3.5, frequenciaMedia: 80, fluenciaLeitora: 35, taxaAprovacao: 80 },
     dadosEducacionais: {
       matricula: { infantil: 0, anosIniciais: 130, anosFinais: 0, eja: 0 },
