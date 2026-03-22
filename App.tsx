@@ -26,6 +26,7 @@ import { InstrumentaisGestao } from './components/InstrumentaisGestao';
 import { ConselhoClasse } from './components/ConselhoClasse';
 import { PermissoesManager } from './components/PermissoesManager';
 import { AtividadesComplementares } from './components/AtividadesComplementares';
+import { StudentManagement } from './components/StudentManagement';
 import { Preloader } from './components/ui/Preloader';
 import { ViewState, Escola, Visita, Coordenador, Segmento } from './types';
 import { supabase } from './services/supabase';
@@ -1113,6 +1114,14 @@ export default function App() {
         return <PermissoesManager />;
       case 'ATIVIDADES_COMPLEMENTARES':
         return <AtividadesComplementares />;
+      case 'GESTAO_ESTUDANTES':
+        return (
+          <StudentManagement 
+            escolas={escolas}
+            isDemoMode={isDemoMode}
+            isAdmin={isAdmin}
+          />
+        );
       default:
         return <div>Página não encontrada</div>;
     }

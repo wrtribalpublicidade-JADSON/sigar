@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { PageHeader } from './ui/PageHeader';
-import { ChevronDown, FileText, Calendar, Printer, CheckSquare, AlertCircle, FileSpreadsheet, Download, Search, MapPin, Users, GraduationCap, Shield, UserCheck, BarChart3 } from 'lucide-react';
+import { ChevronDown, ChevronRight, FileText, Calendar, Printer, CheckSquare, AlertCircle, FileSpreadsheet, Download, Search, MapPin, Users, GraduationCap, Shield, UserCheck, BarChart3 } from 'lucide-react';
 import { Visita, Escola, Coordenador } from '../types';
 import { exportToCSV } from '../utils';
 import { useNotification } from '../context/NotificationContext';
 import { PrintableGerencialReport, TipoRelatorio, FiltroVinculo, SubtipoGestor } from './PrintableGerencialReport';
+import { PrintableMatriculaReport } from './PrintableMatriculaReport';
 
 interface ReportsModuleProps {
    visitas: Visita[];
@@ -12,7 +13,7 @@ interface ReportsModuleProps {
    coordenadores: Coordenador[];
 }
 
-type ReportTab = 'visita' | 'gerenciais';
+type ReportTab = 'visita' | 'gerenciais' | 'matriculas';
 
 export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, coordenadores }) => {
    const { showNotification } = useNotification();
@@ -28,6 +29,11 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
    const [selectedVinculo, setSelectedVinculo] = useState<FiltroVinculo>('Todos');
    const [selectedSubtipoGestor, setSelectedSubtipoGestor] = useState<SubtipoGestor>('Todos');
    const [isPrintingGerencial, setIsPrintingGerencial] = useState(false);
+
+   // === Matriculas Tab State ===
+   const [selectedLocalizacao, setSelectedLocalizacao] = useState<string>('Todas');
+   const [isPrintingMatricula, setIsPrintingMatricula] = useState(false);
+   const [expandedEscolaId, setExpandedEscolaId] = useState<string | null>(null);
 
    const filteredData = useMemo(() => {
       return visitas.filter(visita => {
@@ -67,6 +73,27 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
          coordenadoresContratados: coordenadoresPed.filter(r => r.tipoVinculo === 'Contratado').length,
       };
    }, [escolas]);
+
+   const handlePrintMatricula = () => {
+        setIsPrintingMatricula(true);
+        setTimeout(() => {
+            window.print();
+            setIsPrintingMatricula(false);
+        }, 300);
+    };
+
+    // === Matricula Stats ===
+    const matriculaStats = useMemo(() => {
+        const filtered = escolas.filter(e => selectedLocalizacao === 'Todas' || e.localizacao === selectedLocalizacao);
+        return filtered.reduce((acc, e) => {
+            acc.total += e.alunosMatriculados || 0;
+            acc.infantil += e.dadosEducacionais?.matricula?.infantil || 0;
+            acc.iniciais += e.dadosEducacionais?.matricula?.anosIniciais || 0;
+            acc.finais += e.dadosEducacionais?.matricula?.anosFinais || 0;
+            acc.eja += e.dadosEducacionais?.matricula?.eja || 0;
+            return acc;
+        }, { total: 0, infantil: 0, iniciais: 0, finais: 0, eja: 0 });
+    }, [escolas, selectedLocalizacao]);
 
    const handleExport = () => {
       const dataToExport = filteredData.map(v => ({
@@ -149,6 +176,7 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
             {[
                { id: 'visita' as ReportTab, icon: FileText, label: 'Relatório de Visita' },
                { id: 'gerenciais' as ReportTab, icon: BarChart3, label: 'Relatórios Gerenciais' },
+               { id: 'matriculas' as ReportTab, icon: GraduationCap, label: 'Controle de Matrículas' },
             ].map(tab => (
                <button
                   key={tab.id}
@@ -480,13 +508,205 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
             </div>
          )}
 
-         {/* ====== PRINT PORTAL ====== */}
+         {/* ====== MATRICULAS TAB ====== */}
+         {activeTab === 'matriculas' && (
+            <div className="space-y-8 animate-fade-in">
+               {/* Filters & Export */}
+               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                  <div className="flex flex-col md:flex-row gap-6 items-end">
+                     <div className="flex-1 space-y-2">
+                        <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                           <MapPin className="w-4 h-4 text-orange-500" /> Localização das Unidades
+                        </label>
+                        <div className="relative">
+                           <select
+                              value={selectedLocalizacao}
+                              onChange={e => setSelectedLocalizacao(e.target.value)}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 pr-10 text-sm font-medium text-slate-700 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/10 appearance-none shadow-sm"
+                           >
+                              <option value="Todas">Todas as Localizações</option>
+                              <option value="Sede">Sede</option>
+                              <option value="Zona Rural">Zona Rural</option>
+                           </select>
+                           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        </div>
+                     </div>
+
+                     <button
+                        onClick={handlePrintMatricula}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-indigo-500/20 transition-all flex items-center gap-2 whitespace-nowrap"
+                     >
+                        <Printer className="w-5 h-5" /> Imprimir Controle
+                     </button>
+                  </div>
+               </div>
+
+               {/* KPI Matrix */}
+               <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                  {[
+                     { label: 'Total Geral', val: matriculaStats.total, color: 'bg-slate-900', textColor: 'text-white' },
+                     { label: 'Infantil', val: matriculaStats.infantil, color: 'bg-white', textColor: 'text-indigo-600' },
+                     { label: 'Anos Iniciais', val: matriculaStats.iniciais, color: 'bg-white', textColor: 'text-indigo-600' },
+                     { label: 'Anos Finais', val: matriculaStats.finais, color: 'bg-white', textColor: 'text-indigo-600' },
+                     { label: 'EJA', val: matriculaStats.eja, color: 'bg-white', textColor: 'text-indigo-600' },
+                  ].map((k, i) => (
+                     <div key={i} className={`${k.color} rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col items-center justify-center text-center`}>
+                        <p className={`text-[10px] font-bold ${k.textColor} opacity-60 uppercase tracking-wider mb-1`}>{k.label}</p>
+                        <p className={`text-2xl font-black ${k.textColor}`}>{k.val.toLocaleString()}</p>
+                     </div>
+                  ))}
+               </div>
+
+               {/* Table Consolidada */}
+               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                  <div className="bg-slate-50 p-6 border-b border-slate-100">
+                     <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide flex items-center gap-2">
+                        <FileText className="w-5 h-5 text-indigo-600" /> Consolidado de Matrículas por Unidade
+                     </h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                     <table className="w-full text-left">
+                        <thead className="bg-slate-50 border-b border-slate-200">
+                           <tr className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                              <th className="px-6 py-4">Escola</th>
+                              <th className="px-4 py-4 text-center">Infantil</th>
+                              <th className="px-4 py-4 text-center">Iniciais</th>
+                              <th className="px-4 py-4 text-center">Finais</th>
+                              <th className="px-4 py-4 text-center">EJA</th>
+                              <th className="px-6 py-4 text-right">Total</th>
+                           </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                           {escolas
+                              .filter(e => selectedLocalizacao === 'Todas' || e.localizacao === selectedLocalizacao)
+                              .sort((a,b) => b.alunosMatriculados - a.alunosMatriculados)
+                              .map(escola => (
+                              <React.Fragment key={escola.id}>
+                                 <tr 
+                                    onClick={() => setExpandedEscolaId(expandedEscolaId === escola.id ? null : escola.id)}
+                                    className={`transition-colors cursor-pointer ${expandedEscolaId === escola.id ? 'bg-indigo-50/30' : 'hover:bg-slate-50'}`}
+                                 >
+                                    <td className="px-6 py-4">
+                                       <div className="flex items-center gap-3">
+                                          <div className={`transition-transform duration-200 ${expandedEscolaId === escola.id ? 'rotate-90' : ''}`}>
+                                             <ChevronRight className="w-4 h-4 text-slate-400" />
+                                          </div>
+                                          <div>
+                                             <div className="font-bold text-slate-800 text-sm">{escola.nome}</div>
+                                             <div className="text-[10px] text-slate-400 font-bold uppercase">{escola.localizacao}</div>
+                                          </div>
+                                       </div>
+                                    </td>
+                                    <td className="px-4 py-4 text-center text-sm font-medium text-slate-600">{escola.dadosEducacionais?.matricula?.infantil || 0}</td>
+                                    <td className="px-4 py-4 text-center text-sm font-medium text-slate-600">{escola.dadosEducacionais?.matricula?.anosIniciais || 0}</td>
+                                    <td className="px-4 py-4 text-center text-sm font-medium text-slate-600">{escola.dadosEducacionais?.matricula?.anosFinais || 0}</td>
+                                    <td className="px-4 py-4 text-center text-sm font-medium text-slate-600">{escola.dadosEducacionais?.matricula?.eja || 0}</td>
+                                    <td className="px-6 py-4 text-right">
+                                       <span className="inline-flex items-center px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-bold border border-indigo-100">
+                                          {escola.alunosMatriculados}
+                                       </span>
+                                    </td>
+                                 </tr>
+                                 {expandedEscolaId === escola.id && (
+                                    <tr className="bg-slate-50/30 border-b border-slate-100">
+                                       <td colSpan={6} className="px-8 py-6">
+                                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 animate-fade-in">
+                                             {/* Educação Infantil */}
+                                             <div className="space-y-3">
+                                                <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest border-b border-indigo-100 pb-2">Educação Infantil</h4>
+                                                <div className="space-y-2">
+                                                   {[
+                                                      { label: 'Creche II', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.infantil?.creche2 },
+                                                      { label: 'Creche III', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.infantil?.creche3 },
+                                                      { label: 'Pré I', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.infantil?.pre1 },
+                                                      { label: 'Pré II', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.infantil?.pre2 },
+                                                   ].map(item => (
+                                                      <div key={item.label} className="flex justify-between items-center text-xs">
+                                                         <span className="text-slate-500 font-medium">{item.label}</span>
+                                                         <span className="font-bold text-slate-700">{ (item.val?.alunos?.integral || 0) + (item.val?.alunos?.manha || 0) + (item.val?.alunos?.tarde || 0) }</span>
+                                                      </div>
+                                                   ))}
+                                                </div>
+                                             </div>
+
+                                             {/* Anos Iniciais */}
+                                             <div className="space-y-3">
+                                                <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest border-b border-emerald-100 pb-2">Anos Iniciais</h4>
+                                                <div className="space-y-2">
+                                                   {[
+                                                      { label: '1º Ano', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.fundamental?.ano1 },
+                                                      { label: '2º Ano', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.fundamental?.ano2 },
+                                                      { label: '3º Ano', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.fundamental?.ano3 },
+                                                      { label: '4º Ano', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.fundamental?.ano4 },
+                                                      { label: '5º Ano', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.fundamental?.ano5 },
+                                                   ].map(item => (
+                                                      <div key={item.label} className="flex justify-between items-center text-xs">
+                                                         <span className="text-slate-500 font-medium">{item.label}</span>
+                                                         <span className="font-bold text-slate-700">{ (item.val?.alunos?.integral || 0) + (item.val?.alunos?.manha || 0) + (item.val?.alunos?.tarde || 0) }</span>
+                                                      </div>
+                                                   ))}
+                                                </div>
+                                             </div>
+
+                                             {/* Anos Finais */}
+                                             <div className="space-y-3">
+                                                <h4 className="text-[10px] font-black text-orange-600 uppercase tracking-widest border-b border-orange-100 pb-2">Anos Finais</h4>
+                                                <div className="space-y-2">
+                                                   {[
+                                                      { label: '6º Ano', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.fundamental?.ano6 },
+                                                      { label: '7º Ano', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.fundamental?.ano7 },
+                                                      { label: '8º Ano', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.fundamental?.ano8 },
+                                                      { label: '9º Ano', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.fundamental?.ano9 },
+                                                   ].map(item => (
+                                                      <div key={item.label} className="flex justify-between items-center text-xs">
+                                                         <span className="text-slate-500 font-medium">{item.label}</span>
+                                                         <span className="font-bold text-slate-700">{ (item.val?.alunos?.integral || 0) + (item.val?.alunos?.manha || 0) + (item.val?.alunos?.tarde || 0) }</span>
+                                                      </div>
+                                                   ))}
+                                                </div>
+                                             </div>
+
+                                             {/* EJA */}
+                                             <div className="space-y-3">
+                                                <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-widest border-b border-slate-200 pb-2">EJA / Outros</h4>
+                                                <div className="space-y-2">
+                                                   {[
+                                                      { label: 'EJA', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.fundamental?.eja },
+                                                   ].map(item => (
+                                                      <div key={item.label} className="flex justify-between items-center text-xs">
+                                                         <span className="text-slate-500 font-medium">{item.label}</span>
+                                                         <span className="font-bold text-slate-700">{ (item.val?.alunos?.integral || 0) + (item.val?.alunos?.manha || 0) + (item.val?.alunos?.tarde || 0) }</span>
+                                                      </div>
+                                                   ))}
+                                                </div>
+                                             </div>
+                                          </div>
+                                       </td>
+                                    </tr>
+                                 )}
+                              </React.Fragment>
+                           ))}
+                        </tbody>
+                     </table>
+                  </div>
+               </div>
+            </div>
+         )}
+
+         {/* ====== PRINT PORTALS ====== */}
          {isPrintingGerencial && (
             <PrintableGerencialReport
                tipo={selectedTipo}
                vinculo={selectedVinculo}
                subtipoGestor={selectedTipo === 'gestores' ? selectedSubtipoGestor : undefined}
                escolas={escolas}
+            />
+         )}
+
+         {isPrintingMatricula && (
+            <PrintableMatriculaReport 
+               escolas={escolas}
+               filtroLocalizacao={selectedLocalizacao}
             />
          )}
       </div>

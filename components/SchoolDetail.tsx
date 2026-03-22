@@ -192,11 +192,41 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
   };
 
   const handleSaveIndicators = () => {
+    // 1. Calcular totais do detalhamento
+    const det = formData.matriculaDetalhada;
+    const sumAlunos = (node: any) => (node.alunos.integral || 0) + (node.alunos.manha || 0) + (node.alunos.tarde || 0);
+
+    const infantilTotal = sumAlunos(det.infantil.creche2) + sumAlunos(det.infantil.creche3) +
+      sumAlunos(det.infantil.pre1) + sumAlunos(det.infantil.pre2);
+
+    const iniciaisTotal = sumAlunos(det.fundamental.ano1) + sumAlunos(det.fundamental.ano2) +
+      sumAlunos(det.fundamental.ano3) + sumAlunos(det.fundamental.ano4) +
+      sumAlunos(det.fundamental.ano5);
+
+    const finaisTotal = sumAlunos(det.fundamental.ano6) + sumAlunos(det.fundamental.ano7) +
+      sumAlunos(det.fundamental.ano8) + sumAlunos(det.fundamental.ano9);
+
+    const ejaTotal = sumAlunos(det.fundamental.eja);
+    const totalGeral = infantilTotal + iniciaisTotal + finaisTotal + ejaTotal;
+
+    // 2. Sincronizar com o resumo e o total da escola
+    const updatedFormData: DadosEducacionais = {
+      ...formData,
+      matricula: {
+        infantil: infantilTotal,
+        anosIniciais: iniciaisTotal,
+        anosFinais: finaisTotal,
+        eja: ejaTotal
+      }
+    };
+
     const updatedEscola = {
       ...escola,
-      dadosEducacionais: formData,
+      alunosMatriculados: totalGeral,
+      dadosEducacionais: updatedFormData,
       indicadores: { ...escola.indicadores, ideb: formData.avaliacoesExternas.ideb }
     };
+
     onUpdate(updatedEscola);
   };
 

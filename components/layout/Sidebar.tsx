@@ -88,6 +88,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
     const mainNavItems = [
         { icon: LayoutDashboard, label: 'Visão Geral', view: 'DASHBOARD' as ViewState },
         { icon: School, label: 'Escolas', view: 'LISTA_ESCOLAS' as ViewState },
+        { icon: GraduationCap, label: 'Estudantes', view: 'GESTAO_ESTUDANTES' as ViewState },
     ];
 
     const managementNavItems = [

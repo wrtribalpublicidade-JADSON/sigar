@@ -132,8 +132,25 @@ export interface RecursoHumano {
   etapaAtuacao?: 'Educação Infantil' | 'Anos Iniciais' | 'Anos Finais' | 'EJA' | 'Sala de Recurso' | 'Outros';
   componenteCurricular?: 'Língua Portuguesa' | 'Matemática' | 'Geografia' | 'História' | 'Ciências' | 'Educação Física' | 'Língua Inglesa' | 'Arte' | 'Ensino Religioso' | '';
 }
-
-// Interface para Acompanhamento Mensal
+ 
+ // Interface para Alunos
+ export interface Aluno {
+   id: number;
+   name: string;
+   birth_date?: string;
+   cpf?: string;
+   gender?: string;
+   registration_number?: string;
+   escola_id: string;
+   class_id?: string;
+   stage: string;
+   status: 'Ativo' | 'Inativo' | 'Transferido' | 'Desistente';
+   observations?: string;
+   professor_responsavel?: string;
+   created_at?: string;
+ }
+ 
+ // Interface para Acompanhamento Mensal
 export type StatusAcompanhamento = 'Sim' | 'Não' | 'Parcialmente' | null;
 
 export interface ItemAcompanhamento {
@@ -314,7 +331,7 @@ export interface Visita {
   status: 'Planejada' | 'Realizada' | 'Relatório Pendente';
 }
 
-export type ViewState = 'DASHBOARD' | 'LISTA_ESCOLAS' | 'DETALHE_ESCOLA' | 'NOVA_VISITA' | 'COORDENADORES' | 'RELATORIOS' | 'INDICADORES' | 'ANALISE_PARC' | 'ANALISE_CNCA_PNRA' | 'ANALISE_SEAMA' | 'ANALISE_SAEB' | 'NOTIFICACOES' | 'AUDIT_LOGS' | 'GESTAO_USUARIOS' | 'INSTRUMENTAIS_GESTAO' | 'CONSELHO_CLASSE' | 'CONSELHO_CLASSE_FUNDAMENTAL' | 'CONSELHO_CLASSE_INFANTIL' | 'PERMISSOES' | 'ATIVIDADES_COMPLEMENTARES';
+export type ViewState = 'DASHBOARD' | 'LISTA_ESCOLAS' | 'DETALHE_ESCOLA' | 'NOVA_VISITA' | 'COORDENADORES' | 'RELATORIOS' | 'INDICADORES' | 'ANALISE_PARC' | 'ANALISE_CNCA_PNRA' | 'ANALISE_SEAMA' | 'ANALISE_SAEB' | 'NOTIFICACOES' | 'AUDIT_LOGS' | 'GESTAO_USUARIOS' | 'INSTRUMENTAIS_GESTAO' | 'CONSELHO_CLASSE' | 'CONSELHO_CLASSE_FUNDAMENTAL' | 'CONSELHO_CLASSE_INFANTIL' | 'PERMISSOES' | 'ATIVIDADES_COMPLEMENTARES' | 'GESTAO_ESTUDANTES';
 
 export type PendencyType = 'MATRICULA' | 'TURMAS' | 'RH' | 'MONITORAMENTO' | 'PLANO_ACAO';
 

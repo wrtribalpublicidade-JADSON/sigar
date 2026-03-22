@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, Trash2, Edit, Users, Calendar, AlertTriangle, Search, Info, Lock } from 'lucide-react';
+import { X, Check, Trash2, Edit, Users, Calendar, AlertTriangle, Search, Info, Lock, Plus } from 'lucide-react';
 import { ccEstudanteService } from '../../services/gestaoConselhoService';
 import { supabase } from '../../services/supabase';
 
@@ -17,6 +17,8 @@ interface CadastroEstudanteModalProps {
     escolas: any[];
     onOpenTurmaModal: () => void;
     onSuccess: () => void;
+    hideList?: boolean;
+    initialStudent?: any;
 }
 
 export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
@@ -25,21 +27,26 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
     context,
     escolas,
     onOpenTurmaModal,
-    onSuccess
+    onSuccess,
+    hideList = false,
+    initialStudent = null
 }) => {
     // Form state
     const [id, setId] = useState<string | null>(null);
     const [name, setName] = useState('');
     const [birthDate, setBirthDate] = useState('');
     const [gender, setGender] = useState('');
-    const [status, setStatus] = useState('active');
+    const [status, setStatus] = useState('Ativo');
     const [observations, setObservations] = useState('');
     
     // Interactive context state
     const [selectedSchoolId, setSelectedSchoolId] = useState(context.schoolId);
     const [selectedResponsible, setSelectedResponsible] = useState(context.responsibleName);
+    const [selectedTurmaId, setSelectedTurmaId] = useState(context.classId);
     const [teachers, setTeachers] = useState<any[]>([]);
+    const [turmas, setTurmas] = useState<any[]>([]);
     const [isLoadingTeachers, setIsLoadingTeachers] = useState(false);
+    const [isLoadingTurmas, setIsLoadingTurmas] = useState(false);
 
     // UI state
     const [students, setStudents] = useState<any[]>([]);
@@ -49,16 +56,53 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
     const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
-        if (isOpen && context.classId) {
-            loadStudents();
+        if (isOpen) {
+            if (initialStudent) {
+                handleEdit(initialStudent);
+            } else if (!id) {
+                resetForm();
+            }
         }
-    }, [isOpen, context.classId]);
+    }, [isOpen, initialStudent]);
+
+    useEffect(() => {
+        if (isOpen && selectedTurmaId && !hideList) {
+            loadStudents();
+        } else if (hideList) {
+            setStudents([]);
+        }
+    }, [isOpen, selectedTurmaId, hideList]);
 
     useEffect(() => {
         if (isOpen && selectedSchoolId) {
             loadTeachers();
+            loadTurmas();
         }
     }, [isOpen, selectedSchoolId]);
+
+    useEffect(() => {
+        if (context.classId) {
+            setSelectedTurmaId(context.classId);
+        }
+    }, [context.classId]);
+
+    const loadTurmas = async () => {
+        setIsLoadingTurmas(true);
+        try {
+            const { data, error } = await supabase
+                .from('turmas')
+                .select('*')
+                .eq('school_id', selectedSchoolId)
+                .order('name');
+            
+            if (error) throw error;
+            setTurmas(data || []);
+        } catch (err) {
+            console.error('Error loading turmas:', err);
+        } finally {
+            setIsLoadingTurmas(false);
+        }
+    };
 
     const loadTeachers = async () => {
         setIsLoadingTeachers(true);
@@ -83,7 +127,7 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
         setIsLoading(true);
         setError(null);
         try {
-            const data = await ccEstudanteService.getByTurma(context.classId);
+            const data = await ccEstudanteService.getByTurma(selectedTurmaId);
             setStudents(data || []);
         } catch (err: any) {
             console.error('Error loading students:', err);
@@ -106,7 +150,7 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
             return;
         }
 
-        if (!context.classId) {
+        if (!selectedTurmaId) {
             setError('Uma turma/grupo deve estar selecionada.');
             setIsSaving(false);
             return;
@@ -115,14 +159,16 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
         setIsSaving(true);
         setError(null);
 
+        const currentTurma = turmas.find(t => t.id === selectedTurmaId) || { stage: context.groupName.split('-')[0].trim() };
+
         const payload = {
             name: name.trim().toUpperCase(),
             birth_date: birthDate || null,
             gender: gender || null,
             status,
             observations: observations.trim() || null,
-            stage: context.groupName.split('-')[0].trim(), 
-            class_id: context.classId,
+            stage: currentTurma.stage || currentTurma.year, 
+            class_id: selectedTurmaId,
             escola_id: selectedSchoolId,
             professor_responsavel: selectedResponsible
         };
@@ -147,11 +193,14 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
 
     const handleEdit = (student: any) => {
         setId(student.id);
-        setName(student.name);
+        setName(student.name || '');
         setBirthDate(student.birth_date || '');
         setGender(student.gender || '');
-        setStatus(student.status || 'active');
+        setStatus(student.status || 'Ativo');
         setObservations(student.observations || '');
+        if (student.escola_id) setSelectedSchoolId(student.escola_id);
+        if (student.class_id) setSelectedTurmaId(student.class_id);
+        if (student.professor_responsavel) setSelectedResponsible(student.professor_responsavel);
         setError(null);
     };
 
@@ -173,7 +222,7 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
         setName('');
         setBirthDate('');
         setGender('');
-        setStatus('active');
+        setStatus('Ativo');
         setObservations('');
         setError(null);
     };
@@ -276,16 +325,48 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
                             )}
                         </div>
 
-                        <div 
-                            className="cursor-pointer group"
-                            onClick={onOpenTurmaModal}
-                        >
+                        <div className="cursor-pointer group relative">
                             <ContextCard 
                                 icon={<div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center text-[10px] text-orange-600 font-bold">TR</div>} 
                                 label="Turma/Grupo" 
-                                value={context.groupName} 
+                                value={(() => {
+                                    const t = turmas.find(curr => curr.id === selectedTurmaId);
+                                    if (!t) return context.groupName;
+                                    return `${t.year || t.stage || ''} - ${t.name || ''}`.replace(/^ - | - $/, '');
+                                })()}
                                 isInteractive={true}
                             />
+                            <select 
+                                value={selectedTurmaId}
+                                onChange={(e) => setSelectedTurmaId(e.target.value)}
+                                className="absolute inset-0 opacity-0 cursor-pointer w-full"
+                                disabled={isLoadingTurmas || (!!context.classId && !initialStudent)}
+                            >
+                                <option value="">Selecione uma turma...</option>
+                                {turmas.map(t => (
+                                    <option key={t.id} value={t.id}>
+                                        {t.year || t.stage || ''} - {t.name}
+                                    </option>
+                                ))}
+                            </select>
+                            {isLoadingTurmas && (
+                                <div className="absolute right-12 top-1/2 -translate-y-1/2">
+                                    <div className="w-4 h-4 border-2 border-orange-500/20 border-t-orange-500 rounded-full animate-spin"></div>
+                                </div>
+                            )}
+                            {/* Nova Turma Button */}
+                            <button 
+                                type="button"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    onOpenTurmaModal();
+                                }}
+                                className="absolute -right-3 -top-3 w-10 h-10 bg-emerald-600 text-white rounded-2xl flex items-center justify-center shadow-xl hover:scale-110 active:scale-95 transition-all z-[20] border-4 border-white group/btn"
+                                title="Nova Turma"
+                            >
+                                <Plus className="w-5 h-5 group-hover/btn:rotate-90 transition-transform duration-300" />
+                            </button>
                         </div>
                     </div>
 
@@ -347,15 +428,15 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
                                     <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 h-[60px]">
                                         <button
                                             type="button"
-                                            onClick={() => setStatus('active')}
-                                            className={`flex-1 py-2 text-xs font-black rounded-xl transition-all flex items-center justify-center ${status === 'active' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
+                                            onClick={() => setStatus('Ativo')}
+                                            className={`flex-1 py-2 text-xs font-black rounded-xl transition-all flex items-center justify-center ${status === 'Ativo' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
                                         >
                                             ATIVO
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={() => setStatus('inactive')}
-                                            className={`flex-1 py-2 text-xs font-black rounded-xl transition-all flex items-center justify-center ${status === 'inactive' ? 'bg-slate-300 text-slate-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                                            onClick={() => setStatus('Inativo')}
+                                            className={`flex-1 py-2 text-xs font-black rounded-xl transition-all flex items-center justify-center ${status === 'Inativo' ? 'bg-slate-300 text-slate-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
                                         >
                                             INATIVO
                                         </button>
@@ -398,103 +479,104 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
                         </form>
                     </div>
 
-                    {/* List Section */}
-                    <div className="space-y-6">
-                        <div className="flex items-center justify-between px-2">
-                            <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-3">
-                                <Users className="w-5 h-5 text-emerald-600" />
-                                Estudantes Cadastrados
-                            </h3>
-                            <div className="relative w-80">
-                                <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                                <input
-                                    type="text"
-                                    placeholder="Pesquisar..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="bg-white border border-slate-200 rounded-2xl pl-12 pr-6 py-3 text-sm font-bold text-slate-600 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all w-full shadow-sm"
-                                />
+                    {!hideList && (
+                        <div className="space-y-6">
+                            <div className="flex items-center justify-between px-2">
+                                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-3">
+                                    <Users className="w-5 h-5 text-emerald-600" />
+                                    Estudantes Cadastrados
+                                </h3>
+                                <div className="relative w-80">
+                                    <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                                    <input
+                                        type="text"
+                                        placeholder="Pesquisar..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="bg-white border border-slate-200 rounded-2xl pl-12 pr-6 py-3 text-sm font-bold text-slate-600 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all w-full shadow-sm"
+                                    />
+                                </div>
                             </div>
-                        </div>
 
-                        <div className="bg-white border border-slate-100 rounded-[2.5rem] overflow-hidden shadow-sm border-t-4 border-t-slate-50">
-                            <table className="w-full text-left">
-                                <thead>
-                                    <tr className="bg-slate-50/50 border-b border-slate-100">
-                                        <th className="px-8 py-6 text-[11px] font-black text-slate-400 uppercase tracking-widest">Estudante</th>
-                                        <th className="px-8 py-6 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Nascimento</th>
-                                        <th className="px-8 py-6 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
-                                        <th className="px-8 py-6 text-[11px] font-black text-slate-400 uppercase tracking-widest text-right">Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {isLoading ? (
-                                        <tr>
-                                            <td colSpan={4} className="px-8 py-24 text-center">
-                                                <div className="w-12 h-12 border-4 border-slate-100 border-t-emerald-600 rounded-full animate-spin mx-auto mb-6"></div>
-                                                <p className="text-sm font-bold text-slate-400 tracking-widest uppercase">Carregando estudantes...</p>
-                                            </td>
+                            <div className="bg-white border border-slate-100 rounded-[2.5rem] overflow-hidden shadow-sm border-t-4 border-t-slate-50">
+                                <table className="w-full text-left">
+                                    <thead>
+                                        <tr className="bg-slate-50/50 border-b border-slate-100">
+                                            <th className="px-8 py-6 text-[11px] font-black text-slate-400 uppercase tracking-widest">Estudante</th>
+                                            <th className="px-8 py-6 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Nascimento</th>
+                                            <th className="px-8 py-6 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
+                                            <th className="px-8 py-6 text-[11px] font-black text-slate-400 uppercase tracking-widest text-right">Ações</th>
                                         </tr>
-                                    ) : filteredStudents.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={4} className="px-8 py-24 text-center text-slate-400">
-                                                <Users className="w-16 h-16 mx-auto mb-6 opacity-5" />
-                                                <p className="text-sm font-black uppercase tracking-widest">Nenhum estudante encontrado</p>
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        filteredStudents.map((student) => (
-                                            <tr 
-                                                key={student.id} 
-                                                className={`transition-all group ${id === student.id ? 'bg-emerald-50 hover:bg-emerald-50/80 shadow-inner' : 'hover:bg-slate-50'}`}
-                                            >
-                                                <td className="px-8 py-5">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-black shadow-sm ${getAvatarColor(student.name)}`}>
-                                                            {getInitials(student.name)}
-                                                        </div>
-                                                        <div>
-                                                            <div className={`font-black text-sm uppercase ${id === student.id ? 'text-emerald-900' : 'text-slate-700'}`}>{student.name}</div>
-                                                            {student.observations && (
-                                                                <div className="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5 font-bold">
-                                                                    <Info className="w-3 h-3" />
-                                                                    {student.observations.substring(0, 50)}{student.observations.length > 50 ? '...' : ''}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-8 py-5 text-center text-xs font-bold text-slate-500">
-                                                    {student.birth_date ? new Date(student.birth_date).toLocaleDateString() : '-'}
-                                                </td>
-                                                <td className="px-8 py-5 text-center">
-                                                    <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest shadow-sm ${student.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                                                        {student.status === 'active' ? 'ATIVO' : 'INATIVO'}
-                                                    </span>
-                                                </td>
-                                                <td className="px-8 py-5">
-                                                    <div className="flex items-center justify-end gap-3">
-                                                        <button
-                                                            onClick={() => handleEdit(student)}
-                                                            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all border shadow-sm ${id === student.id ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-blue-500 border-blue-100 hover:bg-blue-600 hover:text-white hover:border-blue-600'}`}
-                                                        >
-                                                            <Edit className="w-4 h-4" />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDelete(student.id)}
-                                                            className="w-9 h-9 rounded-xl bg-white text-rose-500 border border-rose-100 flex items-center justify-center hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-all shadow-sm"
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </button>
-                                                    </div>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {isLoading ? (
+                                            <tr>
+                                                <td colSpan={4} className="px-8 py-24 text-center">
+                                                    <div className="w-12 h-12 border-4 border-slate-100 border-t-emerald-600 rounded-full animate-spin mx-auto mb-6"></div>
+                                                    <p className="text-sm font-bold text-slate-400 tracking-widest uppercase">Carregando estudantes...</p>
                                                 </td>
                                             </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
+                                        ) : filteredStudents.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={4} className="px-8 py-24 text-center text-slate-400">
+                                                    <Users className="w-16 h-16 mx-auto mb-6 opacity-5" />
+                                                    <p className="text-sm font-black uppercase tracking-widest">Nenhum estudante encontrado</p>
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            filteredStudents.map((student) => (
+                                                <tr 
+                                                    key={student.id} 
+                                                    className={`transition-all group ${id === student.id ? 'bg-emerald-50 hover:bg-emerald-50/80 shadow-inner' : 'hover:bg-slate-50'}`}
+                                                >
+                                                    <td className="px-8 py-5">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-black shadow-sm ${getAvatarColor(student.name)}`}>
+                                                                {getInitials(student.name)}
+                                                            </div>
+                                                            <div>
+                                                                <div className={`font-black text-sm uppercase ${id === student.id ? 'text-emerald-900' : 'text-slate-700'}`}>{student.name}</div>
+                                                                {student.observations && (
+                                                                    <div className="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5 font-bold">
+                                                                        <Info className="w-3 h-3" />
+                                                                        {student.observations.substring(0, 50)}{student.observations.length > 50 ? '...' : ''}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-8 py-5 text-center text-xs font-bold text-slate-500">
+                                                        {student.birth_date ? new Date(student.birth_date).toLocaleDateString() : '-'}
+                                                    </td>
+                                                    <td className="px-8 py-5 text-center">
+                                                        <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest shadow-sm ${student.status === 'Ativo' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                            {student.status === 'Ativo' ? 'ATIVO' : 'INATIVO'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-8 py-5">
+                                                        <div className="flex items-center justify-end gap-3">
+                                                            <button
+                                                                onClick={() => handleEdit(student)}
+                                                                className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all border shadow-sm ${id === student.id ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-blue-500 border-blue-100 hover:bg-blue-600 hover:text-white hover:border-blue-600'}`}
+                                                            >
+                                                                <Edit className="w-4 h-4" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDelete(student.id)}
+                                                                className="w-9 h-9 rounded-xl bg-white text-rose-500 border border-rose-100 flex items-center justify-center hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-all shadow-sm"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 {/* Footer */}
