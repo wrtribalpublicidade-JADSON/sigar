@@ -22,7 +22,17 @@ import { FluenciaParcDashboard } from './FluenciaParcDashboard';
 import { CncaPnraDashboard } from './CncaPnraDashboard';
 import { SeamaDashboard } from './SeamaDashboard';
 import { SaebDashboard } from './SaebDashboard';
-import { Coordenador } from '../types';
+import { 
+    Coordenador, 
+    Escola, 
+    Segmento, 
+    RegistroFluenciaPARC, 
+    RegistroCNCA, 
+    RegistroSEAMA, 
+    RegistroSAEB, 
+    RegistroIDEB,
+    RecursoHumano
+} from '../types';
 import { Card } from './ui/Card';
 import { exportToCSV, generateUUID } from '../utils';
 import { FluenciaParcModal } from './modals/FluenciaParcModal';
@@ -160,7 +170,7 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
 
     const handleDeleteCnca = (id: string) => {
         if (!selectedSchoolForCnca) return;
-        const novosRegistros = (selectedSchoolForCnca.dadosEducacionais.registrosCNCA || []).filter(r => r.id !== id);
+        const novosRegistros = (selectedSchoolForCnca.dadosEducacionais.registrosCNCA || []).filter((r: RegistroCNCA) => r.id !== id);
         const getMedia = (tipo: 'Diagnóstica' | 'Formativa' | 'Somativa') => {
             const regs = novosRegistros.filter((r: RegistroCNCA) => r.tipoAvaliacao === tipo);
             if (regs.length === 0) return 0;
@@ -378,9 +388,9 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
                                         {(() => {
                                             const regs = escola.dadosEducacionais?.registrosSAEB || [];
                                             const getScore = (serie: string) => {
-                                                const specificRegs = regs.filter(r => r.anoSerie === serie);
+                                                const specificRegs = regs.filter((r: RegistroSAEB) => r.anoSerie === serie);
                                                 if (specificRegs.length === 0) return '-';
-                                                const latest = specificRegs.sort((a, b) => b.ano - a.ano)[0];
+                                                const latest = specificRegs.sort((a: RegistroSAEB, b: RegistroSAEB) => b.ano - a.ano)[0];
                                                 return latest.notaSaeb || '-';
                                             };
                                             return (
@@ -432,11 +442,11 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
                                             // Helper to get value for specific grade and subject
                                             const getItem = (serie: string, comp: string) => {
                                                 // Filter records for this series and component
-                                                const specificRegs = regs.filter(r => r.anoSerie === serie && r.componenteCurricular === comp);
+                                                const specificRegs = regs.filter((r: RegistroSEAMA) => r.anoSerie === serie && r.componenteCurricular === comp);
                                                 if (specificRegs.length === 0) return '-';
 
                                                 // Get the latest one (by year)
-                                                const latest = specificRegs.sort((a, b) => b.ano - a.ano)[0];
+                                                const latest = specificRegs.sort((a: RegistroSEAMA, b: RegistroSEAMA) => b.ano - a.ano)[0];
                                                 return latest.proficienciaMedia || '-';
                                             };
 
@@ -508,7 +518,7 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
         }
 
         // Docentes count
-        const docentes = (escola.recursosHumanos || []).filter(rh =>
+        const docentes = (escola.recursosHumanos || []).filter((rh: RecursoHumano) =>
             rh.funcao.toLowerCase().includes('professor') ||
             rh.funcao.toLowerCase().includes('docente')
         ).length;
