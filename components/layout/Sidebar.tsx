@@ -94,10 +94,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
     const managementNavItems = [
         { icon: Users, label: 'Equipe', view: 'COORDENADORES' as ViewState },
         { icon: FileText, label: 'Relatórios', view: 'RELATORIOS' as ViewState },
-        { icon: TrendingUp, label: 'Análise PARC', view: 'ANALISE_PARC' as ViewState },
-        { icon: GraduationCap, label: 'Análise SEAMA', view: 'ANALISE_SEAMA' as ViewState },
-        { icon: ClipboardList, label: 'Análise SAEB', view: 'ANALISE_SAEB' as ViewState },
-        { icon: ClipboardCheck, label: 'Análise CNCA/PNRA', view: 'ANALISE_CNCA_PNRA' as ViewState },
         { icon: BarChart3, label: 'Indicadores', view: 'INDICADORES' as ViewState },
         { icon: FileStack, label: 'Instrumentais de Gestão', view: 'INSTRUMENTAIS_GESTAO' as ViewState },
         { icon: Library, label: 'Conselho - Fundamental', view: 'CONSELHO_CLASSE_FUNDAMENTAL' as ViewState },

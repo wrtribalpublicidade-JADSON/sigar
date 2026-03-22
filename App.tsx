@@ -1009,38 +1009,8 @@ export default function App() {
         return (
           <IndicatorsPanel
             escolas={escolas}
-            onUpdateEscola={handleUpdateEscola}
-          />
-        );
-      case 'ANALISE_PARC':
-        return (
-          <FluenciaParcDashboard
-            escolas={escolas}
             coordenadores={coordenadores}
-            onUpdateEscola={handleUpdateEscola}
-          />
-        );
-      case 'ANALISE_CNCA_PNRA':
-        return (
-          <CncaPnraDashboard
-            escolas={escolas}
-            coordenadores={coordenadores}
-            onUpdateEscola={handleUpdateEscola}
-          />
-        );
-      case 'ANALISE_SEAMA':
-        return (
-          <SeamaDashboard
-            escolas={escolas}
-            coordenadores={coordenadores}
-            onUpdateEscola={handleUpdateEscola}
-          />
-        );
-      case 'ANALISE_SAEB':
-        return (
-          <SaebDashboard
-            escolas={escolas}
-            coordenadores={coordenadores}
+            isDemoMode={isDemoMode}
             onUpdateEscola={handleUpdateEscola}
           />
         );

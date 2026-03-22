@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { PageHeader } from './ui/PageHeader';
-import { Escola, RegistroFluenciaPARC, RegistroCNCA, RegistroSEAMA, RegistroSAEB, RegistroIDEB, Segmento } from '../types';
 import {
     BarChart3,
     Users,
@@ -14,8 +13,16 @@ import {
     Download,
     Activity,
     ChevronRight,
-    MapPin
+    MapPin,
+    Settings,
+    PieChart,
+    CheckCircle2
 } from 'lucide-react';
+import { FluenciaParcDashboard } from './FluenciaParcDashboard';
+import { CncaPnraDashboard } from './CncaPnraDashboard';
+import { SeamaDashboard } from './SeamaDashboard';
+import { SaebDashboard } from './SaebDashboard';
+import { Coordenador } from '../types';
 import { Card } from './ui/Card';
 import { exportToCSV, generateUUID } from '../utils';
 import { FluenciaParcModal } from './modals/FluenciaParcModal';
@@ -26,6 +33,8 @@ import { IdebModal } from './modals/IdebModal';
 
 interface IndicatorsPanelProps {
     escolas: Escola[];
+    coordenadores: Coordenador[];
+    isDemoMode: boolean;
     onUpdateEscola: (updatedEscola: Escola) => void;
 }
 
@@ -38,7 +47,9 @@ const COLORS = {
 
 type TabType = 'CENSO' | 'SAMAHC' | 'PARC' | 'SAEB' | 'IDEB' | 'SEAMA' | 'CNCA' | 'EI';
 
-export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, onUpdateEscola }) => {
+export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coordenadores, isDemoMode, onUpdateEscola }) => {
+    const [mainTab, setMainTab] = useState<'CADASTRO' | 'ANALISE'>('CADASTRO');
+    const [activeAnalysis, setActiveAnalysis] = useState<'PARC' | 'SEAMA' | 'CNCA' | 'SAEB'>('PARC');
     const [activeTab, setActiveTab] = useState<TabType>('CENSO');
     const [samahcSubTab, setSamahcSubTab] = useState<'SEAMA' | 'SAEB' | 'FLUENCIA' | 'PORTUGUES' | 'MATEMATICA'>('FLUENCIA');
     const [searchTerm, setSearchTerm] = useState('');
@@ -521,53 +532,103 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, onUpd
                     { label: 'Exportar Dados', icon: Download, onClick: handleExport, variant: 'secondary' }
                 ]}
             />
-
-            <div className="relative mb-8">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                <input
-                    type="text"
-                    placeholder="Buscar unidade escolar..."
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                    className="w-full bg-white border border-slate-200 pl-12 pr-4 py-3 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all font-medium text-slate-700 placeholder:text-slate-400"
-                />
+            <div className="flex p-1 bg-slate-100 rounded-xl w-fit mb-8 shadow-inner border border-slate-200">
+                <button
+                    onClick={() => setMainTab('CADASTRO')}
+                    className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${mainTab === 'CADASTRO' ? 'bg-white text-orange-600 shadow-md translate-y-[-1px]' : 'text-slate-500 hover:text-slate-800'}`}
+                >
+                    <Settings className={`w-4 h-4 ${mainTab === 'CADASTRO' ? 'text-orange-500' : 'text-slate-400'}`} />
+                    Cadastro de Indicadores
+                </button>
+                <button
+                    onClick={() => setMainTab('ANALISE')}
+                    className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${mainTab === 'ANALISE' ? 'bg-white text-orange-600 shadow-md translate-y-[-1px]' : 'text-slate-500 hover:text-slate-800'}`}
+                >
+                    <PieChart className={`w-4 h-4 ${mainTab === 'ANALISE' ? 'text-orange-500' : 'text-slate-400'}`} />
+                    Análise de Indicadores
+                </button>
             </div>
 
-            {activeTab === 'SAMAHC' && (
-                <div className="flex flex-wrap gap-2 animate-fade-in mb-6">
-                    {['FLUENCIA', 'SEAMA', 'SAEB', 'PORTUGUES', 'MATEMATICA'].map((st) => (
-                        <button
-                            key={st}
-                            onClick={() => setSamahcSubTab(st as any)}
-                            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${samahcSubTab === st ? 'bg-slate-800 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}
-                        >
-                            {st}
-                        </button>
-                    ))}
+            {mainTab === 'CADASTRO' ? (
+                <>
+                    <div className="relative mb-8">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                        <input
+                            type="text"
+                            placeholder="Buscar unidade escolar..."
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
+                            className="w-full bg-white border border-slate-200 pl-12 pr-4 py-3 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all font-medium text-slate-700 placeholder:text-slate-400"
+                        />
+                    </div>
+
+                    {activeTab === 'SAMAHC' && (
+                        <div className="flex flex-wrap gap-2 animate-fade-in mb-6">
+                            {['FLUENCIA', 'SEAMA', 'SAEB', 'PORTUGUES', 'MATEMATICA'].map((st) => (
+                                <button
+                                    key={st}
+                                    onClick={() => setSamahcSubTab(st as any)}
+                                    className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${samahcSubTab === st ? 'bg-slate-800 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+                                >
+                                    {st}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div>
+                            <div className="flex overflow-x-auto p-1 bg-slate-50/50 border-b border-slate-100">
+                                {tabs.map((tab) => {
+                                    const Icon = tab.icon;
+                                    const isActive = activeTab === tab.id;
+                                    return (
+                                        <button
+                                            key={tab.id}
+                                            onClick={() => setActiveTab(tab.id)}
+                                            className={`flex items-center gap-2 px-5 py-3 text-sm font-bold whitespace-nowrap transition-all border-b-2 ${isActive ? 'border-orange-500 text-orange-600 bg-orange-50/10' : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100'}`}
+                                        >
+                                            <Icon className={`w-4 h-4 ${isActive ? 'text-orange-500' : 'text-slate-400'}`} />
+                                            <span>{tab.label}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            {renderTabContent()}
+                        </div>
+                    </div>
+                </>
+            ) : (
+                <div className="space-y-6">
+                    <div className="flex flex-wrap gap-4 mb-4">
+                        {[
+                            { id: 'PARC', label: 'Análise PARC', icon: BookOpen },
+                            { id: 'SEAMA', label: 'Análise SEAMA', icon: GraduationCap },
+                            { id: 'CNCA', label: 'Análise CNCA/PNRA', icon: Layout },
+                            { id: 'SAEB', label: 'Análise SAEB', icon: Target },
+                        ].map((analysis) => (
+                            <button
+                                key={analysis.id}
+                                onClick={() => setActiveAnalysis(analysis.id as any)}
+                                className={`flex items-center gap-3 px-6 py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition-all border-2 ${activeAnalysis === analysis.id
+                                        ? 'bg-slate-900 text-white border-brand-orange shadow-lg scale-[1.02]'
+                                        : 'bg-white text-slate-400 border-slate-100 hover:border-brand-orange/30 hover:text-slate-600'
+                                    }`}
+                            >
+                                <analysis.icon className={`w-5 h-5 ${activeAnalysis === analysis.id ? 'text-brand-orange' : ''}`} />
+                                {analysis.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="animate-fade-in bg-slate-50/30 rounded-3xl p-4 border border-slate-100">
+                        {activeAnalysis === 'PARC' && <FluenciaParcDashboard escolas={escolas} coordenadores={coordenadores} onUpdateEscola={onUpdateEscola} />}
+                        {activeAnalysis === 'CNCA' && <CncaPnraDashboard escolas={escolas} coordenadores={coordenadores} onUpdateEscola={onUpdateEscola} />}
+                        {activeAnalysis === 'SEAMA' && <SeamaDashboard escolas={escolas} coordenadores={coordenadores} onUpdateEscola={onUpdateEscola} />}
+                        {activeAnalysis === 'SAEB' && <SaebDashboard escolas={escolas} coordenadores={coordenadores} onUpdateEscola={onUpdateEscola} />}
+                    </div>
                 </div>
             )}
-
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div>
-                    <div className="flex overflow-x-auto p-1 bg-slate-50/50 border-b border-slate-100">
-                        {tabs.map((tab) => {
-                            const Icon = tab.icon;
-                            const isActive = activeTab === tab.id;
-                            return (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => setActiveTab(tab.id)}
-                                    className={`flex items-center gap-2 px-5 py-3 text-sm font-bold whitespace-nowrap transition-all border-b-2 ${isActive ? 'border-orange-500 text-orange-600 bg-orange-50/10' : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100'}`}
-                                >
-                                    <Icon className={`w-4 h-4 ${isActive ? 'text-orange-500' : 'text-slate-400'}`} />
-                                    <span>{tab.label}</span>
-                                </button>
-                            );
-                        })}
-                    </div>
-                    {renderTabContent()}
-                </div>
-            </div>
 
             {selectedSchoolForParc && (
                 <FluenciaParcModal
