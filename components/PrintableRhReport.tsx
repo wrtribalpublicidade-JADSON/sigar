@@ -101,7 +101,7 @@ export const PrintableRhReport: React.FC<PrintableRhReportProps> = ({ escola, co
                                 </td>
                                 <td style={{ padding: '5pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '8pt', color: '#334155' }}>
                                     <div style={{ fontWeight: 600 }}>{servidor.funcao}</div>
-                                    {servidor.etapaAtuacao && <div style={{ fontSize: '7pt', color: '#64748b' }}>{servidor.etapaAtuacao} {servidor.componenteCurricular ? `• ${servidor.componenteCurricular}` : ''}</div>}
+                                    {servidor.etapaAtuacao && <div style={{ fontSize: '7pt', color: '#64748b' }}>{servidor.etapaAtuacao} {servidor.modalidadeInfantil && servidor.modalidadeInfantil.length > 0 ? `• ${servidor.modalidadeInfantil.join(', ')}` : ''} {servidor.anosIniciaisAtuacao && servidor.anosIniciaisAtuacao.length > 0 ? `• ${servidor.anosIniciaisAtuacao.join(', ')}` : ''} {servidor.componenteCurricular ? `• ${servidor.componenteCurricular}` : ''}</div>}
                                 </td>
                                 <td style={{ padding: '5pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '8pt', fontWeight: 600, color: '#475569', textAlign: 'center', textTransform: 'uppercase' }}>
                                     {servidor.tipoVinculo}

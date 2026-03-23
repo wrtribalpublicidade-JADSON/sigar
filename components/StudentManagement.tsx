@@ -84,7 +84,8 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
         anoSerie: t.year || t.name,
         identificacao: t.name,
         turno: t.shift || 'MANHÃ',
-        tipo: t.modality || 'REGULAR'
+        tipo: t.modality || 'REGULAR',
+        escolaId: t.school_id
       }));
       setTurmas(formattedTurmas);
     } catch (error) {
@@ -123,7 +124,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
         year: turmaData.anoSerie,
         shift: turmaData.turno,
         modality: turmaData.tipo,
-        school_id: schoolFilter !== 'ALL' ? schoolFilter : (escolas[0]?.id || '')
+        school_id: turmaData.escolaId || (schoolFilter !== 'ALL' ? schoolFilter : (escolas[0]?.id || ''))
       };
 
       if (turmaData.id) {
@@ -338,6 +339,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
             onSave={handleSaveTurma}
             onDelete={handleDeleteTurma}
             turmasExistentes={turmas}
+            escolas={escolas}
         />
 
         <ImportEstudantesModal 

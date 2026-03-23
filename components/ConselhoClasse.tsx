@@ -483,7 +483,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                 setActiveTurma(updated);
             } else {
                 // Create new
-                const saved = await ccTurmaService.add({ ...novaTurma, schoolId: currentEscolaId });
+                const saved = await ccTurmaService.add({ ...novaTurma, schoolId: novaTurma.escolaId || currentEscolaId });
                 setTurmasCadastradas(prev => [...prev, saved]);
                 setActiveTurma(saved);
             }
@@ -3362,6 +3362,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                 onSave={handleSalvarTurma}
                 onDelete={handleDeleteTurma}
                 turmasExistentes={turmasCadastradas}
+                escolas={escolas}
             />
 
             <StudentReportModal

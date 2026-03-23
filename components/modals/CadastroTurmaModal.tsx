@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { X, Check, AlertTriangle, Edit, Trash2, Plus } from 'lucide-react';
 
+import { Escola } from '../../types';
+
 interface CadastroTurmaModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSave: (turma: TurmaData) => void;
     onDelete: (id: string) => void;
     turmasExistentes: TurmaData[];
+    escolas?: Escola[];
 }
 
 export interface TurmaData {
@@ -16,6 +19,7 @@ export interface TurmaData {
     identificacao: string;
     turno: string;
     tipo: string;
+    escolaId?: string;
 }
 
 export const CadastroTurmaModal: React.FC<CadastroTurmaModalProps> = ({
@@ -23,7 +27,8 @@ export const CadastroTurmaModal: React.FC<CadastroTurmaModalProps> = ({
     onClose,
     onSave,
     onDelete,
-    turmasExistentes
+    turmasExistentes,
+    escolas
 }) => {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [etapa, setEtapa] = useState('');
@@ -31,6 +36,7 @@ export const CadastroTurmaModal: React.FC<CadastroTurmaModalProps> = ({
     const [identificacao, setIdentificacao] = useState('');
     const [turno, setTurno] = useState('');
     const [tipo, setTipo] = useState('');
+    const [escolaId, setEscolaId] = useState('');
     const [error, setError] = useState('');
 
     const anosPorEtapa: Record<string, string[]> = {
@@ -48,7 +54,7 @@ export const CadastroTurmaModal: React.FC<CadastroTurmaModalProps> = ({
         setAnoSerie('');
     }, [etapa]);
 
-    const isFormValid = etapa !== '' && anoSerie !== '' && identificacao !== '' && turno !== '' && tipo !== '';
+    const isFormValid = etapa !== '' && anoSerie !== '' && identificacao !== '' && turno !== '' && tipo !== '' && (!escolas || escolas.length === 0 || escolaId !== '');
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -57,7 +63,7 @@ export const CadastroTurmaModal: React.FC<CadastroTurmaModalProps> = ({
         if (!isFormValid) return;
 
         const isDuplicate = turmasExistentes.some(
-            (t) => t.etapa === etapa && t.anoSerie === anoSerie && t.identificacao === identificacao && t.turno === turno
+            (t) => t.etapa === etapa && t.anoSerie === anoSerie && t.identificacao === identificacao && t.turno === turno && t.escolaId === escolaId
         );
 
         if (isDuplicate) {
@@ -65,7 +71,7 @@ export const CadastroTurmaModal: React.FC<CadastroTurmaModalProps> = ({
             return;
         }
 
-        onSave({ id: editingId || undefined, etapa, anoSerie, identificacao, turno, tipo });
+        onSave({ id: editingId || undefined, etapa, anoSerie, identificacao, turno, tipo, escolaId });
 
         // Reset form
         handleReset();
@@ -78,6 +84,7 @@ export const CadastroTurmaModal: React.FC<CadastroTurmaModalProps> = ({
         setIdentificacao('');
         setTurno('');
         setTipo('');
+        setEscolaId('');
         setError('');
     };
 
@@ -91,6 +98,7 @@ export const CadastroTurmaModal: React.FC<CadastroTurmaModalProps> = ({
         setIdentificacao(turma.identificacao);
         setTurno(turma.turno);
         setTipo(turma.tipo);
+        setEscolaId(turma.escolaId || '');
         setError('');
         
         // Scroll to form
@@ -127,6 +135,24 @@ export const CadastroTurmaModal: React.FC<CadastroTurmaModalProps> = ({
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-4">
+                                {/* Unidade Escolar (se disponível) */}
+                                {escolas && escolas.length > 0 && (
+                                    <div>
+                                        <label className="block text-xs font-bold tracking-wider text-slate-500 uppercase mb-2">
+                                            Unidade Escolar <span className="text-red-500">*</span>
+                                        </label>
+                                        <select
+                                            value={escolaId}
+                                            onChange={(e) => setEscolaId(e.target.value)}
+                                            className="w-full bg-white border border-slate-200 text-slate-700 text-sm rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 block p-3 font-medium transition-all shadow-sm"
+                                            required
+                                        >
+                                            <option value="" disabled>Selecione a unidade escolar</option>
+                                            {escolas.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
+                                        </select>
+                                    </div>
+                                )}
+
                                 {/* Etapa de Ensino */}
                                 <div>
                                     <label className="block text-xs font-bold tracking-wider text-slate-500 uppercase mb-2">

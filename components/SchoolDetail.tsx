@@ -127,7 +127,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
   const [rhForm, setRhForm] = useState<RecursoHumano>({
     id: '', funcao: '', nome: '', telefone: '', email: '', dataNomeacao: '',
     tipoVinculo: 'Efetivo', cargaHoraria: '', cpf: '', dataNascimento: '',
-    etapaAtuacao: undefined, componenteCurricular: ''
+    etapaAtuacao: undefined, componenteCurricular: '', modalidadeInfantil: [], anosIniciaisAtuacao: []
   });
 
   const [isEditingMeta, setIsEditingMeta] = useState(false);
@@ -246,7 +246,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
     }
     setIsAddingRh(false);
     setCpfError('');
-    setRhForm({ id: '', funcao: '', nome: '', telefone: '', email: '', dataNomeacao: '', tipoVinculo: 'Efetivo', cargaHoraria: '', cpf: '', dataNascimento: '', etapaAtuacao: undefined, componenteCurricular: '' });
+    setRhForm({ id: '', funcao: '', nome: '', telefone: '', email: '', dataNomeacao: '', tipoVinculo: 'Efetivo', cargaHoraria: '', cpf: '', dataNascimento: '', etapaAtuacao: undefined, componenteCurricular: '', modalidadeInfantil: [], anosIniciaisAtuacao: [] });
   };
 
   const handleEditRh = (rh: RecursoHumano) => {
@@ -738,7 +738,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                       {rhForm.funcao === 'Professor(a)' && (
                         <div className="space-y-2">
                           <label className="block text-xs font-bold text-slate-500 uppercase">Etapa de Atuação</label>
-                          <select value={rhForm.etapaAtuacao || ''} onChange={e => setRhForm({ ...rhForm, etapaAtuacao: e.target.value as any, componenteCurricular: '' })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all">
+                          <select value={rhForm.etapaAtuacao || ''} onChange={e => setRhForm({ ...rhForm, etapaAtuacao: e.target.value as any, componenteCurricular: '', modalidadeInfantil: [], anosIniciaisAtuacao: [] })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all">
                             <option value="">Selecione a etapa...</option>
                             <option value="Educação Infantil">Educação Infantil</option>
                             <option value="Anos Iniciais">Anos Iniciais</option>
@@ -747,6 +747,54 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                             <option value="Sala de Recurso">Sala de Recurso</option>
                             <option value="Outros">Outros</option>
                           </select>
+                        </div>
+                      )}
+                      {rhForm.funcao === 'Professor(a)' && rhForm.etapaAtuacao === 'Educação Infantil' && (
+                        <div className="space-y-2">
+                          <label className="block text-xs font-bold text-slate-500 uppercase">Modalidade Infantil</label>
+                          <div className="flex gap-4">
+                            {['Creche', 'Pré-Escola'].map(mod => (
+                              <label key={mod} className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={rhForm.modalidadeInfantil?.includes(mod as any)}
+                                  onChange={e => {
+                                    if (e.target.checked) {
+                                      setRhForm({ ...rhForm, modalidadeInfantil: [...(rhForm.modalidadeInfantil || []), mod as any] });
+                                    } else {
+                                      setRhForm({ ...rhForm, modalidadeInfantil: (rhForm.modalidadeInfantil || []).filter(m => m !== mod) });
+                                    }
+                                  }}
+                                  className="w-4 h-4 text-orange-500 border-slate-300 rounded focus:ring-orange-500"
+                                />
+                                <span className="text-sm text-slate-700">{mod}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {rhForm.funcao === 'Professor(a)' && rhForm.etapaAtuacao === 'Anos Iniciais' && (
+                        <div className="space-y-2">
+                          <label className="block text-xs font-bold text-slate-500 uppercase">Ano/Série de Atuação</label>
+                          <div className="flex flex-wrap gap-4">
+                            {['1º ano', '2º ano', '3º ano', '4º ano', '5º ano'].map(ano => (
+                              <label key={ano} className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={rhForm.anosIniciaisAtuacao?.includes(ano as any)}
+                                  onChange={e => {
+                                    if (e.target.checked) {
+                                      setRhForm({ ...rhForm, anosIniciaisAtuacao: [...(rhForm.anosIniciaisAtuacao || []), ano as any] });
+                                    } else {
+                                      setRhForm({ ...rhForm, anosIniciaisAtuacao: (rhForm.anosIniciaisAtuacao || []).filter(a => a !== ano) });
+                                    }
+                                  }}
+                                  className="w-4 h-4 text-orange-500 border-slate-300 rounded focus:ring-orange-500"
+                                />
+                                <span className="text-sm text-slate-700">{ano}</span>
+                              </label>
+                            ))}
+                          </div>
                         </div>
                       )}
                       {rhForm.funcao === 'Professor(a)' && rhForm.etapaAtuacao === 'Anos Finais' && (
@@ -769,7 +817,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                     </div>
                     <div className="flex gap-3">
                       <button onClick={handleAddRh} className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20">{editingRhId ? 'Atualizar Dados' : 'Salvar Dados'}</button>
-                      <button onClick={() => { setIsAddingRh(false); setEditingRhId(null); setRhForm({ id: '', funcao: '', nome: '', telefone: '', email: '', dataNomeacao: '', tipoVinculo: 'Efetivo', etapaAtuacao: undefined, componenteCurricular: '' }); }} className="bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 px-6 py-2.5 rounded-xl font-semibold">Cancelar</button>
+                      <button onClick={() => { setIsAddingRh(false); setEditingRhId(null); setRhForm({ id: '', funcao: '', nome: '', telefone: '', email: '', dataNomeacao: '', tipoVinculo: 'Efetivo', etapaAtuacao: undefined, componenteCurricular: '', modalidadeInfantil: [], anosIniciaisAtuacao: [] }); }} className="bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 px-6 py-2.5 rounded-xl font-semibold">Cancelar</button>
                     </div>
                   </div>
                 )}
@@ -808,6 +856,8 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                             </td>
                             <td className="px-4 py-4 text-center text-sm text-slate-600">
                               {rh.etapaAtuacao || '-'}
+                              {rh.modalidadeInfantil && rh.modalidadeInfantil.length > 0 && <div className="text-xs text-slate-400 mt-0.5">{rh.modalidadeInfantil.join(', ')}</div>}
+                              {rh.anosIniciaisAtuacao && rh.anosIniciaisAtuacao.length > 0 && <div className="text-xs text-slate-400 mt-0.5">{rh.anosIniciaisAtuacao.join(', ')}</div>}
                               {rh.componenteCurricular && <div className="text-xs text-slate-400 mt-0.5">{rh.componenteCurricular}</div>}
                             </td>
                             <td className="px-4 py-4 text-center">

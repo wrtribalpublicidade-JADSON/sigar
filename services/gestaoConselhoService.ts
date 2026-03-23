@@ -542,7 +542,8 @@ export const ccTurmaService = {
             anoSerie: t.year,
             identificacao: t.name,
             turno: t.shift,
-            tipo: t.modality || 'REGULAR'
+            tipo: t.modality || 'REGULAR',
+            escolaId: t.school_id
         }));
     },
 
@@ -571,16 +572,21 @@ export const ccTurmaService = {
         };
     },
 
-    async update(id: string, turma: { etapa: string; anoSerie: string; identificacao: string; turno: string; tipo: string }) {
+    async update(id: string, turma: { etapa: string; anoSerie: string; identificacao: string; turno: string; tipo: string; escolaId?: string; schoolId?: string }) {
+        const payload: any = {
+            stage: turma.etapa,
+            year: turma.anoSerie,
+            name: turma.identificacao,
+            shift: turma.turno,
+            modality: turma.tipo
+        };
+        if (turma.schoolId || turma.escolaId) {
+            payload.school_id = turma.schoolId || turma.escolaId;
+        }
+
         const { data, error } = await supabase
             .from('turmas')
-            .update({
-                stage: turma.etapa,
-                year: turma.anoSerie,
-                name: turma.identificacao,
-                shift: turma.turno,
-                modality: turma.tipo
-            })
+            .update(payload)
             .eq('id', id)
             .select()
             .single();

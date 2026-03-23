@@ -131,6 +131,8 @@ export interface RecursoHumano {
   // Campos condicionais para Professores
   etapaAtuacao?: 'Educação Infantil' | 'Anos Iniciais' | 'Anos Finais' | 'EJA' | 'Sala de Recurso' | 'Outros';
   componenteCurricular?: 'Língua Portuguesa' | 'Matemática' | 'Geografia' | 'História' | 'Ciências' | 'Educação Física' | 'Língua Inglesa' | 'Arte' | 'Ensino Religioso' | '';
+  modalidadeInfantil?: ('Creche' | 'Pré-Escola')[];
+  anosIniciaisAtuacao?: ('1º ano' | '2º ano' | '3º ano' | '4º ano' | '5º ano')[];
 }
  
  // Interface para Alunos
