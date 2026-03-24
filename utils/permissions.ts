@@ -70,6 +70,7 @@ export const ALL_ROLES = [
     'Coordenador Pedagógico',
     'Gestor Geral',
     'Gestor Pedagógico',
+    'Auxiliar Administrativo',
 ];
 
 export const DEFAULT_PERMISSIONS: Record<string, Record<string, AccessLevel>> = {
@@ -80,6 +81,7 @@ export const DEFAULT_PERMISSIONS: Record<string, Record<string, AccessLevel>> = 
     'Coordenador Pedagógico': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['auditoria', 'equipe'].includes(m.id) ? 'none' : 'full'])),
     'Gestor Geral': Object.fromEntries(ALL_MODULES.map(m => [m.id, m.id === 'auditoria' ? 'readonly' : 'full'])),
     'Gestor Pedagógico': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['auditoria', 'equipe'].includes(m.id) ? 'readonly' : 'full'])),
+    'Auxiliar Administrativo': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['auditoria', 'equipe', 'indicadores'].includes(m.id) ? 'none' : 'full'])),
 };
 
 function loadPermissions(): Record<string, Record<string, AccessLevel>> {

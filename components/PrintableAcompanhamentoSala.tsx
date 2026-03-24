@@ -243,16 +243,16 @@ export const PrintableAcompanhamentoSala: React.FC<PrintableAcompanhamentoSalaPr
                         Nenhum item avaliado neste acompanhamento.
                     </p>
                 ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8pt' }}>
+                    <div style={{ display: 'block' }}>
                         {categoriasOrdem.filter(cat => respostasPorCategoria[cat]).map(cat => (
-                            <div key={cat}>
+                            <div key={cat} style={{ marginBottom: '8pt' }}>
                                 <div style={{ fontSize: '7.5pt', fontWeight: 800, textTransform: 'uppercase', color: '#475569', background: '#f1f5f9', padding: '4pt 8pt', borderLeft: '2pt solid #0f172a' }}>
                                     {cat}
                                 </div>
                                 <table style={{ width: '100%', borderCollapse: 'collapse', border: '1pt solid #e2e8f0', borderTop: 'none' }}>
                                     <tbody>
                                         {respostasPorCategoria[cat].map(([pergunta, status]) => (
-                                            <tr key={pergunta} style={{ borderBottom: '0.5pt solid #e2e8f0' }}>
+                                            <tr key={pergunta} style={{ borderBottom: '0.5pt solid #e2e8f0', pageBreakInside: 'avoid' }}>
                                                 <td style={{ padding: '6pt 10pt', fontSize: '8.5pt', color: '#334155', fontWeight: 500, width: '75%' }}>
                                                     {QUESTION_MAP[pergunta] || pergunta}
                                                 </td>

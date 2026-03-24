@@ -87,7 +87,7 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
   };
 
   // Roles available for Coordenador Regional to assign
-  const coordRoles = ['Gestor Geral', 'Gestor Pedagógico', 'Coordenador Pedagógico', 'Professor'];
+  const coordRoles = ['Gestor Geral', 'Gestor Pedagógico', 'Coordenador Pedagógico', 'Professor', 'Auxiliar Administrativo'];
 
   const handleCreate = () => {
     const defaultFuncao = isAdmin ? 'Coordenador Regional' : 'Gestor Geral';
@@ -292,6 +292,7 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
                     <option value="Coordenador Pedagógico">Coordenador Pedagógico</option>
                     <option value="Gestor Geral">Gestor Geral</option>
                     <option value="Gestor Pedagógico">Gestor Pedagógico</option>
+                    <option value="Auxiliar Administrativo">Auxiliar Administrativo</option>
                   </>
                 ) : (
                   <>
@@ -402,6 +403,7 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
           <option value="Coordenador Pedagógico">Coordenador Pedagógico</option>
           <option value="Professor">Professor</option>
           <option value="Técnico Pedagógico">Técnico Pedagógico</option>
+          <option value="Auxiliar Administrativo">Auxiliar Administrativo</option>
         </select>
 
         <select

@@ -32,11 +32,27 @@ export interface MerendaEntrega {
 export const buscarItensMerenda = async () => {
   const { data, error } = await supabase
     .from('merenda_itens')
-    .select('*')
+    .select(`
+      *,
+      merenda_entradas (origem, data)
+    `)
     .order('nome');
   
   if (error) throw error;
-  return data as MerendaItem[];
+  
+  return data.map((item: any) => {
+    let ultimaOrigem = '-';
+    if (item.merenda_entradas && item.merenda_entradas.length > 0) {
+      const sorted = [...item.merenda_entradas].sort((a,b) => new Date(b.data).getTime() - new Date(a.data).getTime());
+      ultimaOrigem = sorted[0].origem || '-';
+    }
+    // Remove the large nested array to save memory component-side
+    delete item.merenda_entradas;
+    return {
+       ...item,
+       ultimaOrigem
+    };
+  }) as (MerendaItem & { ultimaOrigem?: string })[];
 };
 
 export const buscarHistoricoEntradas = async (itemId: string) => {

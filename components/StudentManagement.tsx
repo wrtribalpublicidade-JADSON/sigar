@@ -50,10 +50,22 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
         return;
       }
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('alunos')
         .select('*')
         .order('name', { ascending: true });
+
+      if (!isAdmin) {
+        const validIds = escolas.map(e => e.id);
+        if (validIds.length === 0) {
+          setStudents([]);
+          setIsLoading(false);
+          return;
+        }
+        query = query.in('escola_id', validIds);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setStudents(data || []);
@@ -72,10 +84,21 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
 
   const loadTurmas = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('turmas')
         .select('*')
         .order('name');
+
+      if (!isAdmin) {
+        const validIds = escolas.map(e => e.id);
+        if (validIds.length === 0) {
+          setTurmas([]);
+          return;
+        }
+        query = query.in('school_id', validIds);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       
       const formattedTurmas: TurmaData[] = (data || []).map(t => ({
@@ -95,6 +118,10 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
 
   const filteredStudents = useMemo(() => {
     return students.filter(s => {
+      // Must be linked to a valid school within the user's scope
+      const isValidSchool = escolas.some(e => e.id === s.escola_id);
+      if (!isValidSchool) return false;
+
       const nameMatch = s.name?.toLowerCase().includes(searchTerm.toLowerCase());
       const cpfMatch = s.cpf?.includes(searchTerm);
       const matchSearch = searchTerm === '' || nameMatch || cpfMatch;
@@ -103,7 +130,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
       const matchStatus = statusFilter === 'ALL' || s.status === statusFilter;
       return matchSearch && matchSchool && matchStage && matchStatus;
     });
-  }, [students, searchTerm, schoolFilter, stageFilter, statusFilter]);
+  }, [students, searchTerm, schoolFilter, stageFilter, statusFilter, escolas]);
 
   const handleSave = async () => {
     // This is now handled inside CadastroEstudanteModal
