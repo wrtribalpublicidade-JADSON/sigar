@@ -27,6 +27,7 @@ import { ConselhoClasse } from './components/ConselhoClasse';
 import { PermissoesManager } from './components/PermissoesManager';
 import { AtividadesComplementares } from './components/AtividadesComplementares';
 import { StudentManagement } from './components/StudentManagement';
+import { MerendaEscolar } from './components/MerendaEscolar';
 import { Preloader } from './components/ui/Preloader';
 import { ViewState, Escola, Visita, Coordenador, Segmento } from './types';
 import { supabase } from './services/supabase';
@@ -1092,6 +1093,8 @@ export default function App() {
             isAdmin={isAdmin}
           />
         );
+      case 'MERENDA_ESCOLAR':
+        return <MerendaEscolar escolas={escolas} isAdmin={isAdmin} isDemoMode={isDemoMode} />;
       default:
         return <div>Página não encontrada</div>;
     }

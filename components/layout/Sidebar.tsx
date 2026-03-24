@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     LayoutDashboard, School, Users, FileText,
-    ChevronLeft, ChevronRight, Menu, X, LogOut, PlusCircle, BarChart3, TrendingUp, ClipboardCheck, GraduationCap, ClipboardList, Bell, Shield, FileStack, Library, KeyRound, Baby
+    ChevronLeft, ChevronRight, Menu, X, LogOut, PlusCircle, BarChart3, TrendingUp, ClipboardCheck, GraduationCap, ClipboardList, Bell, Shield, FileStack, Library, KeyRound, Baby, Utensils
 } from 'lucide-react';
 import { ViewState } from '../../types';
 import { getAccessForSidebarItem } from '../../utils/permissions';
@@ -102,6 +102,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
         { icon: Library, label: 'Atividades Complementares', view: 'ATIVIDADES_COMPLEMENTARES' as ViewState },
         { icon: Shield, label: 'Auditoria', view: 'AUDIT_LOGS' as ViewState },
         { icon: KeyRound, label: 'Permissões', view: 'PERMISSOES' as ViewState },
+        { icon: Utensils, label: 'Merenda Escolar', view: 'MERENDA_ESCOLAR' as ViewState },
     ];
 
     // Filter items based on user role permissions (admins bypass)

@@ -23,6 +23,7 @@ const VIEW_TO_MODULE: Record<string, string> = {
     'PERMISSOES': 'auditoria',
     'ATIVIDADES_COMPLEMENTARES': 'atividades_comp',
     'GESTAO_ESTUDANTES': 'estudantes',
+    'MERENDA_ESCOLAR': 'merenda',
 };
 
 // Sidebar label → moduleId mapping
@@ -42,6 +43,7 @@ const SIDEBAR_LABEL_TO_MODULE: Record<string, string> = {
     'Permissões': 'auditoria',
     'Atividades Complementares': 'atividades_comp',
     'Estudantes': 'estudantes',
+    'Merenda Escolar': 'merenda',
 };
 
 export const ALL_MODULES = [
@@ -57,6 +59,7 @@ export const ALL_MODULES = [
     { id: 'registrar_visita', name: 'Registrar Visita', group: 'Sistema' },
     { id: 'atividades_comp', name: 'Atividades Complementares', group: 'Gestão' },
     { id: 'estudantes', name: 'Gestão de Estudantes', group: 'Menu' },
+    { id: 'merenda', name: 'Merenda Escolar', group: 'Gestão' },
 ];
 
 export const ALL_ROLES = [
