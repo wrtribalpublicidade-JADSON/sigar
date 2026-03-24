@@ -33,7 +33,7 @@ import { ViewState, Escola, Visita, Coordenador, Segmento } from './types';
 import { supabase } from './services/supabase';
 import { useNotification } from './context/NotificationContext';
 import { generateUUID, checkSchoolPendencies } from './utils';
-import { hasAccess } from './utils/permissions';
+import { hasAccess, hasFullAccess } from './utils/permissions';
 import { loadPermissions as preloadPermissions } from './services/permissoesService';
 import { ESCOLAS_MOCK, VISITAS_MOCK, COORDENADORES_MOCK } from './constants';
 import { igPlanoAcaoService } from './services/gestaoConselhoService';
@@ -1094,7 +1094,7 @@ export default function App() {
           />
         );
       case 'MERENDA_ESCOLAR':
-        return <MerendaEscolar escolas={escolas} isAdmin={isAdmin} isDemoMode={isDemoMode} />;
+        return <MerendaEscolar escolas={escolas} isAdmin={isAdmin} isDemoMode={isDemoMode} canEdit={isAdmin || hasFullAccess('MERENDA_ESCOLAR', effectiveUser?.funcao)} />;
       default:
         return <div>Página não encontrada</div>;
     }

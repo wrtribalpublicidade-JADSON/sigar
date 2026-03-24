@@ -22,9 +22,10 @@ interface MerendaEscolarProps {
   escolas: Escola[];
   isAdmin: boolean;
   isDemoMode: boolean;
+  canEdit?: boolean;
 }
 
-export const MerendaEscolar: React.FC<MerendaEscolarProps> = ({ escolas, isAdmin, isDemoMode }) => {
+export const MerendaEscolar: React.FC<MerendaEscolarProps> = ({ escolas, isAdmin, isDemoMode, canEdit }) => {
   const [activeTab, setActiveTab] = useState<'estoque' | 'entregas' | 'mapa'>('estoque');
   const [loading, setLoading] = useState(true);
   
@@ -283,7 +284,7 @@ export const MerendaEscolar: React.FC<MerendaEscolarProps> = ({ escolas, isAdmin
           <p className="text-slate-500 mt-1">Gestão de estoque integrada em tempo real e rastreabilidade</p>
         </div>
         
-        {isAdmin && (
+        {canEdit && (
           <div className="flex gap-3">
              <button 
               onClick={() => {
@@ -358,7 +359,7 @@ export const MerendaEscolar: React.FC<MerendaEscolarProps> = ({ escolas, isAdmin
                   className="pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-orange/20 focus:border-brand-orange w-full"
                 />
               </div>
-              {isAdmin && (
+              {canEdit && (
                 <div className="flex gap-2">
                   <button onClick={() => setIsImportModalOpen(true)} className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-50 transition shadow-sm">
                       <FileType className="w-4 h-4 text-brand-orange" /> <span className="hidden md:inline">Importar XML/CSV</span>
@@ -380,12 +381,12 @@ export const MerendaEscolar: React.FC<MerendaEscolarProps> = ({ escolas, isAdmin
                   <th className="px-6 py-4">Estoque Atual</th>
                   <th className="px-6 py-4 text-center">Status</th>
                   <th className="px-6 py-4">Última Atualização</th>
-                  {isAdmin && <th className="px-6 py-4 text-right">Ações</th>}
+                  {canEdit && <th className="px-6 py-4 text-right">Ações</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredEstoque.length === 0 && !loading ? (
-                  <tr><td colSpan={isAdmin ? 7 : 6} className="text-center py-8 text-slate-500">Nenhum item encontrado no estoque ou aguardando conexão.</td></tr>
+                  <tr><td colSpan={canEdit ? 7 : 6} className="text-center py-8 text-slate-500">Nenhum item encontrado no estoque ou aguardando conexão.</td></tr>
                 ) : (
                   filteredEstoque.map(item => (
                     <tr key={item.id} className="hover:bg-slate-50 transition-colors">
@@ -446,7 +447,7 @@ export const MerendaEscolar: React.FC<MerendaEscolarProps> = ({ escolas, isAdmin
                       <td className="px-6 py-4 text-xs font-medium text-slate-500">
                         {new Date(item.ultima_atualizacao).toLocaleDateString('pt-BR')} às {new Date(item.ultima_atualizacao).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}
                       </td>
-                      {isAdmin && (
+                      {canEdit && (
                         <td className="px-6 py-4 text-right">
                           <div className="flex justify-end gap-2">
                             <button onClick={() => handleOpenEditItem(item)} className="p-2 text-slate-400 hover:text-brand-orange hover:bg-orange-50 rounded-lg transition" title="Registro e Edição">
@@ -612,7 +613,7 @@ export const MerendaEscolar: React.FC<MerendaEscolarProps> = ({ escolas, isAdmin
                             <p className="text-sm font-bold text-slate-800 line-clamp-1">{escolaDestino?.nome || 'Escola Desconhecida'}</p>
                           </div>
                         </div>
-                        {isAdmin && (
+                        {canEdit && (
                           <div className="flex gap-1">
                             <button onClick={() => handlePrintEntrega(entrega)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition" title="Imprimir Relatório">
                                <Printer className="w-4 h-4" />
@@ -754,7 +755,7 @@ export const MerendaEscolar: React.FC<MerendaEscolarProps> = ({ escolas, isAdmin
                           )}
                         </div>
 
-                        {isAdmin && (
+                        {canEdit && (
                           <button 
                             onClick={() => {
                                 setActiveTab('entregas');
