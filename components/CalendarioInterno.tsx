@@ -188,11 +188,12 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({
     const getOficiaisForDate = (dateKey: string) =>
         eventosOficiais.filter(e => isDateInRange(dateKey, e.data, e.data_fim));
     const getInternosForDate = (dateKey: string) => {
-        let filtered = eventosInternos;
+        let filtered: EventoInterno[] = [];
         if (filtroEscola !== 'todas') {
-            // Se filtrado por uma escola, mostramos os eventos daquela escola + globais (escola_id null)
-            filtered = filtered.filter(e => e.escola_id === filtroEscola || !e.escola_id);
+            // Se filtrado por uma escola, mostramos apenas os eventos daquela escola
+            filtered = eventosInternos.filter(e => e.escola_id === filtroEscola);
         }
+        // Se "Todas as Escolas" estiver selecionado, não mostramos eventos internos (apenas oficiais SEMED)
         return filtered.filter(e => isDateInRange(dateKey, e.data, e.data_fim));
     };
 
@@ -326,8 +327,8 @@ export const CalendarioInterno: React.FC<CalendarioInternoProps> = ({
 
     // ---- Filtered events for sidebar list ----
     const baseInternos = filtroEscola === 'todas'
-        ? eventosInternos
-        : eventosInternos.filter(e => e.escola_id === filtroEscola || !e.escola_id);
+        ? [] // Na visão de "Todas as Escolas", mostramos apenas eventos oficiais (filtrado via monthOficiais)
+        : eventosInternos.filter(e => e.escola_id === filtroEscola);
     const filteredInternos = filtroTipo === 'todos'
         ? baseInternos
         : baseInternos.filter(e => e.tipo === filtroTipo);
