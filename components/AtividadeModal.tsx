@@ -47,7 +47,7 @@ export const AtividadeModal: React.FC<AtividadeModalProps> = ({ isOpen, onClose,
         status: 'Ativa'
     });
 
-    const [escolasDisponiveis, setEscolasDisponiveis] = useState<string[]>([]);
+    const [escolasDisponiveis, setEscolasDisponiveis] = useState<{id: string, nome: string}[]>([]);
     const [monitoresDisponiveis, setMonitoresDisponiveis] = useState<string[]>([]);
     const [isLoadingData, setIsLoadingData] = useState(false);
 
@@ -58,12 +58,12 @@ export const AtividadeModal: React.FC<AtividadeModalProps> = ({ isOpen, onClose,
                 // Fetch schools that offer complementary activities
                 const { data: schools } = await supabase
                     .from('escolas')
-                    .select('nome')
+                    .select('id, nome')
                     .eq('oferta_atividade_complementar', true)
                     .order('nome');
                 
                 if (schools) {
-                    setEscolasDisponiveis(schools.map(s => s.nome));
+                    setEscolasDisponiveis(schools);
                 }
 
                 // Fetch monitors (servidores in recursos_humanos with specific function)
@@ -104,7 +104,8 @@ export const AtividadeModal: React.FC<AtividadeModalProps> = ({ isOpen, onClose,
                 publicoAlvo: atividadeToEdit.publicoAlvo,
                 objetivos: atividadeToEdit.objetivos,
                 materiais: atividadeToEdit.materiais,
-                status: atividadeToEdit.status
+                status: atividadeToEdit.status,
+                escola_id: atividadeToEdit.escola_id
             });
         } else {
             setFormData({
@@ -210,14 +211,21 @@ export const AtividadeModal: React.FC<AtividadeModalProps> = ({ isOpen, onClose,
                                 <div className="space-y-1.5">
                                     <label className="text-[11px] font-bold text-slate-500 ml-1">Unidade Escolar</label>
                                     <select 
-                                        value={formData.unidadeEscolar}
-                                        onChange={e => setFormData({ ...formData, unidadeEscolar: e.target.value })}
+                                        value={formData.escola_id || ''}
+                                        onChange={e => {
+                                            const selectedEscola = escolasDisponiveis.find(esc => esc.id === e.target.value);
+                                            setFormData({ 
+                                                ...formData, 
+                                                escola_id: e.target.value,
+                                                unidadeEscolar: selectedEscola?.nome || ''
+                                            });
+                                        }}
                                         className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-orange-500/10 focus:border-orange-500 outline-none transition-all cursor-pointer"
                                         disabled={isLoadingData}
                                     >
                                         <option value="" disabled>{isLoadingData ? 'Carregando unidades...' : 'Selecione a unidade'}</option>
                                         {escolasDisponiveis.map(escola => (
-                                            <option key={escola} value={escola}>{escola}</option>
+                                            <option key={escola.id} value={escola.id}>{escola.nome}</option>
                                         ))}
                                         {!isLoadingData && escolasDisponiveis.length === 0 && (
                                             <option value="" disabled>Nenhuma escola com oferta ativa</option>

@@ -1084,7 +1084,14 @@ export default function App() {
       case 'PERMISSOES':
         return <PermissoesManager />;
       case 'ATIVIDADES_COMPLEMENTARES':
-        return <AtividadesComplementares />;
+        return (
+          <AtividadesComplementares 
+            userEscolaIds={effectiveUser?.escolasIds}
+            escolaName={effectiveUser?.escolasIds.length === 1 
+              ? escolas.find(e => e.id === effectiveUser.escolasIds[0])?.nome 
+              : undefined}
+          />
+        );
       case 'GESTAO_ESTUDANTES':
         return (
           <StudentManagement 

@@ -5,6 +5,7 @@ export interface Atividade {
     nome: string;
     categoria: string;
     unidadeEscolar: string;
+    escola_id?: string;
     instrutor: string;
     vagas: number;
     inscritos: number;
@@ -34,14 +35,19 @@ export interface AtividadePresenca {
 }
 
 export const activitiesService = {
-    async getAtividades(): Promise<Atividade[]> {
-        const { data, error } = await supabase
+    async getAtividades(escolaIds?: string[]): Promise<Atividade[]> {
+        let query = supabase
             .from('atividades_complementares')
             .select(`
                 *,
                 atividade_alunos (count)
-            `)
-            .order('created_at', { ascending: false });
+            `);
+
+        if (escolaIds && escolaIds.length > 0) {
+            query = query.in('escola_id', escolaIds);
+        }
+
+        const { data, error } = await query.order('created_at', { ascending: false });
 
         if (error) throw error;
 
@@ -62,6 +68,7 @@ export const activitiesService = {
             nome: atv.nome,
             categoria: atv.categoria,
             unidade_escolar: atv.unidadeEscolar,
+            escola_id: atv.escola_id,
             instrutor: atv.instrutor,
             vagas: atv.vagas,
             dias_semana: atv.diasSemana,

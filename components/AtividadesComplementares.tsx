@@ -16,7 +16,12 @@ const CATEGORIAS = [
     { id: 'reforco', name: 'Reforço', icon: BookOpen, color: 'text-emerald-500', bg: 'bg-emerald-50' },
 ];
 
-export const AtividadesComplementares: React.FC = () => {
+interface AtividadesComplementaresProps {
+    userEscolaIds?: string[];
+    escolaName?: string;
+}
+
+export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> = ({ userEscolaIds, escolaName }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCat, setSelectedCat] = useState('todas');
     const [atividades, setAtividades] = useState<Atividade[]>([]);
@@ -29,7 +34,7 @@ export const AtividadesComplementares: React.FC = () => {
     const fetchAtividades = async () => {
         setIsLoading(true);
         try {
-            const data = await activitiesService.getAtividades();
+            const data = await activitiesService.getAtividades(userEscolaIds);
             setAtividades(data);
         } catch (err) {
             console.error('Error fetching activities:', err);
@@ -40,7 +45,7 @@ export const AtividadesComplementares: React.FC = () => {
 
     React.useEffect(() => {
         fetchAtividades();
-    }, []);
+    }, [userEscolaIds]);
 
     const handleSaveAtividade = async (newAtv: Omit<Atividade, 'id' | 'inscritos'>) => {
         try {
@@ -143,11 +148,13 @@ export const AtividadesComplementares: React.FC = () => {
                 </div>
                 <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
                     <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center">
-                        <Calendar size={24} />
+                        <MapPin size={24} />
                     </div>
                     <div>
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Média Presença</p>
-                        <p className="text-2xl font-black text-slate-800">{presencaMedia}%</p>
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Unidade Escolar</p>
+                        <p className="text-xl font-black text-slate-800 truncate max-w-[200px]" title={escolaName || 'Múltiplas Unidades'}>
+                            {escolaName || (userEscolaIds && userEscolaIds.length > 0 ? 'Múltiplas Unidades' : 'Todas as Unidades')}
+                        </p>
                     </div>
                 </div>
             </div>
