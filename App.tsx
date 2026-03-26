@@ -135,7 +135,8 @@ export default function App() {
         supabase.from('registros_cnca').select('*').in('escola_id', activeSchoolIds),
         supabase.from('registros_seama').select('*').in('escola_id', activeSchoolIds),
         supabase.from('registros_saeb').select('*').in('escola_id', activeSchoolIds),
-        supabase.from('registros_ideb').select('*').in('escola_id', activeSchoolIds)
+        supabase.from('registros_ideb').select('*').in('escola_id', activeSchoolIds),
+        supabase.from('registros_fluencia_samahc').select('*').in('escola_id', activeSchoolIds)
       ]);
 
       const getResultData = (index: number, label: string) => {
@@ -157,6 +158,7 @@ export default function App() {
       const seamaData = getResultData(5, 'SEAMA');
       const saebData = getResultData(6, 'SAEB');
       const idebData = getResultData(7, 'IDEB');
+      const samahcFluenciaData = getResultData(8, 'SAMAHC Fluência');
 
       const mappedEscolas: Escola[] = (escData || []).map((e: any) => ({
         id: e.id,
@@ -177,6 +179,11 @@ export default function App() {
             etapaAplicacao: r.etapa_aplicacao, tipoTurma: r.tipo_turma, turma: r.turma,
             participacao: r.participacao, classificacao: r.classificacao,
             dataRegistro: r.data_registro, responsavel: r.responsavel
+          })) || [],
+          registrosFluenciaSamahc: samahcFluenciaData?.filter((r: any) => r.escola_id === e.id).map((r: any) => ({
+            id: r.id, escolaId: r.escola_id, polo: r.polo, ano: r.ano, estudanteNome: r.estudante_nome,
+            anoSerie: r.ano_serie, nivelDesempenho: r.nivel_desempenho, turno: r.turno,
+            tipoAvaliacao: r.tipo_avaliacao, turma: r.turma, etapa: r.etapa, createdAt: r.created_at
           })) || [],
           registrosCNCA: cncaData?.filter((r: any) => r.escola_id === e.id).map((r: any) => ({
             id: r.id, escolaId: r.escola_id, ano: r.ano, tipoAvaliacao: r.tipo_avaliacao,
@@ -387,7 +394,7 @@ export default function App() {
 
       // Extract JSON-only data by removing relational arrays
       const {
-        registrosFluenciaParc, registrosCNCA, registrosSEAMA, registrosSAEB, registrosIDEB,
+        registrosFluenciaParc, registrosFluenciaSamahc, registrosCNCA, registrosSEAMA, registrosSAEB, registrosIDEB,
         ...cleanDadosEducacionais
       } = updatedEscola.dadosEducacionais;
 
@@ -576,6 +583,31 @@ export default function App() {
             id: r.id, escola_id: updatedEscola.id, ano: r.ano, anos_iniciais: r.anosIniciais,
             anos_finais: r.anosFinais, data_registro: r.dataRegistro, responsavel: r.responsavel
           })), { onConflict: 'escola_id,ano', ignoreDuplicates: false });
+        }
+      }
+
+      // --- Registros Fluência SAMAHC ---
+      const samahcFluenciaChanged = !currentEscola || currentEscola.dadosEducacionais?.registrosFluenciaSamahc !== updatedEscola.dadosEducacionais?.registrosFluenciaSamahc;
+      if (samahcFluenciaChanged) {
+        const registros = updatedEscola.dadosEducacionais.registrosFluenciaSamahc || [];
+        const currentIds = registros.map(r => r.id);
+        const { data: existing } = await supabase.from('registros_fluencia_samahc').select('id').eq('escola_id', updatedEscola.id);
+        const idsToDelete = (existing || []).map((r: any) => r.id).filter((id: string) => !currentIds.includes(id));
+        if (idsToDelete.length > 0) await supabase.from('registros_fluencia_samahc').delete().in('id', idsToDelete);
+        if (registros.length > 0) {
+          await supabase.from('registros_fluencia_samahc').upsert(registros.map(r => ({
+            id: r.id,
+            escola_id: updatedEscola.id,
+            polo: r.polo,
+            ano: r.ano,
+            estudante_nome: r.estudanteNome,
+            ano_serie: r.anoSerie,
+            nivel_desempenho: r.nivelDesempenho,
+            turno: r.turno,
+            tipo_avaliacao: r.tipoAvaliacao,
+            turma: r.turma,
+            etapa: r.etapa
+          })));
         }
       }
 

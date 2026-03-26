@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { CheckCircle, AlertCircle, X } from 'lucide-react';
 
-type NotificationType = 'success' | 'error';
+type NotificationType = 'success' | 'error' | 'warning';
 
 interface Notification {
   id: string;
@@ -51,6 +51,8 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
               pointer-events-auto flex items-start gap-3 p-4 rounded-lg shadow-lg border w-80 animate-fade-in transition-all transform
               ${notification.type === 'success' 
                 ? 'bg-white border-l-4 border-l-green-500 border-slate-100' 
+                : notification.type === 'warning'
+                ? 'bg-white border-l-4 border-l-orange-500 border-slate-100'
                 : 'bg-white border-l-4 border-l-red-500 border-slate-100'}
             `}
             role="alert"
@@ -58,13 +60,19 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
             <div className="shrink-0 mt-0.5">
               {notification.type === 'success' ? (
                 <CheckCircle className="w-5 h-5 text-green-500" />
+              ) : notification.type === 'warning' ? (
+                <AlertCircle className="w-5 h-5 text-orange-500" />
               ) : (
                 <AlertCircle className="w-5 h-5 text-red-500" />
               )}
             </div>
             <div className="flex-1">
-              <h4 className={`text-sm font-bold ${notification.type === 'success' ? 'text-green-800' : 'text-red-800'}`}>
-                {notification.type === 'success' ? 'Sucesso' : 'Erro'}
+              <h4 className={`text-sm font-bold ${
+                notification.type === 'success' ? 'text-green-800' : 
+                notification.type === 'warning' ? 'text-orange-800' : 'text-red-800'
+              }`}>
+                {notification.type === 'success' ? 'Sucesso' : 
+                 notification.type === 'warning' ? 'Atenção' : 'Erro'}
               </h4>
               <p className="text-sm text-slate-600 mt-1 leading-tight">
                 {notification.message}

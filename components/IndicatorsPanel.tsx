@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { PageHeader } from './ui/PageHeader';
 import {
     BarChart3,
@@ -22,6 +22,7 @@ import { FluenciaParcDashboard } from './FluenciaParcDashboard';
 import { CncaPnraDashboard } from './CncaPnraDashboard';
 import { SeamaDashboard } from './SeamaDashboard';
 import { SaebDashboard } from './SaebDashboard';
+import { SamahcDashboard } from './SamahcDashboard';
 import { 
     Coordenador, 
     Escola, 
@@ -31,15 +32,20 @@ import {
     RegistroSEAMA, 
     RegistroSAEB, 
     RegistroIDEB,
+    RegistroFluenciaSAMAHC,
     RecursoHumano
 } from '../types';
 import { Card } from './ui/Card';
-import { exportToCSV, generateUUID } from '../utils';
+import { generateUUID } from '../utils';
+import { exportToCSV } from '../utils/exportUtils';
 import { FluenciaParcModal } from './modals/FluenciaParcModal';
 import { CncaModal } from './modals/CncaModal';
 import { SeamaModal } from './modals/SeamaModal';
 import { SaebModal } from './modals/SaebModal';
 import { IdebModal } from './modals/IdebModal';
+import { parseCSV } from '../utils/importUtils';
+import { useNotification } from '../context/NotificationContext';
+import * as XLSX from 'xlsx';
 
 interface IndicatorsPanelProps {
     escolas: Escola[];
@@ -59,7 +65,7 @@ type TabType = 'CENSO' | 'SAMAHC' | 'PARC' | 'SAEB' | 'IDEB' | 'SEAMA' | 'CNCA' 
 
 export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coordenadores, isDemoMode, onUpdateEscola }) => {
     const [mainTab, setMainTab] = useState<'CADASTRO' | 'ANALISE'>('CADASTRO');
-    const [activeAnalysis, setActiveAnalysis] = useState<'PARC' | 'SEAMA' | 'CNCA' | 'SAEB'>('PARC');
+    const [activeAnalysis, setActiveAnalysis] = useState<'PARC' | 'SEAMA' | 'CNCA' | 'SAEB' | 'SAMAHC'>('PARC');
     const [activeTab, setActiveTab] = useState<TabType>('CENSO');
     const [samahcSubTab, setSamahcSubTab] = useState<'SEAMA' | 'SAEB' | 'FLUENCIA' | 'PORTUGUES' | 'MATEMATICA'>('FLUENCIA');
     const [searchTerm, setSearchTerm] = useState('');
@@ -73,6 +79,14 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
     const [showSaebModal, setShowSaebModal] = useState(false);
     const [selectedSchoolForIdeb, setSelectedSchoolForIdeb] = useState<Escola | null>(null);
     const [showIdebModal, setShowIdebModal] = useState(false);
+    const [showImportPreview, setShowImportPreview] = useState(false);
+    const [pendingImportData, setPendingImportData] = useState<{
+        schoolsToUpdate: Map<string, Escola>;
+        successCount: number;
+        errors: string[];
+    } | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const { showNotification } = useNotification();
 
     const tabs: { id: TabType; label: string; icon: React.FC<{ className?: string; strokeWidth?: number }> }[] = [
         { id: 'CENSO', label: 'Censo Escolar', icon: Users },
@@ -100,9 +114,328 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
     });
 
     const handleExport = () => {
+        let columns: any[] = [];
         let dataToExport: any[] = [];
-        // Implementation for export if needed
-        exportToCSV(dataToExport, `indicadores_${activeTab.toLowerCase()}`);
+
+        if (activeTab === 'CENSO') {
+            columns = [
+                { header: 'Unidade Escolar', key: 'nome' },
+                { header: 'Matrícula', key: (r: Escola) => calculateCensoStats(r).matricula },
+                { header: 'Docentes', key: (r: Escola) => calculateCensoStats(r).docentes },
+                { header: 'Turmas', key: (r: Escola) => calculateCensoStats(r).turmas }
+            ];
+            dataToExport = filteredEscolas;
+        } else if (activeTab === 'SAMAHC') {
+            columns = [
+                { header: 'Unidade Escolar', key: 'nome' },
+                { header: samahcSubTab, key: (r: Escola) => {
+                    const s = r.dadosEducacionais?.dadosSamahc;
+                    if (samahcSubTab === 'SEAMA') return s?.simuladoSeama || 0;
+                    if (samahcSubTab === 'SAEB') return s?.simuladoSaeb || 0;
+                    if (samahcSubTab === 'FLUENCIA') return (s?.fluencia || 0) + '%';
+                    if (samahcSubTab === 'PORTUGUES') return s?.linguaPortuguesa || 0;
+                    if (samahcSubTab === 'MATEMATICA') return s?.matematica || 0;
+                    return 0;
+                }}
+            ];
+            dataToExport = filteredEscolas;
+        } else {
+            dataToExport = [];
+        }
+
+        exportToCSV(dataToExport, columns, `indicadores_${activeTab.toLowerCase()}`);
+    };
+
+    const handleDownloadTemplate = () => {
+        const templateData = escolas.map(e => ({
+            'PÓLO': (e as any).polo || '',
+            'ANO': new Date().getFullYear(),
+            'UNIDADE ESCOLAR': e.nome,
+            'NOME DO ESTUDANTE': '',
+            'ANO/SÉRIE': '',
+            'NÍVEL DE DESEMPENHO': 'Ex: LEITOR FLUENTE, LEITOR INICIANTE, NÃO LEITOR',
+            'TURNO': '',
+            'TIPO DE AVALIAÇÃO': 'DIAGNÓSTICA, FORMATIVA ou SOMATIVA',
+            'TURMA DE MATRÍCULA': '',
+            'ETAPA': ''
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(templateData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Modelo Fluência');
+        XLSX.writeFile(wb, 'modelo_fluencia_samahc.xlsx');
+    };
+    const handleImportFluencia = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+
+        reader.onload = (e) => {
+            try {
+                let parsedData: any[] = [];
+
+                if (isExcel) {
+                    const data = e.target?.result;
+                    const workbook = XLSX.read(data, { type: 'binary' });
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+                    parsedData = XLSX.utils.sheet_to_json(worksheet);
+                } else {
+                    const text = e.target?.result as string;
+                    parsedData = parseCSV(text);
+                }
+                
+                if (!parsedData || parsedData.length === 0) {
+                    showNotification('error', 'Arquivo vazio ou com formato inválido.');
+                    return;
+                }
+
+                const schoolsToUpdate = new Map<string, Escola>();
+                const errors: string[] = [];
+                let successCount = 0;
+
+                parsedData.forEach((row, index) => {
+                    const lineNum = index + 2; // +1 for 0-index, +1 for header
+                    const schoolName = row['UNIDADE ESCOLAR'];
+                    const studentName = row['NOME DO ESTUDANTE'];
+                    const performanceLevel = row['NÍVEL DE DESEMPENHO'];
+                    const year = parseInt(row['ANO']);
+                    const turno = row['TURNO'];
+                    const tipoAvaliacao = row['TIPO DE AVALIAÇÃO']?.toString().toUpperCase().trim();
+
+                    // Validation
+                    if (!schoolName) {
+                        errors.push(`Linha ${lineNum}: Unidade Escolar ausente.`);
+                        return;
+                    }
+
+                    const escola = escolas.find(esc => esc.nome === schoolName);
+                    if (!escola) {
+                        errors.push(`Linha ${lineNum}: Escola "${schoolName}" não encontrada no sistema.`);
+                        return;
+                    }
+
+                    if (!studentName) {
+                        errors.push(`Linha ${lineNum}: Nome do estudante ausente.`);
+                        return;
+                    }
+
+                    if (isNaN(year)) {
+                        errors.push(`Linha ${lineNum}: Ano inválido.`);
+                        return;
+                    }
+
+                    if (!tipoAvaliacao || !['DIAGNÓSTICA', 'FORMATIVA', 'SOMATIVA'].includes(tipoAvaliacao)) {
+                        errors.push(`Linha ${lineNum}: Tipo de avaliação inválida ("${tipoAvaliacao}"). Use DIAGNÓSTICA, FORMATIVA ou SOMATIVA.`);
+                        return;
+                    }
+
+                    let updatedEscola = schoolsToUpdate.get(escola.id) || JSON.parse(JSON.stringify(escola));
+                    
+                    if (!updatedEscola.dadosEducacionais.registrosFluenciaSamahc) {
+                        updatedEscola.dadosEducacionais.registrosFluenciaSamahc = [];
+                    }
+
+                    const newRecord: RegistroFluenciaSAMAHC = {
+                        id: generateUUID(),
+                        escolaId: escola.id,
+                        polo: row['PÓLO'] || '',
+                        ano: year,
+                        estudanteNome: studentName.toString().toUpperCase().trim(),
+                        anoSerie: row['ANO/SÉRIE'] || '',
+                        nivelDesempenho: performanceLevel?.toString().toUpperCase().trim() || 'NÃO INFORMADO',
+                        turno: turno || '',
+                        tipoAvaliacao: tipoAvaliacao as any,
+                        turma: row['TURMA DE MATRÍCULA'] || '',
+                        etapa: row['ETAPA'] || '',
+                        createdAt: new Date().toISOString()
+                    };
+
+                    updatedEscola.dadosEducacionais.registrosFluenciaSamahc.push(newRecord);
+                    schoolsToUpdate.set(escola.id, updatedEscola);
+                    successCount++;
+                });
+
+                if (successCount === 0 && errors.length > 0) {
+                    showNotification('error', `Falha na importação: ${errors[0]}`);
+                    return;
+                }
+
+                // Instead of processing directly, set pending data for preview
+                setPendingImportData({
+                    schoolsToUpdate,
+                    successCount,
+                    errors
+                });
+                setShowImportPreview(true);
+
+                // Reset file input
+                if (event.target) event.target.value = '';
+
+            } catch (error) {
+                console.error('Error importing Fluency:', error);
+                showNotification('error', 'Erro ao importar arquivo. Verifique se é um CSV ou Excel válido.');
+            }
+        };
+
+        if (isExcel) {
+            reader.readAsBinaryString(file);
+        } else {
+            reader.readAsText(file);
+        }
+    };
+
+    const handleConfirmImport = () => {
+        if (!pendingImportData) return;
+
+        const { schoolsToUpdate, successCount, errors } = pendingImportData;
+
+        // Calculate percentages and update each school
+        schoolsToUpdate.forEach(updatedEscola => {
+            const regs = updatedEscola.dadosEducacionais.registrosFluenciaSamahc || [];
+            const currentYear = new Date().getFullYear();
+            const currentYearRegs = regs.filter((r: RegistroFluenciaSAMAHC) => (r.ano === currentYear || r.ano === currentYear - 1));
+            
+            if (currentYearRegs.length > 0) {
+                const total = currentYearRegs.length;
+                const fluentes = currentYearRegs.filter((r: RegistroFluenciaSAMAHC) => {
+                    const n = (r.nivelDesempenho || '').toUpperCase();
+                    return n.includes('FLUENTE') || n.includes('COM FLUÊNCIA') || n.includes('INICIANTE');
+                }).length;
+                
+                const perc = Number(((fluentes / total) * 100).toFixed(1));
+                
+                if (!updatedEscola.dadosEducacionais.dadosSamahc) {
+                    updatedEscola.dadosEducacionais.dadosSamahc = { 
+                        simuladoSeama: 0, 
+                        simuladoSaeb: 0, 
+                        fluencia: 0, 
+                        linguaPortuguesa: 0, 
+                        matematica: 0 
+                    };
+                }
+                updatedEscola.dadosEducacionais.dadosSamahc.fluencia = perc;
+            }
+            
+            onUpdateEscola(updatedEscola);
+        });
+
+        if (errors.length > 0) {
+            showNotification('warning', `Importado com ressalvas: ${successCount} sucessos, ${errors.length} erros. Verifique os dados.`);
+        } else {
+            showNotification('success', `${successCount} registros importados com sucesso em ${schoolsToUpdate.size} escolas!`);
+        }
+
+        setShowImportPreview(false);
+        setPendingImportData(null);
+    };
+
+    const renderImportPreview = () => {
+        if (!pendingImportData) return null;
+
+        const { schoolsToUpdate, errors } = pendingImportData;
+        const allRecords: RegistroFluenciaSAMAHC[] = [];
+        schoolsToUpdate.forEach(escola => {
+            // Only get the new records we just added (they don't have a backend ID yet if it were a real push, but here we generate UUIDs)
+            // Actually, we replaced the whole array in the clone, so we should be careful.
+            // But for preview, let's just show some of the data.
+            allRecords.push(...(escola.dadosEducacionais.registrosFluenciaSamahc || []).slice(-10)); // Show last 10 per school for preview
+        });
+
+        return (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                <div className="bg-white w-full max-w-5xl max-h-[90vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+                    <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                        <div>
+                            <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
+                                <Activity className="w-6 h-6 text-brand-orange" />
+                                PRÉ-VISUALIZAÇÃO DA IMPORTAÇÃO
+                            </h2>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">
+                                Confira os dados antes de confirmar a gravação no sistema
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <button 
+                                onClick={() => { setShowImportPreview(false); setPendingImportData(null); }}
+                                className="px-6 py-2.5 rounded-xl text-xs font-black text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all uppercase tracking-widest"
+                            >
+                                Cancelar
+                            </button>
+                            <button 
+                                onClick={handleConfirmImport}
+                                className="px-8 py-2.5 rounded-xl text-xs font-black bg-brand-orange text-white shadow-lg shadow-orange-200 hover:scale-105 active:scale-95 transition-all uppercase tracking-widest"
+                            >
+                                Confirmar Importação
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 overflow-auto p-6 space-y-6">
+                        {errors.length > 0 && (
+                            <div className="bg-red-50 border border-red-100 rounded-2xl p-4">
+                                <h3 className="text-sm font-black text-red-700 flex items-center gap-2 mb-2 uppercase tracking-tight">
+                                    <Activity className="w-4 h-4 text-red-500" />
+                                    Inconsistências Encontradas ({errors.length})
+                                </h3>
+                                <ul className="text-xs font-bold text-red-500 space-y-1 list-disc pl-4 max-h-32 overflow-auto">
+                                    {errors.slice(0, 10).map((err, i) => <li key={i}>{err}</li>)}
+                                    {errors.length > 10 && <li>E mais {errors.length - 10} erros...</li>}
+                                </ul>
+                            </div>
+                        )}
+
+                        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                                        <th className="px-4 py-3">Escola</th>
+                                        <th className="px-4 py-3">Estudante</th>
+                                        <th className="px-4 py-3">Série</th>
+                                        <th className="px-4 py-3">Turno</th>
+                                        <th className="px-4 py-3">Avaliação</th>
+                                        <th className="px-4 py-3">Nível</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                    {allRecords.slice(0, 50).map((r, i) => (
+                                        <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                                            <td className="px-4 py-3 text-xs font-bold text-slate-600 truncate max-w-[200px]">
+                                                {escolas.find(e => e.id === r.escolaId)?.nome}
+                                            </td>
+                                            <td className="px-4 py-3 text-xs font-bold text-slate-800">{r.estudanteNome}</td>
+                                            <td className="px-4 py-3 text-xs font-bold text-slate-600">{r.anoSerie}</td>
+                                            <td className="px-4 py-3 text-xs">
+                                                <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-bold text-[9px] uppercase">
+                                                    {r.turno}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-xs">
+                                                <span className={`px-2 py-0.5 rounded-full font-bold text-[9px] uppercase ${
+                                                    r.tipoAvaliacao === 'DIAGNÓSTICA' ? 'bg-blue-100 text-blue-600' :
+                                                    r.tipoAvaliacao === 'FORMATIVA' ? 'bg-emerald-100 text-emerald-600' :
+                                                    'bg-amber-100 text-amber-600'
+                                                }`}>
+                                                    {r.tipoAvaliacao}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-xs font-bold text-brand-orange">{r.nivelDesempenho}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            {allRecords.length > 50 && (
+                                <div className="p-3 bg-slate-50 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                    Exibindo 50 de {allRecords.length} registros
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
     };
 
     const handleSchoolClick = (escola: Escola) => {
@@ -573,16 +906,44 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
                     </div>
 
                     {activeTab === 'SAMAHC' && (
-                        <div className="flex flex-wrap gap-2 animate-fade-in mb-6">
-                            {['FLUENCIA', 'SEAMA', 'SAEB', 'PORTUGUES', 'MATEMATICA'].map((st) => (
-                                <button
-                                    key={st}
-                                    onClick={() => setSamahcSubTab(st as any)}
-                                    className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${samahcSubTab === st ? 'bg-slate-800 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}
-                                >
-                                    {st}
-                                </button>
-                            ))}
+                        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+                            <div className="flex flex-wrap gap-2 animate-fade-in">
+                                {['FLUENCIA', 'SEAMA', 'SAEB', 'PORTUGUES', 'MATEMATICA'].map((st) => (
+                                    <button
+                                        key={st}
+                                        onClick={() => setSamahcSubTab(st as any)}
+                                        className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${samahcSubTab === st ? 'bg-slate-800 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+                                    >
+                                        {st}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {samahcSubTab === 'FLUENCIA' && (
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={handleDownloadTemplate}
+                                        className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
+                                    >
+                                        <Download className="w-3.5 h-3.5 text-orange-500" />
+                                        Baixar Modelo
+                                    </button>
+                                    <button
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg text-xs font-bold hover:bg-orange-700 transition-all shadow-md shadow-orange-500/20"
+                                    >
+                                        <Activity className="w-3.5 h-3.5" />
+                                        Importar Fluência
+                                    </button>
+                                    <input
+                                        type="file"
+                                        ref={fileInputRef}
+                                        onChange={handleImportFluencia}
+                                        className="hidden"
+                                        accept=".csv, .xlsx, .xls"
+                                    />
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -616,6 +977,7 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
                             { id: 'SEAMA', label: 'Análise SEAMA', icon: GraduationCap },
                             { id: 'CNCA', label: 'Análise CNCA/PNRA', icon: Layout },
                             { id: 'SAEB', label: 'Análise SAEB', icon: Target },
+                            { id: 'SAMAHC', label: 'Análise SAMAHC', icon: BarChart3 },
                         ].map((analysis) => (
                             <button
                                 key={analysis.id}
@@ -636,6 +998,7 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
                         {activeAnalysis === 'CNCA' && <CncaPnraDashboard escolas={escolas} coordenadores={coordenadores} onUpdateEscola={onUpdateEscola} />}
                         {activeAnalysis === 'SEAMA' && <SeamaDashboard escolas={escolas} coordenadores={coordenadores} onUpdateEscola={onUpdateEscola} />}
                         {activeAnalysis === 'SAEB' && <SaebDashboard escolas={escolas} coordenadores={coordenadores} onUpdateEscola={onUpdateEscola} />}
+                        {activeAnalysis === 'SAMAHC' && <SamahcDashboard escolas={escolas} coordenadores={coordenadores} onUpdateEscola={onUpdateEscola} />}
                     </div>
                 </div>
             )}
@@ -689,6 +1052,8 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
                     onDelete={handleDeleteIdeb}
                 />
             )}
+
+            {showImportPreview && renderImportPreview()}
         </div>
     );
 };

@@ -74,9 +74,17 @@ export const DiarioAtividadeModal: React.FC<{
         setIsLoadingStudents(true);
         try {
             // Fetch students, classes and schools separately to be 100% sure we get data
+            const queryAlunos = supabase.from('alunos').select('id, name, class_id, status, stage, escola_id').order('name', { ascending: true });
+            const queryTurmas = supabase.from('turmas').select('id, name, year');
+
+            if (atividade?.escola_id) {
+                queryAlunos.eq('escola_id', atividade.escola_id);
+                queryTurmas.eq('escola_id', atividade.escola_id);
+            }
+
             const [alunosRes, turmasRes, escolasRes] = await Promise.all([
-                supabase.from('alunos').select('id, name, class_id, status, stage, escola_id').order('name', { ascending: true }),
-                supabase.from('turmas').select('id, name, year'),
+                queryAlunos,
+                queryTurmas,
                 supabase.from('escolas').select('id, name')
             ]);
 

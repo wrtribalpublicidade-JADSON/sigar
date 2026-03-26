@@ -102,10 +102,27 @@ export interface DadosEducacionais {
     desenvolvimento: number; // %
   };
   registrosFluenciaParc?: RegistroFluenciaPARC[]; // Persistência via JSON
+  registrosFluenciaSamahc?: RegistroFluenciaSAMAHC[]; // Persistência via Relacional
   registrosCNCA?: RegistroCNCA[]; // Persistência via JSON
   registrosSEAMA?: RegistroSEAMA[]; // Persistência via JSON
   registrosSAEB?: RegistroSAEB[]; // Persistência via JSON
   registrosIDEB?: RegistroIDEB[]; // Persistência via JSON
+}
+
+// Interface para Registro de Fluência SAMAHC (Estudantil)
+export interface RegistroFluenciaSAMAHC {
+  id: string;
+  escolaId: string;
+  polo: string;
+  ano: number;
+  estudanteNome: string;
+  anoSerie: string;
+  nivelDesempenho: string;
+  turno: string;
+  tipoAvaliacao: 'DIAGNÓSTICA' | 'FORMATIVA' | 'SOMATIVA';
+  turma: string;
+  etapa: string;
+  createdAt?: string;
 }
 
 export interface MetaAcao {
