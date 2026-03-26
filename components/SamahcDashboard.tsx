@@ -12,6 +12,16 @@ import { Escola, Coordenador, RegistroFluenciaSAMAHC } from '../types';
 import { SamahcFluenciaModal } from './modals/SamahcFluenciaModal';
 import { SamahcEvolutionModal } from './modals/SamahcEvolutionModal';
 import { PrintableSamahcFluenciaReport } from './reports/PrintableSamahcFluenciaReport';
+import { samahcService } from '../services/samahcService';
+
+function useDebounce<T>(value: T, delay: number): T {
+    const [debouncedValue, setDebouncedValue] = React.useState<T>(value);
+    React.useEffect(() => {
+        const handler = setTimeout(() => setDebouncedValue(value), delay);
+        return () => clearTimeout(handler);
+    }, [value, delay]);
+    return debouncedValue;
+}
 
 interface SamahcDashboardProps {
     escolas: Escola[];
@@ -29,21 +39,67 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
     const [currentPage, setCurrentPage] = useState(1);
     const pageSize = 100;
     
-    // Reset page when filters or search change
-    React.useEffect(() => {
-        setCurrentPage(1);
-    }, [selectedPolo, selectedRegional, searchTerm, activeView]);
-    
     // States for editing
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [selectedRecord, setSelectedRecord] = useState<RegistroFluenciaSAMAHC | null>(null);
     const [selectedEscola, setSelectedEscola] = useState<Escola | null>(null);
 
+    // Data management for performance
+    const [samahcRecords, setSamahcRecords] = useState<{ registro: RegistroFluenciaSAMAHC; escola: Escola }[]>([]);
+    const [totalRecords, setTotalRecords] = useState(0);
+    const [isLoading, setIsLoading] = useState(false);
+    const debouncedSearch = useDebounce(searchTerm, 500);
+
     // Evolution Stats
     const [isEvolutionModalOpen, setIsEvolutionModalOpen] = useState(false);
     const [selectedStudentForEvolution, setSelectedStudentForEvolution] = useState<{name: string, records: {registro: RegistroFluenciaSAMAHC, escola: Escola}[]} | null>(null);
 
-    // Filtered data based on selectors
+    // Fetching logic
+    React.useEffect(() => {
+        const loadData = async () => {
+            setIsLoading(true);
+            try {
+                // Get school IDs that match the current UI filters (Polo and Regional)
+                const schoolIds = filteredEscolas.map(e => e.id);
+                
+                const { records, totalCount } = await samahcService.getPaginatedRecords({
+                    page: currentPage,
+                    pageSize: pageSize,
+                    searchTerm: debouncedSearch,
+                    polo: selectedPolo,
+                    regional: selectedRegional,
+                    schoolIds: schoolIds
+                });
+                
+                console.log('--- DASHBOARD DATA LOAD ---');
+                console.log('Records Count from Service:', records.length);
+                console.log('Total Count from Service:', totalCount);
+                if (records.length > 0) console.log('First record from Service:', JSON.stringify(records[0]));
+                
+                setSamahcRecords(records.map(r => {
+                    // Supabase join might return an object or an array depending on the configuration
+                    const escolaData = Array.isArray(r.escola) ? r.escola[0] : r.escola;
+                    
+                    const item = {
+                        registro: r,
+                        escola: escolaData || { id: r.escola_id, nome: 'Escola não vinculada', polo: r.polo }
+                    };
+                    return item;
+                }) as any);
+                setTotalRecords(totalCount);
+            } catch (error) {
+                console.error('Error loading samahc records:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        if (activeView === 'DETALHAMENTO') {
+            loadData();
+        }
+    }, [currentPage, debouncedSearch, selectedPolo, selectedRegional, activeView, escolas]);
+
+    // Local filter for summary stats (keep but optimize if possible)
     const filteredEscolas = useMemo(() => {
         return escolas.filter(e => {
             const coord = coordenadores.find(c => c.escolasIds.includes(e.id));
@@ -53,24 +109,10 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
         });
     }, [escolas, coordenadores, selectedPolo, selectedRegional]);
 
-    // Detailing records
-    const detailedRecords = useMemo(() => {
-        const records: { registro: RegistroFluenciaSAMAHC; escola: Escola }[] = [];
-        filteredEscolas.forEach(escola => {
-            const regs = escola.dadosEducacionais?.registrosFluenciaSamahc || [];
-            regs.forEach(r => {
-                const matchesSearch = searchTerm === '' || 
-                    r.estudanteNome.toUpperCase().includes(searchTerm.toUpperCase()) ||
-                    escola.nome.toUpperCase().includes(searchTerm.toUpperCase()) ||
-                    (r.ano && r.ano.toString().includes(searchTerm));
-                
-                if (matchesSearch) {
-                    records.push({ registro: r, escola });
-                }
-            });
-        });
-        return records.sort((a, b) => a.registro.estudanteNome.localeCompare(b.registro.estudanteNome));
-    }, [filteredEscolas, searchTerm]);
+    // Reset page when filters or search change
+    React.useEffect(() => {
+        setCurrentPage(1);
+    }, [selectedPolo, selectedRegional, debouncedSearch, activeView]);
 
     // Statistics
     const stats = useMemo(() => {
@@ -403,8 +445,17 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {detailedRecords.length > 0 ? (
-                                detailedRecords.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((item, idx) => (
+                            {isLoading ? (
+                                <tr>
+                                    <td colSpan={9} className="px-4 py-12 text-center">
+                                        <div className="flex flex-col items-center gap-2">
+                                            <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+                                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">Carregando dados...</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : samahcRecords.length > 0 ? (
+                                samahcRecords.map((item, idx) => (
                                     <tr key={idx} className="group hover:bg-slate-50 transition-colors">
                                         <td className="px-4 py-4 text-[10px] font-black text-slate-400 whitespace-nowrap">{item.escola.polo || 'SEDE'}</td>
                                         <td className="px-4 py-4">
@@ -417,15 +468,15 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
                                         </td>
                                         <td className="px-4 py-4">
                                             <button 
-                                                onClick={() => handleStudentEvolution(item.registro.estudanteNome)}
+                                                onClick={() => handleStudentEvolution(item.registro.estudanteNome || (item.registro as any).estudante_nome)}
                                                 className="text-sm font-black text-slate-800 uppercase line-clamp-1 hover:text-orange-600 transition-colors text-left"
                                             >
-                                                {item.registro.estudanteNome}
+                                                {item.registro.estudanteNome || (item.registro as any).estudante_nome}
                                             </button>
                                         </td>
                                         <td className="px-4 py-4 text-center">
                                             <span className="inline-flex px-2 py-1 bg-slate-100 rounded-lg text-[9px] font-black text-slate-500 whitespace-nowrap">
-                                                {item.registro.anoSerie}
+                                                {item.registro.anoSerie || (item.registro as any).ano_serie}
                                             </span>
                                         </td>
                                         <td className="px-4 py-4 text-center">
@@ -434,17 +485,17 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
                                             </span>
                                         </td>
                                         <td className="px-4 py-4 text-center">
-                                            <span className="inline-flex px-2 py-1 bg-orange-50 rounded-lg text-[9px] font-black text-orange-500 whitespace-nowrap">
-                                                {item.registro.tipoAvaliacao}
+                                            <span className="inline-flex px-2 py-1 bg-orange-50 rounded-lg text-[9px] font-black text-orange-500 whitespace-nowrap uppercase">
+                                                {item.registro.tipoAvaliacao || (item.registro as any).tipo_avaliacao || '-'}
                                             </span>
                                         </td>
                                         <td className="px-4 py-4 text-center">
                                             <span className={`inline-flex px-2 py-1 rounded-lg text-[9px] font-black whitespace-nowrap ${
-                                                item.registro.nivelDesempenho.toUpperCase().includes('FLUENTE') ? 'bg-emerald-50 text-emerald-600' :
-                                                item.registro.nivelDesempenho.toUpperCase().includes('INICIANTE') ? 'bg-blue-50 text-blue-600' :
+                                                String(item.registro.nivelDesempenho || (item.registro as any).nivel_desempenho || '').toUpperCase().includes('FLUENTE') ? 'bg-emerald-50 text-emerald-600' :
+                                                String(item.registro.nivelDesempenho || (item.registro as any).nivel_desempenho || '').toUpperCase().includes('INICIANTE') ? 'bg-blue-50 text-blue-600' :
                                                 'bg-rose-50 text-rose-600'
                                             }`}>
-                                                {item.registro.nivelDesempenho}
+                                                {item.registro.nivelDesempenho || (item.registro as any).nivel_desempenho || '-'}
                                             </span>
                                         </td>
                                         <td className="px-4 py-4 text-right">
@@ -491,20 +542,20 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
                 {/* Standard Pagination Footer as per design */}
                 <div className="bg-slate-50/50 p-4 border-t border-slate-100 flex items-center justify-between">
                     <p className="text-[11px] font-bold text-slate-400">
-                        Exibindo <span className="text-slate-600">{Math.min(currentPage * pageSize, detailedRecords.length)}</span> de <span className="text-slate-600">{detailedRecords.length}</span> estudantes
+                        Exibindo <span className="text-slate-600">{Math.min(currentPage * pageSize, totalRecords)}</span> de <span className="text-slate-600">{totalRecords}</span> estudantes
                     </p>
                     <div className="flex items-center gap-2">
                         <button
-                            disabled={currentPage === 1}
+                            disabled={currentPage === 1 || isLoading}
                             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                            className={`px-6 py-2 rounded-xl text-xs font-black border border-slate-200 transition-all ${currentPage === 1 ? 'bg-slate-50 text-slate-300' : 'bg-white text-slate-600 shadow-sm hover:border-orange-500 hover:text-orange-500 active:scale-95'}`}
+                            className={`px-6 py-2 rounded-xl text-xs font-black border border-slate-200 transition-all ${currentPage === 1 || isLoading ? 'bg-slate-50 text-slate-300' : 'bg-white text-slate-600 shadow-sm hover:border-orange-500 hover:text-orange-500 active:scale-95'}`}
                         >
                             Anterior
                         </button>
                         <button
-                            disabled={currentPage * pageSize >= detailedRecords.length}
+                            disabled={currentPage * pageSize >= totalRecords || isLoading}
                             onClick={() => setCurrentPage(p => p + 1)}
-                            className={`px-6 py-2 rounded-xl text-xs font-black border border-slate-200 transition-all ${currentPage * pageSize >= detailedRecords.length ? 'bg-slate-50 text-slate-300' : 'bg-white text-slate-600 shadow-sm hover:border-orange-500 hover:text-orange-500 active:scale-95'}`}
+                            className={`px-6 py-2 rounded-xl text-xs font-black border border-slate-200 transition-all ${currentPage * pageSize >= totalRecords || isLoading ? 'bg-slate-50 text-slate-300' : 'bg-white text-slate-600 shadow-sm hover:border-orange-500 hover:text-orange-500 active:scale-95'}`}
                         >
                             Próximo
                         </button>
@@ -513,7 +564,7 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
             </div>
             
             <PrintableSamahcFluenciaReport 
-                data={detailedRecords.map(r => ({ registro: r.registro, escolaNome: r.escola.nome }))}
+                data={samahcRecords.map(r => ({ registro: r.registro, escolaNome: r.escola.nome }))}
                 filtroPolo={selectedPolo}
                 filtroRegional={selectedRegional}
             />

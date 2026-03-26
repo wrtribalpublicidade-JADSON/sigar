@@ -66,36 +66,6 @@ export default function App() {
   const [visitas, setVisitas] = useState<Visita[]>([]);
   const [coordenadores, setCoordenadores] = useState<Coordenador[]>([]);
 
-  const fetchAllSamahcRecords = async (schoolIds: string[]) => {
-    let allRecords: any[] = [];
-    let from = 0;
-    const step = 1000;
-    let hasMore = true;
-
-    while (hasMore) {
-      const { data, error } = await supabase
-        .from('registros_fluencia_samahc')
-        .select('*')
-        .in('escola_id', schoolIds)
-        .range(from, from + step - 1);
-
-      if (error) {
-        console.error('Error fetching samahc batch:', error);
-        hasMore = false;
-        break;
-      }
-
-      if (data && data.length > 0) {
-        allRecords = [...allRecords, ...data];
-        from += step;
-        if (data.length < step) hasMore = false;
-      } else {
-        hasMore = false;
-      }
-    }
-    return allRecords;
-  };
-
   // Function to load all data
   const fetchData = async (isDemo: boolean = false, email: string | null = null) => {
     if (isDemo) {
@@ -165,8 +135,7 @@ export default function App() {
         supabase.from('registros_cnca').select('*').in('escola_id', activeSchoolIds),
         supabase.from('registros_seama').select('*').in('escola_id', activeSchoolIds),
         supabase.from('registros_saeb').select('*').in('escola_id', activeSchoolIds),
-        supabase.from('registros_ideb').select('*').in('escola_id', activeSchoolIds),
-        fetchAllSamahcRecords(activeSchoolIds)
+        supabase.from('registros_ideb').select('*').in('escola_id', activeSchoolIds)
       ]);
 
       const getResultData = (index: number, label: string) => {
@@ -188,7 +157,7 @@ export default function App() {
       const seamaData = getResultData(5, 'SEAMA');
       const saebData = getResultData(6, 'SAEB');
       const idebData = getResultData(7, 'IDEB');
-      const samahcFluenciaData = (fetchResults[8].status === 'fulfilled') ? fetchResults[8].value : [];
+      const samahcFluenciaData: any[] = []; // Now loaded on-demand in SamahcDashboard
 
       const mappedEscolas: Escola[] = (escData || []).map((e: any) => ({
         id: e.id,
