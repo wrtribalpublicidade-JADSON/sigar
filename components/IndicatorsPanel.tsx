@@ -148,8 +148,8 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
 
     const handleDownloadTemplate = () => {
         const templateData = escolas.map(e => ({
-            'PÓLO': (e as any).polo || '',
             'ANO': new Date().getFullYear(),
+            'PÓLO': (e as any).polo || '',
             'UNIDADE ESCOLAR': e.nome,
             'NOME DO ESTUDANTE': '',
             'ANO/SÉRIE': '',
@@ -392,7 +392,8 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
                                 <thead>
                                     <tr className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
                                         <th className="px-4 py-3">Escola</th>
-                                        <th className="px-4 py-3">Estudante</th>
+                                        <th className="px-4 py-3">Ano</th>
+                                        <th className="px-4 py-4">Estudante</th>
                                         <th className="px-4 py-3">Série</th>
                                         <th className="px-4 py-3">Turno</th>
                                         <th className="px-4 py-3">Avaliação</th>
@@ -405,6 +406,7 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
                                             <td className="px-4 py-3 text-xs font-bold text-slate-600 truncate max-w-[200px]">
                                                 {escolas.find(e => e.id === r.escolaId)?.nome}
                                             </td>
+                                            <td className="px-4 py-3 text-xs font-bold text-slate-500">{r.ano}</td>
                                             <td className="px-4 py-3 text-xs font-bold text-slate-800">{r.estudanteNome}</td>
                                             <td className="px-4 py-3 text-xs font-bold text-slate-600">{r.anoSerie}</td>
                                             <td className="px-4 py-3 text-xs">

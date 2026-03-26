@@ -322,6 +322,7 @@ export interface Escola {
   acompanhamentoMensal: ItemAcompanhamento[]; // Novo campo Acompanhamento
   relatoriosVisita?: RelatorioVisita[]; // Novo campo Relatórios Específicos
   localizacao: string; // Sede ou Zona Rural
+  polo?: string; // Polo da escola
   ofertaAtividadeComplementar: boolean;
   status: 'Ativo' | 'Inativo';
 }

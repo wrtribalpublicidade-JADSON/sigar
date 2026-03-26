@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Escola, Coordenador, RegistroFluenciaSAMAHC } from '../types';
 import { SamahcFluenciaModal } from './modals/SamahcFluenciaModal';
+import { SamahcEvolutionModal } from './modals/SamahcEvolutionModal';
 import { PrintableSamahcFluenciaReport } from './reports/PrintableSamahcFluenciaReport';
 
 interface SamahcDashboardProps {
@@ -23,19 +24,30 @@ const COLORS = ['#FF4D00', '#000000', '#71717A', '#D6FF00', '#6366f1'];
 export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coordenadores, onUpdateEscola }) => {
     const [selectedPolo, setSelectedPolo] = useState('Todos');
     const [selectedRegional, setSelectedRegional] = useState('Todos');
-    const [activeView, setActiveView] = useState<'VISÃO GERAL' | 'RANKINGS' | 'COMPARATIVO' | 'DETALHAMENTO'>('VISÃO GERAL');
     const [searchTerm, setSearchTerm] = useState('');
+    const [activeView, setActiveView] = useState<'VISÃO GERAL' | 'RANKINGS' | 'COMPARATIVO' | 'DETALHAMENTO'>('VISÃO GERAL');
+    const [currentPage, setCurrentPage] = useState(1);
+    const pageSize = 100;
+    
+    // Reset page when filters or search change
+    React.useEffect(() => {
+        setCurrentPage(1);
+    }, [selectedPolo, selectedRegional, searchTerm, activeView]);
     
     // States for editing
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [selectedRecord, setSelectedRecord] = useState<RegistroFluenciaSAMAHC | null>(null);
     const [selectedEscola, setSelectedEscola] = useState<Escola | null>(null);
 
+    // Evolution Stats
+    const [isEvolutionModalOpen, setIsEvolutionModalOpen] = useState(false);
+    const [selectedStudentForEvolution, setSelectedStudentForEvolution] = useState<{name: string, records: {registro: RegistroFluenciaSAMAHC, escola: Escola}[]} | null>(null);
+
     // Filtered data based on selectors
     const filteredEscolas = useMemo(() => {
         return escolas.filter(e => {
             const coord = coordenadores.find(c => c.escolasIds.includes(e.id));
-            const matchesPolo = selectedPolo === 'Todos' || (e as any).polo === selectedPolo;
+            const matchesPolo = selectedPolo === 'Todos' || e.polo === selectedPolo;
             const matchesRegional = selectedRegional === 'Todos' || (coord && coord.nome === selectedRegional);
             return matchesPolo && matchesRegional;
         });
@@ -47,9 +59,12 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
         filteredEscolas.forEach(escola => {
             const regs = escola.dadosEducacionais?.registrosFluenciaSamahc || [];
             regs.forEach(r => {
-                if (searchTerm === '' || 
+                const matchesSearch = searchTerm === '' || 
                     r.estudanteNome.toUpperCase().includes(searchTerm.toUpperCase()) ||
-                    escola.nome.toUpperCase().includes(searchTerm.toUpperCase())) {
+                    escola.nome.toUpperCase().includes(searchTerm.toUpperCase()) ||
+                    (r.ano && r.ano.toString().includes(searchTerm));
+                
+                if (matchesSearch) {
                     records.push({ registro: r, escola });
                 }
             });
@@ -169,6 +184,23 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
 
         onUpdateEscola?.(updatedEscola);
         setIsEditModalOpen(false);
+    };
+
+    const handleStudentEvolution = (studentName: string) => {
+        // Find all records for this student across ALL schools
+        const studentRecords: { registro: RegistroFluenciaSAMAHC; escola: Escola }[] = [];
+        
+        escolas.forEach(escola => {
+            const regs = escola.dadosEducacionais?.registrosFluenciaSamahc || [];
+            regs.forEach(r => {
+                if (r.estudanteNome.trim().toUpperCase() === studentName.trim().toUpperCase()) {
+                    studentRecords.push({ registro: r, escola });
+                }
+            });
+        });
+
+        setSelectedStudentForEvolution({ name: studentName, records: studentRecords });
+        setIsEvolutionModalOpen(true);
     };
 
     const renderVisaoGeral = () => (
@@ -361,6 +393,7 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
                             <tr className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
                                 <th className="px-4 py-4">Polo</th>
                                 <th className="px-4 py-4">Escola</th>
+                                <th className="px-4 py-4 text-center">Ano</th>
                                 <th className="px-4 py-4">Estudante</th>
                                 <th className="px-4 py-4 text-center">Série</th>
                                 <th className="px-4 py-4 text-center">Turno</th>
@@ -371,14 +404,24 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {detailedRecords.length > 0 ? (
-                                detailedRecords.map((item, idx) => (
+                                detailedRecords.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((item, idx) => (
                                     <tr key={idx} className="group hover:bg-slate-50 transition-colors">
-                                        <td className="px-4 py-4 text-[10px] font-black text-slate-400 whitespace-nowrap">{(item.escola as any).polo || 'SEDE'}</td>
+                                        <td className="px-4 py-4 text-[10px] font-black text-slate-400 whitespace-nowrap">{item.escola.polo || 'SEDE'}</td>
                                         <td className="px-4 py-4">
                                             <p className="text-[10px] font-bold text-slate-600 line-clamp-1 truncate w-32">{item.escola.nome}</p>
                                         </td>
+                                        <td className="px-4 py-4 text-center">
+                                            <span className="inline-flex px-2 py-1 bg-slate-50 rounded-lg text-[10px] font-black text-slate-500 whitespace-nowrap border border-slate-100">
+                                                {item.registro.ano}
+                                            </span>
+                                        </td>
                                         <td className="px-4 py-4">
-                                            <p className="text-sm font-black text-slate-800 uppercase line-clamp-1">{item.registro.estudanteNome}</p>
+                                            <button 
+                                                onClick={() => handleStudentEvolution(item.registro.estudanteNome)}
+                                                className="text-sm font-black text-slate-800 uppercase line-clamp-1 hover:text-orange-600 transition-colors text-left"
+                                            >
+                                                {item.registro.estudanteNome}
+                                            </button>
                                         </td>
                                         <td className="px-4 py-4 text-center">
                                             <span className="inline-flex px-2 py-1 bg-slate-100 rounded-lg text-[9px] font-black text-slate-500 whitespace-nowrap">
@@ -397,8 +440,8 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
                                         </td>
                                         <td className="px-4 py-4 text-center">
                                             <span className={`inline-flex px-2 py-1 rounded-lg text-[9px] font-black whitespace-nowrap ${
-                                                item.registro.nivelDesempenho.includes('FLUENTE') ? 'bg-emerald-50 text-emerald-600' :
-                                                item.registro.nivelDesempenho.includes('INICIANTE') ? 'bg-blue-50 text-blue-600' :
+                                                item.registro.nivelDesempenho.toUpperCase().includes('FLUENTE') ? 'bg-emerald-50 text-emerald-600' :
+                                                item.registro.nivelDesempenho.toUpperCase().includes('INICIANTE') ? 'bg-blue-50 text-blue-600' :
                                                 'bg-rose-50 text-rose-600'
                                             }`}>
                                                 {item.registro.nivelDesempenho}
@@ -406,6 +449,13 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
                                         </td>
                                         <td className="px-4 py-4 text-right">
                                             <div className="flex justify-end gap-2">
+                                                <button 
+                                                    onClick={() => handleStudentEvolution(item.registro.estudanteNome)}
+                                                    className="p-2 text-orange-500 hover:bg-orange-50 rounded-xl transition-colors"
+                                                    title="Ver Evolução"
+                                                >
+                                                    <TrendingUp className="w-4 h-4" />
+                                                </button>
                                                 <button 
                                                     onClick={() => handleEditRecord(item.registro, item.escola)}
                                                     className="p-2 text-blue-500 hover:bg-blue-50 rounded-xl transition-colors"
@@ -426,7 +476,7 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan={8} className="px-4 py-12 text-center">
+                                    <td colSpan={9} className="px-4 py-12 text-center">
                                         <div className="flex flex-col items-center gap-2 text-slate-300">
                                             <Search className="w-12 h-12 mb-2 opacity-20" />
                                             <p className="text-sm font-bold uppercase tracking-widest italic">Nenhum registro encontrado</p>
@@ -436,6 +486,29 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
                             )}
                         </tbody>
                     </table>
+                </div>
+
+                {/* Standard Pagination Footer as per design */}
+                <div className="bg-slate-50/50 p-4 border-t border-slate-100 flex items-center justify-between">
+                    <p className="text-[11px] font-bold text-slate-400">
+                        Exibindo <span className="text-slate-600">{Math.min(currentPage * pageSize, detailedRecords.length)}</span> de <span className="text-slate-600">{detailedRecords.length}</span> estudantes
+                    </p>
+                    <div className="flex items-center gap-2">
+                        <button
+                            disabled={currentPage === 1}
+                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                            className={`px-6 py-2 rounded-xl text-xs font-black border border-slate-200 transition-all ${currentPage === 1 ? 'bg-slate-50 text-slate-300' : 'bg-white text-slate-600 shadow-sm hover:border-orange-500 hover:text-orange-500 active:scale-95'}`}
+                        >
+                            Anterior
+                        </button>
+                        <button
+                            disabled={currentPage * pageSize >= detailedRecords.length}
+                            onClick={() => setCurrentPage(p => p + 1)}
+                            className={`px-6 py-2 rounded-xl text-xs font-black border border-slate-200 transition-all ${currentPage * pageSize >= detailedRecords.length ? 'bg-slate-50 text-slate-300' : 'bg-white text-slate-600 shadow-sm hover:border-orange-500 hover:text-orange-500 active:scale-95'}`}
+                        >
+                            Próximo
+                        </button>
+                    </div>
                 </div>
             </div>
             
@@ -487,8 +560,8 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
                                 className="w-full bg-slate-50 border-none rounded-xl py-3 px-4 text-sm font-bold text-slate-700 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-500 transition-all appearance-none"
                             >
                                 <option value="Todos">Todos os Polos</option>
-                                {Array.from(new Set(escolas.map(e => (e as any).polo).filter(Boolean))).sort().map(p => (
-                                    <option key={p} value={p}>{p}</option>
+                                {Array.from(new Set(escolas.map(e => e.polo).filter(Boolean))).sort().map(p => (
+                                    <option key={p} value={p!}>{p}</option>
                                 ))}
                             </select>
                             <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
@@ -541,6 +614,15 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
                     escola={selectedEscola!}
                     registro={selectedRecord}
                     onSave={handleSaveEdit}
+                />
+            )}
+
+            {isEvolutionModalOpen && selectedStudentForEvolution && (
+                <SamahcEvolutionModal 
+                    isOpen={isEvolutionModalOpen}
+                    onClose={() => setIsEvolutionModalOpen(false)}
+                    studentName={selectedStudentForEvolution.name}
+                    records={selectedStudentForEvolution.records}
                 />
             )}
         </div>
