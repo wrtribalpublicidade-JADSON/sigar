@@ -132,6 +132,13 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
     });
   }, [students, searchTerm, schoolFilter, stageFilter, statusFilter, escolas]);
 
+  const getStudentTurmaInfo = (classId?: string) => {
+    if (!classId) return '---';
+    const turma = turmas.find(t => t.id === classId);
+    if (!turma) return '---';
+    return `${turma.anoSerie} - ${turma.identificacao}`;
+  };
+
   const handleSave = async () => {
     // This is now handled inside CadastroEstudanteModal
     loadStudents();
@@ -271,7 +278,8 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
                         <tr>
                             <th className="px-6 py-4">Matrícula / Nome</th>
                             <th className="px-6 py-4">Unidade Escolar</th>
-                            <th className="px-6 py-4">Série / Etapa</th>
+                            <th className="px-6 py-4">Ano / Série</th>
+                            <th className="px-6 py-4 text-center">Etapa</th>
                             <th className="px-6 py-4 text-center">Status</th>
                             <th className="px-6 py-4 text-right">Ações</th>
                         </tr>
@@ -279,14 +287,14 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
                     <tbody className="divide-y divide-slate-100">
                         {isLoading ? (
                             <tr>
-                                <td colSpan={5} className="py-20 text-center text-slate-400">
+                                <td colSpan={6} className="py-20 text-center text-slate-400">
                                     <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 opacity-20 text-orange-500" />
                                     <p className="font-bold text-sm tracking-wide">Sincronizando base de dados...</p>
                                 </td>
                             </tr>
                         ) : filteredStudents.length === 0 ? (
                             <tr>
-                                <td colSpan={5} className="py-20 text-center text-slate-400">
+                                <td colSpan={6} className="py-20 text-center text-slate-400">
                                     <Users className="w-12 h-12 mx-auto mb-4 opacity-10" />
                                     <p className="font-semibold">Nenhum registro encontrado para os filtros atuais.</p>
                                 </td>
@@ -313,6 +321,11 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
+                                        <div className="text-xs font-bold text-slate-600 uppercase">
+                                            {getStudentTurmaInfo(student.class_id)}
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
                                         <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black bg-indigo-50 text-indigo-600 border border-indigo-100 uppercase">
                                             {student.stage}
                                         </span>

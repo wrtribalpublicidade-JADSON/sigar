@@ -145,8 +145,8 @@ export const activitiesService = {
         // Fetch students, classes and schools separately for robustness
         const [alunosRes, turmasRes, escolasRes] = await Promise.all([
             supabase.from('alunos').select('*').in('id', studentIds),
-            supabase.from('turmas').select('id, name, year'),
-            supabase.from('escolas').select('id, name')
+            supabase.from('turmas').select('*'),
+            supabase.from('escolas').select('id, nome')
         ]);
 
         if (alunosRes.error) throw alunosRes.error;
@@ -162,8 +162,9 @@ export const activitiesService = {
                 id: al.id,
                 nome: al.name || 'Sem nome',
                 turma: t?.name || '-',
-                escola: e?.name || '-',
-                anoSerie: t?.year || al.stage || '-',
+                escola: e?.nome || '-',
+                anoSerie: t ? `${t.year || '-'} - ${t.name || '-'}` : '-',
+                etapa: al.stage || '-',
                 status: al.status === 'active' ? 'Ativo' : 'Inativo'
             };
         });

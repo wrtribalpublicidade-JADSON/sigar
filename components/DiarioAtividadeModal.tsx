@@ -12,6 +12,7 @@ interface Student {
     turma: string;
     escola: string;
     anoSerie: string;
+    etapa: string;
     status: 'Ativo' | 'Inativo';
 }
 
@@ -75,17 +76,16 @@ export const DiarioAtividadeModal: React.FC<{
         try {
             // Fetch students, classes and schools separately to be 100% sure we get data
             const queryAlunos = supabase.from('alunos').select('id, name, class_id, status, stage, escola_id').order('name', { ascending: true });
-            const queryTurmas = supabase.from('turmas').select('id, name, year');
+            const queryTurmas = supabase.from('turmas').select('*');
 
             if (atividade?.escola_id) {
                 queryAlunos.eq('escola_id', atividade.escola_id);
-                queryTurmas.eq('escola_id', atividade.escola_id);
             }
 
             const [alunosRes, turmasRes, escolasRes] = await Promise.all([
                 queryAlunos,
                 queryTurmas,
-                supabase.from('escolas').select('id, name')
+                supabase.from('escolas').select('id, nome')
             ]);
 
             if (alunosRes.error) throw alunosRes.error;
@@ -101,8 +101,9 @@ export const DiarioAtividadeModal: React.FC<{
                     id: a.id,
                     nome: a.name || 'Sem nome',
                     turma: t?.name || '-',
-                    escola: e?.name || '-',
-                    anoSerie: t?.year || a.stage || '-',
+                    escola: e?.nome || '-',
+                    anoSerie: t ? `${t.year || '-'} - ${t.name || '-'}` : '-',
+                    etapa: a.stage || '-',
                     status: a.status === 'active' ? 'Ativo' : 'Inativo' as any
                 };
             });
@@ -279,7 +280,7 @@ export const DiarioAtividadeModal: React.FC<{
                                                         <div className="flex gap-2 items-center flex-wrap">
                                                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{s.escola}</span>
                                                             <span className="w-1 h-1 bg-slate-200 rounded-full" />
-                                                            <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">{s.anoSerie} - {s.turma}</span>
+                                                            <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">{s.anoSerie} • {s.etapa}</span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -427,7 +428,7 @@ export const DiarioAtividadeModal: React.FC<{
                                                     <td className="px-8 py-5">
                                                         <div className="flex flex-col">
                                                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">{student.escola}</span>
-                                                            <span className="bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider w-fit">{student.anoSerie} - {student.turma}</span>
+                                                            <span className="bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider w-fit">{student.anoSerie} • {student.etapa}</span>
                                                         </div>
                                                     </td>
                                                     <td className="px-8 py-5">
@@ -491,7 +492,7 @@ export const DiarioAtividadeModal: React.FC<{
                                             <div>
                                                 <h4 className="font-black text-slate-800 text-lg tracking-tight leading-tight">{student.nome || 'Sem nome'}</h4>
                                                 <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-1">{student.escola}</p>
-                                                <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded-md">{student.anoSerie} - {student.turma}</span>
+                                                <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded-md">{student.anoSerie} • {student.etapa}</span>
                                             </div>
                                         </div>
                                         <div className="flex justify-between items-center pt-4 border-t border-slate-50">
