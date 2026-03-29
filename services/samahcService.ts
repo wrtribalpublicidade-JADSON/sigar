@@ -9,40 +9,66 @@ export const samahcService = {
     polo?: string;
     regional?: string;
     schoolIds?: string[];
+    // Novos filtros
+    escola_id?: string;
+    ano?: number;
+    ano_serie?: string;
+    turno?: string;
+    tipo_avaliacao?: string;
+    nivel_desempenho?: string;
   }) {
-    const { page, pageSize, searchTerm, polo, regional, schoolIds } = params;
+    const { 
+      page, pageSize, searchTerm, polo, regional, schoolIds,
+      escola_id, ano, ano_serie, turno, tipo_avaliacao, nivel_desempenho 
+    } = params;
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
 
     console.log('--- SAMAHC DEBUG ---');
-    console.log('Filters:', { page, pageSize, searchTerm, polo, regional });
+    console.log('Filters:', { page, pageSize, searchTerm, polo, regional, escola_id, ano, ano_serie, turno, tipo_avaliacao, nivel_desempenho });
     console.log('School IDs Count:', schoolIds?.length);
-    if (schoolIds && schoolIds.length > 0) console.log('First 3 School IDs:', schoolIds.slice(0, 3));
 
     let query = supabase
       .from('registros_fluencia_samahc')
-      .select('*', { count: 'exact' });
+      .select('*, escolas(id, nome)', { count: 'exact' });
 
-    console.log('SAMAHC Query Init - Range:', { from, to });
-
-    // Apply security filters (linked schools)
-    // Only apply if the array is provided AND has items
+    // 1. Filtros de Segurança / Regional (baseados no usuário autenticado)
     if (schoolIds && Array.isArray(schoolIds) && schoolIds.length > 0) {
       query = query.in('escola_id', schoolIds);
     }
 
-    // Apply UI filters - Use the 'polo' column directly from the main table
-    // Use ilike to match e.g. '01 - SEDE' when user selects 'Sede'
-    // Ensure we don't filter if it's "Todos" or "Todos os Polos"
-    if (polo && polo !== 'Todos' && polo !== 'Todos os Polos' && polo !== '') {
-      query = query.ilike('polo', `%${polo}%`);
+    // 2. Filtros Específicos do Dashboard (Novos)
+    if (escola_id && escola_id !== 'Todas') {
+      query = query.eq('escola_id', escola_id);
+    }
+    
+    // Check for "Todos" etc strings or 0
+    if (ano && Number(ano) > 0) {
+      query = query.eq('ano', ano);
+    }
+    if (ano_serie && ano_serie !== 'Todas') {
+      query = query.eq('ano_serie', ano_serie);
+    }
+    if (turno && turno !== 'Todos') {
+      query = query.eq('turno', turno);
+    }
+    if (tipo_avaliacao && tipo_avaliacao !== 'Todas') {
+      query = query.eq('tipo_avaliacao', tipo_avaliacao);
+    }
+    if (nivel_desempenho && nivel_desempenho !== 'Todos') {
+      query = query.eq('nivel_desempenho', nivel_desempenho);
     }
 
-    // Regional filter - handled by schoolIds
+    // 3. Filtro de Polo (Global ou Específico)
+    if (polo && polo !== 'Todos' && polo !== 'Todos os Polos' && polo !== '') {
+      // Se não houver escola_id específico selecionado, filtra pelo polo
+      if (!escola_id || escola_id === 'Todas') {
+        query = query.ilike('polo', `%${polo}%`);
+      }
+    }
 
-    // Search logic (Server-side)
+    // 4. Busca por Texto (Habilita pesquisa combinada)
     if (searchTerm) {
-      // Or filter for multiple fields
       query = query.or(`estudante_nome.ilike.%${searchTerm}%,turma.ilike.%${searchTerm}%`);
     }
 
@@ -79,8 +105,7 @@ export const samahcService = {
         *,
         escolas (
           id,
-          nome,
-          polo
+          nome
         )
       `)
       .ilike('estudante_nome', studentName.trim())

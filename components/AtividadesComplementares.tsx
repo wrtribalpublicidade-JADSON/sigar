@@ -227,8 +227,16 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
 
                             <div className="p-6">
                                 <div className="flex justify-between items-start mb-6">
-                                    <div className={`p-3 rounded-2xl ${cat?.bg || 'bg-slate-50'} ${cat?.color || 'text-slate-600'}`}>
-                                        {cat && <cat.icon size={24} />}
+                                    <div className="flex items-center gap-3">
+                                        <div className={`p-3 rounded-2xl ${cat?.bg || 'bg-slate-50'} ${cat?.color || 'text-slate-600'}`}>
+                                            {cat && <cat.icon size={24} />}
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Unidade Escolar</span>
+                                            <span className="text-xs font-black text-slate-700 uppercase tracking-tight truncate max-w-[150px]" title={atv.unidadeEscolar || 'Múltiplas Unidades'}>
+                                                {atv.unidadeEscolar || 'Múltiplas Unidades'}
+                                            </span>
+                                        </div>
                                     </div>
                                     <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter ${atv.status === 'Ativa' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
                                         {atv.status}

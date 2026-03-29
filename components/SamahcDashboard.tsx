@@ -50,6 +50,31 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
     const [isLoading, setIsLoading] = useState(false);
     const debouncedSearch = useDebounce(searchTerm, 500);
 
+    // Local filter for summary stats (keep but optimize if possible)
+    const filteredEscolas = useMemo(() => {
+        return escolas.filter(e => {
+            const coord = (coordenadores || []).find(c => c.escolasIds.includes(e.id));
+            const matchesPolo = selectedPolo === 'Todos' || e.polo === selectedPolo;
+            const matchesRegional = selectedRegional === 'Todos' || (coord && coord.nome === selectedRegional);
+            return matchesPolo && matchesRegional;
+        });
+    }, [escolas, coordenadores, selectedPolo, selectedRegional]);
+
+    // Advanced Detail Filters
+    const [detalheEscolaId, setDetalheEscolaId] = useState('Todas');
+    const [detalheAno, setDetalheAno] = useState(0);
+    const [detalheSerie, setDetalheSerie] = useState('Todas');
+    const [detalheTurno, setDetalheTurno] = useState('Todos');
+    const [detalheAvaliacao, setDetalheAvaliacao] = useState('Todas');
+    const [detalheNivel, setDetalheNivel] = useState('Todos');
+
+    // Reset individual school filter if it's no longer in the filtered list
+    React.useEffect(() => {
+        if (detalheEscolaId !== 'Todas' && !filteredEscolas.find(e => e.id === detalheEscolaId)) {
+            setDetalheEscolaId('Todas');
+        }
+    }, [filteredEscolas, detalheEscolaId]);
+
     // Evolution Stats
     const [isEvolutionModalOpen, setIsEvolutionModalOpen] = useState(false);
     const [selectedStudentForEvolution, setSelectedStudentForEvolution] = useState<{name: string, records: {registro: RegistroFluenciaSAMAHC, escola: Escola}[]} | null>(null);
@@ -68,7 +93,13 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
                     searchTerm: debouncedSearch,
                     polo: selectedPolo,
                     regional: selectedRegional,
-                    schoolIds: schoolIds
+                    schoolIds: schoolIds,
+                    escola_id: detalheEscolaId,
+                    ano: detalheAno,
+                    ano_serie: detalheSerie,
+                    turno: detalheTurno,
+                    tipo_avaliacao: detalheAvaliacao,
+                    nivel_desempenho: detalheNivel
                 });
                 
                 console.log('--- DASHBOARD DATA LOAD ---');
@@ -82,7 +113,10 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
                     
                     const item = {
                         registro: r,
-                        escola: escolaData || { id: r.escola_id, nome: 'Escola não vinculada', polo: r.polo }
+                        escola: { 
+                            ...(escolaData || { id: r.escola_id, nome: 'Escola não vinculada' }), 
+                            polo: r.polo 
+                        }
                     };
                     return item;
                 }) as any);
@@ -97,17 +131,8 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
         if (activeView === 'DETALHAMENTO') {
             loadData();
         }
-    }, [currentPage, debouncedSearch, selectedPolo, selectedRegional, activeView, escolas]);
-
-    // Local filter for summary stats (keep but optimize if possible)
-    const filteredEscolas = useMemo(() => {
-        return escolas.filter(e => {
-            const coord = coordenadores.find(c => c.escolasIds.includes(e.id));
-            const matchesPolo = selectedPolo === 'Todos' || e.polo === selectedPolo;
-            const matchesRegional = selectedRegional === 'Todos' || (coord && coord.nome === selectedRegional);
-            return matchesPolo && matchesRegional;
-        });
-    }, [escolas, coordenadores, selectedPolo, selectedRegional]);
+    }, [currentPage, debouncedSearch, selectedPolo, selectedRegional, activeView, escolas,
+        detalheEscolaId, detalheAno, detalheSerie, detalheTurno, detalheAvaliacao, detalheNivel]);
 
     // Reset page when filters or search change
     React.useEffect(() => {
@@ -413,7 +438,7 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
                         type="text"
-                        placeholder="Buscar por estudante ou escola..."
+                        placeholder="Buscar por estudante..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full bg-slate-50 border-none rounded-xl py-2.5 pl-11 pr-4 text-sm font-bold text-slate-700 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-500 transition-all"
@@ -426,6 +451,115 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
                     <Printer className="w-4 h-4 text-orange-500" />
                     IMPRIMIR RELATÓRIO
                 </button>
+            </div>
+
+            {/* Filtros Avançados */}
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                {/* Escola (Filtrada pelo Polo/Regional do topo) */}
+                <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Escola</label>
+                    <div className="relative">
+                        <select 
+                            value={detalheEscolaId}
+                            onChange={(e) => setDetalheEscolaId(e.target.value)}
+                            className="w-full bg-slate-50 border-none rounded-xl py-2 px-3 text-xs font-bold text-slate-700 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-500 appearance-none"
+                        >
+                            <option value="Todas">Todas as Escolas</option>
+                            {filteredEscolas.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+                    </div>
+                </div>
+
+                {/* Ano */}
+                <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Ano</label>
+                    <div className="relative">
+                        <select 
+                            value={detalheAno}
+                            onChange={(e) => setDetalheAno(Number(e.target.value))}
+                            className="w-full bg-slate-50 border-none rounded-xl py-2 px-3 text-xs font-bold text-slate-700 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-500 appearance-none"
+                        >
+                            <option value={0}>Todos</option>
+                            <option value={2025}>2025</option>
+                            <option value={2024}>2024</option>
+                            <option value={2023}>2023</option>
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+                    </div>
+                </div>
+
+                {/* Série */}
+                <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Série</label>
+                    <div className="relative">
+                        <select 
+                            value={detalheSerie}
+                            onChange={(e) => setDetalheSerie(e.target.value)}
+                            className="w-full bg-slate-50 border-none rounded-xl py-2 px-3 text-xs font-bold text-slate-700 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-500 appearance-none"
+                        >
+                            <option value="Todas">Todas</option>
+                            {['1º ANO', '2º ANO', '3º ANO', '4º ANO', '5º ANO', '6º ANO', '7º ANO', '8º ANO', '9º ANO', 'EJA', 'MULTI'].map(s => (
+                                <option key={s} value={s}>{s}</option>
+                            ))}
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+                    </div>
+                </div>
+
+                {/* Turno */}
+                <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Turno</label>
+                    <div className="relative">
+                        <select 
+                            value={detalheTurno}
+                            onChange={(e) => setDetalheTurno(e.target.value)}
+                            className="w-full bg-slate-50 border-none rounded-xl py-2 px-3 text-xs font-bold text-slate-700 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-500 appearance-none"
+                        >
+                            <option value="Todos">Todos</option>
+                            {['MATUTINO', 'VESPERTINO', 'INTEGRAL', 'A DEFINIR'].map(t => (
+                                <option key={t} value={t}>{t}</option>
+                            ))}
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+                    </div>
+                </div>
+
+                {/* Avaliação */}
+                <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Avaliação</label>
+                    <div className="relative">
+                        <select 
+                            value={detalheAvaliacao}
+                            onChange={(e) => setDetalheAvaliacao(e.target.value)}
+                            className="w-full bg-slate-50 border-none rounded-xl py-2 px-3 text-xs font-bold text-slate-700 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-500 appearance-none"
+                        >
+                            <option value="Todas">Todas</option>
+                            {['DIAGNÓSTICA', 'FORMATIVA', 'SOMATIVA'].map(a => (
+                                <option key={a} value={a}>{a}</option>
+                            ))}
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+                    </div>
+                </div>
+
+                {/* Nível */}
+                <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Nível</label>
+                    <div className="relative">
+                        <select 
+                            value={detalheNivel}
+                            onChange={(e) => setDetalheNivel(e.target.value)}
+                            className="w-full bg-slate-50 border-none rounded-xl py-2 px-3 text-xs font-bold text-slate-700 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-500 appearance-none"
+                        >
+                            <option value="Todos">Todos</option>
+                            {['LEITOR FLUENTE', 'LEITOR INICIANTE', 'PRÉ-LEITOR | NÍVEL I', 'PRÉ-LEITOR | NÍVEL II', 'PRÉ-LEITOR | NÍVEL III', 'PRÉ-LEITOR | NÍVEL IV', 'NÃO AVALIADO'].map(n => (
+                                <option key={n} value={n}>{n}</option>
+                            ))}
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+                    </div>
+                </div>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
