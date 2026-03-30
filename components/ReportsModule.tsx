@@ -1,11 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { PageHeader } from './ui/PageHeader';
-import { ChevronDown, ChevronRight, FileText, Calendar, Printer, CheckSquare, AlertCircle, FileSpreadsheet, Download, Search, MapPin, Users, GraduationCap, Shield, UserCheck, BarChart3 } from 'lucide-react';
-import { Visita, Escola, Coordenador } from '../types';
+import { ChevronDown, ChevronRight, FileText, Calendar, Printer, CheckSquare, AlertCircle, FileSpreadsheet, Download, Search, MapPin, Users, GraduationCap, Shield, UserCheck, BarChart3, Briefcase, Building2, Phone, Mail } from 'lucide-react';
+import { Visita, Escola, Coordenador, RecursoHumano } from '../types';
 import { exportToCSV } from '../utils';
 import { useNotification } from '../context/NotificationContext';
 import { PrintableGerencialReport, TipoRelatorio, FiltroVinculo, SubtipoGestor } from './PrintableGerencialReport';
 import { PrintableMatriculaReport } from './PrintableMatriculaReport';
+import { PrintableServidoresReport } from './PrintableServidoresReport';
 
 interface ReportsModuleProps {
    visitas: Visita[];
@@ -13,7 +14,13 @@ interface ReportsModuleProps {
    coordenadores: Coordenador[];
 }
 
-type ReportTab = 'visita' | 'gerenciais' | 'matriculas';
+type ReportTab = 'visita' | 'gerenciais' | 'matriculas' | 'servidores';
+
+interface ServidorCompleto extends RecursoHumano {
+   escolaNome: string;
+   escolaId: string;
+   escolaLocalizacao: string;
+}
 
 export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, coordenadores }) => {
    const { showNotification } = useNotification();
@@ -34,6 +41,13 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
    const [selectedLocalizacao, setSelectedLocalizacao] = useState<string>('Todas');
    const [isPrintingMatricula, setIsPrintingMatricula] = useState(false);
    const [expandedEscolaId, setExpandedEscolaId] = useState<string | null>(null);
+
+   // === Servidores Tab State ===
+   const [servidorFuncaoFilter, setServidorFuncaoFilter] = useState<string>('Todas');
+   const [servidorVinculoFilter, setServidorVinculoFilter] = useState<string>('Todos');
+   const [servidorEscolaFilter, setServidorEscolaFilter] = useState<string>('Todas');
+   const [servidorSearchTerm, setServidorSearchTerm] = useState<string>('');
+   const [isPrintingServidores, setIsPrintingServidores] = useState(false);
 
    const filteredData = useMemo(() => {
       return visitas.filter(visita => {
@@ -94,6 +108,83 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
             return acc;
         }, { total: 0, infantil: 0, iniciais: 0, finais: 0, eja: 0 });
     }, [escolas, selectedLocalizacao]);
+
+   // === Servidores: All HR employees across all schools ===
+   const todosServidores = useMemo<ServidorCompleto[]>(() => {
+      return escolas.flatMap(escola =>
+         (escola.recursosHumanos || []).map(srv => ({
+            ...srv,
+            escolaNome: escola.nome,
+            escolaId: escola.id,
+            escolaLocalizacao: escola.localizacao || '',
+         }))
+      );
+   }, [escolas]);
+
+   const funcoesDisponiveis = useMemo(() => {
+      const set = new Set(todosServidores.map(s => s.funcao));
+      return Array.from(set).sort();
+   }, [todosServidores]);
+
+   const servidoresFiltrados = useMemo(() => {
+      let filtered = todosServidores;
+      if (servidorFuncaoFilter !== 'Todas') {
+         filtered = filtered.filter(s => s.funcao === servidorFuncaoFilter);
+      }
+      if (servidorVinculoFilter !== 'Todos') {
+         filtered = filtered.filter(s => s.tipoVinculo === servidorVinculoFilter);
+      }
+      if (servidorEscolaFilter !== 'Todas') {
+         filtered = filtered.filter(s => s.escolaId === servidorEscolaFilter);
+      }
+      if (servidorSearchTerm.trim()) {
+         const term = servidorSearchTerm.toLowerCase().trim();
+         filtered = filtered.filter(s =>
+            s.nome.toLowerCase().includes(term) ||
+            (s.email && s.email.toLowerCase().includes(term)) ||
+            (s.cpf && s.cpf.includes(term))
+         );
+      }
+      return filtered.sort((a, b) => a.nome.localeCompare(b.nome));
+   }, [todosServidores, servidorFuncaoFilter, servidorVinculoFilter, servidorEscolaFilter, servidorSearchTerm]);
+
+   const servidoresStats = useMemo(() => {
+      const efetivos = servidoresFiltrados.filter(s => s.tipoVinculo === 'Efetivo').length;
+      const contratados = servidoresFiltrados.filter(s => s.tipoVinculo === 'Contratado').length;
+      const permutados = servidoresFiltrados.filter(s => s.tipoVinculo === 'Permutado').length;
+      const escolasComServidor = new Set(servidoresFiltrados.map(s => s.escolaId)).size;
+      const funcoes = new Set(servidoresFiltrados.map(s => s.funcao)).size;
+      return { total: servidoresFiltrados.length, efetivos, contratados, permutados, escolasComServidor, funcoes };
+   }, [servidoresFiltrados]);
+
+   const handlePrintServidores = () => {
+      setIsPrintingServidores(true);
+      setTimeout(() => {
+         window.print();
+         setIsPrintingServidores(false);
+      }, 300);
+   };
+
+   const handleExportServidoresCSV = () => {
+      const dataToExport = servidoresFiltrados.map((s, i) => ({
+         'Nº': i + 1,
+         'NOME': s.nome,
+         'CPF': s.cpf || '',
+         'DATA NASCIMENTO': s.dataNascimento ? new Date(s.dataNascimento + 'T12:00:00').toLocaleDateString('pt-BR') : '',
+         'FUNÇÃO': s.funcao,
+         'VÍNCULO': s.tipoVinculo,
+         'CARGA HORÁRIA': s.cargaHoraria || '',
+         'UNIDADE ESCOLAR': s.escolaNome,
+         'LOCALIZAÇÃO': s.escolaLocalizacao,
+         'TELEFONE': s.telefone || '',
+         'E-MAIL': s.email || '',
+         'DATA NOMEAÇÃO': s.dataNomeacao ? new Date(s.dataNomeacao + 'T12:00:00').toLocaleDateString('pt-BR') : '',
+         'ETAPA ATUAÇÃO': s.etapaAtuacao || '',
+         'COMPONENTE CURRICULAR': s.componenteCurricular || '',
+      }));
+      exportToCSV(dataToExport, 'controle_geral_servidores');
+      showNotification('success', 'Relatório de servidores exportado com sucesso');
+   };
 
    const handleExport = () => {
       const dataToExport = filteredData.map(v => ({
@@ -177,6 +268,7 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
                { id: 'visita' as ReportTab, icon: FileText, label: 'Relatório de Visita' },
                { id: 'gerenciais' as ReportTab, icon: BarChart3, label: 'Relatórios Gerenciais' },
                { id: 'matriculas' as ReportTab, icon: GraduationCap, label: 'Controle de Matrículas' },
+               { id: 'servidores' as ReportTab, icon: Briefcase, label: 'Controle de Servidores' },
             ].map(tab => (
                <button
                   key={tab.id}
@@ -693,6 +785,211 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
             </div>
          )}
 
+         {/* ====== SERVIDORES TAB ====== */}
+         {activeTab === 'servidores' && (
+            <div className="space-y-8 animate-fade-in">
+               {/* Filters */}
+               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                     {/* Busca por nome */}
+                     <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                           <Search className="w-4 h-4 text-cyan-500" /> Buscar Servidor
+                        </label>
+                        <div className="relative">
+                           <input
+                              type="text"
+                              value={servidorSearchTerm}
+                              onChange={e => setServidorSearchTerm(e.target.value)}
+                              placeholder="Nome, e-mail ou CPF..."
+                              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/10 shadow-sm"
+                           />
+                        </div>
+                     </div>
+
+                     {/* Filtro por Função */}
+                     <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                           <Briefcase className="w-4 h-4 text-cyan-500" /> Função / Cargo
+                        </label>
+                        <div className="relative">
+                           <select
+                              value={servidorFuncaoFilter}
+                              onChange={e => setServidorFuncaoFilter(e.target.value)}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 pr-10 text-sm font-medium text-slate-700 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/10 appearance-none shadow-sm"
+                           >
+                              <option value="Todas">Todas as Funções</option>
+                              {funcoesDisponiveis.map(f => <option key={f} value={f}>{f}</option>)}
+                           </select>
+                           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        </div>
+                     </div>
+
+                     {/* Filtro por Vínculo */}
+                     <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                           <Users className="w-4 h-4 text-cyan-500" /> Tipo de Vínculo
+                        </label>
+                        <div className="relative">
+                           <select
+                              value={servidorVinculoFilter}
+                              onChange={e => setServidorVinculoFilter(e.target.value)}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 pr-10 text-sm font-medium text-slate-700 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/10 appearance-none shadow-sm"
+                           >
+                              <option value="Todos">Todos os Vínculos</option>
+                              <option value="Efetivo">Efetivo</option>
+                              <option value="Contratado">Contratado</option>
+                              <option value="Permutado">Permutado</option>
+                           </select>
+                           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        </div>
+                     </div>
+
+                     {/* Filtro por Escola */}
+                     <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                           <Building2 className="w-4 h-4 text-cyan-500" /> Unidade Escolar
+                        </label>
+                        <div className="relative">
+                           <select
+                              value={servidorEscolaFilter}
+                              onChange={e => setServidorEscolaFilter(e.target.value)}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 pr-10 text-sm font-medium text-slate-700 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/10 appearance-none shadow-sm"
+                           >
+                              <option value="Todas">Todas as Unidades</option>
+                              {escolas.sort((a, b) => a.nome.localeCompare(b.nome)).map(e => (
+                                 <option key={e.id} value={e.id}>{e.nome}</option>
+                              ))}
+                           </select>
+                           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        </div>
+                     </div>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex gap-3 justify-end">
+                     <button
+                        onClick={handleExportServidoresCSV}
+                        className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-6 py-3 rounded-xl font-bold shadow-sm transition-all flex items-center gap-2"
+                     >
+                        <Download className="w-5 h-5" /> Exportar CSV
+                     </button>
+                     <button
+                        onClick={handlePrintServidores}
+                        className="bg-cyan-600 hover:bg-cyan-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-cyan-500/20 transition-all flex items-center gap-2 whitespace-nowrap"
+                     >
+                        <Printer className="w-5 h-5" /> Imprimir Relatório
+                     </button>
+                  </div>
+               </div>
+
+               {/* KPI Cards */}
+               <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+                  {[
+                     { label: 'Total Geral', val: servidoresStats.total, color: 'bg-slate-900', textColor: 'text-white' },
+                     { label: 'Efetivos', val: servidoresStats.efetivos, color: 'bg-emerald-500', textColor: 'text-white' },
+                     { label: 'Contratados', val: servidoresStats.contratados, color: 'bg-orange-500', textColor: 'text-white' },
+                     { label: 'Permutados', val: servidoresStats.permutados, color: 'bg-blue-500', textColor: 'text-white' },
+                     { label: 'Unidades', val: servidoresStats.escolasComServidor, color: 'bg-white', textColor: 'text-cyan-600' },
+                     { label: 'Funções', val: servidoresStats.funcoes, color: 'bg-white', textColor: 'text-cyan-600' },
+                  ].map((k, i) => (
+                     <div key={i} className={`${k.color} rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col items-center justify-center text-center hover:shadow-md transition-all`}>
+                        <p className={`text-[10px] font-bold ${k.textColor} opacity-70 uppercase tracking-wider mb-1`}>{k.label}</p>
+                        <p className={`text-2xl font-black ${k.textColor}`}>{k.val.toLocaleString()}</p>
+                     </div>
+                  ))}
+               </div>
+
+               {/* Table */}
+               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                  <div className="bg-slate-50 p-6 flex items-center justify-between border-b border-slate-100">
+                     <div className="flex items-center gap-3">
+                        <Briefcase className="w-5 h-5 text-cyan-600" />
+                        <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide">
+                           Controle Geral de Servidores — Recursos Humanos
+                        </h3>
+                     </div>
+                     <span className="text-xs font-bold text-slate-500 bg-slate-200 px-2 py-1 rounded-md">
+                        {servidoresFiltrados.length} registros
+                     </span>
+                  </div>
+                  <div className="overflow-x-auto">
+                     {servidoresFiltrados.length === 0 ? (
+                        <div className="p-20 text-center flex flex-col items-center justify-center text-slate-400">
+                           <Users className="w-12 h-12 mb-4 opacity-20" />
+                           <p className="font-medium">Nenhum servidor encontrado com os filtros selecionados.</p>
+                        </div>
+                     ) : (
+                        <table className="w-full text-left">
+                           <thead className="bg-slate-50 border-b border-slate-200">
+                              <tr className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                 <th className="px-4 py-4 w-12">Nº</th>
+                                 <th className="px-4 py-4">Nome / Contato</th>
+                                 <th className="px-4 py-4">Unidade Escolar</th>
+                                 <th className="px-4 py-4">Função / Cargo</th>
+                                 <th className="px-4 py-4 text-center">Vínculo</th>
+                                 <th className="px-4 py-4 text-center">C. Horária</th>
+                                 <th className="px-4 py-4 text-center">Nomeação</th>
+                              </tr>
+                           </thead>
+                           <tbody className="divide-y divide-slate-100">
+                              {servidoresFiltrados.map((srv, i) => (
+                                 <tr key={`${srv.id}-${srv.escolaId}-${i}`} className="group hover:bg-cyan-50/30 transition-all">
+                                    <td className="px-4 py-3 text-xs font-bold text-slate-400">{i + 1}</td>
+                                    <td className="px-4 py-3">
+                                       <div className="font-bold text-slate-800 text-sm">{srv.nome}</div>
+                                       <div className="flex items-center gap-3 mt-1">
+                                          {srv.email && (
+                                             <span className="text-xs text-cyan-500 flex items-center gap-1">
+                                                <Mail className="w-3 h-3" /> {srv.email}
+                                             </span>
+                                          )}
+                                          {srv.telefone && (
+                                             <span className="text-xs text-slate-400 flex items-center gap-1">
+                                                <Phone className="w-3 h-3" /> {srv.telefone}
+                                             </span>
+                                          )}
+                                       </div>
+                                       {srv.cpf && <div className="text-[10px] text-slate-400 mt-0.5">CPF: {srv.cpf}</div>}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                       <div className="text-sm font-medium text-slate-700">{srv.escolaNome}</div>
+                                       <div className="text-[10px] text-slate-400 font-bold uppercase">{srv.escolaLocalizacao}</div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                       <div className="text-sm font-medium text-slate-700">{srv.funcao}</div>
+                                       {srv.etapaAtuacao && (
+                                          <div className="text-xs text-slate-400 mt-0.5">
+                                             {srv.etapaAtuacao}
+                                             {srv.componenteCurricular ? ` • ${srv.componenteCurricular}` : ''}
+                                          </div>
+                                       )}
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                       <span className={`inline-block px-3 py-1 rounded-lg text-xs font-bold ${
+                                          srv.tipoVinculo === 'Efetivo' ? 'bg-emerald-100 text-emerald-700' :
+                                          srv.tipoVinculo === 'Permutado' ? 'bg-blue-100 text-blue-700' :
+                                          'bg-orange-100 text-orange-700'
+                                       }`}>
+                                          {srv.tipoVinculo}
+                                       </span>
+                                    </td>
+                                    <td className="px-4 py-3 text-center text-sm text-slate-600 font-medium">
+                                       {srv.cargaHoraria || '-'}
+                                    </td>
+                                    <td className="px-4 py-3 text-center text-sm text-slate-600">
+                                       {srv.dataNomeacao ? new Date(srv.dataNomeacao + 'T12:00:00').toLocaleDateString('pt-BR') : '-'}
+                                    </td>
+                                 </tr>
+                              ))}
+                           </tbody>
+                        </table>
+                     )}
+                  </div>
+               </div>
+            </div>
+         )}
+
          {/* ====== PRINT PORTALS ====== */}
          {isPrintingGerencial && (
             <PrintableGerencialReport
@@ -707,6 +1004,15 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
             <PrintableMatriculaReport 
                escolas={escolas}
                filtroLocalizacao={selectedLocalizacao}
+            />
+         )}
+
+         {isPrintingServidores && (
+            <PrintableServidoresReport
+               servidores={servidoresFiltrados}
+               filtroFuncao={servidorFuncaoFilter}
+               filtroVinculo={servidorVinculoFilter}
+               filtroEscola={servidorEscolaFilter !== 'Todas' ? escolas.find(e => e.id === servidorEscolaFilter)?.nome || 'Todas' : 'Todas'}
             />
          )}
       </div>
