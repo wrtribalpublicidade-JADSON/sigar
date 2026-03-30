@@ -166,8 +166,12 @@
     background: white !important;
   }
 
-  /* Show the print report portal */
-  #print-report {
+  /* Show the print report portals */
+  #print-report,
+  #print-gerencial-report,
+  #print-matricula-report,
+  #print-matricula-detalhada-report,
+  #print-servidores-report {
     display: block !important;
     visibility: visible !important;
     position: relative !important;
@@ -186,6 +190,11 @@
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
     z-index: 9999;
+  }
+
+  /* Detailed matricula report uses landscape for many columns */
+  #print-matricula-detalhada-report {
+    font-size: 8pt !important;
   }
 
   /* Force hide UI elements */
@@ -218,28 +227,32 @@
   }
 
   /* Tables in print */
-  #print-report table {
+  #print-report table,
+  [id^="print-"] table {
     width: 100% !important;
     border-collapse: collapse !important;
   }
 
   #print-report th,
-  #print-report td {
+  #print-report td,
+  [id^="print-"] th,
+  [id^="print-"] td {
     padding: 6pt 8pt !important;
     border: 0.5pt solid #cbd5e1 !important;
-    text-align: left !important;
-    font-size: 9pt !important;
   }
 
-  #print-report thead {
+  #print-report thead,
+  [id^="print-"] thead {
     display: table-header-group !important;
   }
 
-  #print-report tbody {
+  #print-report tbody,
+  [id^="print-"] tbody {
     display: table-row-group !important;
   }
 
-  #print-report tr {
+  #print-report tr,
+  [id^="print-"] tr {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }

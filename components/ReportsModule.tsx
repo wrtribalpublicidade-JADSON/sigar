@@ -6,6 +6,7 @@ import { exportToCSV } from '../utils';
 import { useNotification } from '../context/NotificationContext';
 import { PrintableGerencialReport, TipoRelatorio, FiltroVinculo, SubtipoGestor } from './PrintableGerencialReport';
 import { PrintableMatriculaReport } from './PrintableMatriculaReport';
+import { PrintableMatriculaDetalhadaReport } from './PrintableMatriculaDetalhadaReport';
 import { PrintableServidoresReport } from './PrintableServidoresReport';
 
 interface ReportsModuleProps {
@@ -40,7 +41,10 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
    // === Matriculas Tab State ===
    const [selectedLocalizacao, setSelectedLocalizacao] = useState<string>('Todas');
    const [isPrintingMatricula, setIsPrintingMatricula] = useState(false);
+   const [isPrintingMatriculaDetalhada, setIsPrintingMatriculaDetalhada] = useState(false);
    const [expandedEscolaId, setExpandedEscolaId] = useState<string | null>(null);
+   const [matriculaSubTab, setMatriculaSubTab] = useState<'consolidado' | 'detalhado'>('consolidado');
+   const [selectedTurno, setSelectedTurno] = useState<'Todos' | 'Integral' | 'Manhã' | 'Tarde'>('Todos');
 
    // === Servidores Tab State ===
    const [servidorFuncaoFilter, setServidorFuncaoFilter] = useState<string>('Todas');
@@ -89,12 +93,48 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
    }, [escolas]);
 
    const handlePrintMatricula = () => {
-        setIsPrintingMatricula(true);
-        setTimeout(() => {
-            window.print();
-            setIsPrintingMatricula(false);
-        }, 300);
+        if (matriculaSubTab === 'detalhado') {
+            setIsPrintingMatriculaDetalhada(true);
+            setTimeout(() => {
+                window.print();
+                setIsPrintingMatriculaDetalhada(false);
+            }, 300);
+        } else {
+            setIsPrintingMatricula(true);
+            setTimeout(() => {
+                window.print();
+                setIsPrintingMatricula(false);
+            }, 300);
+        }
     };
+
+    // Helper to extract alunos by turno from a DadosNivel node
+    const getAlunosByTurno = (node: any, turno: 'Todos' | 'Integral' | 'Manhã' | 'Tarde'): number => {
+        if (!node?.alunos) return 0;
+        if (turno === 'Todos') return (node.alunos.integral || 0) + (node.alunos.manha || 0) + (node.alunos.tarde || 0);
+        if (turno === 'Integral') return node.alunos.integral || 0;
+        if (turno === 'Manhã') return node.alunos.manha || 0;
+        if (turno === 'Tarde') return node.alunos.tarde || 0;
+        return 0;
+    };
+
+    // Grade definitions for the detailed report
+    const GRADES = [
+        { key: 'creche2', label: 'Creche II', segment: 'infantil', group: 'Educação Infantil' },
+        { key: 'creche3', label: 'Creche III', segment: 'infantil', group: 'Educação Infantil' },
+        { key: 'pre1', label: 'Pré I', segment: 'infantil', group: 'Educação Infantil' },
+        { key: 'pre2', label: 'Pré II', segment: 'infantil', group: 'Educação Infantil' },
+        { key: 'ano1', label: '1º Ano', segment: 'fundamental', group: 'Anos Iniciais' },
+        { key: 'ano2', label: '2º Ano', segment: 'fundamental', group: 'Anos Iniciais' },
+        { key: 'ano3', label: '3º Ano', segment: 'fundamental', group: 'Anos Iniciais' },
+        { key: 'ano4', label: '4º Ano', segment: 'fundamental', group: 'Anos Iniciais' },
+        { key: 'ano5', label: '5º Ano', segment: 'fundamental', group: 'Anos Iniciais' },
+        { key: 'ano6', label: '6º Ano', segment: 'fundamental', group: 'Anos Finais' },
+        { key: 'ano7', label: '7º Ano', segment: 'fundamental', group: 'Anos Finais' },
+        { key: 'ano8', label: '8º Ano', segment: 'fundamental', group: 'Anos Finais' },
+        { key: 'ano9', label: '9º Ano', segment: 'fundamental', group: 'Anos Finais' },
+        { key: 'eja', label: 'EJA', segment: 'fundamental', group: 'EJA' },
+    ] as const;
 
     // === Matricula Stats ===
     const matriculaStats = useMemo(() => {
@@ -108,6 +148,25 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
             return acc;
         }, { total: 0, infantil: 0, iniciais: 0, finais: 0, eja: 0 });
     }, [escolas, selectedLocalizacao]);
+
+    // === Detailed Matricula Stats (by grade, respecting turno filter) ===
+    const matriculaDetalhada = useMemo(() => {
+        const filtered = escolas.filter(e => selectedLocalizacao === 'Todas' || e.localizacao === selectedLocalizacao);
+        const gradeMap: Record<string, number> = {};
+        let total = 0;
+        GRADES.forEach(g => {
+            gradeMap[g.key] = 0;
+            filtered.forEach(e => {
+                const det = e.dadosEducacionais?.matriculaDetalhada as any;
+                if (!det) return;
+                const node = det?.[g.segment]?.[g.key];
+                const val = getAlunosByTurno(node, selectedTurno);
+                gradeMap[g.key] += val;
+                total += val;
+            });
+        });
+        return { gradeMap, total };
+    }, [escolas, selectedLocalizacao, selectedTurno]);
 
    // === Servidores: All HR employees across all schools ===
    const todosServidores = useMemo<ServidorCompleto[]>(() => {
@@ -603,18 +662,38 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
          {/* ====== MATRICULAS TAB ====== */}
          {activeTab === 'matriculas' && (
             <div className="space-y-8 animate-fade-in">
+               {/* Sub-tabs: Consolidado / Detalhado */}
+               <div className="flex gap-2 print:hidden">
+                  {[
+                     { id: 'consolidado' as const, label: 'Consolidado por Segmento', icon: BarChart3 },
+                     { id: 'detalhado' as const, label: 'Detalhado por Ano/Série', icon: GraduationCap },
+                  ].map(sub => (
+                     <button
+                        key={sub.id}
+                        onClick={() => setMatriculaSubTab(sub.id)}
+                        className={`px-5 py-2.5 text-sm font-bold flex items-center gap-2 rounded-xl border-2 transition-all ${
+                           matriculaSubTab === sub.id
+                              ? 'bg-indigo-50 text-indigo-700 border-indigo-200 shadow-sm'
+                              : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:text-slate-700'
+                        }`}
+                     >
+                        <sub.icon className="w-4 h-4" /> {sub.label}
+                     </button>
+                  ))}
+               </div>
+
                {/* Filters & Export */}
                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
                   <div className="flex flex-col md:flex-row gap-6 items-end">
                      <div className="flex-1 space-y-2">
                         <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                           <MapPin className="w-4 h-4 text-orange-500" /> Localização das Unidades
+                           <MapPin className="w-4 h-4 text-indigo-500" /> Localização das Unidades
                         </label>
                         <div className="relative">
                            <select
                               value={selectedLocalizacao}
                               onChange={e => setSelectedLocalizacao(e.target.value)}
-                              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 pr-10 text-sm font-medium text-slate-700 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/10 appearance-none shadow-sm"
+                              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 pr-10 text-sm font-medium text-slate-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 appearance-none shadow-sm"
                            >
                               <option value="Todas">Todas as Localizações</option>
                               <option value="Sede">Sede</option>
@@ -624,164 +703,289 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
                         </div>
                      </div>
 
+                     {matriculaSubTab === 'detalhado' && (
+                        <div className="flex-1 space-y-2">
+                           <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                              <Calendar className="w-4 h-4 text-indigo-500" /> Turno
+                           </label>
+                           <div className="relative">
+                              <select
+                                 value={selectedTurno}
+                                 onChange={e => setSelectedTurno(e.target.value as any)}
+                                 className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 pr-10 text-sm font-medium text-slate-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 appearance-none shadow-sm"
+                              >
+                                 <option value="Todos">Todos os Turnos</option>
+                                 <option value="Integral">Integral</option>
+                                 <option value="Manhã">Manhã</option>
+                                 <option value="Tarde">Tarde</option>
+                              </select>
+                              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                           </div>
+                        </div>
+                     )}
+
                      <button
                         onClick={handlePrintMatricula}
                         className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-indigo-500/20 transition-all flex items-center gap-2 whitespace-nowrap"
                      >
-                        <Printer className="w-5 h-5" /> Imprimir Controle
+                        <Printer className="w-5 h-5" /> Imprimir Relatório
                      </button>
                   </div>
                </div>
 
-               {/* KPI Matrix */}
-               <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-                  {[
-                     { label: 'Total Geral', val: matriculaStats.total, color: 'bg-slate-900', textColor: 'text-white' },
-                     { label: 'Infantil', val: matriculaStats.infantil, color: 'bg-white', textColor: 'text-indigo-600' },
-                     { label: 'Anos Iniciais', val: matriculaStats.iniciais, color: 'bg-white', textColor: 'text-indigo-600' },
-                     { label: 'Anos Finais', val: matriculaStats.finais, color: 'bg-white', textColor: 'text-indigo-600' },
-                     { label: 'EJA', val: matriculaStats.eja, color: 'bg-white', textColor: 'text-indigo-600' },
-                  ].map((k, i) => (
-                     <div key={i} className={`${k.color} rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col items-center justify-center text-center`}>
-                        <p className={`text-[10px] font-bold ${k.textColor} opacity-60 uppercase tracking-wider mb-1`}>{k.label}</p>
-                        <p className={`text-2xl font-black ${k.textColor}`}>{k.val.toLocaleString()}</p>
+               {/* ====== CONSOLIDADO SUB-TAB ====== */}
+               {matriculaSubTab === 'consolidado' && (
+                  <>
+                     {/* KPI Matrix */}
+                     <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                        {[
+                           { label: 'Total Geral', val: matriculaStats.total, color: 'bg-slate-900', textColor: 'text-white' },
+                           { label: 'Infantil', val: matriculaStats.infantil, color: 'bg-white', textColor: 'text-indigo-600' },
+                           { label: 'Anos Iniciais', val: matriculaStats.iniciais, color: 'bg-white', textColor: 'text-indigo-600' },
+                           { label: 'Anos Finais', val: matriculaStats.finais, color: 'bg-white', textColor: 'text-indigo-600' },
+                           { label: 'EJA', val: matriculaStats.eja, color: 'bg-white', textColor: 'text-indigo-600' },
+                        ].map((k, i) => (
+                           <div key={i} className={`${k.color} rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col items-center justify-center text-center`}>
+                              <p className={`text-[10px] font-bold ${k.textColor} opacity-60 uppercase tracking-wider mb-1`}>{k.label}</p>
+                              <p className={`text-2xl font-black ${k.textColor}`}>{k.val.toLocaleString()}</p>
+                           </div>
+                        ))}
                      </div>
-                  ))}
-               </div>
 
-               {/* Table Consolidada */}
-               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                  <div className="bg-slate-50 p-6 border-b border-slate-100">
-                     <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide flex items-center gap-2">
-                        <FileText className="w-5 h-5 text-indigo-600" /> Consolidado de Matrículas por Unidade
-                     </h3>
-                  </div>
-                  <div className="overflow-x-auto">
-                     <table className="w-full text-left">
-                        <thead className="bg-slate-50 border-b border-slate-200">
-                           <tr className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                              <th className="px-6 py-4">Escola</th>
-                              <th className="px-4 py-4 text-center">Infantil</th>
-                              <th className="px-4 py-4 text-center">Iniciais</th>
-                              <th className="px-4 py-4 text-center">Finais</th>
-                              <th className="px-4 py-4 text-center">EJA</th>
-                              <th className="px-6 py-4 text-right">Total</th>
-                           </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                           {escolas
-                              .filter(e => selectedLocalizacao === 'Todas' || e.localizacao === selectedLocalizacao)
-                              .sort((a,b) => b.alunosMatriculados - a.alunosMatriculados)
-                              .map(escola => (
-                              <React.Fragment key={escola.id}>
-                                 <tr 
-                                    onClick={() => setExpandedEscolaId(expandedEscolaId === escola.id ? null : escola.id)}
-                                    className={`transition-colors cursor-pointer ${expandedEscolaId === escola.id ? 'bg-indigo-50/30' : 'hover:bg-slate-50'}`}
-                                 >
-                                    <td className="px-6 py-4">
-                                       <div className="flex items-center gap-3">
-                                          <div className={`transition-transform duration-200 ${expandedEscolaId === escola.id ? 'rotate-90' : ''}`}>
-                                             <ChevronRight className="w-4 h-4 text-slate-400" />
-                                          </div>
-                                          <div>
-                                             <div className="font-bold text-slate-800 text-sm">{escola.nome}</div>
-                                             <div className="text-[10px] text-slate-400 font-bold uppercase">{escola.localizacao}</div>
-                                          </div>
-                                       </div>
-                                    </td>
-                                    <td className="px-4 py-4 text-center text-sm font-medium text-slate-600">{escola.dadosEducacionais?.matricula?.infantil || 0}</td>
-                                    <td className="px-4 py-4 text-center text-sm font-medium text-slate-600">{escola.dadosEducacionais?.matricula?.anosIniciais || 0}</td>
-                                    <td className="px-4 py-4 text-center text-sm font-medium text-slate-600">{escola.dadosEducacionais?.matricula?.anosFinais || 0}</td>
-                                    <td className="px-4 py-4 text-center text-sm font-medium text-slate-600">{escola.dadosEducacionais?.matricula?.eja || 0}</td>
-                                    <td className="px-6 py-4 text-right">
-                                       <span className="inline-flex items-center px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-bold border border-indigo-100">
-                                          {escola.alunosMatriculados}
-                                       </span>
+                     {/* Table Consolidada */}
+                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div className="bg-slate-50 p-6 border-b border-slate-100">
+                           <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide flex items-center gap-2">
+                              <FileText className="w-5 h-5 text-indigo-600" /> Consolidado de Matrículas por Unidade
+                           </h3>
+                        </div>
+                        <div className="overflow-x-auto">
+                           <table className="w-full text-left">
+                              <thead className="bg-slate-50 border-b border-slate-200">
+                                 <tr className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                    <th className="px-6 py-4">Escola</th>
+                                    <th className="px-4 py-4 text-center">Infantil</th>
+                                    <th className="px-4 py-4 text-center">Iniciais</th>
+                                    <th className="px-4 py-4 text-center">Finais</th>
+                                    <th className="px-4 py-4 text-center">EJA</th>
+                                    <th className="px-6 py-4 text-right">Total</th>
+                                 </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                 {escolas
+                                    .filter(e => selectedLocalizacao === 'Todas' || e.localizacao === selectedLocalizacao)
+                                    .sort((a,b) => b.alunosMatriculados - a.alunosMatriculados)
+                                    .map(escola => (
+                                    <React.Fragment key={escola.id}>
+                                       <tr 
+                                          onClick={() => setExpandedEscolaId(expandedEscolaId === escola.id ? null : escola.id)}
+                                          className={`transition-colors cursor-pointer ${expandedEscolaId === escola.id ? 'bg-indigo-50/30' : 'hover:bg-slate-50'}`}
+                                       >
+                                          <td className="px-6 py-4">
+                                             <div className="flex items-center gap-3">
+                                                <div className={`transition-transform duration-200 ${expandedEscolaId === escola.id ? 'rotate-90' : ''}`}>
+                                                   <ChevronRight className="w-4 h-4 text-slate-400" />
+                                                </div>
+                                                <div>
+                                                   <div className="font-bold text-slate-800 text-sm">{escola.nome}</div>
+                                                   <div className="text-[10px] text-slate-400 font-bold uppercase">{escola.localizacao}</div>
+                                                </div>
+                                             </div>
+                                          </td>
+                                          <td className="px-4 py-4 text-center text-sm font-medium text-slate-600">{escola.dadosEducacionais?.matricula?.infantil || 0}</td>
+                                          <td className="px-4 py-4 text-center text-sm font-medium text-slate-600">{escola.dadosEducacionais?.matricula?.anosIniciais || 0}</td>
+                                          <td className="px-4 py-4 text-center text-sm font-medium text-slate-600">{escola.dadosEducacionais?.matricula?.anosFinais || 0}</td>
+                                          <td className="px-4 py-4 text-center text-sm font-medium text-slate-600">{escola.dadosEducacionais?.matricula?.eja || 0}</td>
+                                          <td className="px-6 py-4 text-right">
+                                             <span className="inline-flex items-center px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-bold border border-indigo-100">
+                                                {escola.alunosMatriculados}
+                                             </span>
+                                          </td>
+                                       </tr>
+                                       {expandedEscolaId === escola.id && (
+                                          <tr className="bg-slate-50/30 border-b border-slate-100">
+                                             <td colSpan={6} className="px-8 py-6">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 animate-fade-in">
+                                                   <div className="space-y-3">
+                                                      <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest border-b border-indigo-100 pb-2">Educação Infantil</h4>
+                                                      <div className="space-y-2">
+                                                         {[
+                                                            { label: 'Creche II', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.infantil?.creche2 },
+                                                            { label: 'Creche III', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.infantil?.creche3 },
+                                                            { label: 'Pré I', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.infantil?.pre1 },
+                                                            { label: 'Pré II', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.infantil?.pre2 },
+                                                         ].map(item => (
+                                                            <div key={item.label} className="flex justify-between items-center text-xs">
+                                                               <span className="text-slate-500 font-medium">{item.label}</span>
+                                                               <span className="font-bold text-slate-700">{ (item.val?.alunos?.integral || 0) + (item.val?.alunos?.manha || 0) + (item.val?.alunos?.tarde || 0) }</span>
+                                                            </div>
+                                                         ))}
+                                                      </div>
+                                                   </div>
+                                                   <div className="space-y-3">
+                                                      <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest border-b border-emerald-100 pb-2">Anos Iniciais</h4>
+                                                      <div className="space-y-2">
+                                                         {[
+                                                            { label: '1º Ano', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.fundamental?.ano1 },
+                                                            { label: '2º Ano', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.fundamental?.ano2 },
+                                                            { label: '3º Ano', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.fundamental?.ano3 },
+                                                            { label: '4º Ano', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.fundamental?.ano4 },
+                                                            { label: '5º Ano', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.fundamental?.ano5 },
+                                                         ].map(item => (
+                                                            <div key={item.label} className="flex justify-between items-center text-xs">
+                                                               <span className="text-slate-500 font-medium">{item.label}</span>
+                                                               <span className="font-bold text-slate-700">{ (item.val?.alunos?.integral || 0) + (item.val?.alunos?.manha || 0) + (item.val?.alunos?.tarde || 0) }</span>
+                                                            </div>
+                                                         ))}
+                                                      </div>
+                                                   </div>
+                                                   <div className="space-y-3">
+                                                      <h4 className="text-[10px] font-black text-orange-600 uppercase tracking-widest border-b border-orange-100 pb-2">Anos Finais</h4>
+                                                      <div className="space-y-2">
+                                                         {[
+                                                            { label: '6º Ano', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.fundamental?.ano6 },
+                                                            { label: '7º Ano', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.fundamental?.ano7 },
+                                                            { label: '8º Ano', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.fundamental?.ano8 },
+                                                            { label: '9º Ano', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.fundamental?.ano9 },
+                                                         ].map(item => (
+                                                            <div key={item.label} className="flex justify-between items-center text-xs">
+                                                               <span className="text-slate-500 font-medium">{item.label}</span>
+                                                               <span className="font-bold text-slate-700">{ (item.val?.alunos?.integral || 0) + (item.val?.alunos?.manha || 0) + (item.val?.alunos?.tarde || 0) }</span>
+                                                            </div>
+                                                         ))}
+                                                      </div>
+                                                   </div>
+                                                   <div className="space-y-3">
+                                                      <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-widest border-b border-slate-200 pb-2">EJA / Outros</h4>
+                                                      <div className="space-y-2">
+                                                         {[
+                                                            { label: 'EJA', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.fundamental?.eja },
+                                                         ].map(item => (
+                                                            <div key={item.label} className="flex justify-between items-center text-xs">
+                                                               <span className="text-slate-500 font-medium">{item.label}</span>
+                                                               <span className="font-bold text-slate-700">{ (item.val?.alunos?.integral || 0) + (item.val?.alunos?.manha || 0) + (item.val?.alunos?.tarde || 0) }</span>
+                                                            </div>
+                                                         ))}
+                                                      </div>
+                                                   </div>
+                                                </div>
+                                             </td>
+                                          </tr>
+                                       )}
+                                    </React.Fragment>
+                                 ))}
+                              </tbody>
+                           </table>
+                        </div>
+                     </div>
+                  </>
+               )}
+
+               {/* ====== DETALHADO SUB-TAB ====== */}
+               {matriculaSubTab === 'detalhado' && (
+                  <>
+                     {/* KPI per grade */}
+                     <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-3">
+                        <div className="col-span-full lg:col-span-1 bg-slate-900 rounded-2xl border border-slate-700 shadow-sm p-4 flex flex-col items-center justify-center text-center">
+                           <p className="text-[9px] font-bold text-white opacity-60 uppercase tracking-wider mb-1">Total Geral</p>
+                           <p className="text-2xl font-black text-white">{matriculaDetalhada.total.toLocaleString()}</p>
+                           {selectedTurno !== 'Todos' && <p className="text-[9px] text-indigo-300 font-bold mt-1">Turno: {selectedTurno}</p>}
+                        </div>
+                        {GRADES.map(g => {
+                           const val = matriculaDetalhada.gradeMap[g.key];
+                           const groupColor = g.group === 'Educação Infantil' ? 'text-indigo-600' :
+                              g.group === 'Anos Iniciais' ? 'text-emerald-600' :
+                              g.group === 'Anos Finais' ? 'text-orange-600' : 'text-slate-600';
+                           return (
+                              <div key={g.key} className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 flex flex-col items-center justify-center text-center hover:shadow-md transition-all">
+                                 <p className={`text-[8px] font-bold ${groupColor} uppercase tracking-wider mb-0.5`}>{g.label}</p>
+                                 <p className={`text-lg font-black ${groupColor}`}>{val}</p>
+                              </div>
+                           );
+                        })}
+                     </div>
+
+                     {/* Detailed Table */}
+                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div className="bg-slate-50 p-6 border-b border-slate-100 flex items-center justify-between">
+                           <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide flex items-center gap-2">
+                              <GraduationCap className="w-5 h-5 text-indigo-600" /> Detalhamento de Matrículas por Ano/Série
+                              {selectedTurno !== 'Todos' && <span className="text-xs font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-md ml-2">Turno: {selectedTurno}</span>}
+                           </h3>
+                           <span className="text-xs font-bold text-slate-500 bg-slate-200 px-2 py-1 rounded-md">
+                              {escolas.filter(e => selectedLocalizacao === 'Todas' || e.localizacao === selectedLocalizacao).length} unidades
+                           </span>
+                        </div>
+                        <div className="overflow-x-auto">
+                           <table className="w-full text-left" style={{ minWidth: '1200px' }}>
+                              <thead>
+                                 <tr className="bg-slate-800 text-white">
+                                    <th rowSpan={2} className="px-4 py-3 text-[9px] font-bold uppercase tracking-wider border-r border-slate-700 sticky left-0 bg-slate-800 z-10 min-w-[200px]">Unidade Escolar</th>
+                                    <th colSpan={4} className="px-2 py-2 text-[9px] font-bold uppercase tracking-wider text-center border-r border-slate-700 bg-indigo-900/50">Educação Infantil</th>
+                                    <th colSpan={5} className="px-2 py-2 text-[9px] font-bold uppercase tracking-wider text-center border-r border-slate-700 bg-emerald-900/50">Anos Iniciais</th>
+                                    <th colSpan={4} className="px-2 py-2 text-[9px] font-bold uppercase tracking-wider text-center border-r border-slate-700 bg-orange-900/50">Anos Finais</th>
+                                    <th className="px-2 py-2 text-[9px] font-bold uppercase tracking-wider text-center border-r border-slate-700 bg-slate-700">EJA</th>
+                                    <th rowSpan={2} className="px-4 py-3 text-[9px] font-bold uppercase tracking-wider text-center bg-slate-900">Total</th>
+                                 </tr>
+                                 <tr className="bg-slate-700 text-white text-[8px] font-bold uppercase tracking-wider">
+                                    {GRADES.map(g => (
+                                       <th key={g.key} className="px-1 py-2 text-center border-r border-slate-600 whitespace-nowrap">{g.label}</th>
+                                    ))}
+                                 </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                 {escolas
+                                    .filter(e => selectedLocalizacao === 'Todas' || e.localizacao === selectedLocalizacao)
+                                    .sort((a, b) => a.nome.localeCompare(b.nome))
+                                    .map((escola, idx) => {
+                                       const det = escola.dadosEducacionais?.matriculaDetalhada as any;
+                                       let rowTotal = 0;
+                                       const values = GRADES.map(g => {
+                                          const node = det?.[g.segment]?.[g.key];
+                                          const val = getAlunosByTurno(node, selectedTurno);
+                                          rowTotal += val;
+                                          return val;
+                                       });
+                                       return (
+                                          <tr key={escola.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'} hover:bg-indigo-50/30 transition-colors`}>
+                                             <td className="px-4 py-3 sticky left-0 z-10" style={{ background: idx % 2 === 0 ? '#fff' : '#f8fafc' }}>
+                                                <div className="font-bold text-slate-800 text-xs">{escola.nome}</div>
+                                                <div className="text-[9px] text-slate-400 font-bold uppercase">{escola.localizacao}</div>
+                                             </td>
+                                             {values.map((val, i) => (
+                                                <td key={GRADES[i].key} className={`px-1 py-3 text-center text-xs font-medium ${
+                                                   val > 0 ? 'text-slate-700' : 'text-slate-300'
+                                                } ${i === 3 || i === 8 || i === 12 ? 'border-r border-slate-200' : ''}`}>
+                                                   {val || '-'}
+                                                </td>
+                                             ))}
+                                             <td className="px-4 py-3 text-center">
+                                                <span className="inline-flex items-center px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full text-xs font-bold border border-indigo-100">
+                                                   {rowTotal}
+                                                </span>
+                                             </td>
+                                          </tr>
+                                       );
+                                    })}
+                              </tbody>
+                              <tfoot>
+                                 <tr className="bg-slate-900 text-white font-bold">
+                                    <td className="px-4 py-3 text-xs uppercase tracking-wider sticky left-0 z-10 bg-slate-900">Total da Rede</td>
+                                    {GRADES.map(g => (
+                                       <td key={g.key} className={`px-1 py-3 text-center text-xs ${g.key === 'pre2' || g.key === 'ano5' || g.key === 'ano9' ? 'border-r border-slate-700' : ''}`}>
+                                          {matriculaDetalhada.gradeMap[g.key]}
+                                       </td>
+                                    ))}
+                                    <td className="px-4 py-3 text-center text-sm font-black text-orange-400">
+                                       {matriculaDetalhada.total}
                                     </td>
                                  </tr>
-                                 {expandedEscolaId === escola.id && (
-                                    <tr className="bg-slate-50/30 border-b border-slate-100">
-                                       <td colSpan={6} className="px-8 py-6">
-                                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 animate-fade-in">
-                                             {/* Educação Infantil */}
-                                             <div className="space-y-3">
-                                                <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest border-b border-indigo-100 pb-2">Educação Infantil</h4>
-                                                <div className="space-y-2">
-                                                   {[
-                                                      { label: 'Creche II', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.infantil?.creche2 },
-                                                      { label: 'Creche III', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.infantil?.creche3 },
-                                                      { label: 'Pré I', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.infantil?.pre1 },
-                                                      { label: 'Pré II', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.infantil?.pre2 },
-                                                   ].map(item => (
-                                                      <div key={item.label} className="flex justify-between items-center text-xs">
-                                                         <span className="text-slate-500 font-medium">{item.label}</span>
-                                                         <span className="font-bold text-slate-700">{ (item.val?.alunos?.integral || 0) + (item.val?.alunos?.manha || 0) + (item.val?.alunos?.tarde || 0) }</span>
-                                                      </div>
-                                                   ))}
-                                                </div>
-                                             </div>
-
-                                             {/* Anos Iniciais */}
-                                             <div className="space-y-3">
-                                                <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest border-b border-emerald-100 pb-2">Anos Iniciais</h4>
-                                                <div className="space-y-2">
-                                                   {[
-                                                      { label: '1º Ano', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.fundamental?.ano1 },
-                                                      { label: '2º Ano', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.fundamental?.ano2 },
-                                                      { label: '3º Ano', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.fundamental?.ano3 },
-                                                      { label: '4º Ano', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.fundamental?.ano4 },
-                                                      { label: '5º Ano', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.fundamental?.ano5 },
-                                                   ].map(item => (
-                                                      <div key={item.label} className="flex justify-between items-center text-xs">
-                                                         <span className="text-slate-500 font-medium">{item.label}</span>
-                                                         <span className="font-bold text-slate-700">{ (item.val?.alunos?.integral || 0) + (item.val?.alunos?.manha || 0) + (item.val?.alunos?.tarde || 0) }</span>
-                                                      </div>
-                                                   ))}
-                                                </div>
-                                             </div>
-
-                                             {/* Anos Finais */}
-                                             <div className="space-y-3">
-                                                <h4 className="text-[10px] font-black text-orange-600 uppercase tracking-widest border-b border-orange-100 pb-2">Anos Finais</h4>
-                                                <div className="space-y-2">
-                                                   {[
-                                                      { label: '6º Ano', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.fundamental?.ano6 },
-                                                      { label: '7º Ano', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.fundamental?.ano7 },
-                                                      { label: '8º Ano', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.fundamental?.ano8 },
-                                                      { label: '9º Ano', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.fundamental?.ano9 },
-                                                   ].map(item => (
-                                                      <div key={item.label} className="flex justify-between items-center text-xs">
-                                                         <span className="text-slate-500 font-medium">{item.label}</span>
-                                                         <span className="font-bold text-slate-700">{ (item.val?.alunos?.integral || 0) + (item.val?.alunos?.manha || 0) + (item.val?.alunos?.tarde || 0) }</span>
-                                                      </div>
-                                                   ))}
-                                                </div>
-                                             </div>
-
-                                             {/* EJA */}
-                                             <div className="space-y-3">
-                                                <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-widest border-b border-slate-200 pb-2">EJA / Outros</h4>
-                                                <div className="space-y-2">
-                                                   {[
-                                                      { label: 'EJA', val: (escola.dadosEducacionais?.matriculaDetalhada as any)?.fundamental?.eja },
-                                                   ].map(item => (
-                                                      <div key={item.label} className="flex justify-between items-center text-xs">
-                                                         <span className="text-slate-500 font-medium">{item.label}</span>
-                                                         <span className="font-bold text-slate-700">{ (item.val?.alunos?.integral || 0) + (item.val?.alunos?.manha || 0) + (item.val?.alunos?.tarde || 0) }</span>
-                                                      </div>
-                                                   ))}
-                                                </div>
-                                             </div>
-                                          </div>
-                                       </td>
-                                    </tr>
-                                 )}
-                              </React.Fragment>
-                           ))}
-                        </tbody>
-                     </table>
-                  </div>
-               </div>
+                              </tfoot>
+                           </table>
+                        </div>
+                     </div>
+                  </>
+               )}
             </div>
          )}
 
@@ -1004,6 +1208,14 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
             <PrintableMatriculaReport 
                escolas={escolas}
                filtroLocalizacao={selectedLocalizacao}
+            />
+         )}
+
+         {isPrintingMatriculaDetalhada && (
+            <PrintableMatriculaDetalhadaReport 
+               escolas={escolas}
+               filtroLocalizacao={selectedLocalizacao}
+               filtroTurno={selectedTurno}
             />
          )}
 
