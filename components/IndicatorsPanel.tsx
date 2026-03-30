@@ -65,7 +65,7 @@ type TabType = 'CENSO' | 'SAMAHC' | 'PARC' | 'SAEB' | 'IDEB' | 'SEAMA' | 'CNCA' 
 
 export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coordenadores, isDemoMode, onUpdateEscola }) => {
     const [mainTab, setMainTab] = useState<'CADASTRO' | 'ANALISE'>('CADASTRO');
-    const [activeAnalysis, setActiveAnalysis] = useState<'PARC' | 'SEAMA' | 'CNCA' | 'SAEB' | 'SAMAHC'>('PARC');
+    const [activeAnalysis, setActiveAnalysis] = useState<'PARC' | 'SEAMA' | 'CNCA' | 'SAEB' | 'SAMAHC_FLUENCIA' | 'SAMAHC_SEAMA' | 'SAMAHC_SAEB' | 'SAMAHC_PORTUGUES' | 'SAMAHC_MATEMATICA'>('PARC');
     const [activeTab, setActiveTab] = useState<TabType>('CENSO');
     const [samahcSubTab, setSamahcSubTab] = useState<'SEAMA' | 'SAEB' | 'FLUENCIA' | 'PORTUGUES' | 'MATEMATICA'>('FLUENCIA');
     const [searchTerm, setSearchTerm] = useState('');
@@ -973,23 +973,27 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
                 </>
             ) : (
                 <div className="space-y-6">
-                    <div className="flex flex-wrap gap-4 mb-4">
+                    <div className="flex flex-wrap gap-3 mb-4">
                         {[
                             { id: 'PARC', label: 'Análise PARC', icon: BookOpen },
                             { id: 'SEAMA', label: 'Análise SEAMA', icon: GraduationCap },
                             { id: 'CNCA', label: 'Análise CNCA/PNRA', icon: Layout },
                             { id: 'SAEB', label: 'Análise SAEB', icon: Target },
-                            { id: 'SAMAHC', label: 'Análise SAMAHC', icon: BarChart3 },
+                            { id: 'SAMAHC_FLUENCIA', label: 'SAMAHC Fluência', icon: BarChart3 },
+                            { id: 'SAMAHC_SEAMA', label: 'SAMAHC SEAMA', icon: BarChart3 },
+                            { id: 'SAMAHC_SAEB', label: 'SAMAHC SAEB', icon: BarChart3 },
+                            { id: 'SAMAHC_PORTUGUES', label: 'SAMAHC Português', icon: BarChart3 },
+                            { id: 'SAMAHC_MATEMATICA', label: 'SAMAHC Matemática', icon: BarChart3 },
                         ].map((analysis) => (
                             <button
                                 key={analysis.id}
                                 onClick={() => setActiveAnalysis(analysis.id as any)}
-                                className={`flex items-center gap-3 px-6 py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition-all border-2 ${activeAnalysis === analysis.id
+                                className={`flex items-center gap-3 px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-wider transition-all border-2 ${activeAnalysis === analysis.id
                                         ? 'bg-slate-900 text-white border-brand-orange shadow-lg scale-[1.02]'
                                         : 'bg-white text-slate-400 border-slate-100 hover:border-brand-orange/30 hover:text-slate-600'
                                     }`}
                             >
-                                <analysis.icon className={`w-5 h-5 ${activeAnalysis === analysis.id ? 'text-brand-orange' : ''}`} />
+                                <analysis.icon className={`w-4 h-4 ${activeAnalysis === analysis.id ? 'text-brand-orange' : ''}`} />
                                 {analysis.label}
                             </button>
                         ))}
@@ -1000,7 +1004,11 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
                         {activeAnalysis === 'CNCA' && <CncaPnraDashboard escolas={escolas} coordenadores={coordenadores} onUpdateEscola={onUpdateEscola} />}
                         {activeAnalysis === 'SEAMA' && <SeamaDashboard escolas={escolas} coordenadores={coordenadores} onUpdateEscola={onUpdateEscola} />}
                         {activeAnalysis === 'SAEB' && <SaebDashboard escolas={escolas} coordenadores={coordenadores} onUpdateEscola={onUpdateEscola} />}
-                        {activeAnalysis === 'SAMAHC' && <SamahcDashboard escolas={escolas} coordenadores={coordenadores} onUpdateEscola={onUpdateEscola} />}
+                        {activeAnalysis === 'SAMAHC_FLUENCIA' && <SamahcDashboard escolas={escolas} coordenadores={coordenadores} onUpdateEscola={onUpdateEscola} samahcSubIndicator="FLUENCIA" />}
+                        {activeAnalysis === 'SAMAHC_SEAMA' && <SamahcDashboard escolas={escolas} coordenadores={coordenadores} onUpdateEscola={onUpdateEscola} samahcSubIndicator="SEAMA" />}
+                        {activeAnalysis === 'SAMAHC_SAEB' && <SamahcDashboard escolas={escolas} coordenadores={coordenadores} onUpdateEscola={onUpdateEscola} samahcSubIndicator="SAEB" />}
+                        {activeAnalysis === 'SAMAHC_PORTUGUES' && <SamahcDashboard escolas={escolas} coordenadores={coordenadores} onUpdateEscola={onUpdateEscola} samahcSubIndicator="PORTUGUES" />}
+                        {activeAnalysis === 'SAMAHC_MATEMATICA' && <SamahcDashboard escolas={escolas} coordenadores={coordenadores} onUpdateEscola={onUpdateEscola} samahcSubIndicator="MATEMATICA" />}
                     </div>
                 </div>
             )}

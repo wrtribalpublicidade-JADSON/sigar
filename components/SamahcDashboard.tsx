@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { 
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-    Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis 
+    Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+    PieChart, Pie, Cell, LabelList
 } from 'recharts';
 import { 
     BarChart3, Award, Users, Filter, School, MapPin, 
@@ -27,11 +28,12 @@ interface SamahcDashboardProps {
     escolas: Escola[];
     coordenadores: Coordenador[];
     onUpdateEscola?: (escola: Escola) => void;
+    samahcSubIndicator?: 'SEAMA' | 'SAEB' | 'FLUENCIA' | 'PORTUGUES' | 'MATEMATICA';
 }
 
 const COLORS = ['#FF4D00', '#000000', '#71717A', '#D6FF00', '#6366f1'];
 
-export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coordenadores, onUpdateEscola }) => {
+export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coordenadores, onUpdateEscola, samahcSubIndicator = 'FLUENCIA' }) => {
     const [selectedPolo, setSelectedPolo] = useState('Todos');
     const [selectedRegional, setSelectedRegional] = useState('Todos');
     const [searchTerm, setSearchTerm] = useState('');
@@ -162,6 +164,92 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
         };
     }, [filteredEscolas]);
 
+    // Fluency-specific stats (fetched directly from DB since escola objects don't carry this data)
+    const [fluencyStats, setFluencyStats] = useState({
+        participatingSchools: 0,
+        totalStudents: 0,
+        pctFluent: 0,
+        pctBeginner: 0,
+        pctPreReaderIV: 0,
+        pctPreReaderIII: 0,
+        pctPreReaderII: 0,
+        pctPreReaderI: 0,
+        pctTotalPreReaders: 0
+    });
+    const [participatingSchoolIdsSet, setParticipatingSchoolIdsSet] = useState<Set<string>>(new Set());
+
+    React.useEffect(() => {
+        
+        const fetchFluencyStats = async () => {
+            try {
+                const schoolIds = filteredEscolas.map(e => e.id);
+                const records = await samahcService.getAllStatsRecords(schoolIds, {
+                    escola_id: detalheEscolaId,
+                    ano: detalheAno,
+                    ano_serie: detalheSerie,
+                    turno: detalheTurno,
+                    tipo_avaliacao: detalheAvaliacao,
+                    nivel_desempenho: detalheNivel
+                });
+                
+                let totalStudents = 0;
+                let fluentCount = 0;
+                let beginnerCount = 0;
+                let preReaderIVCount = 0;
+                let preReaderIIICount = 0;
+                let preReaderIICount = 0;
+                let preReaderICount = 0;
+                const participatingSchoolIds = new Set<string>();
+
+                records.forEach((r: any) => {
+                    totalStudents++;
+                    participatingSchoolIds.add(r.escola_id);
+                    const nivel = (r.nivel_desempenho || '').toUpperCase();
+                    if (nivel.includes('FLUENTE')) {
+                        fluentCount++;
+                    } else if (nivel.includes('INICIANTE')) {
+                        beginnerCount++;
+                    } else if (nivel.includes('NÍVEL IV') || nivel.includes('NIVEL IV')) {
+                        preReaderIVCount++;
+                    } else if (nivel.includes('NÍVEL III') || nivel.includes('NIVEL III')) {
+                        preReaderIIICount++;
+                    } else if (nivel.includes('NÍVEL II') || nivel.includes('NIVEL II')) {
+                        preReaderIICount++;
+                    } else if (nivel.includes('NÍVEL I') || nivel.includes('NIVEL I')) {
+                        preReaderICount++;
+                    }
+                });
+
+                const pctFluent = totalStudents > 0 ? Number(((fluentCount / totalStudents) * 100).toFixed(1)) : 0;
+                const pctBeginner = totalStudents > 0 ? Number(((beginnerCount / totalStudents) * 100).toFixed(1)) : 0;
+                const pctPreReaderIV = totalStudents > 0 ? Number(((preReaderIVCount / totalStudents) * 100).toFixed(1)) : 0;
+                const pctPreReaderIII = totalStudents > 0 ? Number(((preReaderIIICount / totalStudents) * 100).toFixed(1)) : 0;
+                const pctPreReaderII = totalStudents > 0 ? Number(((preReaderIICount / totalStudents) * 100).toFixed(1)) : 0;
+                const pctPreReaderI = totalStudents > 0 ? Number(((preReaderICount / totalStudents) * 100).toFixed(1)) : 0;
+                
+                const totalPreReaders = preReaderIVCount + preReaderIIICount + preReaderIICount + preReaderICount;
+                const pctTotalPreReaders = totalStudents > 0 ? Number(((totalPreReaders / totalStudents) * 100).toFixed(1)) : 0;
+
+                setFluencyStats({
+                    participatingSchools: participatingSchoolIds.size,
+                    totalStudents,
+                    pctFluent,
+                    pctBeginner,
+                    pctPreReaderIV,
+                    pctPreReaderIII,
+                    pctPreReaderII,
+                    pctPreReaderI,
+                    pctTotalPreReaders
+                });
+                setParticipatingSchoolIdsSet(participatingSchoolIds);
+            } catch (error) {
+                console.error('Error fetching fluency stats:', error);
+            }
+        };
+
+        fetchFluencyStats();
+    }, [filteredEscolas, detalheEscolaId, detalheAno, detalheSerie, detalheTurno, detalheAvaliacao, detalheNivel]);
+
     // Radar Data for average
     const radarData = [
         { subject: 'SEAMA', A: stats.seama, fullMark: 100 },
@@ -270,17 +358,44 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
         setIsEvolutionModalOpen(true);
     };
 
-    const renderVisaoGeral = () => (
+    const renderVisaoGeral = () => {
+        // Build card data based on sub-indicator
+        const cardData = samahcSubIndicator === 'FLUENCIA' ? [
+            { label: 'ESCOLAS PARTICIPANTES', val: fluencyStats.participatingSchools, icon: School, color: 'text-indigo-500', key: 'SEAMA' },
+            { label: 'ESTUDANTES AVALIADOS', val: fluencyStats.totalStudents, icon: Users, color: 'text-red-500', key: 'SAEB' },
+            { label: 'LEITORES FLUENTES', val: fluencyStats.pctFluent + '%', icon: Activity, color: 'text-orange-500', key: 'FLUENCIA' },
+            { label: 'LEITORES INICIANTES', val: fluencyStats.pctBeginner + '%', icon: BookOpen, color: 'text-emerald-500', key: 'PORTUGUES' },
+            { label: 'PRÉ-LEITORES', val: fluencyStats.pctTotalPreReaders + '%', icon: TrendingUp, color: 'text-blue-500', key: 'MATEMATICA' },
+        ] : [
+            { label: 'SIMULADO SEAMA', val: stats.seama, icon: GraduationCap, color: 'text-indigo-500', key: 'SEAMA' },
+            { label: 'SIMULADO SAEB', val: stats.saeb, icon: Target, color: 'text-red-500', key: 'SAEB' },
+            { label: 'FLUÊNCIA', val: stats.fluencia + '%', icon: Activity, color: 'text-orange-500', key: 'FLUENCIA' },
+            { label: 'L. PORTUGUESA', val: stats.lp, icon: BookOpen, color: 'text-emerald-500', key: 'PORTUGUES' },
+            { label: 'MATEMÁTICA', val: stats.mat, icon: TrendingUp, color: 'text-blue-500', key: 'MATEMATICA' },
+        ];
+
+        // Specific data for Fluency Charts
+        const fluencyBarData = [
+            { subject: 'Fluentes', A: fluencyStats.pctFluent },
+            { subject: 'Iniciantes', A: fluencyStats.pctBeginner },
+            { subject: 'Pré-Leitor IV', A: fluencyStats.pctPreReaderIV },
+            { subject: 'Pré-Leitor III', A: fluencyStats.pctPreReaderIII },
+            { subject: 'Pré-Leitor II', A: fluencyStats.pctPreReaderII },
+            { subject: 'Pré-Leitor I', A: fluencyStats.pctPreReaderI },
+        ];
+
+        const fluencyPieData = [
+            { name: 'Leitores', value: fluencyStats.pctFluent + fluencyStats.pctBeginner, color: '#FF4D00' },
+            { name: 'Pré-Leitores', value: fluencyStats.pctTotalPreReaders, color: '#CBD5E1' }
+        ];
+
+        const barData = samahcSubIndicator === 'FLUENCIA' ? fluencyBarData : radarData;
+
+        return (
         <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                {[
-                    { label: 'SIMULADO SEAMA', val: stats.seama, icon: GraduationCap, color: 'text-indigo-500' },
-                    { label: 'SIMULADO SAEB', val: stats.saeb, icon: Target, color: 'text-red-500' },
-                    { label: 'FLUÊNCIA', val: stats.fluencia + '%', icon: Activity, color: 'text-orange-500' },
-                    { label: 'L. PORTUGUESA', val: stats.lp, icon: BookOpen, color: 'text-emerald-500' },
-                    { label: 'MATEMÁTICA', val: stats.mat, icon: TrendingUp, color: 'text-blue-500' },
-                ].map((s, i) => (
-                    <div key={i} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm transition-all hover:shadow-md group">
+                {cardData.map((s, i) => (
+                    <div key={i} className={`bg-white p-6 rounded-2xl border shadow-sm transition-all hover:shadow-md group ${samahcSubIndicator === s.key ? 'border-orange-400 ring-2 ring-orange-200' : 'border-slate-200'}`}>
                         <div className="flex items-center justify-between mb-4">
                             <div className={`p-2 rounded-lg bg-slate-50 group-hover:bg-slate-100 transition-colors`}>
                                 <s.icon className={`w-5 h-5 ${s.color}`} />
@@ -300,15 +415,17 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
                     </h3>
                     <div className="h-80">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={radarData}>
+                            <BarChart data={barData}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                 <XAxis dataKey="subject" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 700 }} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
+                                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} domain={[0, 100]} />
                                 <Tooltip 
                                     cursor={{ fill: '#f8fafc' }}
                                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                                 />
-                                <Bar dataKey="A" name="Média Geral" fill="#FF4D00" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="A" name="Média Geral" fill="#FF4D00" radius={[4, 4, 0, 0]}>
+                                    <LabelList dataKey="A" position="top" formatter={(val: any) => `${val}%`} style={{ fill: '#64748b', fontSize: 10, fontWeight: 800 }} />
+                                </Bar>
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
@@ -321,19 +438,40 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
                     </h3>
                     <div className="flex-1 min-h-[300px]">
                         <ResponsiveContainer width="100%" height="100%">
-                            <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
-                                <PolarGrid stroke="#e2e8f0" />
-                                <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }} />
-                                <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-                                <Radar name="Média" dataKey="A" stroke="#FF4D00" fill="#FF4D00" fillOpacity={0.6} />
-                                <Tooltip />
-                            </RadarChart>
+                            {samahcSubIndicator === 'FLUENCIA' ? (
+                                <PieChart>
+                                    <Pie
+                                        data={fluencyPieData}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={60}
+                                        outerRadius={80}
+                                        paddingAngle={5}
+                                        dataKey="value"
+                                        label={({ name, value }) => `${name}: ${value.toFixed(1)}%`}
+                                    >
+                                        {fluencyPieData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip />
+                                    <Legend verticalAlign="bottom" height={36}/>
+                                </PieChart>
+                            ) : (
+                                <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
+                                    <PolarGrid stroke="#e2e8f0" />
+                                    <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }} />
+                                    <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                                    <Radar name="Média" dataKey="A" stroke="#FF4D00" fill="#FF4D00" fillOpacity={0.6} />
+                                    <Tooltip />
+                                </RadarChart>
+                            )}
                         </ResponsiveContainer>
                     </div>
                 </div>
             </div>
         </div>
-    );
+    )};
 
     const renderRankings = () => (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -373,11 +511,38 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
                 <div className="bg-slate-900 p-4 text-white">
                     <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
                         <Activity className="w-4 h-4 text-orange-500" />
-                        Maiores Taxas de Fluência
+                        {samahcSubIndicator === 'SEAMA' ? 'Maiores Notas SEAMA' :
+                         samahcSubIndicator === 'SAEB' ? 'Maiores Notas SAEB' :
+                         samahcSubIndicator === 'PORTUGUES' ? 'Maiores Notas L. Portuguesa' :
+                         samahcSubIndicator === 'MATEMATICA' ? 'Maiores Notas Matemática' :
+                         'Maiores Taxas de Fluência'}
                     </h3>
                 </div>
                 <div className="divide-y divide-slate-100">
-                    {[...filteredEscolas].sort((a, b) => (b.dadosEducacionais?.dadosSamahc?.fluencia || 0) - (a.dadosEducacionais?.dadosSamahc?.fluencia || 0)).slice(0, 5).map((e, i) => (
+                    {[...filteredEscolas].sort((a, b) => {
+                        const sA = a.dadosEducacionais?.dadosSamahc;
+                        const sB = b.dadosEducacionais?.dadosSamahc;
+                        const getVal = (s: any) => {
+                            if (samahcSubIndicator === 'SEAMA') return s?.simuladoSeama || 0;
+                            if (samahcSubIndicator === 'SAEB') return s?.simuladoSaeb || 0;
+                            if (samahcSubIndicator === 'PORTUGUES') return s?.linguaPortuguesa || 0;
+                            if (samahcSubIndicator === 'MATEMATICA') return s?.matematica || 0;
+                            return s?.fluencia || 0;
+                        };
+                        return getVal(sB) - getVal(sA);
+                    }).slice(0, 5).map((e, i) => {
+                        const s = e.dadosEducacionais?.dadosSamahc;
+                        const val = samahcSubIndicator === 'SEAMA' ? (s?.simuladoSeama || 0) :
+                                    samahcSubIndicator === 'SAEB' ? (s?.simuladoSaeb || 0) :
+                                    samahcSubIndicator === 'PORTUGUES' ? (s?.linguaPortuguesa || 0) :
+                                    samahcSubIndicator === 'MATEMATICA' ? (s?.matematica || 0) :
+                                    (s?.fluencia || 0);
+                        const suffix = samahcSubIndicator === 'FLUENCIA' ? '%' : '';
+                        const labelText = samahcSubIndicator === 'FLUENCIA' ? 'Leitores' :
+                                          samahcSubIndicator === 'SEAMA' ? 'Sim. SEAMA' :
+                                          samahcSubIndicator === 'SAEB' ? 'Sim. SAEB' :
+                                          samahcSubIndicator === 'PORTUGUES' ? 'L. Portuguesa' : 'Matemática';
+                        return (
                         <div key={e.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
                             <div className="flex items-center gap-4">
                                 <span className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 font-black text-xs">
@@ -389,11 +554,12 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
                                 </div>
                             </div>
                             <div className="text-right">
-                                <p className="text-lg font-black text-slate-800">{e.dadosEducacionais?.dadosSamahc?.fluencia || 0}%</p>
-                                <p className="text-[10px] text-orange-500 font-black uppercase tracking-tighter">Leitores</p>
+                                <p className="text-lg font-black text-slate-800">{val}{suffix}</p>
+                                <p className="text-[10px] text-orange-500 font-black uppercase tracking-tighter">{labelText}</p>
                             </div>
                         </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
         </div>
@@ -405,25 +571,31 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
                 <thead>
                     <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
                         <th className="pb-4">Unidade Escolar</th>
-                        <th className="pb-4 text-center">Simulado Seama</th>
-                        <th className="pb-4 text-center">Simulado Saeb</th>
-                        <th className="pb-4 text-center">Fluência %</th>
-                        <th className="pb-4 text-center">L. Portuguesa</th>
-                        <th className="pb-4 text-center">Matemática</th>
+                        <th className={`pb-4 text-center ${samahcSubIndicator === 'SEAMA' ? 'text-orange-600 bg-orange-50/50' : ''}`}>Simulado Seama</th>
+                        <th className={`pb-4 text-center ${samahcSubIndicator === 'SAEB' ? 'text-orange-600 bg-orange-50/50' : ''}`}>Simulado Saeb</th>
+                        <th className={`pb-4 text-center ${samahcSubIndicator === 'FLUENCIA' ? 'text-orange-600 bg-orange-50/50' : ''}`}>Fluência %</th>
+                        <th className={`pb-4 text-center ${samahcSubIndicator === 'PORTUGUES' ? 'text-orange-600 bg-orange-50/50' : ''}`}>L. Portuguesa</th>
+                        <th className={`pb-4 text-center ${samahcSubIndicator === 'MATEMATICA' ? 'text-orange-600 bg-orange-50/50' : ''}`}>Matemática</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                    {filteredEscolas.map(e => (
+                    {filteredEscolas.filter(e => {
+                        // Only show schools that participated in at least one test
+                        const s = e.dadosEducacionais?.dadosSamahc;
+                        const hasRecords = participatingSchoolIdsSet.has(e.id);
+                        const hasData = (s?.simuladoSeama || 0) > 0 || (s?.simuladoSaeb || 0) > 0 || (s?.fluencia || 0) > 0 || (s?.linguaPortuguesa || 0) > 0 || (s?.matematica || 0) > 0;
+                        return hasRecords || hasData;
+                    }).map(e => (
                         <tr key={e.id} className="group hover:bg-slate-50 transition-colors">
                             <td className="py-4">
                                 <p className="text-sm font-bold text-slate-700 group-hover:text-orange-600 transition-colors">{e.nome}</p>
                                 <p className="text-[10px] text-slate-400 uppercase font-bold tracking-tight">{(e as any).polo || 'N/A'}</p>
                             </td>
-                            <td className="py-4 text-center font-bold text-slate-600">{e.dadosEducacionais?.dadosSamahc?.simuladoSeama || 0}</td>
-                            <td className="py-4 text-center font-bold text-slate-600">{e.dadosEducacionais?.dadosSamahc?.simuladoSaeb || 0}</td>
-                            <td className="py-4 text-center font-bold text-orange-600">{e.dadosEducacionais?.dadosSamahc?.fluencia || 0}%</td>
-                            <td className="py-4 text-center font-bold text-slate-600">{e.dadosEducacionais?.dadosSamahc?.linguaPortuguesa || 0}</td>
-                            <td className="py-4 text-center font-bold text-slate-600">{e.dadosEducacionais?.dadosSamahc?.matematica || 0}</td>
+                            <td className={`py-4 text-center font-bold ${samahcSubIndicator === 'SEAMA' ? 'text-orange-600 bg-orange-50/30' : 'text-slate-600'}`}>{e.dadosEducacionais?.dadosSamahc?.simuladoSeama || 0}</td>
+                            <td className={`py-4 text-center font-bold ${samahcSubIndicator === 'SAEB' ? 'text-orange-600 bg-orange-50/30' : 'text-slate-600'}`}>{e.dadosEducacionais?.dadosSamahc?.simuladoSaeb || 0}</td>
+                            <td className={`py-4 text-center font-bold ${samahcSubIndicator === 'FLUENCIA' ? 'text-orange-600 bg-orange-50/30' : 'text-slate-600'}`}>{e.dadosEducacionais?.dadosSamahc?.fluencia || 0}%</td>
+                            <td className={`py-4 text-center font-bold ${samahcSubIndicator === 'PORTUGUES' ? 'text-orange-600 bg-orange-50/30' : 'text-slate-600'}`}>{e.dadosEducacionais?.dadosSamahc?.linguaPortuguesa || 0}</td>
+                            <td className={`py-4 text-center font-bold ${samahcSubIndicator === 'MATEMATICA' ? 'text-orange-600 bg-orange-50/30' : 'text-slate-600'}`}>{e.dadosEducacionais?.dadosSamahc?.matematica || 0}</td>
                         </tr>
                     ))}
                 </tbody>
@@ -451,115 +623,6 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
                     <Printer className="w-4 h-4 text-orange-500" />
                     IMPRIMIR RELATÓRIO
                 </button>
-            </div>
-
-            {/* Filtros Avançados */}
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                {/* Escola (Filtrada pelo Polo/Regional do topo) */}
-                <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Escola</label>
-                    <div className="relative">
-                        <select 
-                            value={detalheEscolaId}
-                            onChange={(e) => setDetalheEscolaId(e.target.value)}
-                            className="w-full bg-slate-50 border-none rounded-xl py-2 px-3 text-xs font-bold text-slate-700 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-500 appearance-none"
-                        >
-                            <option value="Todas">Todas as Escolas</option>
-                            {filteredEscolas.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
-                    </div>
-                </div>
-
-                {/* Ano */}
-                <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Ano</label>
-                    <div className="relative">
-                        <select 
-                            value={detalheAno}
-                            onChange={(e) => setDetalheAno(Number(e.target.value))}
-                            className="w-full bg-slate-50 border-none rounded-xl py-2 px-3 text-xs font-bold text-slate-700 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-500 appearance-none"
-                        >
-                            <option value={0}>Todos</option>
-                            <option value={2025}>2025</option>
-                            <option value={2024}>2024</option>
-                            <option value={2023}>2023</option>
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
-                    </div>
-                </div>
-
-                {/* Série */}
-                <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Série</label>
-                    <div className="relative">
-                        <select 
-                            value={detalheSerie}
-                            onChange={(e) => setDetalheSerie(e.target.value)}
-                            className="w-full bg-slate-50 border-none rounded-xl py-2 px-3 text-xs font-bold text-slate-700 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-500 appearance-none"
-                        >
-                            <option value="Todas">Todas</option>
-                            {['1º ANO', '2º ANO', '3º ANO', '4º ANO', '5º ANO', '6º ANO', '7º ANO', '8º ANO', '9º ANO', 'EJA', 'MULTI'].map(s => (
-                                <option key={s} value={s}>{s}</option>
-                            ))}
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
-                    </div>
-                </div>
-
-                {/* Turno */}
-                <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Turno</label>
-                    <div className="relative">
-                        <select 
-                            value={detalheTurno}
-                            onChange={(e) => setDetalheTurno(e.target.value)}
-                            className="w-full bg-slate-50 border-none rounded-xl py-2 px-3 text-xs font-bold text-slate-700 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-500 appearance-none"
-                        >
-                            <option value="Todos">Todos</option>
-                            {['MATUTINO', 'VESPERTINO', 'INTEGRAL', 'A DEFINIR'].map(t => (
-                                <option key={t} value={t}>{t}</option>
-                            ))}
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
-                    </div>
-                </div>
-
-                {/* Avaliação */}
-                <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Avaliação</label>
-                    <div className="relative">
-                        <select 
-                            value={detalheAvaliacao}
-                            onChange={(e) => setDetalheAvaliacao(e.target.value)}
-                            className="w-full bg-slate-50 border-none rounded-xl py-2 px-3 text-xs font-bold text-slate-700 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-500 appearance-none"
-                        >
-                            <option value="Todas">Todas</option>
-                            {['DIAGNÓSTICA', 'FORMATIVA', 'SOMATIVA'].map(a => (
-                                <option key={a} value={a}>{a}</option>
-                            ))}
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
-                    </div>
-                </div>
-
-                {/* Nível */}
-                <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Nível</label>
-                    <div className="relative">
-                        <select 
-                            value={detalheNivel}
-                            onChange={(e) => setDetalheNivel(e.target.value)}
-                            className="w-full bg-slate-50 border-none rounded-xl py-2 px-3 text-xs font-bold text-slate-700 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-500 appearance-none"
-                        >
-                            <option value="Todos">Todos</option>
-                            {['LEITOR FLUENTE', 'LEITOR INICIANTE', 'PRÉ-LEITOR | NÍVEL I', 'PRÉ-LEITOR | NÍVEL II', 'PRÉ-LEITOR | NÍVEL III', 'PRÉ-LEITOR | NÍVEL IV', 'NÃO AVALIADO'].map(n => (
-                                <option key={n} value={n}>{n}</option>
-                            ))}
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
-                    </div>
-                </div>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -784,6 +847,106 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
                     </div>
                 </div>
             </div>
+
+            {/* Filtros Avançados (Compartilhados entre todas as views) */}
+            {samahcSubIndicator === 'FLUENCIA' && (
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-4">
+                <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Escola</label>
+                    <div className="relative">
+                        <select 
+                            value={detalheEscolaId}
+                            onChange={(e) => setDetalheEscolaId(e.target.value)}
+                            className="w-full bg-slate-50 border-none rounded-xl py-2 px-3 text-xs font-bold text-slate-700 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-500 appearance-none"
+                        >
+                            <option value="Todas">Todas as Escolas</option>
+                            {filteredEscolas.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+                    </div>
+                </div>
+                <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Ano</label>
+                    <div className="relative">
+                        <select 
+                            value={detalheAno}
+                            onChange={(e) => setDetalheAno(Number(e.target.value))}
+                            className="w-full bg-slate-50 border-none rounded-xl py-2 px-3 text-xs font-bold text-slate-700 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-500 appearance-none"
+                        >
+                            <option value={0}>Todos</option>
+                            <option value={2025}>2025</option>
+                            <option value={2024}>2024</option>
+                            <option value={2023}>2023</option>
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+                    </div>
+                </div>
+                <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Série</label>
+                    <div className="relative">
+                        <select 
+                            value={detalheSerie}
+                            onChange={(e) => setDetalheSerie(e.target.value)}
+                            className="w-full bg-slate-50 border-none rounded-xl py-2 px-3 text-xs font-bold text-slate-700 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-500 appearance-none"
+                        >
+                            <option value="Todas">Todas</option>
+                            {['1º ANO', '2º ANO', '3º ANO', '4º ANO', '5º ANO', '6º ANO', '7º ANO', '8º ANO', '9º ANO', 'EJA', 'MULTI'].map(s => (
+                                <option key={s} value={s}>{s}</option>
+                            ))}
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+                    </div>
+                </div>
+                <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Turno</label>
+                    <div className="relative">
+                        <select 
+                            value={detalheTurno}
+                            onChange={(e) => setDetalheTurno(e.target.value)}
+                            className="w-full bg-slate-50 border-none rounded-xl py-2 px-3 text-xs font-bold text-slate-700 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-500 appearance-none"
+                        >
+                            <option value="Todos">Todos</option>
+                            {['MATUTINO', 'VESPERTINO', 'INTEGRAL', 'A DEFINIR'].map(t => (
+                                <option key={t} value={t}>{t}</option>
+                            ))}
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+                    </div>
+                </div>
+                <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Avaliação</label>
+                    <div className="relative">
+                        <select 
+                            value={detalheAvaliacao}
+                            onChange={(e) => setDetalheAvaliacao(e.target.value)}
+                            className="w-full bg-slate-50 border-none rounded-xl py-2 px-3 text-xs font-bold text-slate-700 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-500 appearance-none"
+                        >
+                            <option value="Todas">Todas</option>
+                            {['DIAGNÓSTICA', 'FORMATIVA', 'SOMATIVA'].map(a => (
+                                <option key={a} value={a}>{a}</option>
+                            ))}
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+                    </div>
+                </div>
+                <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Nível</label>
+                    <div className="relative">
+                        <select 
+                            value={detalheNivel}
+                            onChange={(e) => setDetalheNivel(e.target.value)}
+                            className="w-full bg-slate-50 border-none rounded-xl py-2 px-3 text-xs font-bold text-slate-700 outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-orange-500 appearance-none"
+                        >
+                            <option value="Todos">Todos</option>
+                            {['LEITOR FLUENTE', 'LEITOR INICIANTE', 'PRÉ-LEITOR | NÍVEL I', 'PRÉ-LEITOR | NÍVEL II', 'PRÉ-LEITOR | NÍVEL III', 'PRÉ-LEITOR | NÍVEL IV', 'NÃO AVALIADO'].map(n => (
+                                <option key={n} value={n}>{n}</option>
+                            ))}
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+                    </div>
+                </div>
+            </div>
+            )}
 
             <div className="mt-8">
                 {activeView === 'VISÃO GERAL' && renderVisaoGeral()}
