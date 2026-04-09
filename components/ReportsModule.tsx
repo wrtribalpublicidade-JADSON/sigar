@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { PageHeader } from './ui/PageHeader';
-import { ChevronDown, ChevronRight, FileText, Calendar, Printer, CheckSquare, AlertCircle, FileSpreadsheet, Download, Search, MapPin, Users, GraduationCap, Shield, UserCheck, BarChart3, Briefcase, Building2, Phone, Mail } from 'lucide-react';
+import { ChevronDown, ChevronRight, FileText, Calendar, Printer, CheckSquare, AlertCircle, FileSpreadsheet, Download, Search, MapPin, Users, GraduationCap, Shield, UserCheck, BarChart3, Briefcase, Building2, Phone, Mail, BookOpen, Clock, Star, Trophy, ClipboardCheck } from 'lucide-react';
 import { Visita, Escola, Coordenador, RecursoHumano } from '../types';
 import { exportToCSV } from '../utils';
 import { useNotification } from '../context/NotificationContext';
@@ -8,6 +8,10 @@ import { PrintableGerencialReport, TipoRelatorio, FiltroVinculo, SubtipoGestor }
 import { PrintableMatriculaReport } from './PrintableMatriculaReport';
 import { PrintableMatriculaDetalhadaReport } from './PrintableMatriculaDetalhadaReport';
 import { PrintableServidoresReport } from './PrintableServidoresReport';
+import { PrintableAtividadesReport } from './PrintableAtividadesReport';
+import { CoordinatorReportTab } from './reports/CoordinatorReportTab';
+import { PrintableCoordinatorReport } from './PrintableCoordinatorReport';
+import { activitiesService, Atividade } from '../services/activitiesService';
 
 interface ReportsModuleProps {
    visitas: Visita[];
@@ -15,7 +19,7 @@ interface ReportsModuleProps {
    coordenadores: Coordenador[];
 }
 
-type ReportTab = 'visita' | 'gerenciais' | 'matriculas' | 'servidores';
+type ReportTab = 'visita' | 'gerenciais' | 'matriculas' | 'servidores' | 'atividades' | 'coordenador';
 
 interface ServidorCompleto extends RecursoHumano {
    escolaNome: string;
@@ -52,6 +56,22 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
    const [servidorEscolaFilter, setServidorEscolaFilter] = useState<string>('Todas');
    const [servidorSearchTerm, setServidorSearchTerm] = useState<string>('');
    const [isPrintingServidores, setIsPrintingServidores] = useState(false);
+
+   // === Atividades Tab State ===
+   const [atividadesData, setAtividadesData] = useState<(Atividade & { alunosList?: any[] })[]>([]);
+   const [isLoadingAtividades, setIsLoadingAtividades] = useState(false);
+   const [atividadeCatFilter, setAtividadeCatFilter] = useState<string>('Todas');
+   const [atividadeStatusFilter, setAtividadeStatusFilter] = useState<string>('Todos');
+   const [atividadeEscolaFilter, setAtividadeEscolaFilter] = useState<string>('Todas');
+   const [atividadeSearchTerm, setAtividadeSearchTerm] = useState<string>('');
+   const [isPrintingAtividades, setIsPrintingAtividades] = useState(false);
+   const [expandedAtividadeId, setExpandedAtividadeId] = useState<string | null>(null);
+
+   // === Coordenador Tab State ===
+   const [isPrintingCoordinator, setIsPrintingCoordinator] = useState(false);
+   const [coordinatorPrintData, setCoordinatorPrintData] = useState<any[]>([]);
+   const [coordinatorPrintFiltroCoord, setCoordinatorPrintFiltroCoord] = useState('');
+   const [coordinatorPrintFiltroRegional, setCoordinatorPrintFiltroRegional] = useState('');
 
    const filteredData = useMemo(() => {
       return visitas.filter(visita => {
@@ -216,11 +236,141 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
       return { total: servidoresFiltrados.length, efetivos, contratados, permutados, escolasComServidor, funcoes };
    }, [servidoresFiltrados]);
 
+   // === Atividades: load from Supabase ===
+   const fetchAtividadesReport = useCallback(async () => {
+      setIsLoadingAtividades(true);
+      try {
+         const atividades = await activitiesService.getAtividades();
+         // Load enrolled students for each activity
+         const withStudents = await Promise.all(
+            atividades.map(async (atv) => {
+               try {
+                  const alunos = await activitiesService.getEnrolledStudents(atv.id);
+                  return { ...atv, alunosList: alunos };
+               } catch {
+                  return { ...atv, alunosList: [] };
+               }
+            })
+         );
+         setAtividadesData(withStudents);
+      } catch (err) {
+         console.error('Error loading activities for report:', err);
+      } finally {
+         setIsLoadingAtividades(false);
+      }
+   }, []);
+
+   useEffect(() => {
+      if (activeTab === 'atividades' && atividadesData.length === 0) {
+         fetchAtividadesReport();
+      }
+   }, [activeTab]);
+
+   const CATEGORIAS_ATIVIDADES = [
+      { id: 'esportes', name: 'Esportes' },
+      { id: 'artes', name: 'Artes' },
+      { id: 'musica', name: 'Música' },
+      { id: 'tecnologia', name: 'Tecnologia' },
+      { id: 'reforco', name: 'Reforço' },
+   ];
+
+   const atividadesFiltradas = useMemo(() => {
+      let filtered = atividadesData;
+      if (atividadeCatFilter !== 'Todas') {
+         filtered = filtered.filter(a => a.categoria === atividadeCatFilter);
+      }
+      if (atividadeStatusFilter !== 'Todos') {
+         filtered = filtered.filter(a => a.status === atividadeStatusFilter);
+      }
+      if (atividadeEscolaFilter !== 'Todas') {
+         filtered = filtered.filter(a => a.escola_id === atividadeEscolaFilter);
+      }
+      if (atividadeSearchTerm.trim()) {
+         const term = atividadeSearchTerm.toLowerCase().trim();
+         filtered = filtered.filter(a =>
+            a.nome.toLowerCase().includes(term) ||
+            a.instrutor?.toLowerCase().includes(term) ||
+            a.unidadeEscolar?.toLowerCase().includes(term)
+         );
+      }
+      return filtered.sort((a, b) => a.nome.localeCompare(b.nome));
+   }, [atividadesData, atividadeCatFilter, atividadeStatusFilter, atividadeEscolaFilter, atividadeSearchTerm]);
+
+   const atividadesStats = useMemo(() => {
+      const total = atividadesFiltradas.length;
+      const ativas = atividadesFiltradas.filter(a => a.status === 'Ativa').length;
+      const encerradas = atividadesFiltradas.filter(a => a.status === 'Encerrada').length;
+      const totalInscritos = atividadesFiltradas.reduce((sum, a) => sum + (a.alunosList?.length || a.inscritos || 0), 0);
+      const totalVagas = atividadesFiltradas.reduce((sum, a) => sum + (a.vagas || 0), 0);
+      const unidades = new Set(atividadesFiltradas.map(a => a.escola_id || a.unidadeEscolar)).size;
+      return { total, ativas, encerradas, totalInscritos, totalVagas, unidades };
+   }, [atividadesFiltradas]);
+
+   const handlePrintAtividades = () => {
+      setIsPrintingAtividades(true);
+      setTimeout(() => {
+         window.print();
+         setIsPrintingAtividades(false);
+      }, 300);
+   };
+
+   const handleExportAtividadesCSV = () => {
+      const rows: any[] = [];
+      atividadesFiltradas.forEach(atv => {
+         if (atv.alunosList && atv.alunosList.length > 0) {
+            atv.alunosList.forEach((aluno, i) => {
+               rows.push({
+                  'ATIVIDADE': atv.nome,
+                  'CATEGORIA': atv.categoria,
+                  'UNIDADE ESCOLAR': atv.unidadeEscolar || '',
+                  'INSTRUTOR': atv.instrutor || '',
+                  'STATUS': atv.status,
+                  'DIAS': atv.diasSemana?.join('/') || '',
+                  'HORÁRIO': `${atv.horarioInicio || ''} - ${atv.horarioFim || ''}`,
+                  'Nº ALUNO': i + 1,
+                  'NOME DO ALUNO': aluno.nome,
+                  'DATA NASCIMENTO': aluno.dataNascimento ? new Date(aluno.dataNascimento + 'T12:00:00').toLocaleDateString('pt-BR') : '',
+                  'ESCOLA DO ALUNO': aluno.escola || '',
+                  'ANO/SÉRIE': aluno.anoSerie || '',
+               });
+            });
+         } else {
+            rows.push({
+               'ATIVIDADE': atv.nome,
+               'CATEGORIA': atv.categoria,
+               'UNIDADE ESCOLAR': atv.unidadeEscolar || '',
+               'INSTRUTOR': atv.instrutor || '',
+               'STATUS': atv.status,
+               'DIAS': atv.diasSemana?.join('/') || '',
+               'HORÁRIO': `${atv.horarioInicio || ''} - ${atv.horarioFim || ''}`,
+               'Nº ALUNO': '-',
+               'NOME DO ALUNO': 'Sem alunos inscritos',
+               'DATA NASCIMENTO': '',
+               'ESCOLA DO ALUNO': '',
+               'ANO/SÉRIE': '',
+            });
+         }
+      });
+      exportToCSV(rows, 'relatorio_atividades_complementares');
+      showNotification('success', 'Relatório de atividades exportado com sucesso');
+   };
+
    const handlePrintServidores = () => {
       setIsPrintingServidores(true);
       setTimeout(() => {
          window.print();
          setIsPrintingServidores(false);
+      }, 300);
+   };
+
+   const handlePrintCoordinator = (data: any[], filtroCoord: string, filtroRegional: string) => {
+      setCoordinatorPrintData(data);
+      setCoordinatorPrintFiltroCoord(filtroCoord);
+      setCoordinatorPrintFiltroRegional(filtroRegional);
+      setIsPrintingCoordinator(true);
+      setTimeout(() => {
+         window.print();
+         setIsPrintingCoordinator(false);
       }, 300);
    };
 
@@ -324,10 +474,12 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
          {/* ====== TABS ====== */}
          <div className="flex gap-2 p-1 bg-slate-100 rounded-xl print:hidden">
             {[
+               { id: 'coordenador' as ReportTab, icon: ClipboardCheck, label: 'Atividades do Coordenador' },
                { id: 'visita' as ReportTab, icon: FileText, label: 'Relatório de Visita' },
                { id: 'gerenciais' as ReportTab, icon: BarChart3, label: 'Relatórios Gerenciais' },
                { id: 'matriculas' as ReportTab, icon: GraduationCap, label: 'Controle de Matrículas' },
                { id: 'servidores' as ReportTab, icon: Briefcase, label: 'Controle de Servidores' },
+               { id: 'atividades' as ReportTab, icon: BookOpen, label: 'Ativ. Complementares' },
             ].map(tab => (
                <button
                   key={tab.id}
@@ -1194,6 +1346,281 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
             </div>
          )}
 
+         {/* ====== ATIVIDADES COMPLEMENTARES TAB ====== */}
+         {activeTab === 'atividades' && (
+            <div className="space-y-8 animate-fade-in">
+               {/* Filters */}
+               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                     {/* Busca */}
+                     <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                           <Search className="w-4 h-4 text-purple-500" /> Buscar Atividade
+                        </label>
+                        <input
+                           type="text"
+                           value={atividadeSearchTerm}
+                           onChange={e => setAtividadeSearchTerm(e.target.value)}
+                           placeholder="Nome ou instrutor..."
+                           className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/10 shadow-sm"
+                        />
+                     </div>
+
+                     {/* Categoria */}
+                     <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                           <Trophy className="w-4 h-4 text-purple-500" /> Categoria
+                        </label>
+                        <div className="relative">
+                           <select
+                              value={atividadeCatFilter}
+                              onChange={e => setAtividadeCatFilter(e.target.value)}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 pr-10 text-sm font-medium text-slate-700 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/10 appearance-none shadow-sm"
+                           >
+                              <option value="Todas">Todas as Categorias</option>
+                              {CATEGORIAS_ATIVIDADES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                           </select>
+                           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        </div>
+                     </div>
+
+                     {/* Status */}
+                     <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                           <Star className="w-4 h-4 text-purple-500" /> Status
+                        </label>
+                        <div className="relative">
+                           <select
+                              value={atividadeStatusFilter}
+                              onChange={e => setAtividadeStatusFilter(e.target.value)}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 pr-10 text-sm font-medium text-slate-700 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/10 appearance-none shadow-sm"
+                           >
+                              <option value="Todos">Todos os Status</option>
+                              <option value="Ativa">Ativa</option>
+                              <option value="Encerrada">Encerrada</option>
+                              <option value="Planejada">Planejada</option>
+                           </select>
+                           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        </div>
+                     </div>
+
+                     {/* Escola */}
+                     <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                           <Building2 className="w-4 h-4 text-purple-500" /> Unidade Escolar
+                        </label>
+                        <div className="relative">
+                           <select
+                              value={atividadeEscolaFilter}
+                              onChange={e => setAtividadeEscolaFilter(e.target.value)}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 pr-10 text-sm font-medium text-slate-700 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/10 appearance-none shadow-sm"
+                           >
+                              <option value="Todas">Todas as Unidades</option>
+                              {escolas.sort((a, b) => a.nome.localeCompare(b.nome)).map(e => (
+                                 <option key={e.id} value={e.id}>{e.nome}</option>
+                              ))}
+                           </select>
+                           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        </div>
+                     </div>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex gap-3 justify-end">
+                     <button
+                        onClick={fetchAtividadesReport}
+                        disabled={isLoadingAtividades}
+                        className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-6 py-3 rounded-xl font-bold shadow-sm transition-all flex items-center gap-2 disabled:opacity-50"
+                     >
+                        <FileSpreadsheet className="w-5 h-5" /> {isLoadingAtividades ? 'Carregando...' : 'Atualizar Dados'}
+                     </button>
+                     <button
+                        onClick={handleExportAtividadesCSV}
+                        className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-6 py-3 rounded-xl font-bold shadow-sm transition-all flex items-center gap-2"
+                     >
+                        <Download className="w-5 h-5" /> Exportar CSV
+                     </button>
+                     <button
+                        onClick={handlePrintAtividades}
+                        className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-purple-500/20 transition-all flex items-center gap-2 whitespace-nowrap"
+                     >
+                        <Printer className="w-5 h-5" /> Imprimir Relatório
+                     </button>
+                  </div>
+               </div>
+
+               {/* KPI Cards */}
+               <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+                  {[
+                     { label: 'Atividades', val: atividadesStats.total, color: 'bg-slate-900', textColor: 'text-white' },
+                     { label: 'Ativas', val: atividadesStats.ativas, color: 'bg-emerald-500', textColor: 'text-white' },
+                     { label: 'Encerradas', val: atividadesStats.encerradas, color: 'bg-orange-500', textColor: 'text-white' },
+                     { label: 'Total Inscritos', val: atividadesStats.totalInscritos, color: 'bg-purple-500', textColor: 'text-white' },
+                     { label: 'Total Vagas', val: atividadesStats.totalVagas, color: 'bg-white', textColor: 'text-purple-600' },
+                     { label: 'Unidades', val: atividadesStats.unidades, color: 'bg-white', textColor: 'text-purple-600' },
+                  ].map((k, i) => (
+                     <div key={i} className={`${k.color} rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col items-center justify-center text-center hover:shadow-md transition-all`}>
+                        <p className={`text-[10px] font-bold ${k.textColor} opacity-70 uppercase tracking-wider mb-1`}>{k.label}</p>
+                        <p className={`text-2xl font-black ${k.textColor}`}>{k.val.toLocaleString()}</p>
+                     </div>
+                  ))}
+               </div>
+
+               {/* Loading State */}
+               {isLoadingAtividades && (
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-20 text-center flex flex-col items-center justify-center">
+                     <div className="w-10 h-10 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mb-4" />
+                     <p className="text-slate-500 font-bold">Carregando atividades e alunos inscritos...</p>
+                  </div>
+               )}
+
+               {/* Table */}
+               {!isLoadingAtividades && (
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                     <div className="bg-slate-50 p-6 flex items-center justify-between border-b border-slate-100">
+                        <div className="flex items-center gap-3">
+                           <BookOpen className="w-5 h-5 text-purple-600" />
+                           <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide">
+                              Atividades Complementares — Estudantes Matriculados
+                           </h3>
+                        </div>
+                        <span className="text-xs font-bold text-slate-500 bg-slate-200 px-2 py-1 rounded-md">
+                           {atividadesFiltradas.length} atividades • {atividadesStats.totalInscritos} alunos
+                        </span>
+                     </div>
+                     <div className="overflow-x-auto">
+                        {atividadesFiltradas.length === 0 ? (
+                           <div className="p-20 text-center flex flex-col items-center justify-center text-slate-400">
+                              <BookOpen className="w-12 h-12 mb-4 opacity-20" />
+                              <p className="font-medium">Nenhuma atividade encontrada com os filtros selecionados.</p>
+                           </div>
+                        ) : (
+                           <table className="w-full text-left">
+                              <thead className="bg-slate-50 border-b border-slate-200">
+                                 <tr className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                    <th className="px-4 py-4">Atividade / Categoria</th>
+                                    <th className="px-4 py-4">Unidade Escolar</th>
+                                    <th className="px-4 py-4">Instrutor</th>
+                                    <th className="px-4 py-4 text-center">Horário</th>
+                                    <th className="px-4 py-4 text-center">Status</th>
+                                    <th className="px-4 py-4 text-center">Inscritos / Vagas</th>
+                                 </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                 {atividadesFiltradas.map(atv => {
+                                    const studentCount = atv.alunosList?.length || atv.inscritos || 0;
+                                    const pctOcupacao = atv.vagas > 0 ? Math.round((studentCount / atv.vagas) * 100) : 0;
+                                    const isExpanded = expandedAtividadeId === atv.id;
+                                    return (
+                                       <React.Fragment key={atv.id}>
+                                          <tr
+                                             onClick={() => setExpandedAtividadeId(isExpanded ? null : atv.id)}
+                                             className={`transition-colors cursor-pointer ${isExpanded ? 'bg-purple-50/40' : 'hover:bg-slate-50'}`}
+                                          >
+                                             <td className="px-4 py-3">
+                                                <div className="flex items-center gap-3">
+                                                   <div className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}>
+                                                      <ChevronRight className="w-4 h-4 text-slate-400" />
+                                                   </div>
+                                                   <div>
+                                                      <div className="font-bold text-slate-800 text-sm">{atv.nome}</div>
+                                                      <span className="text-[10px] font-bold text-purple-500 uppercase tracking-wider">{atv.categoria}</span>
+                                                   </div>
+                                                </div>
+                                             </td>
+                                             <td className="px-4 py-3">
+                                                <div className="text-sm font-medium text-slate-700">{atv.unidadeEscolar || '-'}</div>
+                                             </td>
+                                             <td className="px-4 py-3">
+                                                <div className="text-sm font-medium text-slate-700">{atv.instrutor || '-'}</div>
+                                             </td>
+                                             <td className="px-4 py-3 text-center">
+                                                <div className="text-xs text-slate-600">
+                                                   <div className="font-medium">{atv.diasSemana?.join(', ') || '-'}</div>
+                                                   <div className="text-slate-400">{atv.horarioInicio} - {atv.horarioFim}</div>
+                                                </div>
+                                             </td>
+                                             <td className="px-4 py-3 text-center">
+                                                <span className={`inline-block px-3 py-1 rounded-lg text-xs font-bold ${
+                                                   atv.status === 'Ativa' ? 'bg-emerald-100 text-emerald-700' :
+                                                   atv.status === 'Encerrada' ? 'bg-orange-100 text-orange-700' :
+                                                   'bg-blue-100 text-blue-700'
+                                                }`}>
+                                                   {atv.status}
+                                                </span>
+                                             </td>
+                                             <td className="px-4 py-3 text-center">
+                                                <div className="flex flex-col items-center gap-1">
+                                                   <span className="text-sm font-bold text-slate-700">{studentCount} / {atv.vagas}</span>
+                                                   <div className="w-20 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                      <div className={`h-full rounded-full ${
+                                                         pctOcupacao > 90 ? 'bg-rose-500' : pctOcupacao > 50 ? 'bg-purple-500' : 'bg-emerald-500'
+                                                      }`} style={{ width: `${Math.min(pctOcupacao, 100)}%` }} />
+                                                   </div>
+                                                </div>
+                                             </td>
+                                          </tr>
+                                          {isExpanded && (
+                                             <tr className="bg-purple-50/20 border-b border-slate-100">
+                                                <td colSpan={6} className="px-8 py-4">
+                                                   <div className="animate-fade-in">
+                                                      <h4 className="text-[10px] font-black text-purple-600 uppercase tracking-widest mb-3">
+                                                         Estudantes Matriculados ({atv.alunosList?.length || 0})
+                                                      </h4>
+                                                      {(!atv.alunosList || atv.alunosList.length === 0) ? (
+                                                         <p className="text-xs text-slate-400 italic">Nenhum estudante inscrito nesta atividade.</p>
+                                                      ) : (
+                                                         <div className="overflow-x-auto">
+                                                            <table className="w-full text-left">
+                                                               <thead>
+                                                                  <tr className="text-[9px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-200">
+                                                                     <th className="px-3 py-2 w-10">Nº</th>
+                                                                     <th className="px-3 py-2">Nome do Aluno</th>
+                                                                     <th className="px-3 py-2">Data Nasc.</th>
+                                                                     <th className="px-3 py-2">Escola</th>
+                                                                     <th className="px-3 py-2">Ano/Série</th>
+                                                                  </tr>
+                                                               </thead>
+                                                               <tbody className="divide-y divide-slate-100">
+                                                                  {atv.alunosList.map((aluno: any, idx: number) => (
+                                                                     <tr key={aluno.id || idx} className="hover:bg-purple-50/30">
+                                                                        <td className="px-3 py-1.5 text-[10px] font-bold text-slate-400">{idx + 1}</td>
+                                                                        <td className="px-3 py-1.5 text-xs font-bold text-slate-700">{aluno.nome}</td>
+                                                                        <td className="px-3 py-1.5 text-xs text-slate-600 font-mono">{aluno.dataNascimento ? new Date(aluno.dataNascimento + 'T12:00:00').toLocaleDateString('pt-BR') : '-'}</td>
+                                                                        <td className="px-3 py-1.5 text-xs text-slate-600">{aluno.escola || '-'}</td>
+                                                                        <td className="px-3 py-1.5 text-xs text-slate-600">{aluno.anoSerie || '-'}</td>
+                                                                     </tr>
+                                                                  ))}
+                                                               </tbody>
+                                                            </table>
+                                                         </div>
+                                                      )}
+                                                   </div>
+                                                </td>
+                                             </tr>
+                                          )}
+                                       </React.Fragment>
+                                    );
+                                 })}
+                              </tbody>
+                           </table>
+                        )}
+                     </div>
+                  </div>
+               )}
+            </div>
+         )}
+
+         {/* ====== COORDENADOR TAB ====== */}
+         {activeTab === 'coordenador' && (
+            <CoordinatorReportTab
+               escolas={escolas}
+               visitas={visitas}
+               coordenadores={coordenadores}
+               onPrint={handlePrintCoordinator}
+            />
+         )}
+
          {/* ====== PRINT PORTALS ====== */}
          {isPrintingGerencial && (
             <PrintableGerencialReport
@@ -1225,6 +1652,23 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
                filtroFuncao={servidorFuncaoFilter}
                filtroVinculo={servidorVinculoFilter}
                filtroEscola={servidorEscolaFilter !== 'Todas' ? escolas.find(e => e.id === servidorEscolaFilter)?.nome || 'Todas' : 'Todas'}
+            />
+         )}
+
+         {isPrintingAtividades && (
+            <PrintableAtividadesReport
+               atividades={atividadesFiltradas}
+               filtroCategoria={atividadeCatFilter}
+               filtroStatus={atividadeStatusFilter}
+               filtroEscola={atividadeEscolaFilter !== 'Todas' ? escolas.find(e => e.id === atividadeEscolaFilter)?.nome || 'Todas' : 'Todas'}
+            />
+         )}
+
+         {isPrintingCoordinator && (
+            <PrintableCoordinatorReport
+               data={coordinatorPrintData}
+               filtroCoordenador={coordinatorPrintFiltroCoord}
+               filtroRegional={coordinatorPrintFiltroRegional}
             />
          )}
       </div>

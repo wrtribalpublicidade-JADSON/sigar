@@ -221,13 +221,15 @@ export default function App() {
           nome: r.nome,
           telefone: r.telefone,
           email: r.email,
-          dataNomeacao: r.data_nomeacao,
+          dataNomeacao: r.data_nomeacao || '',
           tipoVinculo: r.tipo_vinculo,
           cargaHoraria: r.carga_horaria || '',
           cpf: r.cpf || '',
           dataNascimento: r.data_nascimento || '',
           etapaAtuacao: r.etapa_atuacao,
-          componenteCurricular: r.componente_curricular
+          componenteCurricular: r.componente_curricular,
+          modalidadeInfantil: r.modalidade_infantil || [],
+          anosIniciaisAtuacao: r.anos_iniciais_atuacao || []
         })) || [],
         acompanhamentoMensal: acompData?.filter((a: any) => a.escola_id === e.id) || [],
         relatoriosVisita: []
@@ -463,13 +465,15 @@ export default function App() {
             nome: r.nome,
             telefone: r.telefone,
             email: r.email,
-            data_nomeacao: r.dataNomeacao,
+            data_nomeacao: r.dataNomeacao || null,
             tipo_vinculo: r.tipoVinculo,
             carga_horaria: r.cargaHoraria || null,
             cpf: r.cpf || null,
             data_nascimento: r.dataNascimento || null,
             etapa_atuacao: r.etapaAtuacao,
-            componente_curricular: r.componenteCurricular
+            componente_curricular: r.componenteCurricular,
+            modalidade_infantil: r.modalidadeInfantil || [],
+            anos_iniciais_atuacao: r.anosIniciaisAtuacao || []
           })));
           if (upsertErr) throw upsertErr;
         }

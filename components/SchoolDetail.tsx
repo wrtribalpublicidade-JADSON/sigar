@@ -745,6 +745,8 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                             <option value="Anos Finais">Anos Finais</option>
                             <option value="EJA">EJA</option>
                             <option value="Sala de Recurso">Sala de Recurso</option>
+                            <option value="Recomposição - Língua Portuguesa">Recomposição - Língua Portuguesa</option>
+                            <option value="Recomposição - Matemática">Recomposição - Matemática</option>
                             <option value="Outros">Outros</option>
                           </select>
                         </div>

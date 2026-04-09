@@ -161,6 +161,7 @@ export const activitiesService = {
             return {
                 id: al.id,
                 nome: al.name || 'Sem nome',
+                dataNascimento: al.birth_date || null,
                 turma: t?.name || '-',
                 escola: e?.nome || '-',
                 anoSerie: t ? `${t.year || '-'} - ${t.name || '-'}` : '-',

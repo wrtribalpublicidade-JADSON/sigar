@@ -171,7 +171,8 @@
   #print-gerencial-report,
   #print-matricula-report,
   #print-matricula-detalhada-report,
-  #print-servidores-report {
+  #print-servidores-report,
+  #print-atividades-report {
     display: block !important;
     visibility: visible !important;
     position: relative !important;
