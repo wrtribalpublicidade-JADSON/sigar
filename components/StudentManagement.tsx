@@ -126,11 +126,22 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
       const cpfMatch = s.cpf?.includes(searchTerm);
       const matchSearch = searchTerm === '' || nameMatch || cpfMatch;
       const matchSchool = schoolFilter === 'ALL' || s.escola_id === schoolFilter;
-      const matchStage = stageFilter === 'ALL' || s.stage === stageFilter;
+      
+      let matchStage = stageFilter === 'ALL' || s.stage === stageFilter;
+      if (stageFilter !== 'ALL' && !matchStage && s.class_id) {
+        const turma = turmas.find(t => t.id === s.class_id);
+        if (turma) {
+          const turmaInfo = `${turma.anoSerie} - ${turma.identificacao}`;
+          if (turma.anoSerie === stageFilter || turmaInfo === stageFilter) {
+            matchStage = true;
+          }
+        }
+      }
+
       const matchStatus = statusFilter === 'ALL' || s.status === statusFilter;
       return matchSearch && matchSchool && matchStage && matchStatus;
     });
-  }, [students, searchTerm, schoolFilter, stageFilter, statusFilter, escolas]);
+  }, [students, searchTerm, schoolFilter, stageFilter, statusFilter, escolas, turmas]);
 
   const getStudentTurmaInfo = (classId?: string) => {
     if (!classId) return '---';
@@ -210,11 +221,15 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
     }
   };
 
-  const stages = [
-    'Creche II', 'Creche III', 'Pré I', 'Pré II',
-    '1º Ano', '2º Ano', '3º Ano', '4º Ano', '5º Ano',
-    '6º Ano', '7º Ano', '8º Ano', '9º Ano', 'EJA'
-  ];
+  const stages = useMemo(() => {
+    const uniqueTurmas = new Set<string>();
+    turmas.forEach(t => {
+      if (t.anoSerie && t.identificacao) {
+        uniqueTurmas.add(`${t.anoSerie} - ${t.identificacao}`);
+      }
+    });
+    return Array.from(uniqueTurmas).sort();
+  }, [turmas]);
 
   return (
     <div className="space-y-6 pb-12 animate-fade-in relative">
@@ -265,7 +280,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
                     onChange={e => setStageFilter(e.target.value)}
                     className="px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-600 outline-none focus:border-orange-500 focus:bg-white transition-all"
                 >
-                    <option value="ALL">Todas as Etapas</option>
+                    <option value="ALL">Todos os Anos / Séries</option>
                     {stages.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
             </div>
