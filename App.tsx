@@ -1032,6 +1032,7 @@ export default function App() {
             onDelete={handleDeleteCoordenador}
             isAdmin={isAdmin}
             loggedInCoordId={loggedInCoordId}
+            isDemoMode={isDemoMode}
           />
         );
       case 'RELATORIOS':

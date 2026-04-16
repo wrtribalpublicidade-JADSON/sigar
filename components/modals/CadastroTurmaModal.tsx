@@ -45,7 +45,7 @@ export const CadastroTurmaModal: React.FC<CadastroTurmaModalProps> = ({
         'Anos Finais': ['6º ANO', '7º ANO', '8º ANO', '9º ANO']
     };
 
-    const identificacoes = ['Turma A', 'Turma B', 'Turma C', 'Turma D'];
+    const identificacoes = ['Turma A', 'Turma B', 'Turma C', 'Turma D', 'Turma E'];
     const turnos = ['MANHÃ', 'TARDE', 'INTEGRAL', 'NOITE'];
     const tipos = ['REGULAR', 'MULTISSERIADA', 'MULTIETAPA'];
 

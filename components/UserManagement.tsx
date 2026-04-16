@@ -196,8 +196,8 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
             if (error) throw error;
             showNotification('success', `E-mail de redefinição de senha enviado para ${selectedUser.contato}.`);
         } catch (error: any) {
-            console.error(error);
-            showNotification('error', 'Erro ao enviar e-mail de redefinição.');
+            console.error('Password reset error:', error);
+            showNotification('error', `Erro: ${error?.message || 'Falha ao enviar e-mail de redefinição.'}`);
         } finally {
             setIsPasswordModalOpen(false);
             setSelectedUser(null);

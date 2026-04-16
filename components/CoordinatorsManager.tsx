@@ -3,10 +3,12 @@ import { Coordenador, Escola, StatusMeta, Visita } from '../types';
 import {
   UserPlus, Edit2, Trash2, MapPin, Mail, School as SchoolIcon,
   Save, X, ClipboardList, ArrowLeft, AlertTriangle, CheckCircle,
-  TrendingUp, BookOpen, Target, ShieldCheck, User, Download, Users
+  TrendingUp, BookOpen, Target, ShieldCheck, User, Download, Users, KeyRound
 } from 'lucide-react';
 import { exportToCSV, checkSchoolPendencies } from '../utils';
 import { ConfirmModal } from './ui/ConfirmModal';
+import { supabase } from '../services/supabase';
+import { useNotification } from '../context/NotificationContext';
 
 interface CoordinatorsManagerProps {
   coordenadores: Coordenador[];
@@ -16,15 +18,60 @@ interface CoordinatorsManagerProps {
   onDelete: (id: string) => void;
   isAdmin?: boolean;
   loggedInCoordId?: string | null;
+  isDemoMode?: boolean;
 }
 
 export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
-  coordenadores, escolas, visitas, onSave, onDelete, isAdmin = true, loggedInCoordId = null
+  coordenadores, escolas, visitas, onSave, onDelete, isAdmin = true, loggedInCoordId = null, isDemoMode = false
 }) => {
+  const { showNotification } = useNotification();
   const [isEditing, setIsEditing] = useState(false);
   const [viewSummaryCoord, setViewSummaryCoord] = useState<Coordenador | null>(null);
   const [formData, setFormData] = useState<Coordenador | null>(null);
   const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null);
+  const [selectedUserForPassword, setSelectedUserForPassword] = useState<Coordenador | null>(null);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+
+  const handleTriggerPasswordReset = (coord: Coordenador) => {
+    setSelectedUserForPassword(coord);
+    setNewPassword('');
+    setIsPasswordModalOpen(true);
+  };
+
+  const confirmPasswordReset = async () => {
+    if (!selectedUserForPassword) return;
+    if (!newPassword || newPassword.length < 6) {
+      showNotification('warning', 'A nova senha deve ter no mínimo 6 caracteres.');
+      return;
+    }
+    
+    try {
+      if (isDemoMode) {
+        showNotification('success', `Senha do usuário ${selectedUserForPassword.contato} atualizada com sucesso. (Modo Demo)`);
+        setIsPasswordModalOpen(false);
+        setSelectedUserForPassword(null);
+        return;
+      }
+      
+      const { data, error } = await supabase.functions.invoke('admin-manage-auth', {
+        body: { targetEmail: selectedUserForPassword.contato, newPassword },
+      });
+      
+      if (error) throw error;
+      
+      if (data.error) throw new Error(data.error);
+      
+      showNotification('success', `A senha de ${selectedUserForPassword.nome} foi definida com sucesso.`);
+    } catch (error: any) {
+      console.error('Password reset error:', error);
+      showNotification('error', `Erro: ${error?.message || 'Falha ao redefinir a senha.'}`);
+    } finally {
+      setIsPasswordModalOpen(false);
+      setSelectedUserForPassword(null);
+      setNewPassword('');
+    }
+  };
 
   // Coordenador Regional: find own record and filter users linked to same schools
   const loggedInCoord = loggedInCoordId ? coordenadores.find(c => c.id === loggedInCoordId) : null;
@@ -502,6 +549,13 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
                             <ClipboardList className="w-4 h-4" />
                           </button>
                         )}
+                        <button
+                          onClick={() => handleTriggerPasswordReset(coord)}
+                          className="p-2 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-colors"
+                          title="Redefinir Senha"
+                        >
+                          <KeyRound className="w-4 h-4" />
+                        </button>
                         <button onClick={() => handleEdit(coord)} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition" title="Editar">
                           <Edit2 className="w-4 h-4" />
                         </button>
@@ -520,6 +574,30 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
         </div>
       </div>
       <ConfirmModal isOpen={deleteConfirmationId !== null} onClose={() => setDeleteConfirmationId(null)} onConfirm={confirmDelete} title="Remover Usuário?" message="Esta ação removerá o acesso do profissional." icon={Trash2} iconColor="red" confirmText="Sim, Remover" cancelText="Cancelar" variant="danger" />
+      <ConfirmModal
+        isOpen={isPasswordModalOpen}
+        onClose={() => setIsPasswordModalOpen(false)}
+        onConfirm={confirmPasswordReset}
+        title="Alterar Senha do Usuário"
+        message={`Defina a nova senha de acesso para o e-mail: ${selectedUserForPassword?.contato}.`}
+        icon={KeyRound}
+        variant="warning"
+        confirmText="Salvar Nova Senha"
+      >
+        <div className="mt-4">
+          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Nova Senha</label>
+          <input
+            type="text"
+            className="w-full rounded-xl border-slate-200 shadow-sm focus:border-amber-500 focus:ring-amber-500 border px-4 py-2.5"
+            placeholder="Mínimo 6 caracteres"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+          />
+          <p className="text-xs text-slate-500 mt-2">
+            A conta será criada silenciosamente caso o usuário ainda não estivesse cadastrado no banco de autenticações.
+          </p>
+        </div>
+      </ConfirmModal>
     </div>
   );
 };
