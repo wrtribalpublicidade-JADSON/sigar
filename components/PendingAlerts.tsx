@@ -14,7 +14,7 @@ interface PendingAlertsProps {
 interface Pendency {
     escolaId: string;
     escolaNome: string;
-    type: 'MATRICULA' | 'TURMAS' | 'RH' | 'PLANO_ACAO' | 'MONITORAMENTO';
+    type: 'MATRICULA' | 'TURMAS' | 'RH' | 'PLANO_ACAO' | 'MONITORAMENTO' | 'VISITA';
     message: string;
     severity: 'critical' | 'warning';
 }

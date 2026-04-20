@@ -765,7 +765,7 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
                                     <th className="px-4 py-4 text-center">Turmas</th>
                                 </>
                             )}
-                            {activeTab !== 'CENSO' && activeTab !== 'FLUXO' && (
+                            {activeTab !== 'CENSO' && (
                                 <th className="px-6 py-4 text-center">Status de Edições</th>
                             )}
                             {activeTab === 'SAMAHC' && (
@@ -822,7 +822,7 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
                                         )}
                                     </div>
                                 </td>
-                                {activeTab !== 'CENSO' && activeTab !== 'FLUXO' && currentKey && (() => {
+                                {activeTab !== 'CENSO' && currentKey && (() => {
                                     const { esperadas, preenchidas, status } = getEdicoesStatus(escola, currentKey);
                                     let badgeColor = 'bg-slate-100 text-slate-500';
                                     if (status === 'Completo') badgeColor = 'bg-emerald-100 text-emerald-700';
