@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Lock, Mail, ArrowRight, User, AlertCircle, Eye, Target } from 'lucide-react';
+import { Lock, Mail, ArrowRight, User, AlertCircle, Eye, Target, FileText } from 'lucide-react';
 import { supabase } from '../services/supabase';
+import { formatCpf, validateCpf } from '../utils';
 
 interface LoginPageProps {
   onLogin: (email: string) => void;
@@ -11,6 +12,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onDemoLogin }) =>
   const [isSignUp, setIsSignUp] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [cpf, setCpf] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -20,6 +22,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onDemoLogin }) =>
     setIsSignUp(!isSignUp);
     setError('');
     setSuccessMessage('');
+    setCpf('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -34,12 +37,38 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onDemoLogin }) =>
           throw new Error('Por favor, informe seu nome completo.');
         }
 
+        const cleanCpf = cpf.replace(/\D/g, '');
+        if (!cleanCpf) {
+          throw new Error('Por favor, informe seu CPF.');
+        }
+
+        if (!validateCpf(cpf)) {
+          throw new Error('CPF inválido. Verifique o número digitado.');
+        }
+
+        // Check for duplicate CPF
+        const { data: existingUser, error: checkError } = await supabase
+          .from('coordenadores')
+          .select('id')
+          .eq('cpf', cleanCpf)
+          .maybeSingle();
+
+        if (checkError && checkError.code !== 'PGRST116') {
+          // It's possible the column doesn't exist yet in the backend, or another connection error.
+          throw new Error('Erro ao validar CPF no banco de dados. Contate o administrador.');
+        }
+
+        if (existingUser) {
+          throw new Error('Este CPF já está cadastrado no sistema.');
+        }
+
         const { data, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: {
             data: {
               full_name: name,
+              cpf: cleanCpf
             },
           },
         });
@@ -112,6 +141,26 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onDemoLogin }) =>
                       placeholder="Seu nome completo"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Campo CPF - Apenas no Cadastro */}
+              {isSignUp && (
+                <div className="animate-fade-in">
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">CPF</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <FileText className="h-5 w-5 text-slate-400" />
+                    </div>
+                    <input
+                      type="text"
+                      className="w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
+                      placeholder="000.000.000-00"
+                      value={cpf}
+                      onChange={(e) => setCpf(formatCpf(e.target.value))}
+                      maxLength={14}
                     />
                   </div>
                 </div>

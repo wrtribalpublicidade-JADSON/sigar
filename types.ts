@@ -360,6 +360,7 @@ export interface Escola {
 export interface Coordenador {
   id: string;
   nome: string;
+  cpf?: string;
   contato: string; // Utilizado como E-mail principal/Autenticação
   regiao: string; // Ex: "Regional Sede", "Regional Litoral"
   funcao?: 'Administrador' | 'Coordenador Regional' | 'Gestor' | 'Coordenador Pedagógico' | 'Técnico' | 'Gestor Geral' | 'Gestor Pedagógico' | 'Professor'; // Papel no sistema
