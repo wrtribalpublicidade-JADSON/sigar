@@ -4,6 +4,7 @@ import { Escola, Visita, Coordenador, MetaAcao } from '../../types';
 import { supabase } from '../../services/supabase';
 import { exportToCSV } from '../../utils';
 import { useNotification } from '../../context/NotificationContext';
+import { getEdicoesStatus, IndicadorEdicaoKey } from '../../utils/edicoesHelper';
 
 interface CoordinatorReportTabProps {
   escolas: Escola[];
@@ -165,13 +166,55 @@ export const CoordinatorReportTab: React.FC<CoordinatorReportTabProps> = ({ esco
         const totalVisitas = visitas.filter(v => v.escolaId === esc.id).length;
         const totalAtividades = atividadesCount[esc.id] || 0;
 
-        // Indicadores (avalia se os dados educacionais têm algo além de null/0)
+        // Regra de visite mensal (Nova Regra Mínimo 1 por mês para escolas Ativas)
+        let pendenteVisitaMensal = false;
+        if (esc.status === 'Ativo') {
+            const agora = new Date();
+            const mesAtual = agora.getMonth();
+            const anoAtual = agora.getFullYear();
+            const temVisitaEsteMes = visitas.some(v => {
+                if (v.escolaId !== esc.id) return false;
+                const dv = new Date(v.data);
+                return dv.getMonth() === mesAtual && dv.getFullYear() === anoAtual;
+            });
+            if (!temVisitaEsteMes) {
+                pendenteVisitaMensal = true;
+            }
+        }
+
+        // Indicadores (baseado no controle de edições)
         let temIndicadores = false;
+        let textStatusIndicadores = 'Sem metas';
+        let indicadoresEsperadosTotal = 0;
+        let pendenciasIndicadores = 0;
+
         if (esc.dadosEducacionais) {
-          const m = esc.dadosEducacionais.matricula;
-          if (m && (m.infantil > 0 || m.anosIniciais > 0 || m.anosFinais > 0 || m.eja > 0)) {
-             temIndicadores = true;
-          }
+           const chaves: IndicadorEdicaoKey[] = ['PARC', 'CNCA', 'SEAMA', 'SAEB', 'IDEB', 'SAMAHC_FLUENCIA', 'SAMAHC_SEAMA', 'SAMAHC_SAEB', 'SAMAHC_PORTUGUES', 'SAMAHC_MATEMATICA', 'EI'];
+           
+           for (const chave of chaves) {
+               const status = getEdicoesStatus(esc, chave);
+               if (status.esperadas > 0) {
+                   indicadoresEsperadosTotal++;
+                   if (status.pendentes > 0) {
+                       pendenciasIndicadores++;
+                   }
+               }
+           }
+           
+           if (indicadoresEsperadosTotal > 0) {
+               if (pendenciasIndicadores === 0) {
+                   temIndicadores = true;
+                   textStatusIndicadores = 'Completo';
+               } else {
+                   temIndicadores = false;
+                   textStatusIndicadores = `${pendenciasIndicadores} Pendentes`;
+               }
+           } else {
+               // Fallback
+               if (esc.dadosEducacionais.registrosFluenciaParc && esc.dadosEducacionais.registrosFluenciaParc.length > 0) {
+                   temIndicadores = true;
+               }
+           }
         }
 
         // Checklist de eixos (7)
@@ -200,7 +243,9 @@ export const CoordinatorReportTab: React.FC<CoordinatorReportTabProps> = ({ esco
           totalVisitas,
           totalAtividades,
           cumprimentoPerm,
-          pontos
+          pontos,
+          textStatusIndicadores,
+          pendenteVisitaMensal
         });
       }
     }
@@ -242,7 +287,7 @@ export const CoordinatorReportTab: React.FC<CoordinatorReportTabProps> = ({ esco
       'PLANO AÇÃO': d.planoAcao.length > 0 ? 'SIM' : 'NÃO',
       'SMART ADEQUADA': d.temAcaoAdequada ? 'SIM' : 'NÃO',
       'ESTUDANTES': d.totalAlunos,
-      'INDICADORES': d.temIndicadores ? 'PREENCHIDO' : 'PENDENTE',
+      'INDICADORES': d.textStatusIndicadores || (d.temIndicadores ? 'PREENCHIDO' : 'PENDENTE'),
       'VISITAS': d.totalVisitas,
       '% CUMPRIMENTO': `${d.cumprimentoPerm.toFixed(1)}%`
     }));
@@ -388,9 +433,23 @@ export const CoordinatorReportTab: React.FC<CoordinatorReportTabProps> = ({ esco
                   </td>
                   <td className="px-3 py-3 text-center text-sm font-bold {d.totalAlunos > 0 ? 'text-slate-800' : 'text-slate-400'}">{d.totalAlunos || '-'}</td>
                   <td className="px-3 py-3 text-center">
-                     {d.temIndicadores ? <CheckSquare className="w-4 h-4 text-emerald-500 mx-auto" /> : <AlertCircle className="w-4 h-4 text-slate-300 mx-auto" />}
+                     <div className="flex flex-col items-center gap-0.5">
+                       {d.temIndicadores ? <CheckSquare className="w-4 h-4 text-emerald-500 mx-auto" /> : (d.textStatusIndicadores === 'Sem metas' ? <AlertCircle className="w-4 h-4 text-slate-300 mx-auto" /> : <AlertCircle className="w-4 h-4 text-amber-500 mx-auto" />)}
+                       <span className={`text-[9px] font-bold ${d.textStatusIndicadores === 'Completo' ? 'text-emerald-600' : d.textStatusIndicadores === 'Sem metas' ? 'text-slate-400' : 'text-amber-600'}`}>
+                         {d.textStatusIndicadores}
+                       </span>
+                     </div>
                   </td>
-                  <td className="px-3 py-3 text-center text-sm font-bold {d.totalVisitas > 0 ? 'text-slate-800' : 'text-slate-400'}">{d.totalVisitas || '-'}</td>
+                  <td className="px-3 py-3 text-center">
+                     <div className="flex flex-col items-center gap-0.5 relative group/visita">
+                       <span className={`text-sm font-bold ${d.totalVisitas > 0 ? 'text-slate-800' : 'text-slate-400'}`}>{d.totalVisitas || '-'}</span>
+                       {d.pendenteVisitaMensal && (
+                           <span className="text-[9px] font-bold text-rose-600 uppercase tracking-widest flex items-center gap-1 mt-1 bg-rose-100 px-1.5 py-0.5 rounded shadow-sm">
+                             <AlertCircle className="w-3 h-3"/> Pendente Mês
+                           </span>
+                       )}
+                     </div>
+                  </td>
                   <td className="px-3 py-3 text-center">
                     <div className="flex flex-col items-center gap-1">
                       <span className={`text-sm font-black ${d.cumprimentoPerm >= 80 ? 'text-emerald-600' : d.cumprimentoPerm >= 50 ? 'text-orange-500' : 'text-red-500'}`}>

@@ -101,8 +101,10 @@ export interface DadosEducacionais {
   relatorioEI: {
     desenvolvimento: number; // %
   };
+  controleEdicoes?: Record<string, number>; // Novo campo de controle de edições meta
   registrosFluenciaParc?: RegistroFluenciaPARC[]; // Persistência via JSON
   registrosFluenciaSamahc?: RegistroFluenciaSAMAHC[]; // Persistência via Relacional
+  registrosFluenciaSamahcAgregados?: RegistroFluenciaSamahcAgregado[]; // Novo JSON Agregado
   registrosCNCA?: RegistroCNCA[]; // Persistência via JSON
   registrosSEAMA?: RegistroSEAMA[]; // Persistência via JSON
   registrosSAEB?: RegistroSAEB[]; // Persistência via JSON
@@ -236,6 +238,34 @@ export interface RegistroFluenciaPARC {
   responsavel: string;
 }
 
+// Interface para Registro Agregado de Fluência SAMAHC (Turma)
+export interface RegistroFluenciaSamahcAgregado {
+  id: string;
+  escolaId: string;
+  polo: string;
+  ano: number;
+  edicao: 'Entrada' | 'Saída' | 'Diagnóstica' | 'Formativa' | 'Somativa';
+  etapaAplicacao: string;
+  tipoTurma: 'Regular' | 'Multisseriada';
+  turma: {
+    nome: string;
+    anoSerie: string;
+  };
+  participacao: {
+    matriculados: number;
+    presentes: number;
+  };
+  classificacao: {
+    leitorFluente: number;
+    leitorIniciante: number;
+    preLeitor: number;
+    naoLeitor: number;
+    naoAvaliado: number;
+  };
+  dataRegistro: string;
+  responsavel: string;
+}
+
 // Interface para Registro de CNCA/PNRA
 export interface RegistroCNCA {
   id: string;
@@ -353,7 +383,7 @@ export interface Visita {
 
 export type ViewState = 'DASHBOARD' | 'LISTA_ESCOLAS' | 'DETALHE_ESCOLA' | 'NOVA_VISITA' | 'COORDENADORES' | 'RELATORIOS' | 'INDICADORES' | 'NOTIFICACOES' | 'AUDIT_LOGS' | 'GESTAO_USUARIOS' | 'INSTRUMENTAIS_GESTAO' | 'CONSELHO_CLASSE' | 'CONSELHO_CLASSE_FUNDAMENTAL' | 'CONSELHO_CLASSE_INFANTIL' | 'PERMISSOES' | 'ATIVIDADES_COMPLEMENTARES' | 'GESTAO_ESTUDANTES' | 'MERENDA_ESCOLAR';
 
-export type PendencyType = 'MATRICULA' | 'TURMAS' | 'RH' | 'MONITORAMENTO' | 'PLANO_ACAO';
+export type PendencyType = 'MATRICULA' | 'TURMAS' | 'RH' | 'MONITORAMENTO' | 'PLANO_ACAO' | 'VISITA';
 
 // Interfaces for Logs
 export interface AccessLog {

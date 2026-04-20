@@ -46,6 +46,10 @@ import { IdebModal } from './modals/IdebModal';
 import { parseCSV } from '../utils/importUtils';
 import { useNotification } from '../context/NotificationContext';
 import * as XLSX from 'xlsx';
+import { SamahcIndicatorsModal } from './modals/SamahcIndicatorsModal';
+import { RelatorioEiModal } from './modals/RelatorioEiModal';
+import { FluenciaSamahcAgregadoModal } from './modals/FluenciaSamahcAgregadoModal';
+import { getEdicoesStatus, IndicadorEdicaoKey } from '../utils/edicoesHelper';
 
 interface IndicatorsPanelProps {
     escolas: Escola[];
@@ -79,6 +83,12 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
     const [showSaebModal, setShowSaebModal] = useState(false);
     const [selectedSchoolForIdeb, setSelectedSchoolForIdeb] = useState<Escola | null>(null);
     const [showIdebModal, setShowIdebModal] = useState(false);
+    const [selectedSchoolForSamahcIndicators, setSelectedSchoolForSamahcIndicators] = useState<Escola | null>(null);
+    const [showSamahcIndicatorsModal, setShowSamahcIndicatorsModal] = useState(false);
+    const [selectedSchoolForFluenciaSamahc, setSelectedSchoolForFluenciaSamahc] = useState<Escola | null>(null);
+    const [showFluenciaSamahcModal, setShowFluenciaSamahcModal] = useState(false);
+    const [selectedSchoolForEi, setSelectedSchoolForEi] = useState<Escola | null>(null);
+    const [showEiModal, setShowEiModal] = useState(false);
     const [showImportPreview, setShowImportPreview] = useState(false);
     const [pendingImportData, setPendingImportData] = useState<{
         schoolsToUpdate: Map<string, Escola>;
@@ -112,6 +122,43 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
         }
         return matchesSearch;
     });
+
+    const getCurrentIndicadorKey = (): IndicadorEdicaoKey | null => {
+        if (activeTab === 'PARC') return 'PARC';
+        if (activeTab === 'CNCA') return 'CNCA';
+        if (activeTab === 'SEAMA') return 'SEAMA';
+        if (activeTab === 'SAEB') return 'SAEB';
+        if (activeTab === 'IDEB') return 'IDEB';
+        if (activeTab === 'EI') return 'EI';
+        if (activeTab === 'SAMAHC') {
+            if (samahcSubTab === 'FLUENCIA') return 'SAMAHC_FLUENCIA';
+            if (samahcSubTab === 'SEAMA') return 'SAMAHC_SEAMA';
+            if (samahcSubTab === 'SAEB') return 'SAMAHC_SAEB';
+            if (samahcSubTab === 'PORTUGUES') return 'SAMAHC_PORTUGUES';
+            if (samahcSubTab === 'MATEMATICA') return 'SAMAHC_MATEMATICA';
+        }
+        return null;
+    };
+
+    const currentKey = getCurrentIndicadorKey();
+
+    const handleMetaEdicoesChange = (escolaId: string, newTotal: number) => {
+        if (!currentKey) return;
+        const escolaAtual = escolas.find(e => e.id === escolaId);
+        if (!escolaAtual) return;
+
+        const escolaAtualizada: Escola = {
+            ...escolaAtual,
+            dadosEducacionais: {
+                ...escolaAtual.dadosEducacionais,
+                controleEdicoes: {
+                    ...(escolaAtual.dadosEducacionais.controleEdicoes || {}),
+                    [currentKey]: Math.max(0, newTotal)
+                }
+            }
+        };
+        onUpdateEscola(escolaAtualizada);
+    };
 
     const handleExport = () => {
         let columns: any[] = [];
@@ -456,7 +503,85 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
         } else if (activeTab === 'IDEB') {
             setSelectedSchoolForIdeb(escola);
             setShowIdebModal(true);
+        } else if (activeTab === 'SAMAHC') {
+            if (samahcSubTab === 'FLUENCIA') {
+                setSelectedSchoolForFluenciaSamahc(escola);
+                setShowFluenciaSamahcModal(true);
+            } else {
+                setSelectedSchoolForSamahcIndicators(escola);
+                setShowSamahcIndicatorsModal(true);
+            }
+        } else if (activeTab === 'EI') {
+            setSelectedSchoolForEi(escola);
+            setShowEiModal(true);
         }
+    };
+
+    const handleSaveFluenciaSamahc = (registro: any) => {
+        if (!selectedSchoolForFluenciaSamahc) return;
+
+        const escolaAtual = escolas.find(e => e.id === selectedSchoolForFluenciaSamahc.id);
+        if (!escolaAtual) return;
+
+        let novosRegistros = [...(escolaAtual.dadosEducacionais.registrosFluenciaSamahcAgregados || [])];
+
+        if (registro.id) {
+            novosRegistros = novosRegistros.map(r => r.id === registro.id ? { ...r, ...registro } : r);
+        } else {
+            novosRegistros.push({ ...registro, id: generateUUID() });
+        }
+
+        const escolaAtualizada: Escola = {
+            ...escolaAtual,
+            dadosEducacionais: {
+                ...escolaAtual.dadosEducacionais,
+                registrosFluenciaSamahcAgregados: novosRegistros
+            }
+        };
+
+        onUpdateEscola(escolaAtualizada);
+        setSelectedSchoolForFluenciaSamahc(escolaAtualizada);
+    };
+
+    const handleDeleteFluenciaSamahc = (id: string) => {
+        if (!selectedSchoolForFluenciaSamahc) return;
+
+        const escolaAtualizada: Escola = {
+            ...selectedSchoolForFluenciaSamahc,
+            dadosEducacionais: {
+                ...selectedSchoolForFluenciaSamahc.dadosEducacionais,
+                registrosFluenciaSamahcAgregados: (selectedSchoolForFluenciaSamahc.dadosEducacionais.registrosFluenciaSamahcAgregados || []).filter(r => r.id !== id)
+            }
+        };
+
+        onUpdateEscola(escolaAtualizada);
+        setSelectedSchoolForFluenciaSamahc(escolaAtualizada);
+    };
+
+    const handleSaveSamahcIndicators = (dados: any) => {
+        if (!selectedSchoolForSamahcIndicators) return;
+        const escolaAtualizada: Escola = {
+            ...selectedSchoolForSamahcIndicators,
+            dadosEducacionais: {
+                ...selectedSchoolForSamahcIndicators.dadosEducacionais,
+                dadosSamahc: { ...selectedSchoolForSamahcIndicators.dadosEducacionais.dadosSamahc, ...dados }
+            }
+        };
+        onUpdateEscola(escolaAtualizada);
+        setSelectedSchoolForSamahcIndicators(escolaAtualizada);
+    };
+
+    const handleSaveEi = (dados: any) => {
+        if (!selectedSchoolForEi) return;
+        const escolaAtualizada: Escola = {
+            ...selectedSchoolForEi,
+            dadosEducacionais: {
+                ...selectedSchoolForEi.dadosEducacionais,
+                relatorioEI: { ...selectedSchoolForEi.dadosEducacionais.relatorioEI, ...dados }
+            }
+        };
+        onUpdateEscola(escolaAtualizada);
+        setSelectedSchoolForEi(escolaAtualizada);
     };
 
     const calculateConsolidatedParc = (registros: RegistroFluenciaPARC[]) => {
@@ -640,6 +765,9 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
                                     <th className="px-4 py-4 text-center">Turmas</th>
                                 </>
                             )}
+                            {activeTab !== 'CENSO' && activeTab !== 'FLUXO' && (
+                                <th className="px-6 py-4 text-center">Status de Edições</th>
+                            )}
                             {activeTab === 'SAMAHC' && (
                                 <th className="px-4 py-4 text-center bg-brand-orange/5">
                                     {samahcSubTab === 'SEAMA' && 'Simulado SEAMA'}
@@ -681,19 +809,53 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
                         {filteredEscolas.map((escola) => (
                             <tr
                                 key={escola.id}
-                                className={`group hover:bg-slate-50 transition-all text-xs uppercase ${(activeTab === 'PARC' || activeTab === 'CNCA' || activeTab === 'SEAMA' || activeTab === 'SAEB' || activeTab === 'IDEB') ? 'cursor-pointer' : ''}`}
+                                className={`group hover:bg-slate-50 transition-all text-xs uppercase ${(activeTab === 'PARC' || activeTab === 'CNCA' || activeTab === 'SEAMA' || activeTab === 'SAEB' || activeTab === 'IDEB' || activeTab === 'SAMAHC' || activeTab === 'EI') ? 'cursor-pointer' : ''}`}
                                 onClick={() => handleSchoolClick(escola)}
                             >
                                 <td className="px-6 py-4">
                                     <div className="flex flex-col">
                                         <span className="font-black text-brand-black text-sm">{escola.nome}</span>
-                                        {(activeTab === 'PARC' || activeTab === 'CNCA' || activeTab === 'SEAMA' || activeTab === 'SAEB' || activeTab === 'IDEB') && (
+                                        {(activeTab === 'PARC' || activeTab === 'CNCA' || activeTab === 'SEAMA' || activeTab === 'SAEB' || activeTab === 'IDEB' || activeTab === 'SAMAHC' || activeTab === 'EI') && (
                                             <span className="text-[8px] font-black text-brand-orange mt-1 flex items-center gap-1 group-hover:translate-x-1 transition-all uppercase tracking-widest">
                                                 Inserir Dados <ChevronRight className="w-2 h-2" strokeWidth={4} />
                                             </span>
                                         )}
                                     </div>
                                 </td>
+                                {activeTab !== 'CENSO' && activeTab !== 'FLUXO' && currentKey && (() => {
+                                    const { esperadas, preenchidas, status } = getEdicoesStatus(escola, currentKey);
+                                    let badgeColor = 'bg-slate-100 text-slate-500';
+                                    if (status === 'Completo') badgeColor = 'bg-emerald-100 text-emerald-700';
+                                    else if (status === 'Pendente') badgeColor = 'bg-amber-100 text-amber-700';
+
+                                    return (
+                                        <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                                            <div className="flex flex-col items-center gap-1.5">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] font-bold text-slate-400 capitalize">Meta:</span>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        value={esperadas}
+                                                        onChange={(e) => handleMetaEdicoesChange(escola.id, Number(e.target.value))}
+                                                        className="w-14 text-center bg-white border border-slate-200 rounded px-1 py-0.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-brand-orange"
+                                                        title="Total de edições esperadas"
+                                                    />
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`px-2 py-0.5 rounded text-[9px] font-black tracking-widest uppercase ${badgeColor}`}>
+                                                        {status}
+                                                    </span>
+                                                    {(esperadas > 0 || preenchidas > 0) && (
+                                                        <span className="text-[10px] font-bold text-slate-500">
+                                                            {preenchidas}/{esperadas}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </td>
+                                    );
+                                })()}
                                 {activeTab === 'CENSO' && (() => {
                                     const stats = calculateCensoStats(escola);
                                     return (
@@ -910,13 +1072,19 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
                     {activeTab === 'SAMAHC' && (
                         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
                             <div className="flex flex-wrap gap-2 animate-fade-in">
-                                {['FLUENCIA', 'SEAMA', 'SAEB', 'PORTUGUES', 'MATEMATICA'].map((st) => (
+                                {[
+                                    { id: 'FLUENCIA', label: 'FLUÊNCIA' },
+                                    { id: 'SEAMA', label: 'SEAMA' },
+                                    { id: 'SAEB', label: 'SAEB' },
+                                    { id: 'PORTUGUES', label: 'PORTUGUÊS' },
+                                    { id: 'MATEMATICA', label: 'MATEMÁTICA' }
+                                ].map((st) => (
                                     <button
-                                        key={st}
-                                        onClick={() => setSamahcSubTab(st as any)}
-                                        className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${samahcSubTab === st ? 'bg-slate-800 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+                                        key={st.id}
+                                        onClick={() => setSamahcSubTab(st.id as any)}
+                                        className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${samahcSubTab === st.id ? 'bg-slate-800 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}
                                     >
-                                        {st}
+                                        {st.label}
                                     </button>
                                 ))}
                             </div>
@@ -1060,6 +1228,34 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
                     escola={selectedSchoolForIdeb}
                     onSave={handleSaveIdeb}
                     onDelete={handleDeleteIdeb}
+                />
+            )}
+
+            {selectedSchoolForSamahcIndicators && (
+                <SamahcIndicatorsModal
+                    isOpen={showSamahcIndicatorsModal}
+                    onClose={() => { setShowSamahcIndicatorsModal(false); setSelectedSchoolForSamahcIndicators(null); }}
+                    escola={selectedSchoolForSamahcIndicators}
+                    onSave={handleSaveSamahcIndicators}
+                />
+            )}
+
+            {selectedSchoolForFluenciaSamahc && (
+                <FluenciaSamahcAgregadoModal
+                    isOpen={showFluenciaSamahcModal}
+                    onClose={() => { setShowFluenciaSamahcModal(false); setSelectedSchoolForFluenciaSamahc(null); }}
+                    escola={selectedSchoolForFluenciaSamahc}
+                    onSave={handleSaveFluenciaSamahc}
+                    onDelete={handleDeleteFluenciaSamahc}
+                />
+            )}
+
+            {selectedSchoolForEi && (
+                <RelatorioEiModal
+                    isOpen={showEiModal}
+                    onClose={() => { setShowEiModal(false); setSelectedSchoolForEi(null); }}
+                    escola={selectedSchoolForEi}
+                    onSave={handleSaveEi}
                 />
             )}
 

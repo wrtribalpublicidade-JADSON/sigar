@@ -119,7 +119,7 @@ const countTotalClasses = (detalhada: any): number => {
   return total;
 };
 
-export const checkSchoolPendencies = (escola: Escola) => {
+export const checkSchoolPendencies = (escola: Escola, visitas?: any[]) => {
   const pendencies: { type: PendencyType; label: string; severity: 'critical' | 'warning' }[] = [];
 
   if (!escola) return [];
@@ -187,6 +187,24 @@ export const checkSchoolPendencies = (escola: Escola) => {
       }
     }
 
+    // 6. Visitas (Nova Regra Mínimo 1 por mês)
+    if (visitas && escola.status === 'Ativo') {
+      const agora = new Date();
+      const mesAtual = agora.getMonth();
+      const anoAtual = agora.getFullYear();
+
+      const temVisitaEsteMes = visitas.some(v => {
+        if (v.escolaId !== escola.id) return false;
+        const dv = new Date(v.data);
+        // Considerando fuso horario local
+        return dv.getMonth() === mesAtual && dv.getFullYear() === anoAtual;
+      });
+
+      if (!temVisitaEsteMes) {
+        pendencies.push({ type: 'VISITA', label: 'Visita mensal obrigatória pendente', severity: 'critical' });
+      }
+    }
+
   } catch (error) {
     console.warn(`Error checking pendencies for school ${escola.id}:`, error);
     return [];
@@ -194,3 +212,4 @@ export const checkSchoolPendencies = (escola: Escola) => {
 
   return pendencies;
 };
+

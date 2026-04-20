@@ -1,11 +1,12 @@
 import React, { useMemo } from 'react';
-import { Escola, Coordenador, StatusMeta } from '../types';
-import { AlertTriangle, ArrowRight, CheckCircle, ClipboardList, Users, School, FileText, Activity } from 'lucide-react';
+import { Escola, Coordenador, Visita } from '../types';
+import { AlertTriangle, ArrowRight, CheckCircle, ClipboardList, Users, School, FileText, Activity, Calendar } from 'lucide-react';
 import { Button } from './ui/Button';
 import { checkSchoolPendencies } from '../utils';
 
 interface PendingAlertsProps {
     escolas: Escola[];
+    visitas?: Visita[];
     coordenador: Coordenador;
     onNavigateToEscola: (escolaId: string) => void;
 }
@@ -20,6 +21,7 @@ interface Pendency {
 
 export const PendingAlerts: React.FC<PendingAlertsProps> = ({
     escolas,
+    visitas = [],
     coordenador,
     onNavigateToEscola
 }) => {
@@ -32,7 +34,7 @@ export const PendingAlerts: React.FC<PendingAlertsProps> = ({
         const list: Pendency[] = [];
 
         mySchools.forEach(escola => {
-            const schoolPendencies = checkSchoolPendencies(escola);
+            const schoolPendencies = checkSchoolPendencies(escola, visitas);
             schoolPendencies.forEach(p => {
                 list.push({
                     escolaId: escola.id,
@@ -92,13 +94,15 @@ export const PendingAlerts: React.FC<PendingAlertsProps> = ({
                                     pendency.type === 'TURMAS' ? 'bg-indigo-100 text-indigo-600' :
                                         pendency.type === 'RH' ? 'bg-purple-100 text-purple-600' :
                                             pendency.type === 'PLANO_ACAO' ? 'bg-emerald-100 text-emerald-600' :
-                                                'bg-orange-100 text-orange-600'
+                                                pendency.type === 'VISITA' ? 'bg-rose-100 text-rose-600' :
+                                                    'bg-orange-100 text-orange-600'
                                     }`}>
                                     {pendency.type === 'MATRICULA' && <Users className="w-4 h-4" />}
                                     {pendency.type === 'TURMAS' && <School className="w-4 h-4" />}
                                     {pendency.type === 'RH' && <Users className="w-4 h-4" />}
                                     {pendency.type === 'PLANO_ACAO' && <TargetIcon className="w-4 h-4" />}
                                     {pendency.type === 'MONITORAMENTO' && <Activity className="w-4 h-4" />}
+                                    {pendency.type === 'VISITA' && <Calendar className="w-4 h-4" />}
                                 </div>
                                 <div className="min-w-0">
                                     <p className="text-xs font-bold text-slate-700 truncate" title={pendency.escolaNome}>

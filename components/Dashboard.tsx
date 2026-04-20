@@ -166,6 +166,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div id="pending-alerts-section">
           <PendingAlerts
             escolas={escolas}
+            visitas={visitas}
             coordenador={currentUser}
             onNavigateToEscola={onNavigateToDetail}
           />
