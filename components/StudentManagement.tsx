@@ -50,25 +50,44 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
         return;
       }
 
-      let query = supabase
-        .from('alunos')
-        .select('*')
-        .order('name', { ascending: true });
+      // Supabase returns max 1000 rows per request by default.
+      // We paginate to load all students.
+      const PAGE_SIZE = 1000;
+      let allStudents: any[] = [];
+      let from = 0;
+      let hasMore = true;
 
-      if (!isAdmin) {
-        const validIds = escolas.map(e => e.id);
-        if (validIds.length === 0) {
-          setStudents([]);
-          setIsLoading(false);
-          return;
+      while (hasMore) {
+        let query = supabase
+          .from('alunos')
+          .select('*')
+          .order('name', { ascending: true })
+          .range(from, from + PAGE_SIZE - 1);
+
+        if (!isAdmin) {
+          const validIds = escolas.map(e => e.id);
+          if (validIds.length === 0) {
+            setStudents([]);
+            setIsLoading(false);
+            return;
+          }
+          query = query.in('escola_id', validIds);
         }
-        query = query.in('escola_id', validIds);
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        const batch = data || [];
+        allStudents = allStudents.concat(batch);
+
+        if (batch.length < PAGE_SIZE) {
+          hasMore = false;
+        } else {
+          from += PAGE_SIZE;
+        }
       }
 
-      const { data, error } = await query;
-
-      if (error) throw error;
-      setStudents(data || []);
+      setStudents(allStudents);
     } catch (error) {
       console.error(error);
       showNotification('error', 'Erro ao carregar estudantes.');
@@ -119,17 +138,17 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
   const filteredStudents = useMemo(() => {
     return students.filter(s => {
       // Must be linked to a valid school within the user's scope
-      const isValidSchool = escolas.some(e => e.id === s.escola_id);
+      const isValidSchool = escolas.some(e => String(e.id) === String(s.escola_id));
       if (!isValidSchool) return false;
 
       const nameMatch = s.name?.toLowerCase().includes(searchTerm.toLowerCase());
       const cpfMatch = s.cpf?.includes(searchTerm);
       const matchSearch = searchTerm === '' || nameMatch || cpfMatch;
-      const matchSchool = schoolFilter === 'ALL' || s.escola_id === schoolFilter;
+      const matchSchool = schoolFilter === 'ALL' || String(s.escola_id) === String(schoolFilter);
       
       let matchStage = stageFilter === 'ALL' || s.stage === stageFilter;
       if (stageFilter !== 'ALL' && !matchStage && s.class_id) {
-        const turma = turmas.find(t => t.id === s.class_id);
+        const turma = turmas.find(t => String(t.id) === String(s.class_id));
         if (turma) {
           const turmaInfo = `${turma.anoSerie} - ${turma.identificacao}`;
           if (turma.anoSerie === stageFilter || turmaInfo === stageFilter) {
@@ -145,7 +164,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
 
   const getStudentTurmaInfo = (classId?: string) => {
     if (!classId) return '---';
-    const turma = turmas.find(t => t.id === classId);
+    const turma = turmas.find(t => String(t.id) === String(classId));
     if (!turma) return '---';
     return `${turma.anoSerie} - ${turma.identificacao}`;
   };
@@ -264,6 +283,13 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
                     className="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-100 bg-slate-50/50 focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all font-medium text-slate-700"
                 />
             </div>
+
+            <div className="flex items-center gap-2 px-4 py-2.5 bg-orange-50 border border-orange-100 rounded-xl shrink-0">
+                <Users className="w-4 h-4 text-orange-500" />
+                <span className="text-xs font-black text-orange-600 uppercase tracking-wider whitespace-nowrap">
+                    {filteredStudents.length} {filteredStudents.length === 1 ? 'estudante' : 'estudantes'}
+                </span>
+            </div>
             
             <div className="flex flex-wrap gap-2 w-full md:w-auto">
                 <select 
@@ -375,7 +401,6 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
             onClose={() => setIsCadastroModalOpen(false)}
             onSuccess={loadStudents}
             escolas={escolas}
-            hideList={true}
             initialStudent={selectedStudent}
             onOpenTurmaModal={() => setIsTurmaModalOpen(true)}
             context={{

@@ -8,9 +8,9 @@ const isMockId = (id: any): boolean => {
 };
 
 const isValidUUID = (id: any): boolean => {
-    if (!id || typeof id !== 'string') return false;
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    return uuidRegex.test(id);
+    if (!id) return false;
+    // Allow both numeric strings/numbers and UUIDs
+    return typeof id === 'string' || typeof id === 'number';
 };
 
 // ==========================================
@@ -615,10 +615,8 @@ export const ccEstudanteService = {
         if (classId && typeof classId === 'string' && classId.startsWith('t')) { // Mock Turma IDs start with 't'
             return ALUNOS_MOCK.filter(a => a.class_id === classId);
         }
-        // Guard: class_id is a UUID column, skip query if not a valid UUID
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        if (!classId || !uuidRegex.test(classId)) {
-            console.warn('getByTurma: classId is not a valid UUID:', classId);
+        if (!classId) {
+            console.warn('getByTurma: classId is missing');
             return [];
         }
 
@@ -627,7 +625,7 @@ export const ccEstudanteService = {
             .from('alunos')
             .select('*')
             .eq('class_id', classId)
-            .eq('status', 'active')
+            .in('status', ['active', 'Ativo'])
             .order('name', { ascending: true });
 
         if (error) throw error;
