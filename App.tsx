@@ -126,23 +126,44 @@ export default function App() {
 
       const activeSchoolIds = (escData || []).map(e => e.id);
 
+      // Helper: paginated fetch to bypass Supabase's 1000-row default limit
+      const fetchAllRows = async (table: string, filterCol: string, filterIds: string[]) => {
+        const PAGE_SIZE = 1000;
+        let allRows: any[] = [];
+        let from = 0;
+        let hasMore = true;
+        while (hasMore) {
+          const { data, error } = await supabase
+            .from(table)
+            .select('*')
+            .in(filterCol, filterIds)
+            .range(from, from + PAGE_SIZE - 1);
+          if (error) throw error;
+          const batch = data || [];
+          allRows = allRows.concat(batch);
+          hasMore = batch.length === PAGE_SIZE;
+          from += PAGE_SIZE;
+        }
+        return allRows;
+      };
+
       // Fetch related data in parallel with explicit error handling for each
       const fetchResults = await Promise.allSettled([
         igPlanoAcaoService.getAll(activeSchoolIds),
-        supabase.from('recursos_humanos').select('*').in('escola_id', activeSchoolIds),
-        supabase.from('acompanhamento_mensal').select('*').in('escola_id', activeSchoolIds),
-        supabase.from('registros_fluencia_parc').select('*').in('escola_id', activeSchoolIds),
-        supabase.from('registros_cnca').select('*').in('escola_id', activeSchoolIds),
-        supabase.from('registros_seama').select('*').in('escola_id', activeSchoolIds),
-        supabase.from('registros_saeb').select('*').in('escola_id', activeSchoolIds),
-        supabase.from('registros_ideb').select('*').in('escola_id', activeSchoolIds)
+        fetchAllRows('recursos_humanos', 'escola_id', activeSchoolIds),
+        fetchAllRows('acompanhamento_mensal', 'escola_id', activeSchoolIds),
+        fetchAllRows('registros_fluencia_parc', 'escola_id', activeSchoolIds),
+        fetchAllRows('registros_cnca', 'escola_id', activeSchoolIds),
+        fetchAllRows('registros_seama', 'escola_id', activeSchoolIds),
+        fetchAllRows('registros_saeb', 'escola_id', activeSchoolIds),
+        fetchAllRows('registros_ideb', 'escola_id', activeSchoolIds)
       ]);
 
       const getResultData = (index: number, label: string) => {
         const res = fetchResults[index];
         if (res.status === 'fulfilled') {
-          // igPlanoAcaoService returns data directly, others return {data, error}
-          return (index === 0) ? res.value : (res.value as any).data;
+          // All fetchers now return data directly (arrays)
+          return res.value;
         } else {
           console.error(`Error fetching ${label}:`, res.reason);
           return [];
