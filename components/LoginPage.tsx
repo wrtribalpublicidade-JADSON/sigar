@@ -46,20 +46,27 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onDemoLogin }) =>
           throw new Error('CPF inválido. Verifique o número digitado.');
         }
 
-        // Check for duplicate CPF
-        const { data: existingUser, error: checkError } = await supabase
-          .from('coordenadores')
-          .select('id')
-          .eq('cpf', cleanCpf)
-          .maybeSingle();
+        // Check for duplicate CPF - this may fail if user is not yet authenticated (RLS)
+        // In that case, we skip the check and rely on the unique DB index for enforcement.
+        try {
+          const { data: existingUser, error: checkError } = await supabase
+            .from('coordenadores')
+            .select('id')
+            .eq('cpf', cleanCpf)
+            .maybeSingle();
 
-        if (checkError && checkError.code !== 'PGRST116') {
-          // It's possible the column doesn't exist yet in the backend, or another connection error.
-          throw new Error('Erro ao validar CPF no banco de dados. Contate o administrador.');
-        }
-
-        if (existingUser) {
-          throw new Error('Este CPF já está cadastrado no sistema.');
+          if (!checkError && existingUser) {
+            throw new Error('Este CPF já está cadastrado no sistema.');
+          }
+          // If checkError occurs (e.g. RLS blocking unauthenticated access), we skip
+          // the duplicate check and let the unique index handle it at insert time.
+        } catch (cpfCheckErr: any) {
+          // Re-throw only if it's our own "already registered" error
+          if (cpfCheckErr?.message?.includes('já está cadastrado')) {
+            throw cpfCheckErr;
+          }
+          // Otherwise, silently skip — the DB unique constraint will catch duplicates
+          console.warn('CPF duplicate check skipped (likely RLS):', cpfCheckErr?.message);
         }
 
         const { data, error: signUpError } = await supabase.auth.signUp({
