@@ -174,6 +174,7 @@ export const PrintableGerencialReport: React.FC<PrintableGerencialReportProps> =
                                 <td style={{ padding: '4pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 700, color: '#334155' }}>
                                     {servidor.nome}
                                     {servidor.email && <div style={{ fontSize: '7pt', fontWeight: 400, color: '#64748b', marginTop: '1pt' }}>{servidor.email}</div>}
+                                    {servidor.telefone && <div style={{ fontSize: '7pt', fontWeight: 400, color: '#64748b', marginTop: '1pt' }}>{servidor.telefone}</div>}
                                 </td>
                                 <td style={{ padding: '4pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '8pt', fontWeight: 600, color: '#475569' }}>
                                     {servidor.escolaNome}

@@ -341,6 +341,13 @@ export const ccReuniaoEstudantilService = {
             if (error) throw error;
             return data;
         }
+    },
+
+    async delete(id: string, stage: EducationalStage = 'fundamental') {
+        const table = getTableName('reuniao', stage);
+        const { error } = await supabase.from(table).delete().eq('id', id);
+        if (error) throw error;
+        return true;
     }
 };
 

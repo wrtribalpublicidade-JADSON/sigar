@@ -130,6 +130,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     const [activeTab, setActiveTab] = useState<Tab>('estudantil');
     const [isLoading, setIsLoading] = useState(true);
     const [selectedEscolaId, setSelectedEscolaId] = useState<string>(externalSelectedEscolaId || escolas[0]?.id || '');
+    const [isPrintingReport, setIsPrintingReport] = useState(false);
 
     // Sync with external school ID
     useEffect(() => {
@@ -1106,7 +1107,11 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     };
 
     const handleImprimir = () => {
-        window.print();
+        setIsPrintingReport(true);
+        setTimeout(() => {
+            window.print();
+            setTimeout(() => setIsPrintingReport(false), 1000);
+        }, 500);
     };
 
     const handleSolicitarDesbloqueio = async () => {
@@ -3393,15 +3398,17 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                 />
             )}
 
-            <PrintableConselhoReport
-                escola={currentEscola}
-                turma={activeTurma}
-                etapa={avaliacaoEtapa}
-                context={avaliacaoBimestre}
-                componenteCurricular={selectedComponenteCurricular}
-                data={avaliacaoBimestre === 'Resultado Consolidado' ? visaoGeralData : studentsAvaliacao}
-                coordenador={currentUser}
-            />
+            {isPrintingReport && (
+                <PrintableConselhoReport
+                    escola={currentEscola}
+                    turma={activeTurma}
+                    etapa={avaliacaoEtapa}
+                    context={avaliacaoBimestre}
+                    componenteCurricular={selectedComponenteCurricular}
+                    data={avaliacaoBimestre === 'Resultado Consolidado' ? visaoGeralData : studentsAvaliacao}
+                    coordenador={currentUser}
+                />
+            )}
         </div>
     );
 };

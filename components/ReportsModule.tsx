@@ -784,6 +784,7 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
                                        <td className="px-6 py-3">
                                           <div className="font-bold text-slate-800 text-sm">{srv.nome}</div>
                                           {srv.email && <div className="text-xs text-slate-400 mt-0.5">{srv.email}</div>}
+                                          {srv.telefone && <div className="text-xs text-slate-400 mt-0.5">{srv.telefone}</div>}
                                        </td>
                                        <td className="px-6 py-3 text-sm text-slate-600 font-medium">{srv.escolaNome}</td>
                                        <td className="px-6 py-3">
