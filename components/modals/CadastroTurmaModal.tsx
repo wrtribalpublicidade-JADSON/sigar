@@ -42,7 +42,8 @@ export const CadastroTurmaModal: React.FC<CadastroTurmaModalProps> = ({
     const anosPorEtapa: Record<string, string[]> = {
         'Educação Infantil': ['Creche II', 'Creche III', 'Pré-Escola I', 'Pré-Escola II'],
         'Anos Iniciais': ['1º ANO', '2º ANO', '3º ANO', '4º ANO', '5º ANO'],
-        'Anos Finais': ['6º ANO', '7º ANO', '8º ANO', '9º ANO']
+        'Anos Finais': ['6º ANO', '7º ANO', '8º ANO', '9º ANO'],
+        'EJA': ['I ETAPA', 'II ETAPA', 'III ETAPA', 'IV ETAPA']
     };
 
     const identificacoes = ['Turma A', 'Turma B', 'Turma C', 'Turma D', 'Turma E'];
