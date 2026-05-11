@@ -7,6 +7,7 @@ import { CadastroEstudanteModal } from './modals/CadastroEstudanteModal';
 import { ReuniaoEstudantilForm } from './ReuniaoEstudantilForm';
 import { ccAvaliacaoDocenteService, ccAcompanhamentoDocenteService, ccEncaminhamentosService, ccAvaliacaoEtapaService, ccSolicitacaoDesbloqueioService, ccAvaliacaoInfantilService, ccEstudanteService, ccTurmaService } from '../services/gestaoConselhoService';
 import { PrintableConselhoReport } from './PrintableConselhoReport';
+import { PrintableEncaminhamento } from './PrintableEncaminhamento';
 import { Escola, Segmento, Coordenador } from '../types';
 
 const BNCC_INFANTIL = {
@@ -1213,7 +1214,10 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     const [mockEncaminhamentos, setMockEncaminhamentos] = useState<any[]>([]);
 
     const handleSaveEnc = async () => {
-        if (!encForm.estudante || !encForm.descricao) return;
+        if (!encForm.estudante || !encForm.descricao) {
+            alert('Por favor, preencha o nome do estudante e a descrição do caso.');
+            return;
+        }
         try {
             let encToSave = {
                 id: encForm.id,
@@ -1295,9 +1299,13 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         status: 'Pendente'
     });
     const [mockEncInfantil, setMockEncInfantil] = useState<any[]>([]);
+    const [printingEncaminhamento, setPrintingEncaminhamento] = useState<any | null>(null);
 
     const handleSaveEncInfantil = async () => {
-        if (!encInfantilForm.crianca || !encInfantilForm.evidencias) return;
+        if (!encInfantilForm.crianca || !encInfantilForm.evidencias) {
+            alert('Por favor, preencha o nome da criança e as evidências observadas.');
+            return;
+        }
         try {
             let encToSave = {
                 id: encInfantilForm.id,
@@ -3028,85 +3036,122 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
 
                         {/* ===== LISTA DE REGISTROS FUNDAMENTAL ===== */}
                         {encEtapa === 'fundamental' && (
-                            <div className="space-y-4">
-                                {mockEncaminhamentos.filter(e => e.etapa !== 'infantil').map(enc => (
-                                    <div key={enc.id} className="p-6 border border-slate-100 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all flex flex-col lg:flex-row justify-between lg:items-center gap-6 group">
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-3 mb-2 flex-wrap">
-                                                <span className={`px-3 py-1 text-xs font-bold uppercase rounded-full ${enc.status === 'Concluído' ? 'bg-emerald-100 text-emerald-700' : enc.status === 'Em Andamento' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>{enc.status}</span>
-                                                <span className="px-3 py-1 text-xs font-bold uppercase rounded-full border border-slate-200 text-slate-500">{enc.tipo}</span>
-                                                <span className="text-xs font-medium text-slate-400">Registrado em: {enc.data}</span>
-                                                {enc.periodoLetivo && <span className="text-xs font-medium text-slate-400 border-l border-slate-200 pl-3">Período: {enc.periodoLetivo}</span>}
-                                            </div>
-                                            <h4 className="text-lg font-bold text-slate-900 leading-tight mb-1">{enc.estudante} <span className="text-slate-400 font-normal text-sm ml-2">({enc.turma})</span></h4>
-                                            <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                                                    <p className="text-xs font-bold text-slate-400 uppercase mb-1">Motivo / Descrição</p>
-                                                    <p className="text-sm text-slate-600 line-clamp-2">{enc.descricao}</p>
-                                                </div>
-                                                <div className="bg-orange-50 p-3 rounded-xl border border-orange-100/50">
-                                                    <p className="text-xs font-bold text-orange-400/80 uppercase mb-1">Encaminhamento</p>
-                                                    <p className="text-sm text-slate-700 line-clamp-2">{enc.encaminhamento}</p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-4 mt-4">
-                                                <p className="text-xs font-medium text-slate-500 tracking-wide flex items-center gap-1">Resp: {enc.responsavel}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity lg:flex-col justify-center">
-                                            <button title="Editar" onClick={() => handleEditEnc(enc)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-orange-50 hover:text-brand-orange hover:border-orange-200 transition-all flex-shrink-0"><Edit size={16} /></button>
-                                            <button title="Excluir" onClick={() => handleDeleteEnc(enc.id)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all flex-shrink-0"><Trash2 size={16} /></button>
-                                        </div>
-                                    </div>
-                                ))}
-                                {mockEncaminhamentos.filter(e => e.etapa !== 'infantil').length === 0 && !isEditingEnc && (
-                                    <div className="text-center p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                                        <AlertTriangle className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                                        <p className="text-slate-500">Nenhum encaminhamento ou intervenção registrada.</p>
-                                    </div>
-                                )}
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-slate-50 border-y border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                            <th className="p-4">Estudante</th>
+                                            <th className="p-4">Tipo / Status</th>
+                                            <th className="p-4">Período / Data</th>
+                                            <th className="p-4 max-w-xs">Motivo / Descrição</th>
+                                            <th className="p-4 text-center">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {mockEncaminhamentos.filter(e => e.etapa !== 'infantil').map(enc => (
+                                            <tr key={enc.id} className="hover:bg-slate-50 transition-colors group">
+                                                <td className="p-4">
+                                                    <p className="font-bold text-slate-800">{enc.estudante}</p>
+                                                    <p className="text-xs text-slate-500">{enc.turma}</p>
+                                                    <p className="text-[10px] text-slate-400 mt-1 uppercase">Resp: {enc.responsavel}</p>
+                                                </td>
+                                                <td className="p-4">
+                                                    <span className="inline-block px-2 py-1 text-[10px] font-bold uppercase rounded bg-slate-100 text-slate-600 mb-1">{enc.tipo}</span><br />
+                                                    <span className={`inline-block px-2 py-1 text-[10px] font-bold uppercase rounded ${enc.status === 'Concluído' ? 'bg-emerald-100 text-emerald-700' : enc.status === 'Em Andamento' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>{enc.status}</span>
+                                                </td>
+                                                <td className="p-4">
+                                                    <p className="text-sm text-slate-700">{enc.periodoLetivo}</p>
+                                                    <p className="text-xs text-slate-500">{enc.data}</p>
+                                                </td>
+                                                <td className="p-4 max-w-xs">
+                                                    <p className="text-xs text-slate-600 line-clamp-2" title={enc.descricao}>{enc.descricao}</p>
+                                                </td>
+                                                <td className="p-4">
+                                                    <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button title="Imprimir" onClick={() => setPrintingEncaminhamento(enc)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-brand-orange hover:border-brand-orange hover:bg-orange-50 flex items-center justify-center transition-colors shadow-sm">
+                                                            <Printer size={14} />
+                                                        </button>
+                                                        <button title="Editar" onClick={() => handleEditEnc(enc)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 flex items-center justify-center transition-colors shadow-sm">
+                                                            <Edit size={14} />
+                                                        </button>
+                                                        <button title="Excluir" onClick={() => handleDeleteEnc(enc.id)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50 flex items-center justify-center transition-colors shadow-sm">
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {mockEncaminhamentos.filter(e => e.etapa !== 'infantil').length === 0 && !isEditingEnc && (
+                                            <tr>
+                                                <td colSpan={5} className="p-8 text-center bg-slate-50 border-b border-dashed border-slate-200">
+                                                    <AlertTriangle className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                                                    <p className="text-slate-500">Nenhum encaminhamento ou intervenção registrada.</p>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
                             </div>
                         )}
 
                         {/* ===== LISTA DE REGISTROS INFANTIL ===== */}
                         {encEtapa === 'infantil' && (
-                            <div className="space-y-4">
-                                {mockEncInfantil.map(enc => (
-                                    <div key={enc.id} className="p-6 border border-slate-100 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all flex flex-col lg:flex-row justify-between lg:items-center gap-6 group">
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-3 mb-2 flex-wrap">
-                                                <span className={`px-3 py-1 text-xs font-bold uppercase rounded-full ${enc.status === 'Concluído' ? 'bg-emerald-100 text-emerald-700' : enc.status === 'Em Andamento' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>{enc.status}</span>
-                                                <span className="px-3 py-1 text-xs font-bold uppercase rounded-full bg-purple-50 text-purple-600 border border-purple-100">{enc.campoExperiencia}</span>
-                                                {enc.data && <span className="text-xs font-medium text-slate-400">Data: {enc.data}</span>}
-                                                {enc.periodoLetivo && <span className="text-xs font-medium text-slate-400 border-l border-slate-200 pl-3">Período: {enc.periodoLetivo}</span>}
-                                            </div>
-                                            <h4 className="text-lg font-bold text-slate-900 leading-tight mb-1">{enc.crianca} <span className="text-slate-400 font-normal text-sm ml-2">({enc.agrupamento})</span></h4>
-                                            <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                                                    <p className="text-xs font-bold text-slate-400 uppercase mb-1">Evidências Observadas</p>
-                                                    <p className="text-sm text-slate-600 line-clamp-3">{enc.evidencias}</p>
-                                                </div>
-                                                <div className="bg-purple-50/50 p-3 rounded-xl border border-purple-100/50">
-                                                    <p className="text-xs font-bold text-purple-600/80 uppercase mb-1">Estratégia Pedagógica</p>
-                                                    <p className="text-sm text-slate-700 line-clamp-3">{enc.estrategia}</p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-4 mt-4">
-                                                <p className="text-xs font-medium text-slate-500 tracking-wide flex items-center gap-1">Prof.: {enc.professor}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity lg:flex-col justify-center">
-                                            <button title="Editar" onClick={() => handleEditEncInfantil(enc)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-orange-50 hover:text-brand-orange hover:border-orange-200 transition-all flex-shrink-0"><Edit size={16} /></button>
-                                            <button title="Excluir" onClick={() => handleDeleteEncInfantil(enc.id)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all flex-shrink-0"><Trash2 size={16} /></button>
-                                        </div>
-                                    </div>
-                                ))}
-                                {mockEncInfantil.length === 0 && !isEditingEncInfantil && (
-                                    <div className="text-center p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                                        <Baby className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                                        <p className="text-slate-500">Nenhum encaminhamento ou intervenção da Educação Infantil registrada.</p>
-                                    </div>
-                                )}
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-slate-50 border-y border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                            <th className="p-4">Criança</th>
+                                            <th className="p-4">Campo / Status</th>
+                                            <th className="p-4">Período / Data</th>
+                                            <th className="p-4 max-w-xs">Evidências / Estratégia</th>
+                                            <th className="p-4 text-center">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {mockEncInfantil.map(enc => (
+                                            <tr key={enc.id} className="hover:bg-slate-50 transition-colors group">
+                                                <td className="p-4">
+                                                    <p className="font-bold text-slate-800">{enc.crianca}</p>
+                                                    <p className="text-xs text-slate-500">{enc.agrupamento}</p>
+                                                    <p className="text-[10px] text-slate-400 mt-1 uppercase">Prof: {enc.professor}</p>
+                                                </td>
+                                                <td className="p-4">
+                                                    <span className="inline-block px-2 py-1 text-[10px] font-bold uppercase rounded bg-purple-50 text-purple-600 mb-1">{enc.campoExperiencia}</span><br />
+                                                    <span className={`inline-block px-2 py-1 text-[10px] font-bold uppercase rounded ${enc.status === 'Concluído' ? 'bg-emerald-100 text-emerald-700' : enc.status === 'Em Andamento' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>{enc.status}</span>
+                                                </td>
+                                                <td className="p-4">
+                                                    <p className="text-sm text-slate-700">{enc.periodoLetivo}</p>
+                                                    <p className="text-xs text-slate-500">{enc.data}</p>
+                                                </td>
+                                                <td className="p-4 max-w-xs">
+                                                    <p className="text-xs text-slate-600 line-clamp-1 mb-1" title={enc.evidencias}><strong className="text-slate-400">Evidência:</strong> {enc.evidencias}</p>
+                                                    <p className="text-xs text-slate-600 line-clamp-1" title={enc.estrategia}><strong className="text-slate-400">Estratégia:</strong> {enc.estrategia}</p>
+                                                </td>
+                                                <td className="p-4">
+                                                    <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button title="Imprimir" onClick={() => setPrintingEncaminhamento(enc)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-brand-orange hover:border-brand-orange hover:bg-orange-50 flex items-center justify-center transition-colors shadow-sm">
+                                                            <Printer size={14} />
+                                                        </button>
+                                                        <button title="Editar" onClick={() => handleEditEncInfantil(enc)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 flex items-center justify-center transition-colors shadow-sm">
+                                                            <Edit size={14} />
+                                                        </button>
+                                                        <button title="Excluir" onClick={() => handleDeleteEncInfantil(enc.id)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50 flex items-center justify-center transition-colors shadow-sm">
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {mockEncInfantil.length === 0 && !isEditingEncInfantil && (
+                                            <tr>
+                                                <td colSpan={5} className="p-8 text-center bg-slate-50 border-b border-dashed border-slate-200">
+                                                    <Baby className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                                                    <p className="text-slate-500">Nenhum encaminhamento ou intervenção da Educação Infantil registrada.</p>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
                             </div>
                         )}
                     </div>
@@ -3407,6 +3452,13 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                     componenteCurricular={selectedComponenteCurricular}
                     data={avaliacaoBimestre === 'Resultado Consolidado' ? visaoGeralData : studentsAvaliacao}
                     coordenador={currentUser}
+                />
+            )}
+
+            {printingEncaminhamento && (
+                <PrintableEncaminhamento 
+                    encaminhamento={printingEncaminhamento} 
+                    onClose={() => setPrintingEncaminhamento(null)} 
                 />
             )}
         </div>
