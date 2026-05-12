@@ -309,7 +309,7 @@ const getTableName = (base: string, stage: EducationalStage) => {
     const tableMap: Record<string, string> = {
         'avaliacao': stage === 'fundamental' ? 'cc_f_avaliacao' : 'cc_i_avaliacoes',
         'acompanhamento': prefix + 'acompanhamento',
-        'encaminhamento': prefix + 'encaminhamentos_intervencoes',
+        'encaminhamento': prefix + 'encaminhamento',
         'status_etapa': prefix + 'status_etapa',
         'solicitacoes': prefix + 'solicitacoes',
         'reuniao': prefix + 'reuniao_estudantil'

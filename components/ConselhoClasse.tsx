@@ -1222,15 +1222,15 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             let encToSave = {
                 id: encForm.id,
                 estudante_nome: encForm.estudante,
-                turma_nome: encForm.turma,
-                tipo_intervencao: encForm.tipo,
-                descricao_caso: encForm.descricao,
-                encaminhamento_proposto: encForm.encaminhamento,
+                turma: encForm.turma,
+                tipo_encaminhamento: encForm.tipo,
+                descricao: encForm.descricao,
+                encaminhamento_realizado: encForm.encaminhamento,
                 data_registro: encForm.data,
                 periodo_letivo: encForm.periodoLetivo,
                 escola_id: currentEscolaId,
                 status: encForm.status,
-                responsavel_acao: encForm.responsavel
+                responsavel: encForm.responsavel
             };
             if (!encToSave.id) delete (encToSave as any).id;
 
@@ -1240,14 +1240,14 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             const formattedResult = {
                 id: result.id,
                 estudante: result.estudante_nome,
-                turma: result.turma_nome,
-                tipo: result.tipo_intervencao,
-                descricao: result.descricao_caso,
-                encaminhamento: result.encaminhamento_proposto,
+                turma: result.turma,
+                tipo: result.tipo_encaminhamento,
+                descricao: result.descricao,
+                encaminhamento: result.encaminhamento_realizado,
                 data: result.data_registro,
                 periodoLetivo: result.periodo_letivo,
                 status: result.status,
-                responsavel: result.responsavel_acao
+                responsavel: result.responsavel
             };
 
             if (encForm.id) {
@@ -1257,9 +1257,10 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             }
             setIsEditingEnc(false);
             setEncForm({ id: '', estudante: '', turma: '', tipo: 'Pedagógico', descricao: '', encaminhamento: '', data: '', periodoLetivo: '1º Bimestre', status: 'Pendente', responsavel: '' });
-        } catch (error) {
+            alert("Registro salvo com sucesso!");
+        } catch (error: any) {
             console.error("Erro ao salvar encaminhamento:", error);
-            alert("Erro ao salvar acompanhamento");
+            alert(`Erro ao salvar: ${error.message || 'Ocorreu um erro inesperado.'}`);
         } finally {
             setTimeout(() => setIsSaving(false), 800);
         }
@@ -1310,33 +1311,32 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             let encToSave = {
                 id: encInfantilForm.id,
                 estudante_nome: encInfantilForm.crianca,
-                turma_nome: encInfantilForm.agrupamento,
-                tipo_intervencao: encInfantilForm.campoExperiencia,
-                descricao_caso: encInfantilForm.evidencias,
-                encaminhamento_proposto: encInfantilForm.estrategia,
+                turma: encInfantilForm.agrupamento,
+                campo_experiencia: encInfantilForm.campoExperiencia,
+                evidencias: encInfantilForm.evidencias,
+                estrategia: encInfantilForm.estrategia,
                 data_registro: encInfantilForm.data,
                 periodo_letivo: encInfantilForm.periodoLetivo,
                 status: encInfantilForm.status,
-                responsavel_acao: encInfantilForm.professor,
-                escola_id: currentEscolaId,
-                etapa: 'infantil'
+                responsavel: encInfantilForm.professor,
+                escola_id: currentEscolaId
             };
             if (!encToSave.id) delete (encToSave as any).id;
 
             setIsSaving(true);
-            const result = await ccEncaminhamentosService.save(encToSave);
+            const result = await ccEncaminhamentosService.save(encToSave, 'infantil');
 
             const formattedResult = {
                 id: result.id,
                 crianca: result.estudante_nome,
-                agrupamento: result.turma_nome,
-                campoExperiencia: result.tipo_intervencao,
-                evidencias: result.descricao_caso,
-                estrategia: result.encaminhamento_proposto,
+                agrupamento: result.turma,
+                campoExperiencia: result.campo_experiencia,
+                evidencias: result.evidencias,
+                estrategia: result.estrategia,
                 data: result.data_registro ? result.data_registro.substring(0, 10) : '',
                 periodoLetivo: result.periodo_letivo,
                 status: result.status,
-                professor: result.responsavel_acao,
+                professor: result.responsavel,
                 etapa: 'infantil'
             };
 
@@ -1347,6 +1347,10 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             }
             setIsEditingEncInfantil(false);
             setEncInfantilForm({ id: '', crianca: '', agrupamento: '', campoExperiencia: '', periodoLetivo: '1º Bimestre', data: '', evidencias: '', estrategia: '', professor: '', status: 'Pendente' });
+            alert("Registro salvo com sucesso!");
+        } catch (error: any) {
+            console.error("Erro ao salvar encaminhamento infantil:", error);
+            alert(`Erro ao salvar: ${error.message || 'Ocorreu um erro inesperado.'}`);
         } finally {
             setTimeout(() => setIsSaving(false), 800);
         }
@@ -1360,7 +1364,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     const handleDeleteEncInfantil = async (id: string) => {
         if (confirm('Tem certeza que deseja excluir este registro?')) {
             try {
-                await ccEncaminhamentosService.delete(id);
+                await ccEncaminhamentosService.delete(id, 'infantil');
                 setMockEncInfantil(prev => prev.filter(m => m.id !== id));
             } catch (error) {
                 console.error("Erro ao excluir encaminhamento infantil", error);
@@ -1380,9 +1384,10 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         const loadDocs = async () => {
             setIsLoading(true);
             try {
-                const [acomp, encs] = await Promise.all([
+                const [acomp, encs, encsInfantil] = await Promise.all([
                     ccAcompanhamentoDocenteService.getAll(currentEscolaId),
-                    ccEncaminhamentosService.getAll(currentEscolaId)
+                    ccEncaminhamentosService.getAll(currentEscolaId, 'fundamental'),
+                    ccEncaminhamentosService.getAll(currentEscolaId, 'infantil')
                 ]);
 
                 if (acomp) {
@@ -1404,14 +1409,30 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                     setMockEncaminhamentos(encs.map(e => ({
                         id: e.id,
                         estudante: e.estudante_nome,
-                        turma: e.turma_nome,
-                        tipo: e.tipo_intervencao,
-                        descricao: e.descricao_caso,
-                        encaminhamento: e.encaminhamento_proposto,
+                        turma: e.turma,
+                        tipo: e.tipo_encaminhamento,
+                        descricao: e.descricao,
+                        encaminhamento: e.encaminhamento_realizado,
                         data: e.data_registro ? e.data_registro.substring(0, 10) : '',
                         periodoLetivo: e.periodo_letivo,
                         status: e.status,
-                        responsavel: e.responsavel_acao
+                        responsavel: e.responsavel
+                    })));
+                }
+
+                if (encsInfantil) {
+                    setMockEncInfantil(encsInfantil.map(e => ({
+                        id: e.id,
+                        crianca: e.estudante_nome,
+                        agrupamento: e.turma,
+                        campoExperiencia: e.campo_experiencia,
+                        evidencias: e.evidencias,
+                        estrategia: e.estrategia,
+                        data: e.data_registro ? e.data_registro.substring(0, 10) : '',
+                        periodoLetivo: e.periodo_letivo,
+                        status: e.status,
+                        professor: e.responsavel,
+                        etapa: 'infantil'
                     })));
                 }
             } catch (error) {
