@@ -1597,7 +1597,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                         <div className="bg-white rounded-2xl border border-slate-200 p-4 grid grid-cols-1 md:grid-cols-4 gap-4 shadow-sm divide-x divide-slate-100">
                             <div className="px-4">
                                 <p className="text-xs font-bold text-slate-400 uppercase mb-1">Unidade Escolar</p>
-                                {isAdmin ? (
+                                {isAdmin || escolas.length > 1 ? (
                                     <select
                                         value={selectedEscolaId}
                                         onChange={(e) => setSelectedEscolaId(e.target.value)}
