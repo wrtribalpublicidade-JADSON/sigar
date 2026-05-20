@@ -8,6 +8,7 @@ import { ReuniaoEstudantilForm } from './ReuniaoEstudantilForm';
 import { ccAvaliacaoDocenteService, ccAcompanhamentoDocenteService, ccEncaminhamentosService, ccAvaliacaoEtapaService, ccSolicitacaoDesbloqueioService, ccAvaliacaoInfantilService, ccEstudanteService, ccTurmaService } from '../services/gestaoConselhoService';
 import { PrintableConselhoReport } from './PrintableConselhoReport';
 import { PrintableEncaminhamento } from './PrintableEncaminhamento';
+import { PrintableAcompanhamentoDocente } from './PrintableAcompanhamentoDocente';
 import { Escola, Segmento, Coordenador } from '../types';
 
 const BNCC_INFANTIL = {
@@ -995,7 +996,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             if (!acToSave.id) delete (acToSave as any).id;
 
             setIsSaving(true);
-            const result = await ccAcompanhamentoDocenteService.save(acToSave);
+            const result: any = await ccAcompanhamentoDocenteService.save(acToSave);
 
             const formattedResult = {
                 id: result.id,
@@ -1034,7 +1035,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     const handleDeleteAcompInfantil = async (id: string) => {
         if (confirm('Tem certeza que deseja excluir este registro?')) {
             try {
-                await ccAcompanhamentoDocenteService.delete(id);
+                await ccAcompanhamentoDocenteService.delete(id, 'infantil');
                 setMockAcompInfantil(prev => prev.filter(m => m.id !== id));
             } catch (error) {
                 console.error("Erro ao excluir acompanhamento infantil", error);
@@ -1063,7 +1064,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             if (!acToSave.id) delete (acToSave as any).id;
 
             setIsSaving(true);
-            const result = await ccAcompanhamentoDocenteService.save(acToSave);
+            const result: any = await ccAcompanhamentoDocenteService.save(acToSave);
 
             const formattedResult = {
                 id: result.id,
@@ -1301,6 +1302,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     });
     const [mockEncInfantil, setMockEncInfantil] = useState<any[]>([]);
     const [printingEncaminhamento, setPrintingEncaminhamento] = useState<any | null>(null);
+    const [printingAcomp, setPrintingAcomp] = useState<any | null>(null);
 
     const handleSaveEncInfantil = async () => {
         if (!encInfantilForm.crianca || !encInfantilForm.evidencias) {
@@ -1384,14 +1386,15 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         const loadDocs = async () => {
             setIsLoading(true);
             try {
-                const [acomp, encs, encsInfantil] = await Promise.all([
-                    ccAcompanhamentoDocenteService.getAll(currentEscolaId),
+                const [acomp, acompInfantil, encs, encsInfantil] = await Promise.all([
+                    ccAcompanhamentoDocenteService.getAll(currentEscolaId, 'fundamental'),
+                    ccAcompanhamentoDocenteService.getAll(currentEscolaId, 'infantil'),
                     ccEncaminhamentosService.getAll(currentEscolaId, 'fundamental'),
                     ccEncaminhamentosService.getAll(currentEscolaId, 'infantil')
                 ]);
 
                 if (acomp) {
-                    setMockAcompanhamentos(acomp.map(a => ({
+                    setMockAcompanhamentos(acomp.map((a: any) => ({
                         id: a.id,
                         professor: a.professor,
                         componente: a.componente_curricular,
@@ -1401,7 +1404,24 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                         estudante: a.estudante_nome,
                         lider: a.lider_turma || '',
                         dificuldades: a.dificuldades || '',
-                        intervencao: a.intervencao_pedagogica || ''
+                        intervencao: a.intervencao_pedagogica || '',
+                        etapa: 'fundamental'
+                    })));
+                }
+
+                if (acompInfantil) {
+                    setMockAcompInfantil(acompInfantil.map((a: any) => ({
+                        id: a.id,
+                        professor: a.professor,
+                        agrupamento: a.turma_nome,
+                        periodoLetivo: a.periodo_letivo,
+                        data: a.data_registro ? a.data_registro.substring(0, 10) : '',
+                        campoExperiencia: a.componente_curricular,
+                        crianca: a.estudante_nome,
+                        tipoInteracao: a.lider_turma || '',
+                        evidencias: a.dificuldades || '',
+                        intencionalidade: a.intervencao_pedagogica || '',
+                        etapa: 'infantil'
                     })));
                 }
 
@@ -2766,7 +2786,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                         </div>
                                         <div className="mt-6">
                                             <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Intencionalidade Pedagógica / Mediação do Professor</label>
-                                            <textarea value={acompInfantilForm.intencionalidade} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, intencionalidade: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 h-28 resize-none" placeholder="Descreva qual foi o seu papel como mediador, as intervenções feitas e como o ambiente foi preparado para potencializar a experiênci..." />
+                                            <textarea value={acompInfantilForm.intencionalidade} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, intencionalidade: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 h-28 resize-none" placeholder="Descreva qual foi o seu papel como mediador, as intervenções feitas e como o ambiente foi preparado para potencializar a experiência..." />
                                         </div>
                                         <div className="flex gap-3 pt-6 border-t border-slate-100 mt-6">
                                             <button onClick={handleSaveAcompInfantil} className="bg-brand-orange hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-colors flex items-center gap-2">Salvar Registro</button>
@@ -2779,54 +2799,75 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                             {/* List Fundamental */}
                             {
                                 acompEtapa === 'fundamental' && (
-                                    <div className="space-y-4">
-                                        {mockAcompanhamentos.filter(a => a.etapa !== 'infantil').map(acomp => (
-                                            <div key={acomp.id} className="p-6 border border-slate-100 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all flex flex-col lg:flex-row justify-between lg:items-start gap-6 group">
-                                                <div className="flex-1">
-                                                    <div className="flex items-center gap-3 mb-2 flex-wrap">
-                                                        <span className="px-3 py-1 text-xs font-bold uppercase rounded-full border border-slate-200 text-slate-500">{acomp.turma}</span>
-                                                        <span className="px-3 py-1 text-xs font-bold uppercase rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100">{acomp.componente}</span>
-                                                        {acomp.data && <span className="text-xs font-medium text-slate-400">Data: {acomp.data}</span>}
-                                                        {acomp.periodoLetivo && <span className="text-xs font-medium text-slate-400 border-l border-slate-200 pl-3">Período: {acomp.periodoLetivo}</span>}
-                                                    </div>
-                                                    <h4 className="text-lg font-bold text-slate-900 leading-tight mb-1">Prof. {acomp.professor}</h4>
-                                                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                                                            <div className="mb-3">
-                                                                <p className="text-xs font-bold text-slate-400 uppercase mb-1">Estudante c/ Dificuldade</p>
+                                    <div className="overflow-x-auto mt-6">
+                                        <table className="w-full text-left border-collapse">
+                                            <thead>
+                                                <tr className="bg-slate-50 border-y border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                                    <th className="p-4">Professor(a) / Componente</th>
+                                                    <th className="p-4">Turma / Período</th>
+                                                    <th className="p-4">Estudante / Líder</th>
+                                                    <th className="p-4 max-w-xs">Dificuldades / Intervenção</th>
+                                                    <th className="p-4 text-center">Ações</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {mockAcompanhamentos.filter(a => a.etapa !== 'infantil').map(acomp => (
+                                                    <tr key={acomp.id} className="hover:bg-slate-50 transition-colors group">
+                                                        <td className="p-4">
+                                                            <p className="font-bold text-slate-800">Prof. {acomp.professor}</p>
+                                                            <span className="inline-block px-2.5 py-0.5 text-[10px] font-bold uppercase rounded bg-emerald-50 text-emerald-600 border border-emerald-100 mt-1">{acomp.componente}</span>
+                                                        </td>
+                                                        <td className="p-4">
+                                                            <p className="text-sm font-semibold text-slate-700">{acomp.turma}</p>
+                                                            <p className="text-xs text-slate-500 mt-0.5">{acomp.periodoLetivo}</p>
+                                                            {acomp.data && <p className="text-[10px] text-slate-400 mt-0.5">{acomp.data}</p>}
+                                                        </td>
+                                                        <td className="p-4">
+                                                            <div>
+                                                                <p className="text-xs font-bold text-slate-400 uppercase">Estudante c/ Dificuldade</p>
                                                                 <p className="text-sm font-semibold text-slate-700">{acomp.estudante}</p>
                                                             </div>
-                                                            <div>
-                                                                <p className="text-xs font-bold text-slate-400 uppercase mb-1">Dificuldades</p>
-                                                                <p className="text-sm text-slate-600 line-clamp-3">{acomp.dificuldades}</p>
-                                                            </div>
-                                                        </div>
-                                                        <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100/50">
-                                                            <div className="mb-3">
-                                                                <p className="text-xs font-bold text-emerald-600/80 uppercase mb-1">Intervenção Pedagógica</p>
-                                                                <p className="text-sm text-slate-700 line-clamp-3">{acomp.intervencao}</p>
-                                                            </div>
                                                             {acomp.lider && (
-                                                                <div className="pt-3 border-t border-emerald-100/50">
-                                                                    <p className="text-xs font-bold text-emerald-600/80 uppercase mb-1 flex items-center gap-1"><UserCheck size={12} /> Líder de Turma</p>
-                                                                    <p className="text-sm text-slate-600">{acomp.lider}</p>
+                                                                <div className="mt-1">
+                                                                    <p className="text-[10px] font-bold text-emerald-600 uppercase">Líder: {acomp.lider}</p>
                                                                 </div>
                                                             )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity flex-row lg:flex-col justify-center">
-                                                    <button title="Editar" onClick={() => handleEditAcomp(acomp)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-orange-50 hover:text-brand-orange hover:border-orange-200 transition-all flex-shrink-0"><Edit size={16} /></button>
-                                                    <button title="Excluir" onClick={() => handleDeleteAcomp(acomp.id)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all flex-shrink-0"><Trash2 size={16} /></button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                        {mockAcompanhamentos.filter(a => a.etapa !== 'infantil').length === 0 && !isEditingAcomp && (
-                                            <div className="text-center p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                                                <UserCheck className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                                                <p className="text-slate-500">Nenhum acompanhamento docente registrado.</p>
-                                            </div>
-                                        )}
+                                                        </td>
+                                                        <td className="p-4 max-w-xs">
+                                                            <div className="mb-1.5">
+                                                                <span className="text-[10px] font-bold text-slate-400 uppercase">Dificuldades:</span>
+                                                                <p className="text-xs text-slate-600 line-clamp-2" title={acomp.dificuldades}>{acomp.dificuldades}</p>
+                                                            </div>
+                                                            <div>
+                                                                <span className="text-[10px] font-bold text-emerald-600 uppercase">Intervenção:</span>
+                                                                <p className="text-xs text-slate-700 line-clamp-2" title={acomp.intervencao}>{acomp.intervencao}</p>
+                                                            </div>
+                                                        </td>
+                                                        <td className="p-4 text-center">
+                                                            <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <button title="Imprimir" onClick={() => setPrintingAcomp(acomp)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-brand-orange hover:border-brand-orange hover:bg-orange-50 flex items-center justify-center transition-colors shadow-sm">
+                                                                    <Printer size={14} />
+                                                                </button>
+                                                                <button title="Editar" onClick={() => handleEditAcomp(acomp)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 flex items-center justify-center transition-colors shadow-sm">
+                                                                    <Edit size={14} />
+                                                                </button>
+                                                                <button title="Excluir" onClick={() => handleDeleteAcomp(acomp.id)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50 flex items-center justify-center transition-colors shadow-sm">
+                                                                    <Trash2 size={14} />
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                {mockAcompanhamentos.filter(a => a.etapa !== 'infantil').length === 0 && !isEditingAcomp && (
+                                                    <tr>
+                                                        <td colSpan={5} className="p-8 text-center bg-slate-50 border-b border-dashed border-slate-200">
+                                                            <UserCheck className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                                                            <p className="text-slate-500">Nenhum acompanhamento docente registrado.</p>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
                                     </div>
                                 )
                             }
@@ -2834,50 +2875,75 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                             {/* List Infantil */}
                             {
                                 acompEtapa === 'infantil' && (
-                                    <div className="space-y-4">
-                                        {mockAcompInfantil.map(acomp => (
-                                            <div key={acomp.id} className="p-6 border border-slate-100 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all flex flex-col lg:flex-row justify-between lg:items-start gap-6 group">
-                                                <div className="flex-1">
-                                                    <div className="flex items-center gap-3 mb-2 flex-wrap">
-                                                        <span className="px-3 py-1 text-xs font-bold uppercase rounded-full border border-slate-200 text-slate-500">{acomp.agrupamento}</span>
-                                                        <span className="px-3 py-1 text-xs font-bold uppercase rounded-full bg-purple-50 text-purple-600 border border-purple-100">{acomp.campoExperiencia}</span>
-                                                        {acomp.data && <span className="text-xs font-medium text-slate-400">Data: {acomp.data}</span>}
-                                                        {acomp.periodoLetivo && <span className="text-xs font-medium text-slate-400 border-l border-slate-200 pl-3">Período: {acomp.periodoLetivo}</span>}
-                                                    </div>
-                                                    <h4 className="text-lg font-bold text-slate-900 leading-tight mb-1">Prof. {acomp.professor}</h4>
-                                                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                                                            <div className="mb-3">
-                                                                <p className="text-xs font-bold text-slate-400 uppercase mb-1">Criança em Observação</p>
+                                    <div className="overflow-x-auto mt-6">
+                                        <table className="w-full text-left border-collapse">
+                                            <thead>
+                                                <tr className="bg-slate-50 border-y border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                                    <th className="p-4">Professor(a) / Campo</th>
+                                                    <th className="p-4">Agrupamento / Período</th>
+                                                    <th className="p-4">Criança / Interação</th>
+                                                    <th className="p-4 max-w-xs">Evidências / Mediação</th>
+                                                    <th className="p-4 text-center">Ações</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {mockAcompInfantil.map(acomp => (
+                                                    <tr key={acomp.id} className="hover:bg-slate-50 transition-colors group">
+                                                        <td className="p-4">
+                                                            <p className="font-bold text-slate-800">Prof. {acomp.professor}</p>
+                                                            <span className="inline-block px-2.5 py-0.5 text-[10px] font-bold uppercase rounded bg-purple-50 text-purple-600 border border-purple-100 mt-1">{acomp.campoExperiencia}</span>
+                                                        </td>
+                                                        <td className="p-4">
+                                                            <p className="text-sm font-semibold text-slate-700">{acomp.agrupamento}</p>
+                                                            <p className="text-xs text-slate-500 mt-0.5">{acomp.periodoLetivo}</p>
+                                                            {acomp.data && <p className="text-[10px] text-slate-400 mt-0.5">{acomp.data}</p>}
+                                                        </td>
+                                                        <td className="p-4">
+                                                            <div>
+                                                                <p className="text-xs font-bold text-slate-400 uppercase">Criança em Observação</p>
                                                                 <p className="text-sm font-semibold text-slate-700">{acomp.crianca}</p>
                                                             </div>
                                                             {acomp.tipoInteracao && (
-                                                                <div className="mb-3">
-                                                                    <p className="text-xs font-bold text-slate-400 uppercase mb-1">Tipo de Interação</p>
-                                                                    <span className="px-2.5 py-1 text-xs font-bold rounded-lg bg-orange-50 text-orange-600 border border-orange-100">{acomp.tipoInteracao}</span>
+                                                                <div className="mt-1">
+                                                                    <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-orange-50 text-orange-600 border border-orange-100">{acomp.tipoInteracao}</span>
                                                                 </div>
                                                             )}
-                                                            <div>
-                                                                <p className="text-xs font-bold text-slate-400 uppercase mb-1">Evidências de Aprendizagem</p>
-                                                                <p className="text-sm text-slate-600 line-clamp-3">{acomp.evidencias}</p>
+                                                        </td>
+                                                        <td className="p-4 max-w-xs">
+                                                            <div className="mb-1.5">
+                                                                <span className="text-[10px] font-bold text-slate-400 uppercase">Evidências:</span>
+                                                                <p className="text-xs text-slate-600 line-clamp-2" title={acomp.evidencias}>{acomp.evidencias}</p>
                                                             </div>
-                                                        </div>
-                                                        <div className="bg-purple-50/50 p-4 rounded-xl border border-purple-100/50">
                                                             <div>
-                                                                <p className="text-xs font-bold text-purple-600/80 uppercase mb-1">Intencionalidade Pedagógica / Mediação</p>
-                                                                <p className="text-sm text-slate-700 line-clamp-4">{acomp.intencionalidade}</p>
+                                                                <span className="text-[10px] font-bold text-purple-600 uppercase">Mediação:</span>
+                                                                <p className="text-xs text-slate-700 line-clamp-2" title={acomp.intencionalidade}>{acomp.intencionalidade}</p>
                                                             </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                        {mockAcompInfantil.length === 0 && !isEditingAcompInfantil && (
-                                            <div className="text-center p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                                                <Baby className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                                                <p className="text-slate-500">Nenhum registro de acompanhamento infantil.</p>
-                                            </div>
-                                        )}
+                                                        </td>
+                                                        <td className="p-4 text-center">
+                                                            <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <button title="Imprimir" onClick={() => setPrintingAcomp(acomp)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-brand-orange hover:border-brand-orange hover:bg-orange-50 flex items-center justify-center transition-colors shadow-sm">
+                                                                    <Printer size={14} />
+                                                                </button>
+                                                                <button title="Editar" onClick={() => handleEditAcompInfantil(acomp)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 flex items-center justify-center transition-colors shadow-sm">
+                                                                    <Edit size={14} />
+                                                                </button>
+                                                                <button title="Excluir" onClick={() => handleDeleteAcompInfantil(acomp.id)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50 flex items-center justify-center transition-colors shadow-sm">
+                                                                    <Trash2 size={14} />
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                {mockAcompInfantil.length === 0 && !isEditingAcompInfantil && (
+                                                    <tr>
+                                                        <td colSpan={5} className="p-8 text-center bg-slate-50 border-b border-dashed border-slate-200">
+                                                            <Baby className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                                                            <p className="text-slate-500">Nenhum registro de acompanhamento infantil.</p>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
                                     </div>
                                 )
                             }
@@ -3480,6 +3546,13 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                 <PrintableEncaminhamento 
                     encaminhamento={printingEncaminhamento} 
                     onClose={() => setPrintingEncaminhamento(null)} 
+                />
+            )}
+
+            {printingAcomp && (
+                <PrintableAcompanhamentoDocente
+                    acompanhamento={printingAcomp}
+                    onClose={() => setPrintingAcomp(null)}
                 />
             )}
         </div>

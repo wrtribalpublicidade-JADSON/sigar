@@ -659,27 +659,65 @@ export const ccEstudanteService = {
 };
 
 // 8. Acompanhamento Docente
+const mapToUiAcompanhamento = (db: any): any => {
+    if (!db) return {};
+    return {
+        id: db.id,
+        escola_id: db.escola_id,
+        professor: db.professor_nome,
+        componente_curricular: db.componente_curricular,
+        turma_nome: db.turma,
+        periodo_letivo: db.periodo_letivo,
+        data_registro: db.data_registro,
+        estudante_nome: db.estudante_alvo,
+        lider_turma: db.tipo_interacao || db.lider_turma,
+        dificuldades: db.evidencias || db.dificuldades,
+        intervencao_pedagogica: db.intencionalidade || db.intervencao_sugerida
+    };
+};
+
 export const ccAcompanhamentoDocenteService = {
-    async getAll(escolaId?: string, stage: EducationalStage = 'fundamental') {
+    async getAll(escolaId?: string, stage: EducationalStage = 'fundamental'): Promise<any[]> {
         const table = getTableName('acompanhamento', stage);
         let query = supabase.from(table).select('*').order('data_registro', { ascending: false });
         if (escolaId) query = query.eq('escola_id', escolaId);
         const { data, error } = await query;
         if (error) throw error;
-        return data;
+        return (data || []).map(mapToUiAcompanhamento).filter((item: any) => item && item.id);
     },
 
-    async save(acompanhamento: any, stage: EducationalStage = 'fundamental') {
-        const table = getTableName('acompanhamento', stage);
+    async save(acompanhamento: any, stage?: EducationalStage): Promise<any> {
+        const actualStage = stage || acompanhamento.etapa || 'fundamental';
+        const table = getTableName('acompanhamento', actualStage);
+        
+        const dbAcomp: any = {
+            escola_id: acompanhamento.escola_id,
+            professor_nome: acompanhamento.professor,
+            componente_curricular: acompanhamento.componente_curricular,
+            turma: acompanhamento.turma_nome,
+            periodo_letivo: acompanhamento.periodo_letivo,
+            data_registro: acompanhamento.data_registro || null,
+            estudante_alvo: acompanhamento.estudante_nome,
+            lider_turma: acompanhamento.lider_turma,
+            dificuldades: acompanhamento.dificuldades,
+            intervencao_sugerida: acompanhamento.intervencao_pedagogica
+        };
+
+        if (actualStage === 'infantil') {
+            dbAcomp.tipo_interacao = acompanhamento.lider_turma;
+            dbAcomp.evidencias = acompanhamento.dificuldades;
+            dbAcomp.intencionalidade = acompanhamento.intervencao_pedagogica;
+        }
+
         if (acompanhamento.id && acompanhamento.id.length > 20) {
-            const { data, error } = await supabase.from(table).update(acompanhamento).eq('id', acompanhamento.id).select().single();
+            dbAcomp.id = acompanhamento.id;
+            const { data, error } = await supabase.from(table).update(dbAcomp).eq('id', dbAcomp.id).select().single();
             if (error) throw error;
-            return data;
+            return mapToUiAcompanhamento(data);
         } else {
-            const { id, ...newAcompanhamento } = acompanhamento;
-            const { data, error } = await supabase.from(table).insert(newAcompanhamento).select().single();
+            const { data, error } = await supabase.from(table).insert(dbAcomp).select().single();
             if (error) throw error;
-            return data;
+            return mapToUiAcompanhamento(data);
         }
     },
 
