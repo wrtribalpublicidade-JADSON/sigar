@@ -1221,10 +1221,11 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     const handleEditAcompInfantil = async (acomp: any) => {
         setAcompInfantilForm(acomp);
         setIsEditingAcompInfantil(true);
-        const selectedTurma = turmasCadastradas.find(t => getTurmaLabel(t) === acomp.agrupamento);
+        const selectedTurma = findTurmaMatch(turmasCadastradas, acomp.agrupamento);
         if (selectedTurma && selectedTurma.id) {
             try {
                 const students = await ccEstudanteService.getByTurma(selectedTurma.id);
+                setAcompInfantilFormStudents(students || []);
                 setCurrentClassStudents(students || []);
             } catch (err) {
                 console.error('Erro ao buscar alunos do agrupamento:', err);
@@ -1294,10 +1295,11 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     const handleEditAcomp = async (acomp: any) => {
         setAcompForm(acomp);
         setIsEditingAcomp(true);
-        const selectedTurma = turmasCadastradas.find(t => getTurmaLabel(t) === acomp.turma);
+        const selectedTurma = findTurmaMatch(turmasCadastradas, acomp.turma);
         if (selectedTurma && selectedTurma.id) {
             try {
                 const students = await ccEstudanteService.getByTurma(selectedTurma.id);
+                setAcompFormStudents(students || []);
                 setCurrentClassStudents(students || []);
             } catch (err) {
                 console.error('Erro ao buscar alunos da turma:', err);
@@ -1479,10 +1481,11 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     const handleEditEnc = async (enc: any) => {
         setEncForm(enc);
         setIsEditingEnc(true);
-        const selectedTurma = turmasCadastradas.find(t => getTurmaLabel(t) === enc.turma);
+        const selectedTurma = findTurmaMatch(turmasCadastradas, enc.turma);
         if (selectedTurma && selectedTurma.id) {
             try {
                 const students = await ccEstudanteService.getByTurma(selectedTurma.id);
+                setEncFormStudents(students || []);
                 setCurrentClassStudents(students || []);
             } catch (err) {
                 console.error('Erro ao buscar alunos da turma:', err);
@@ -1518,6 +1521,126 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         professor: '',
         status: 'Pendente'
     });
+
+    const cleanTurmaName = (s: string) => {
+        if (!s) return '';
+        const mainPart = s.split('•')[0];
+        return mainPart
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/\b(ano|serie|turma)\b/g, '')
+            .replace(/[^a-z0-9]/g, '');
+    };
+
+    const findTurmaMatch = (turmas: TurmaData[], labelToFind: string): TurmaData | undefined => {
+        if (!labelToFind) return undefined;
+        let matched = turmas.find(t => t.id === labelToFind);
+        if (matched) return matched;
+        
+        matched = turmas.find(t => getTurmaLabel(t) === labelToFind);
+        if (matched) return matched;
+        
+        const cleanToFind = cleanTurmaName(labelToFind);
+        matched = turmas.find(t => cleanTurmaName(getTurmaLabel(t)) === cleanToFind);
+        if (matched) return matched;
+        
+        matched = turmas.find(t => {
+            const cleanAnoSerie = cleanTurmaName(t.anoSerie || '');
+            const cleanIdent = cleanTurmaName(t.identificacao || '');
+            return cleanAnoSerie === cleanToFind || (cleanAnoSerie + cleanIdent) === cleanToFind;
+        });
+        return matched;
+    };
+
+    const [acompFormStudents, setAcompFormStudents] = useState<any[]>([]);
+    const [acompInfantilFormStudents, setAcompInfantilFormStudents] = useState<any[]>([]);
+    const [encFormStudents, setEncFormStudents] = useState<any[]>([]);
+    const [encInfantilFormStudents, setEncInfantilFormStudents] = useState<any[]>([]);
+
+    useEffect(() => {
+        const load = async () => {
+            if (!isEditingAcomp || !acompForm.turma) {
+                setAcompFormStudents([]);
+                return;
+            }
+            const matched = findTurmaMatch(turmasCadastradas, acompForm.turma);
+            if (matched && matched.id) {
+                try {
+                    const students = await ccEstudanteService.getByTurma(matched.id);
+                    setAcompFormStudents(students || []);
+                } catch (err) {
+                    console.error('Erro ao carregar alunos do acompanhamento:', err);
+                }
+            } else {
+                setAcompFormStudents([]);
+            }
+        };
+        load();
+    }, [isEditingAcomp, acompForm.turma, turmasCadastradas]);
+
+    useEffect(() => {
+        const load = async () => {
+            if (!isEditingAcompInfantil || !acompInfantilForm.agrupamento) {
+                setAcompInfantilFormStudents([]);
+                return;
+            }
+            const matched = findTurmaMatch(turmasCadastradas, acompInfantilForm.agrupamento);
+            if (matched && matched.id) {
+                try {
+                    const students = await ccEstudanteService.getByTurma(matched.id);
+                    setAcompInfantilFormStudents(students || []);
+                } catch (err) {
+                    console.error('Erro ao carregar alunos do acompanhamento infantil:', err);
+                }
+            } else {
+                setAcompInfantilFormStudents([]);
+            }
+        };
+        load();
+    }, [isEditingAcompInfantil, acompInfantilForm.agrupamento, turmasCadastradas]);
+
+    useEffect(() => {
+        const load = async () => {
+            if (!isEditingEnc || !encForm.turma) {
+                setEncFormStudents([]);
+                return;
+            }
+            const matched = findTurmaMatch(turmasCadastradas, encForm.turma);
+            if (matched && matched.id) {
+                try {
+                    const students = await ccEstudanteService.getByTurma(matched.id);
+                    setEncFormStudents(students || []);
+                } catch (err) {
+                    console.error('Erro ao carregar alunos do encaminhamento:', err);
+                }
+            } else {
+                setEncFormStudents([]);
+            }
+        };
+        load();
+    }, [isEditingEnc, encForm.turma, turmasCadastradas]);
+
+    useEffect(() => {
+        const load = async () => {
+            if (!isEditingEncInfantil || !encInfantilForm.agrupamento) {
+                setEncInfantilFormStudents([]);
+                return;
+            }
+            const matched = findTurmaMatch(turmasCadastradas, encInfantilForm.agrupamento);
+            if (matched && matched.id) {
+                try {
+                    const students = await ccEstudanteService.getByTurma(matched.id);
+                    setEncInfantilFormStudents(students || []);
+                } catch (err) {
+                    console.error('Erro ao carregar alunos do encaminhamento infantil:', err);
+                }
+            } else {
+                setEncInfantilFormStudents([]);
+            }
+        };
+        load();
+    }, [isEditingEncInfantil, encInfantilForm.agrupamento, turmasCadastradas]);
 
     const [printingEncaminhamento, setPrintingEncaminhamento] = useState<any | null>(null);
     const [printingAcomp, setPrintingAcomp] = useState<any | null>(null);
@@ -1579,10 +1702,11 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     const handleEditEncInfantil = async (enc: any) => {
         setEncInfantilForm(enc);
         setIsEditingEncInfantil(true);
-        const selectedTurma = turmasCadastradas.find(t => getTurmaLabel(t) === enc.agrupamento);
+        const selectedTurma = findTurmaMatch(turmasCadastradas, enc.agrupamento);
         if (selectedTurma && selectedTurma.id) {
             try {
                 const students = await ccEstudanteService.getByTurma(selectedTurma.id);
+                setEncInfantilFormStudents(students || []);
                 setCurrentClassStudents(students || []);
             } catch (err) {
                 console.error('Erro ao buscar alunos do agrupamento:', err);
@@ -2937,7 +3061,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                             <div>
                                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Turma</label>
                                                 <select
-                                                    value={turmasCadastradas.find(t => getTurmaLabel(t) === acompForm.turma)?.id || ''}
+                                                    value={findTurmaMatch(turmasCadastradas, acompForm.turma)?.id || ''}
                                                     onChange={async (e) => {
                                                         const selected = turmasCadastradas.find(t => t.id === e.target.value);
                                                         const turmaLabel = selected ? getTurmaLabel(selected) : '';
@@ -2945,6 +3069,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                         if (selected && selected.id) {
                                                             try {
                                                                 const students = await ccEstudanteService.getByTurma(selected.id);
+                                                                setAcompFormStudents(students || []);
                                                                 setCurrentClassStudents(students || []);
                                                             } catch (err) {
                                                                 console.error('Erro ao buscar alunos da turma selecionada:', err);
@@ -2982,8 +3107,8 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                                                 >
                                                     <option value="">Selecione o estudante</option>
-                                                    {currentClassStudents.map(student => (
-                                                        <option key={student.id} value={student.nome}>{student.nome}</option>
+                                                    {acompFormStudents.map(student => (
+                                                        <option key={student.id} value={student.name}>{student.name}</option>
                                                     ))}
                                                 </select>
                                             </div>
@@ -3028,7 +3153,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                             <div>
                                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Agrupamento/Turma</label>
                                                 <select
-                                                    value={turmasCadastradas.find(t => getTurmaLabel(t) === acompInfantilForm.agrupamento)?.id || ''}
+                                                    value={findTurmaMatch(turmasCadastradas, acompInfantilForm.agrupamento)?.id || ''}
                                                     onChange={async (e) => {
                                                         const selected = turmasCadastradas.find(t => t.id === e.target.value);
                                                         const turmaLabel = selected ? getTurmaLabel(selected) : '';
@@ -3036,6 +3161,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                         if (selected && selected.id) {
                                                             try {
                                                                 const students = await ccEstudanteService.getByTurma(selected.id);
+                                                                setAcompInfantilFormStudents(students || []);
                                                                 setCurrentClassStudents(students || []);
                                                             } catch (err) {
                                                                 console.error('Erro ao buscar alunos do agrupamento selecionado:', err);
@@ -3078,8 +3204,8 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                                                 >
                                                     <option value="">Selecione a criança</option>
-                                                    {currentClassStudents.map(student => (
-                                                        <option key={student.id} value={student.nome}>{student.nome}</option>
+                                                    {acompInfantilFormStudents.map(student => (
+                                                        <option key={student.id} value={student.name}>{student.name}</option>
                                                     ))}
                                                 </select>
                                             </div>
@@ -3362,7 +3488,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                         <div>
                                             <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Turma</label>
                                             <select
-                                                value={turmasCadastradas.find(t => getTurmaLabel(t) === encForm.turma)?.id || ''}
+                                                value={findTurmaMatch(turmasCadastradas, encForm.turma)?.id || ''}
                                                 onChange={async (e) => {
                                                     const selected = turmasCadastradas.find(t => t.id === e.target.value);
                                                     const turmaLabel = selected ? getTurmaLabel(selected) : '';
@@ -3370,8 +3496,9 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                     if (selected && selected.id) {
                                                         try {
                                                             const students = await ccEstudanteService.getByTurma(selected.id);
+                                                            setEncFormStudents(students || []);
                                                             setCurrentClassStudents(students || []);
-                                                        } catch (err) {
+                                                        } catch (err) { 
                                                             console.error('Erro ao buscar alunos da turma selecionada:', err);
                                                         }
                                                     }
@@ -3392,8 +3519,8 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                                             >
                                                 <option value="">Selecione o estudante</option>
-                                                {currentClassStudents.map(student => (
-                                                    <option key={student.id} value={student.nome}>{student.nome}</option>
+                                                {encFormStudents.map(student => (
+                                                    <option key={student.id} value={student.name}>{student.name}</option>
                                                 ))}
                                             </select>
                                         </div>
@@ -3459,7 +3586,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                         <div>
                                             <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Agrupamento / Turma</label>
                                             <select
-                                                value={turmasCadastradas.find(t => getTurmaLabel(t) === encInfantilForm.agrupamento)?.id || ''}
+                                                value={findTurmaMatch(turmasCadastradas, encInfantilForm.agrupamento)?.id || ''}
                                                 onChange={async (e) => {
                                                     const selected = turmasCadastradas.find(t => t.id === e.target.value);
                                                     const turmaLabel = selected ? getTurmaLabel(selected) : '';
@@ -3467,6 +3594,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                     if (selected && selected.id) {
                                                         try {
                                                             const students = await ccEstudanteService.getByTurma(selected.id);
+                                                            setEncInfantilFormStudents(students || []);
                                                             setCurrentClassStudents(students || []);
                                                         } catch (err) {
                                                             console.error('Erro ao buscar alunos do agrupamento selecionado:', err);
@@ -3489,8 +3617,8 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                                             >
                                                 <option value="">Selecione a criança</option>
-                                                {currentClassStudents.map(student => (
-                                                    <option key={student.id} value={student.nome}>{student.nome}</option>
+                                                {encInfantilFormStudents.map(student => (
+                                                    <option key={student.id} value={student.name}>{student.name}</option>
                                                 ))}
                                             </select>
                                         </div>

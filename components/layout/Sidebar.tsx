@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     LayoutDashboard, School, Users, FileText,
-    ChevronLeft, ChevronRight, Menu, X, LogOut, PlusCircle, BarChart3, TrendingUp, ClipboardCheck, GraduationCap, ClipboardList, Bell, Shield, FileStack, Library, KeyRound, Baby, Utensils
+    ChevronLeft, ChevronRight, Menu, X, LogOut, PlusCircle, BarChart3, TrendingUp, ClipboardCheck, GraduationCap, ClipboardList, Bell, Shield, FileStack, Library, KeyRound, Baby, Utensils, BookOpen
 } from 'lucide-react';
 import { ViewState } from '../../types';
 import { getAccessForSidebarItem } from '../../utils/permissions';
@@ -105,10 +105,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
         { icon: Utensils, label: 'Merenda Escolar', view: 'MERENDA_ESCOLAR' as ViewState },
     ];
 
+    const diarioClasseNavItems = [
+        { icon: BookOpen, label: 'Plano de Aula', view: 'PLANO_AULA' as ViewState },
+        { icon: FileText, label: 'Aulas ministradas', view: 'AULAS_MINISTRADAS' as ViewState },
+        { icon: ClipboardCheck, label: 'Frequencia', view: 'FREQUENCIA' as ViewState },
+        { icon: GraduationCap, label: 'Notas', view: 'NOTAS' as ViewState },
+    ];
+
     // Filter items based on user role permissions (admins bypass)
     // If the user is admin, force the logical role to be 'Administrador' so that permissions.ts can grant full access.
     const effectiveRole = isAdmin ? 'Administrador' : userRole;
     const filteredMainNav = mainNavItems.filter(item => getAccessForSidebarItem(item.label, effectiveRole) !== 'none');
+    const filteredDiarioClasseNav = diarioClasseNavItems.filter(item => getAccessForSidebarItem(item.label, effectiveRole) !== 'none');
     const filteredManagementNav = managementNavItems.filter(item => getAccessForSidebarItem(item.label, effectiveRole) !== 'none');
     const showRegistrarVisita = getAccessForSidebarItem('Registrar Visita', effectiveRole) !== 'none';
 
@@ -146,6 +154,24 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
                         ))}
                     </div>
                 </div>
+
+                {filteredDiarioClasseNav.length > 0 && (
+                    <div>
+                        {!isCollapsed && <p className="px-3 mb-3 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Diário de Classe</p>}
+                        <div className="space-y-1">
+                            {filteredDiarioClasseNav.map(item => (
+                                <NavItem
+                                    key={item.view}
+                                    icon={item.icon}
+                                    label={item.label}
+                                    isActive={currentView === item.view}
+                                    isCollapsed={isCollapsed}
+                                    onClick={() => { onNavigate(item.view); setIsMobileOpen(false); }}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 <div>
                     {!isCollapsed && <p className="px-3 mb-3 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Gestão</p>}

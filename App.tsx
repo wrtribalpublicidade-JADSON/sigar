@@ -29,6 +29,10 @@ import { AtividadesComplementares } from './components/AtividadesComplementares'
 import { StudentManagement } from './components/StudentManagement';
 import { MerendaEscolar } from './components/MerendaEscolar';
 import { Preloader } from './components/ui/Preloader';
+import { PlanoAula } from './components/PlanoAula';
+import { AulasMinistradas } from './components/AulasMinistradas';
+import { Frequencia } from './components/Frequencia';
+import { Notas } from './components/Notas';
 import { ViewState, Escola, Visita, Coordenador, Segmento } from './types';
 import { supabase } from './services/supabase';
 import { useNotification } from './context/NotificationContext';
@@ -1160,6 +1164,14 @@ export default function App() {
         );
       case 'MERENDA_ESCOLAR':
         return <MerendaEscolar escolas={escolas} isAdmin={isAdmin} isDemoMode={isDemoMode} canEdit={isAdmin || hasFullAccess('MERENDA_ESCOLAR', effectiveUser?.funcao)} />;
+      case 'PLANO_AULA':
+        return <PlanoAula escolas={escolas} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={effectiveUser || null} />;
+      case 'AULAS_MINISTRADAS':
+        return <AulasMinistradas escolas={escolas} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={effectiveUser || null} />;
+      case 'FREQUENCIA':
+        return <Frequencia escolas={escolas} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={effectiveUser || null} />;
+      case 'NOTAS':
+        return <Notas escolas={escolas} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={effectiveUser || null} />;
       default:
         return <div>Página não encontrada</div>;
     }
