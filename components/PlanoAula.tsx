@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { PageHeader } from './ui/PageHeader';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
@@ -33,6 +33,8 @@ interface LessonPlan {
   recursos: string;
   avaliacao: string;
   criadoEm: string;
+  anoSerie: string;
+  periodo: string;
 }
 
 const COMPONENTES = [
@@ -48,6 +50,32 @@ const COMPONENTES = [
   'Campos de Experiência (EI)'
 ];
 
+const BIMESTRES = [
+  '1º Bimestre',
+  '2º Bimestre',
+  '3º Bimestre',
+  '4º Bimestre',
+  'Anual'
+];
+
+const ANOS_SERIES = [
+  '1º Ano',
+  '2º Ano',
+  '3º Ano',
+  '4º Ano',
+  '5º Ano',
+  '6º Ano',
+  '7º Ano',
+  '8º Ano',
+  '9º Ano',
+  'Creche II',
+  'Creche III',
+  'Pré I',
+  'Pré II',
+  'EJA',
+  'Outros'
+];
+
 export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdmin, userEmail, currentUser }) => {
   const { showNotification } = useNotification();
   const [plans, setPlans] = useState<LessonPlan[]>([]);
@@ -58,7 +86,9 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
   const [dataPlan, setDataPlan] = useState(new Date().toISOString().split('T')[0]);
   const [selectedEscolaId, setSelectedEscolaId] = useState('');
   const [selectedTurmaId, setSelectedTurmaId] = useState('');
+  const [anoSerie, setAnoSerie] = useState(ANOS_SERIES[0]);
   const [componente, setComponente] = useState(COMPONENTES[0]);
+  const [periodo, setPeriodo] = useState(BIMESTRES[0]);
   const [titulo, setTitulo] = useState('');
   const [objetivos, setObjetivos] = useState('');
   const [habilidades, setHabilidades] = useState('');
@@ -100,9 +130,9 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
 
       if (isDemoMode) {
         setTurmas([
-          { id: 'demo-t1', name: '1º ANO A', shift: 'MANHÃ' },
-          { id: 'demo-t2', name: '2º ANO B', shift: 'TARDE' },
-          { id: 'demo-t3', name: '5º ANO A', shift: 'MANHÃ' },
+          { id: 'demo-t1', name: '1º ANO A', year: '1º Ano', shift: 'MANHÃ' },
+          { id: 'demo-t2', name: '2º ANO B', year: '2º Ano', shift: 'TARDE' },
+          { id: 'demo-t3', name: '5º ANO A', year: '5º Ano', shift: 'MANHÃ' },
         ]);
         return;
       }
@@ -116,11 +146,6 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
 
         if (error) throw error;
         setTurmas(data || []);
-        if (data && data.length > 0) {
-          setSelectedTurmaId(data[0].id);
-        } else {
-          setSelectedTurmaId('');
-        }
       } catch (err) {
         console.error('Erro ao carregar turmas:', err);
       }
@@ -128,6 +153,75 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
 
     fetchTurmas();
   }, [selectedEscolaId, isDemoMode]);
+
+  // Helpers for filtering and matching
+  const isTurmaInAnoSerie = (t: any, anoSerieVal: string): boolean => {
+    if (!t) return false;
+    const target = anoSerieVal.toLowerCase().trim();
+    const tYear = (t.year || '').toLowerCase().trim();
+    const tName = (t.name || '').toLowerCase().trim();
+    
+    if (tYear) {
+      if (tYear === target) return true;
+      if (target.includes(tYear) || tYear.includes(target)) return true;
+    }
+    
+    if (tName) {
+      if (tName === target) return true;
+      if (tName.includes(target)) return true;
+      
+      const normalizedTarget = target.replace(/[-\s]/g, '');
+      const normalizedName = tName.replace(/[-\s]/g, '');
+      if (normalizedName.includes(normalizedTarget)) return true;
+    }
+    
+    return false;
+  };
+
+  // Compute available Anos/Séries for the selected school
+  const availableAnosSeries = useMemo(() => {
+    if (turmas.length === 0) return ANOS_SERIES;
+    const filtered = ANOS_SERIES.filter(ano => 
+      turmas.some(t => isTurmaInAnoSerie(t, ano))
+    );
+    return filtered.length > 0 ? filtered : ANOS_SERIES;
+  }, [turmas]);
+
+  // Compute available Turmas for the selected school and Ano/Série
+  const availableTurmas = useMemo(() => {
+    return turmas.filter(t => isTurmaInAnoSerie(t, anoSerie));
+  }, [turmas, anoSerie]);
+
+  // Sync anoSerie selection when availableAnosSeries changes
+  useEffect(() => {
+    const turmasMatchSchool = turmas.length === 0 || 
+      turmas[0].school_id === selectedEscolaId || 
+      (isDemoMode && turmas[0].id?.startsWith('demo'));
+
+    if (turmasMatchSchool) {
+      if (availableAnosSeries.length > 0 && !availableAnosSeries.includes(anoSerie)) {
+        setAnoSerie(availableAnosSeries[0]);
+      }
+    }
+  }, [availableAnosSeries, anoSerie, selectedEscolaId, turmas, isDemoMode]);
+
+  // Sync selectedTurmaId selection when availableTurmas changes
+  useEffect(() => {
+    const turmasMatchSchool = turmas.length === 0 || 
+      turmas[0].school_id === selectedEscolaId || 
+      (isDemoMode && turmas[0].id?.startsWith('demo'));
+
+    if (turmasMatchSchool) {
+      if (availableTurmas.length > 0) {
+        const exists = availableTurmas.some(t => t.id === selectedTurmaId);
+        if (!exists) {
+          setSelectedTurmaId(availableTurmas[0].id);
+        }
+      } else {
+        setSelectedTurmaId('');
+      }
+    }
+  }, [availableTurmas, selectedTurmaId, selectedEscolaId, turmas, isDemoMode]);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -155,16 +249,18 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       metodologia,
       recursos,
       avaliacao,
+      anoSerie,
+      periodo,
       criadoEm: new Date().toISOString()
     };
 
     let updatedPlans: LessonPlan[];
     if (editingId) {
       updatedPlans = plans.map(p => p.id === editingId ? payload : p);
-      showNotification('success', 'Plano de Aula atualizado com sucesso!');
+      showNotification('success', 'Guia de Aprendizagem atualizada com sucesso!');
     } else {
       updatedPlans = [payload, ...plans];
-      showNotification('success', 'Plano de Aula cadastrado com sucesso!');
+      showNotification('success', 'Guia de Aprendizagem cadastrada com sucesso!');
     }
 
     setPlans(updatedPlans);
@@ -180,7 +276,9 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
     setTimeout(() => {
       setSelectedTurmaId(plan.turmaId);
     }, 150);
+    setAnoSerie(plan.anoSerie || ANOS_SERIES[0]);
     setComponente(plan.componente);
+    setPeriodo(plan.periodo || BIMESTRES[0]);
     setTitulo(plan.titulo);
     setObjetivos(plan.objetivos);
     setHabilidades(plan.habilidades);
@@ -191,15 +289,17 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
   };
 
   const handleDelete = (id: string) => {
-    if (!confirm('Deseja realmente excluir este Plano de Aula?')) return;
+    if (!confirm('Deseja realmente excluir esta Guia de Aprendizagem?')) return;
     const updated = plans.filter(p => p.id !== id);
     setPlans(updated);
     localStorage.setItem('sigar_planos_aula', JSON.stringify(updated));
-    showNotification('success', 'Plano de Aula removido.');
+    showNotification('success', 'Guia de Aprendizagem removida.');
   };
 
   const resetForm = () => {
     setEditingId(null);
+    setAnoSerie(ANOS_SERIES[0]);
+    setPeriodo(BIMESTRES[0]);
     setTitulo('');
     setObjetivos('');
     setHabilidades('');
@@ -227,8 +327,8 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
   return (
     <div className="space-y-6 pb-12 animate-fade-in relative">
       <PageHeader 
-        title="Plano de Aula"
-        subtitle="Elaboração e acompanhamento de planos de aulas para os professores"
+        title="Guia de Aprendizagem"
+        subtitle="Elaboração e acompanhamento de guias de aprendizagem para os professores"
         icon={BookOpen}
         badgeText="DIÁRIO DE CLASSE"
         actions={[]}
@@ -239,17 +339,19 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
         <div className="hidden print:block fixed inset-0 bg-white z-[9999] p-8 text-black text-xs font-sans">
           <div className="text-center border-b pb-4 mb-6">
             <h1 className="text-lg font-black tracking-tight">SISTEMA INTEGRADO DE GESTÃO DE APRENDIZAGEM (SIGAR)</h1>
-            <p className="text-[10px] text-gray-500 uppercase font-bold mt-1">Instrumental - Plano de Aula Docente</p>
+            <p className="text-[10px] text-gray-500 uppercase font-bold mt-1">Instrumental - Guia de Aprendizagem Docente</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4 mb-6 border p-4 rounded-lg bg-gray-50">
             <div>
               <p><strong>Unidade Escolar:</strong> {printPlan.escolaNome}</p>
               <p><strong>Turma:</strong> {printPlan.turmaNome}</p>
+              <p><strong>Ano/Série:</strong> {printPlan.anoSerie || '---'}</p>
               <p><strong>Data:</strong> {new Date(printPlan.data + 'T12:00:00').toLocaleDateString()}</p>
             </div>
             <div>
               <p><strong>Componente Curricular:</strong> {printPlan.componente}</p>
+              <p><strong>Período:</strong> {printPlan.periodo || '---'}</p>
               <p><strong>Título da Aula:</strong> {printPlan.titulo}</p>
             </div>
           </div>
@@ -303,12 +405,12 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
         <div className="flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
           <Bookmark className="text-brand-orange w-5 h-5" />
           <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight">
-            {editingId ? 'Editar Plano de Aula' : 'Novo Plano de Aula'}
+            {editingId ? 'Editar Guia de Aprendizagem' : 'Nova Guia de Aprendizagem'}
           </h2>
         </div>
 
         <form onSubmit={handleSave} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Data *</label>
               <div className="relative">
@@ -341,6 +443,20 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
             </div>
 
             <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Ano/Série *</label>
+              <select 
+                value={anoSerie}
+                onChange={e => setAnoSerie(e.target.value)}
+                required
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
+              >
+                {availableAnosSeries.map(a => (
+                  <option key={a} value={a}>{a}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Turma *</label>
               <select 
                 value={selectedTurmaId}
@@ -348,10 +464,10 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
                 required
                 className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
               >
-                {turmas.length === 0 ? (
+                {availableTurmas.length === 0 ? (
                   <option value="">Nenhuma turma cadastrada</option>
                 ) : (
-                  turmas.map(t => (
+                  availableTurmas.map(t => (
                     <option key={t.id} value={t.id}>{`${t.name || t.year} • ${t.shift || ''}`}</option>
                   ))
                 )}
@@ -371,10 +487,24 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
                 ))}
               </select>
             </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Período *</label>
+              <select 
+                value={periodo}
+                onChange={e => setPeriodo(e.target.value)}
+                required
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
+              >
+                {BIMESTRES.map(b => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Título do Plano/Tema da Aula *</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Título da Guia/Tema da Aula *</label>
             <input 
               type="text" 
               value={titulo}
@@ -463,8 +593,8 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       <div className="space-y-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h3 className="text-md font-black text-slate-800 uppercase tracking-wider">Histórico de Planos de Aulas</h3>
-            <p className="text-xs text-slate-500 mt-0.5">Consulte, edite ou exporte os planos já elaborados</p>
+            <h3 className="text-md font-black text-slate-800 uppercase tracking-wider">Histórico de Guias de Aprendizagem</h3>
+            <p className="text-xs text-slate-500 mt-0.5">Consulte, edite ou exporte as guias já elaboradas</p>
           </div>
 
           <div className="flex flex-wrap gap-2 w-full md:w-auto">
@@ -497,6 +627,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
                 <tr>
                   <th className="px-6 py-4">Data / Escola</th>
                   <th className="px-6 py-4">Turma / Componente</th>
+                  <th className="px-6 py-4">Ano/Série / Período</th>
                   <th className="px-6 py-4">Tema da Aula</th>
                   <th className="px-6 py-4 text-right">Ações</th>
                 </tr>
@@ -504,8 +635,8 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
               <tbody className="divide-y divide-slate-100">
                 {filteredPlans.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="py-12 text-center text-slate-400 font-semibold">
-                      Nenhum plano de aula encontrado.
+                    <td colSpan={5} className="py-12 text-center text-slate-400 font-semibold">
+                      Nenhuma Guia de Aprendizagem encontrada.
                     </td>
                   </tr>
                 ) : (
@@ -523,6 +654,12 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
                         <div className="font-bold text-slate-700">{plan.turmaNome}</div>
                         <div className="text-[10px] text-brand-orange font-bold uppercase mt-0.5">
                           {plan.componente}
+                        </div>
+                      </td>
+                      <td className="px-6 py-3">
+                        <div className="font-bold text-slate-700">{plan.anoSerie || '---'}</div>
+                        <div className="text-[10px] text-slate-500 font-bold uppercase mt-0.5">
+                          {plan.periodo || '---'}
                         </div>
                       </td>
                       <td className="px-6 py-3">

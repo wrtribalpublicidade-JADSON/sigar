@@ -29,6 +29,7 @@ import { AtividadesComplementares } from './components/AtividadesComplementares'
 import { StudentManagement } from './components/StudentManagement';
 import { MerendaEscolar } from './components/MerendaEscolar';
 import { Preloader } from './components/ui/Preloader';
+import { PlanoCurso } from './components/PlanoCurso';
 import { PlanoAula } from './components/PlanoAula';
 import { AulasMinistradas } from './components/AulasMinistradas';
 import { Frequencia } from './components/Frequencia';
@@ -1164,6 +1165,8 @@ export default function App() {
         );
       case 'MERENDA_ESCOLAR':
         return <MerendaEscolar escolas={escolas} isAdmin={isAdmin} isDemoMode={isDemoMode} canEdit={isAdmin || hasFullAccess('MERENDA_ESCOLAR', effectiveUser?.funcao)} />;
+      case 'PLANO_CURSO':
+        return <PlanoCurso escolas={escolas} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={effectiveUser || null} />;
       case 'PLANO_AULA':
         return <PlanoAula escolas={escolas} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={effectiveUser || null} />;
       case 'AULAS_MINISTRADAS':

@@ -32,7 +32,7 @@ interface NavItemProps {
 const NavItem: React.FC<NavItemProps> = ({ icon: Icon, label, isActive, isCollapsed, onClick, isHighlighted, hasNotification }) => (
     <button
         onClick={onClick}
-        className={`w-full flex items-center gap-3 px-4 py-1.5 rounded-xl transition-all duration-200 group relative
+        className={`w-full flex items-center gap-3 px-4 py-1 rounded-xl transition-all duration-200 group relative
       ${isActive
                 ? 'bg-brand-orange text-white shadow-lg shadow-brand-orange/20'
                 : isHighlighted
@@ -106,7 +106,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
     ];
 
     const diarioClasseNavItems = [
-        { icon: BookOpen, label: 'Plano de Aula', view: 'PLANO_AULA' as ViewState },
+        { icon: ClipboardList, label: 'Plano de Curso', view: 'PLANO_CURSO' as ViewState },
+        { icon: BookOpen, label: 'Guia de Aprendizagem', view: 'PLANO_AULA' as ViewState },
         { icon: FileText, label: 'Aulas ministradas', view: 'AULAS_MINISTRADAS' as ViewState },
         { icon: ClipboardCheck, label: 'Frequencia', view: 'FREQUENCIA' as ViewState },
         { icon: GraduationCap, label: 'Notas', view: 'NOTAS' as ViewState },
@@ -123,7 +124,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
     const SidebarContent = () => (
         <div className="flex flex-col h-full bg-white">
             {/* Logo */}
-            <div className={`pt-8 px-6 pb-6 ${isCollapsed ? 'text-center' : ''}`}>
+            <div className={`pt-6 px-6 pb-4 ${isCollapsed ? 'text-center' : ''}`}>
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-brand-orange rounded-xl shadow-lg shadow-brand-orange/20 flex items-center justify-center">
                         <span className="text-white font-black text-xl">S</span>
@@ -138,9 +139,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 px-4 space-y-8 overflow-y-auto">
+            <nav className="flex-1 px-4 space-y-5 overflow-y-auto">
                 <div>
-                    {!isCollapsed && <p className="px-3 mb-3 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Menu</p>}
+                    {!isCollapsed && <p className="px-3 mb-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Menu</p>}
                     <div className="space-y-1">
                         {filteredMainNav.map(item => (
                             <NavItem
@@ -157,7 +158,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
 
                 {filteredDiarioClasseNav.length > 0 && (
                     <div>
-                        {!isCollapsed && <p className="px-3 mb-3 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Diário de Classe</p>}
+                        {!isCollapsed && <p className="px-3 mb-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Diário de Classe</p>}
                         <div className="space-y-1">
                             {filteredDiarioClasseNav.map(item => (
                                 <NavItem
@@ -174,7 +175,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
                 )}
 
                 <div>
-                    {!isCollapsed && <p className="px-3 mb-3 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Gestão</p>}
+                    {!isCollapsed && <p className="px-3 mb-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Gestão</p>}
                     <div className="space-y-1">
                         {filteredManagementNav.map(item => (
                             <NavItem
@@ -192,7 +193,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
 
                 {/* Quick Action */}
                 {showRegistrarVisita && (
-                    <div className="pt-4">
+                    <div className="pt-2.5">
                         <NavItem
                             icon={PlusCircle}
                             label="Registrar Visita"
