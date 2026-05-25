@@ -4,7 +4,8 @@ import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { 
   FileText, Plus, Search, Edit2, Trash2, Printer, 
-  X, Calendar, School as SchoolIcon, BookOpen, Save, ClipboardList
+  X, Calendar, School as SchoolIcon, BookOpen, Save, ClipboardList,
+  Layers, Check
 } from 'lucide-react';
 import { Escola, Coordenador } from '../types';
 import { supabase } from '../services/supabase';
@@ -33,6 +34,8 @@ interface ClassLog {
   criadoEm: string;
   anoSerie: string;
   periodo: string;
+  selectedObjetoIds?: string[];
+  selectedHabilidadeIds?: string[];
 }
 
 const COMPONENTES = [
@@ -92,6 +95,11 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
   const [atividades, setAtividades] = useState('');
   const [observacoes, setObservacoes] = useState('');
 
+  // Course Plans integration state
+  const [coursePlans, setCoursePlans] = useState<any[]>([]);
+  const [selectedObjetoIds, setSelectedObjetoIds] = useState<string[]>([]);
+  const [selectedHabilidadeIds, setSelectedHabilidadeIds] = useState<string[]>([]);
+
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [schoolFilter, setSchoolFilter] = useState('ALL');
@@ -115,6 +123,278 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
       setSelectedEscolaId(escolas[0].id);
     }
   }, [escolas]);
+
+  // Load course plans from localStorage
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const saved = localStorage.getItem('sigar_planos_curso');
+      if (saved) {
+        try {
+          setCoursePlans(JSON.parse(saved));
+        } catch (e) {
+          console.error(e);
+        }
+      } else {
+        setCoursePlans([]);
+      }
+    };
+    handleStorageChange();
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  // Get active Course Plan unificado matching selections
+  const activeCoursePlan = useMemo(() => {
+    return coursePlans.find((p: any) => 
+      p.componente === componente && 
+      p.anoSerie === anoSerie && 
+      p.bimestre === periodo
+    );
+  }, [coursePlans, componente, anoSerie, periodo]);
+
+  // Aggregate objects and skills from active Course Plan items
+  const planData = useMemo(() => {
+    if (!activeCoursePlan || !activeCoursePlan.itens) {
+      return { objetos: [], habilidades: [], links: [] };
+    }
+    
+    const objetosMap = new Map<string, any>();
+    const habilidadesMap = new Map<string, any>();
+    const links: { objetoId: string; habilidadeId: string }[] = [];
+    
+    activeCoursePlan.itens.forEach((item: any) => {
+      if (item.objetos) {
+        item.objetos.forEach((obj: any) => {
+          objetosMap.set(obj.id, obj);
+        });
+      }
+      if (item.habilidades) {
+        item.habilidades.forEach((hab: any) => {
+          habilidadesMap.set(hab.id, hab);
+        });
+      }
+      if (item.links) {
+        item.links.forEach((link: any) => {
+          links.push(link);
+        });
+      }
+    });
+    
+    return {
+      objetos: Array.from(objetosMap.values()),
+      habilidades: Array.from(habilidadesMap.values()),
+      links
+    };
+  }, [activeCoursePlan]);
+
+  // Reset selection when grade/component/period/turma changes
+  useEffect(() => {
+    if (!editingId) {
+      setSelectedObjetoIds([]);
+      setSelectedHabilidadeIds([]);
+    }
+  }, [componente, anoSerie, periodo, selectedTurmaId, editingId]);
+
+  // Auto-fill form values from interactive selections
+  const updateTextFromSelections = (objIds: string[], habIds: string[]) => {
+    const selectedObjs = planData.objetos
+      .filter((o: any) => objIds.includes(o.id))
+      .map((o: any) => o.descricao);
+    
+    const selectedHabs = planData.habilidades
+      .filter((h: any) => habIds.includes(h.id))
+      .map((h: any) => h.codigo);
+      
+    let newContent = '';
+    if (selectedObjs.length > 0) {
+      newContent += `Objetos de Conhecimento:\n- ${selectedObjs.join('\n- ')}\n\n`;
+    }
+    if (selectedHabs.length > 0) {
+      newContent += `Habilidades Trabalhadas:\n- ${selectedHabs.join(', ')}`;
+    }
+    
+    setConteudo(newContent);
+  };
+
+  // Interactive selection handlers
+  const toggleObjetoSelection = (objId: string) => {
+    const isSelected = selectedObjetoIds.includes(objId);
+    let newObjetoIds: string[];
+    let newHabilidadeIds = [...selectedHabilidadeIds];
+    
+    if (!isSelected) {
+      newObjetoIds = [...selectedObjetoIds, objId];
+      const linkedHabs = planData.links
+        .filter(l => l.objetoId === objId)
+        .map(l => l.habilidadeId);
+      
+      linkedHabs.forEach(habId => {
+        if (!newHabilidadeIds.includes(habId)) {
+          newHabilidadeIds.push(habId);
+        }
+      });
+    } else {
+      newObjetoIds = selectedObjetoIds.filter(id => id !== objId);
+      const linkedHabs = planData.links
+        .filter(l => l.objetoId === objId)
+        .map(l => l.habilidadeId);
+      
+      linkedHabs.forEach(habId => {
+        const linkedToOtherSelectedObj = planData.links.some(l => 
+          l.habilidadeId === habId && 
+          l.objetoId !== objId && 
+          newObjetoIds.includes(l.objetoId)
+        );
+        if (!linkedToOtherSelectedObj) {
+          newHabilidadeIds = newHabilidadeIds.filter(id => id !== habId);
+        }
+      });
+    }
+    
+    setSelectedObjetoIds(newObjetoIds);
+    setSelectedHabilidadeIds(newHabilidadeIds);
+    updateTextFromSelections(newObjetoIds, newHabilidadeIds);
+  };
+
+  const toggleHabilidadeSelection = (habId: string) => {
+    const isSelected = selectedHabilidadeIds.includes(habId);
+    let newHabilidadeIds: string[];
+    let newObjetoIds = [...selectedObjetoIds];
+    
+    if (!isSelected) {
+      newHabilidadeIds = [...selectedHabilidadeIds, habId];
+      const linkedObjs = planData.links
+        .filter(l => l.habilidadeId === habId)
+        .map(l => l.objetoId);
+      
+      linkedObjs.forEach(objId => {
+        if (!newObjetoIds.includes(objId)) {
+          newObjetoIds.push(objId);
+        }
+      });
+    } else {
+      newHabilidadeIds = selectedHabilidadeIds.filter(id => id !== habId);
+      const linkedObjs = planData.links
+        .filter(l => l.habilidadeId === habId)
+        .map(l => l.objetoId);
+      
+      linkedObjs.forEach(objId => {
+        const linkedToOtherSelectedHab = planData.links.some(l => 
+          l.objetoId === objId && 
+          l.habilidadeId !== habId && 
+          newHabilidadeIds.includes(l.habilidadeId)
+        );
+        if (!linkedToOtherSelectedHab) {
+          newObjetoIds = newObjetoIds.filter(id => id !== objId);
+        }
+      });
+    }
+    
+    setSelectedHabilidadeIds(newHabilidadeIds);
+    setSelectedObjetoIds(newObjetoIds);
+    updateTextFromSelections(newObjetoIds, newHabilidadeIds);
+  };
+
+  // Compute previously used objects and skills in this class, component, and period
+  const previouslyUsedData = useMemo(() => {
+    const usedObjetos = new Set<string>();
+    const usedHabilidades = new Set<string>();
+    
+    logs.forEach(log => {
+      if (
+        log.id !== editingId &&
+        log.turmaId === selectedTurmaId &&
+        log.componente === componente &&
+        log.anoSerie === anoSerie &&
+        log.periodo === periodo
+      ) {
+        if (log.selectedObjetoIds) {
+          log.selectedObjetoIds.forEach(id => usedObjetos.add(id));
+        }
+        if (log.selectedHabilidadeIds) {
+          log.selectedHabilidadeIds.forEach(id => usedHabilidades.add(id));
+        }
+      }
+    });
+    
+    return { usedObjetos, usedHabilidades };
+  }, [logs, selectedTurmaId, componente, anoSerie, periodo, editingId]);
+
+  // Compute skills statistics
+  const skillStats = useMemo(() => {
+    const total = planData.habilidades.length;
+    if (total === 0) return { total: 0, worked: 0, percentage: 0, missing: 0 };
+    
+    const uniqueWorkedHabilidadeIds = new Set<string>();
+    
+    logs.forEach(log => {
+      if (
+        log.turmaId === selectedTurmaId &&
+        log.componente === componente &&
+        log.anoSerie === anoSerie &&
+        log.periodo === periodo
+      ) {
+        if (log.selectedHabilidadeIds) {
+          log.selectedHabilidadeIds.forEach(id => {
+            if (planData.habilidades.some(h => h.id === id)) {
+              uniqueWorkedHabilidadeIds.add(id);
+            }
+          });
+        }
+      }
+    });
+
+    selectedHabilidadeIds.forEach(id => {
+      if (planData.habilidades.some(h => h.id === id)) {
+        uniqueWorkedHabilidadeIds.add(id);
+      }
+    });
+    
+    const worked = uniqueWorkedHabilidadeIds.size;
+    const percentage = Math.round((worked / total) * 100);
+    const missing = total - worked;
+    
+    return { total, worked, percentage, missing };
+  }, [planData.habilidades, logs, selectedTurmaId, componente, anoSerie, periodo, selectedHabilidadeIds]);
+
+  // Calculate chronological sequence and lesson numbers for logs
+  const logSequences = useMemo(() => {
+    const filtered = logs.filter(l => l.turmaId && l.componente && l.periodo);
+    
+    const sorted = [...filtered].sort((a, b) => {
+      const dateDiff = a.data.localeCompare(b.data);
+      if (dateDiff !== 0) return dateDiff;
+      return a.criadoEm.localeCompare(b.criadoEm);
+    });
+
+    const sequences: Record<string, { entrySeq: number; lessonRange: string }> = {};
+    const counters: Record<string, { currentLesson: number; currentEntry: number }> = {};
+
+    sorted.forEach((log) => {
+      const key = `${log.turmaId}-${log.componente}-${log.periodo}`;
+      if (!counters[key]) {
+        counters[key] = { currentLesson: 0, currentEntry: 0 };
+      }
+      
+      const count = counters[key];
+      count.currentEntry += 1;
+      
+      const startLesson = count.currentLesson + 1;
+      const endLesson = count.currentLesson + log.aulas;
+      count.currentLesson = endLesson;
+
+      const lessonRange = startLesson === endLesson 
+        ? `Aula ${startLesson}` 
+        : `Aulas ${startLesson} e ${endLesson}`;
+
+      sequences[log.id] = {
+        entrySeq: count.currentEntry,
+        lessonRange
+      };
+    });
+
+    return sequences;
+  }, [logs]);
 
   // Load turmas when selected school changes
   useEffect(() => {
@@ -245,6 +525,8 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
       observacoes,
       anoSerie,
       periodo,
+      selectedObjetoIds,
+      selectedHabilidadeIds,
       criadoEm: new Date().toISOString()
     };
 
@@ -277,6 +559,8 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
     setConteudo(log.conteudo);
     setAtividades(log.atividades);
     setObservacoes(log.observacoes);
+    setSelectedObjetoIds(log.selectedObjetoIds || []);
+    setSelectedHabilidadeIds(log.selectedHabilidadeIds || []);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -296,6 +580,8 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
     setAtividades('');
     setObservacoes('');
     setAulas(2);
+    setSelectedObjetoIds([]);
+    setSelectedHabilidadeIds([]);
   };
 
   const filteredLogs = logs.filter(l => {
@@ -343,6 +629,7 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
               <p><strong>Componente Curricular:</strong> {printLog.componente}</p>
               <p><strong>Período:</strong> {printLog.periodo || '---'}</p>
               <p><strong>Quantidade de Aulas:</strong> {printLog.aulas} {printLog.aulas === 1 ? 'aula' : 'aulas'}</p>
+              <p><strong>Sequência de Aulas:</strong> {logSequences[printLog.id]?.lessonRange || '---'}</p>
             </div>
           </div>
 
@@ -491,41 +778,197 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Conteúdo Letivo Ministrado *</label>
-            <textarea 
-              value={conteudo}
-              onChange={e => setConteudo(e.target.value)}
-              placeholder="Descreva o conteúdo desenvolvido nesta aula..."
-              required
-              rows={3}
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Atividades e Procedimentos Realizados</label>
-              <textarea 
-                value={atividades}
-                onChange={e => setAtividades(e.target.value)}
-                placeholder="Ex: Leitura dirigida, exercícios no caderno, dinâmicas de grupo..."
-                rows={2}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
-              />
+          {/* Progresso Curricular das Habilidades */}
+          {skillStats.total > 0 && (
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2.5 animate-fade-in shadow-sm">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <ClipboardList className="text-brand-orange w-4 h-4" />
+                    Progresso Curricular das Habilidades no Período
+                  </h4>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">
+                    {skillStats.worked} de {skillStats.total} Habilidades trabalhadas nesta turma ({skillStats.percentage}%)
+                  </p>
+                </div>
+                
+                <div className="w-full md:w-auto text-right">
+                  <span className={`inline-block text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                    skillStats.missing === 0 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-brand-orange/10 text-brand-orange'
+                  }`}>
+                    {skillStats.missing === 0 ? '✓ 100% Concluído' : `Faltam trabalhar ${skillStats.missing} habilidades`}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="w-full bg-slate-200/60 rounded-full h-2.5 overflow-hidden border border-slate-100">
+                <div 
+                  className="bg-brand-orange h-full rounded-full transition-all duration-500 ease-out" 
+                  style={{ width: `${skillStats.percentage}%` }}
+                />
+              </div>
             </div>
+          )}
 
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Observações / Ocorrências Pedagógicas</label>
-              <textarea 
-                value={observacoes}
-                onChange={e => setObservacoes(e.target.value)}
-                placeholder="Ex: Aluno X apresentou dificuldades com a matéria, aula reduzia devido à chuva..."
-                rows={2}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
-              />
+          {/* Painel de Seleção Rápida */}
+          {planData.objetos.length > 0 && (
+            <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl space-y-3 animate-fade-in shadow-sm">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <Layers className="text-brand-orange w-4 h-4" />
+                  Vincular Conteúdo do Plano de Curso Unificado
+                </h3>
+                <span className="text-[10px] text-slate-500 font-bold bg-slate-200 px-2 py-0.5 rounded-full uppercase tracking-tight">
+                  {periodo} • {anoSerie} • {componente}
+                </span>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Objetos de Conhecimento Column */}
+                <div className="bg-white p-3 rounded-xl border border-slate-200 flex flex-col space-y-2">
+                  <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-wider border-b pb-1.5 flex justify-between items-center">
+                    <span>Objetos de Conhecimento ({planData.objetos.length})</span>
+                    {selectedObjetoIds.length > 0 && (
+                      <span className="text-[9px] bg-brand-orange/15 text-brand-orange font-bold px-1.5 py-0.2 rounded-full">
+                        {selectedObjetoIds.length} selecionado(s)
+                      </span>
+                    )}
+                  </h4>
+                  <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                    {planData.objetos.map((obj: any) => {
+                      const isSelected = selectedObjetoIds.includes(obj.id);
+                      const isAlreadyUsed = previouslyUsedData.usedObjetos.has(obj.id);
+                      return (
+                        <button
+                          type="button"
+                          key={obj.id}
+                          onClick={() => toggleObjetoSelection(obj.id)}
+                          className={`w-full text-left p-2.5 rounded-xl border transition-all text-xs flex gap-2.5 items-start ${
+                            isSelected 
+                              ? 'border-brand-orange bg-brand-orange/5 text-slate-800 shadow-sm font-semibold' 
+                              : 'border-slate-100 hover:border-slate-300 hover:bg-slate-50/50 text-slate-600'
+                          }`}
+                        >
+                          <div className={`mt-0.5 w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 transition-all ${
+                            isSelected 
+                              ? 'border-brand-orange bg-brand-orange text-white' 
+                              : 'border-slate-300 bg-white'
+                          }`}>
+                            {isSelected && <Check className="w-2.5 h-2.5 stroke-[3px]" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="font-semibold leading-normal break-words block text-slate-700">{obj.descricao}</span>
+                            {isAlreadyUsed && (
+                              <span className="inline-flex items-center gap-1 text-[8px] font-bold text-amber-600 bg-amber-50 border border-amber-100 rounded px-1.5 py-0.5 mt-1">
+                                ⚠️ Já ministrado anteriormente em outra aula
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Habilidades BNCC Column */}
+                <div className="bg-white p-3 rounded-xl border border-slate-200 flex flex-col space-y-2">
+                  <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-wider border-b pb-1.5 flex justify-between items-center">
+                    <span>Habilidades BNCC ({planData.habilidades.length})</span>
+                    {selectedHabilidadeIds.length > 0 && (
+                      <span className="text-[9px] bg-brand-orange/15 text-brand-orange font-bold px-1.5 py-0.2 rounded-full">
+                        {selectedHabilidadeIds.length} selecionada(s)
+                      </span>
+                    )}
+                  </h4>
+                  <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                    {planData.habilidades.length === 0 ? (
+                      <p className="text-slate-400 text-xs italic text-center py-6">Nenhuma habilidade neste plano.</p>
+                    ) : (
+                      planData.habilidades.map((hab: any) => {
+                        const isSelected = selectedHabilidadeIds.includes(hab.id);
+                        const isAlreadyUsed = previouslyUsedData.usedHabilidades.has(hab.id);
+                        return (
+                          <button
+                            type="button"
+                            key={hab.id}
+                            onClick={() => toggleHabilidadeSelection(hab.id)}
+                            className={`w-full text-left p-2.5 rounded-xl border transition-all text-xs flex gap-2.5 items-start ${
+                              isSelected 
+                                ? 'border-brand-orange bg-brand-orange/5 text-slate-800 shadow-sm font-semibold' 
+                                : 'border-slate-100 hover:border-slate-300 hover:bg-slate-50/50 text-slate-600'
+                            }`}
+                          >
+                            <div className={`mt-0.5 w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 transition-all ${
+                              isSelected 
+                                ? 'border-brand-orange bg-brand-orange text-white' 
+                                : 'border-slate-300 bg-white'
+                            }`}>
+                              {isSelected && <Check className="w-2.5 h-2.5 stroke-[3px]" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 mb-0.5">
+                                <span className="bg-brand-orange/10 text-brand-orange text-[9px] font-black px-1.5 py-0.5 rounded font-mono">
+                                  {hab.codigo}
+                                </span>
+                                {isAlreadyUsed && (
+                                  <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-amber-600 bg-amber-50 border border-amber-100 rounded px-1.5 py-0.5">
+                                    ⚠️ Já utilizado
+                                  </span>
+                                )}
+                              </div>
+                              <p className="font-semibold leading-normal text-slate-600 text-[11px] break-words">{hab.descricao}</p>
+                            </div>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
+
+          {planData.objetos.length === 0 && (
+            <>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Conteúdo Letivo Ministrado *</label>
+                <textarea 
+                  value={conteudo}
+                  onChange={e => setConteudo(e.target.value)}
+                  placeholder="Descreva o conteúdo desenvolvido nesta aula..."
+                  required
+                  rows={3}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Atividades e Procedimentos Realizados</label>
+                  <textarea 
+                    value={atividades}
+                    onChange={e => setAtividades(e.target.value)}
+                    placeholder="Ex: Leitura dirigida, exercícios no caderno, dinâmicas de grupo..."
+                    rows={2}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Observações / Ocorrências Pedagógicas</label>
+                  <textarea 
+                    value={observacoes}
+                    onChange={e => setObservacoes(e.target.value)}
+                    placeholder="Ex: Aluno X apresentou dificuldades com a matéria, aula reduzia devido à chuva..."
+                    rows={2}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
+                  />
+                </div>
+              </div>
+            </>
+          )}
 
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
             {editingId && (
@@ -624,9 +1067,12 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
                         )}
                       </td>
                       <td className="px-6 py-3 text-center">
-                        <span className="inline-block bg-slate-100 font-bold text-slate-700 px-2 py-0.5 rounded-full">
-                          {log.aulas}
-                        </span>
+                        <div className="font-bold text-slate-800">
+                          {logSequences[log.id]?.lessonRange || 'Aula ---'}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">
+                          ({log.aulas} {log.aulas === 1 ? 'aula' : 'aulas'})
+                        </div>
                       </td>
                       <td className="px-6 py-3 text-right">
                         <div className="flex items-center justify-end gap-1 opacity-40 group-hover:opacity-100 transition-opacity">

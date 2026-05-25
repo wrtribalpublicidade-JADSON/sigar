@@ -102,3 +102,51 @@ export const gerarResumoConsolidado = async (
     return "Falha ao gerar resumo consolidado.";
   }
 };
+
+/**
+ * Generates pedagogical suggestions (Methodology, Resources, or Evaluation)
+ * based on the selected Objeto de Conhecimento and Habilidades.
+ */
+export const gerarSugestaoCampoPlano = async (
+  campo: 'metodologia' | 'recursos' | 'avaliacao',
+  objetoConhecimento: string,
+  habilidades: string,
+  componente: string,
+  anoSerie: string
+): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+  const nomesCampos = {
+    metodologia: 'Procedimentos Metodológicos (como a aula será conduzida, metodologias ativas, etc.)',
+    recursos: 'Recursos Didáticos (materiais, livros, tecnologias, etc.)',
+    avaliacao: 'Critérios de Avaliação (como o aprendizado será aferido, instrumentos avaliativos, etc.)'
+  };
+
+  const prompt = `
+    Atue como um Coordenador Pedagógico e especialista em design instrucional.
+    Preciso que você gere sugestões práticas e adequadas para o campo "${nomesCampos[campo]}" em um plano de aula/guia de aprendizagem.
+
+    Dados da Aula:
+    - Componente Curricular: ${componente}
+    - Ano/Série: ${anoSerie}
+    - Objeto de Conhecimento: "${objetoConhecimento}"
+    - Habilidades BNCC (Códigos/Descrição): "${habilidades}"
+
+    Instruções:
+    1. Sugira ideias alinhadas à BNCC e adequadas para o ano/série e componente especificados.
+    2. Seja prático, direto e conciso. A resposta deve ser útil para colocar diretamente no campo correspondente de um diário de classe.
+    3. Responda em formato de texto descritivo e direto ou em tópicos simples e curtos, sem formatação markdown complexa (evite hashtags, cabeçalhos grandes ou explicações de introdução/conclusão). Vá direto ao ponto.
+    4. Limite o texto a no máximo 100 palavras.
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+    });
+    return response.text || "";
+  } catch (error) {
+    console.error(`Erro ao gerar sugestão para o campo ${campo}:`, error);
+    return "Erro ao gerar sugestão com a IA.";
+  }
+};

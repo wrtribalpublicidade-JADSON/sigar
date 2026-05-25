@@ -4,7 +4,8 @@ import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { 
   BookOpen, Plus, Search, Edit2, Trash2, Printer, 
-  X, Calendar, School as SchoolIcon, Bookmark, Save
+  X, Calendar, School as SchoolIcon, Bookmark, Save,
+  Layers, Check
 } from 'lucide-react';
 import { Escola, Coordenador } from '../types';
 import { supabase } from '../services/supabase';
@@ -95,6 +96,191 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
   const [metodologia, setMetodologia] = useState('');
   const [recursos, setRecursos] = useState('');
   const [avaliacao, setAvaliacao] = useState('');
+
+  // Course Plans integration state
+  const [coursePlans, setCoursePlans] = useState<any[]>([]);
+  const [selectedObjetoIds, setSelectedObjetoIds] = useState<string[]>([]);
+  const [selectedHabilidadeIds, setSelectedHabilidadeIds] = useState<string[]>([]);
+
+
+
+  // Load course plans from localStorage
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const saved = localStorage.getItem('sigar_planos_curso');
+      if (saved) {
+        try {
+          setCoursePlans(JSON.parse(saved));
+        } catch (e) {
+          console.error(e);
+        }
+      } else {
+        setCoursePlans([]);
+      }
+    };
+    handleStorageChange();
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  // Get active Course Plan unificado matching selections
+  const activeCoursePlan = useMemo(() => {
+    return coursePlans.find((p: any) => 
+      p.componente === componente && 
+      p.anoSerie === anoSerie && 
+      p.bimestre === periodo
+    );
+  }, [coursePlans, componente, anoSerie, periodo]);
+
+  // Aggregate objects and skills from active Course Plan items
+  const planData = useMemo(() => {
+    if (!activeCoursePlan || !activeCoursePlan.itens) {
+      return { objetos: [], habilidades: [], links: [] };
+    }
+    
+    const objetosMap = new Map<string, any>();
+    const habilidadesMap = new Map<string, any>();
+    const links: { objetoId: string; habilidadeId: string }[] = [];
+    
+    activeCoursePlan.itens.forEach((item: any) => {
+      if (item.objetos) {
+        item.objetos.forEach((obj: any) => {
+          objetosMap.set(obj.id, obj);
+        });
+      }
+      if (item.habilidades) {
+        item.habilidades.forEach((hab: any) => {
+          habilidadesMap.set(hab.id, hab);
+        });
+      }
+      if (item.links) {
+        item.links.forEach((link: any) => {
+          links.push(link);
+        });
+      }
+    });
+    
+    return {
+      objetos: Array.from(objetosMap.values()),
+      habilidades: Array.from(habilidadesMap.values()),
+      links
+    };
+  }, [activeCoursePlan]);
+
+  // Reset selection when grade/component/period changes
+  useEffect(() => {
+    setSelectedObjetoIds([]);
+    setSelectedHabilidadeIds([]);
+  }, [componente, anoSerie, periodo]);
+
+  // Auto-fill form values from interactive selections
+  const updateTextFromSelections = (objIds: string[], habIds: string[]) => {
+    const selectedObjs = planData.objetos
+      .filter((o: any) => objIds.includes(o.id))
+      .map((o: any) => o.descricao);
+    
+    const selectedHabs = planData.habilidades
+      .filter((h: any) => habIds.includes(h.id))
+      .map((h: any) => `${h.codigo}: ${h.descricao}`);
+      
+    setObjetivos(selectedObjs.join('\n'));
+    setHabilidades(selectedHabs.join('\n'));
+  };
+
+  // Interactive selection handlers
+  const toggleObjetoSelection = (objId: string) => {
+    const isSelected = selectedObjetoIds.includes(objId);
+    let newObjetoIds: string[];
+    let newHabilidadeIds = [...selectedHabilidadeIds];
+    
+    if (!isSelected) {
+      newObjetoIds = [...selectedObjetoIds, objId];
+      const linkedHabs = planData.links
+        .filter(l => l.objetoId === objId)
+        .map(l => l.habilidadeId);
+      
+      linkedHabs.forEach(habId => {
+        if (!newHabilidadeIds.includes(habId)) {
+          newHabilidadeIds.push(habId);
+        }
+      });
+    } else {
+      newObjetoIds = selectedObjetoIds.filter(id => id !== objId);
+      const linkedHabs = planData.links
+        .filter(l => l.objetoId === objId)
+        .map(l => l.habilidadeId);
+      
+      linkedHabs.forEach(habId => {
+        const linkedToOtherSelectedObj = planData.links.some(l => 
+          l.habilidadeId === habId && 
+          l.objetoId !== objId && 
+          newObjetoIds.includes(l.objetoId)
+        );
+        if (!linkedToOtherSelectedObj) {
+          newHabilidadeIds = newHabilidadeIds.filter(id => id !== habId);
+        }
+      });
+    }
+    
+    setSelectedObjetoIds(newObjetoIds);
+    setSelectedHabilidadeIds(newHabilidadeIds);
+    updateTextFromSelections(newObjetoIds, newHabilidadeIds);
+  };
+
+  const toggleHabilidadeSelection = (habId: string) => {
+    const isSelected = selectedHabilidadeIds.includes(habId);
+    let newHabilidadeIds: string[];
+    let newObjetoIds = [...selectedObjetoIds];
+    
+    if (!isSelected) {
+      newHabilidadeIds = [...selectedHabilidadeIds, habId];
+      const linkedObjs = planData.links
+        .filter(l => l.habilidadeId === habId)
+        .map(l => l.objetoId);
+      
+      linkedObjs.forEach(objId => {
+        if (!newObjetoIds.includes(objId)) {
+          newObjetoIds.push(objId);
+        }
+      });
+    } else {
+      newHabilidadeIds = selectedHabilidadeIds.filter(id => id !== habId);
+      const linkedObjs = planData.links
+        .filter(l => l.habilidadeId === habId)
+        .map(l => l.objetoId);
+      
+      linkedObjs.forEach(objId => {
+        const linkedToOtherSelectedHab = planData.links.some(l => 
+          l.objetoId === objId && 
+          l.habilidadeId !== habId && 
+          newHabilidadeIds.includes(l.habilidadeId)
+        );
+        if (!linkedToOtherSelectedHab) {
+          newObjetoIds = newObjetoIds.filter(id => id !== objId);
+        }
+      });
+    }
+    
+    setSelectedHabilidadeIds(newHabilidadeIds);
+    setSelectedObjetoIds(newObjetoIds);
+    updateTextFromSelections(newObjetoIds, newHabilidadeIds);
+  };
+
+  // Pre-populate selections when editing existing plan
+  useEffect(() => {
+    if (editingId && activeCoursePlan) {
+      const matchedObjIds = planData.objetos
+        .filter((o: any) => objetivos.includes(o.descricao))
+        .map((o: any) => o.id);
+        
+      const matchedHabIds = planData.habilidades
+        .filter((h: any) => habilidades.includes(h.codigo) || habilidades.includes(h.descricao))
+        .map((h: any) => h.id);
+        
+      setSelectedObjetoIds(matchedObjIds);
+      setSelectedHabilidadeIds(matchedHabIds);
+    }
+  }, [editingId, activeCoursePlan]);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -306,6 +492,8 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
     setMetodologia('');
     setRecursos('');
     setAvaliacao('');
+    setSelectedObjetoIds([]);
+    setSelectedHabilidadeIds([]);
   };
 
   const filteredPlans = plans.filter(p => {
@@ -381,12 +569,10 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
               </div>
             )}
 
-            {printPlan.avaliacao && (
-              <div className="border p-3 rounded-lg">
-                <h3 className="font-bold border-b pb-1 mb-1 text-slate-800 uppercase text-[9px] tracking-widest">Critérios de Avaliação</h3>
-                <p className="whitespace-pre-line text-gray-700">{printPlan.avaliacao}</p>
-              </div>
-            )}
+            <div className="border p-3 rounded-lg">
+              <h3 className="font-bold border-b pb-1 mb-1 text-slate-800 uppercase text-[9px] tracking-widest">Critérios de Avaliação</h3>
+              <p className="whitespace-pre-line text-gray-700">{printPlan.avaliacao}</p>
+            </div>
           </div>
 
           <div className="mt-16 flex justify-around">
@@ -515,13 +701,116 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
             />
           </div>
 
+          {planData.objetos.length > 0 && (
+            <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl space-y-3 animate-fade-in">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <Layers className="text-brand-orange w-4 h-4" />
+                  Vincular Conteúdo do Plano de Curso Unificado
+                </h3>
+                <span className="text-[10px] text-slate-500 font-bold bg-slate-200 px-2 py-0.5 rounded-full uppercase tracking-tight">
+                  {periodo} • {anoSerie} • {componente}
+                </span>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Objetos de Conhecimento Column */}
+                <div className="bg-white p-3 rounded-xl border border-slate-200 flex flex-col space-y-2">
+                  <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-wider border-b pb-1.5 flex justify-between items-center">
+                    <span>Objetos de Conhecimento ({planData.objetos.length})</span>
+                    {selectedObjetoIds.length > 0 && (
+                      <span className="text-[9px] bg-brand-orange/15 text-brand-orange font-bold px-1.5 py-0.2 rounded-full">
+                        {selectedObjetoIds.length} selecionado(s)
+                      </span>
+                    )}
+                  </h4>
+                  <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                    {planData.objetos.map((obj: any) => {
+                      const isSelected = selectedObjetoIds.includes(obj.id);
+                      return (
+                        <button
+                          type="button"
+                          key={obj.id}
+                          onClick={() => toggleObjetoSelection(obj.id)}
+                          className={`w-full text-left p-2.5 rounded-xl border transition-all text-xs flex gap-2.5 items-start ${
+                            isSelected 
+                              ? 'border-brand-orange bg-brand-orange/5 text-slate-800 shadow-sm font-semibold' 
+                              : 'border-slate-100 hover:border-slate-300 hover:bg-slate-50/50 text-slate-600'
+                          }`}
+                        >
+                          <div className={`mt-0.5 w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 transition-all ${
+                            isSelected 
+                              ? 'border-brand-orange bg-brand-orange text-white' 
+                              : 'border-slate-300 bg-white'
+                          }`}>
+                            {isSelected && <Check className="w-2.5 h-2.5 stroke-[3px]" />}
+                          </div>
+                          <span className="font-semibold leading-normal">{obj.descricao}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Habilidades BNCC Column */}
+                <div className="bg-white p-3 rounded-xl border border-slate-200 flex flex-col space-y-2">
+                  <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-wider border-b pb-1.5 flex justify-between items-center">
+                    <span>Habilidades BNCC ({planData.habilidades.length})</span>
+                    {selectedHabilidadeIds.length > 0 && (
+                      <span className="text-[9px] bg-brand-orange/15 text-brand-orange font-bold px-1.5 py-0.2 rounded-full">
+                        {selectedHabilidadeIds.length} selecionada(s)
+                      </span>
+                    )}
+                  </h4>
+                  <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                    {planData.habilidades.length === 0 ? (
+                      <p className="text-slate-400 text-xs italic text-center py-6">Nenhuma habilidade neste plano.</p>
+                    ) : (
+                      planData.habilidades.map((hab: any) => {
+                        const isSelected = selectedHabilidadeIds.includes(hab.id);
+                        return (
+                          <button
+                            type="button"
+                            key={hab.id}
+                            onClick={() => toggleHabilidadeSelection(hab.id)}
+                            className={`w-full text-left p-2.5 rounded-xl border transition-all text-xs flex gap-2.5 items-start ${
+                              isSelected 
+                                ? 'border-brand-orange bg-brand-orange/5 text-slate-800 shadow-sm font-semibold' 
+                                : 'border-slate-100 hover:border-slate-300 hover:bg-slate-50/50 text-slate-600'
+                            }`}
+                          >
+                            <div className={`mt-0.5 w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 transition-all ${
+                              isSelected 
+                                ? 'border-brand-orange bg-brand-orange text-white' 
+                                : 'border-slate-300 bg-white'
+                            }`}>
+                              {isSelected && <Check className="w-2.5 h-2.5 stroke-[3px]" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 mb-0.5">
+                                <span className="bg-brand-orange/10 text-brand-orange text-[9px] font-black px-1.5 py-0.5 rounded font-mono">
+                                  {hab.codigo}
+                                </span>
+                              </div>
+                              <p className="font-semibold leading-normal text-slate-600 text-[11px]">{hab.descricao}</p>
+                            </div>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Objetivos de Aprendizagem *</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Objeto de Conhecimento *</label>
               <textarea 
                 value={objetivos}
                 onChange={e => setObjetivos(e.target.value)}
-                placeholder="Descreva o que os estudantes devem atingir..."
+                placeholder="Descreva o objeto de conhecimento..."
                 required
                 rows={3}
                 className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
@@ -542,34 +831,34 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Procedimentos Metodológicos</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Procedimentos Metodológicos</label>
               <textarea 
                 value={metodologia}
                 onChange={e => setMetodologia(e.target.value)}
                 placeholder="Como a aula será conduzida..."
-                rows={2}
+                rows={3}
                 className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Recursos Didáticos</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Recursos Didáticos</label>
               <textarea 
                 value={recursos}
                 onChange={e => setRecursos(e.target.value)}
                 placeholder="Livros, projetor, cartolina..."
-                rows={2}
+                rows={3}
                 className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Critérios de Avaliação</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Critérios de Avaliação</label>
               <textarea 
                 value={avaliacao}
                 onChange={e => setAvaliacao(e.target.value)}
                 placeholder="Como o aprendizado será aferido..."
-                rows={2}
+                rows={3}
                 className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
               />
             </div>
@@ -701,6 +990,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
           </div>
         </Card>
       </div>
+
     </div>
   );
 };

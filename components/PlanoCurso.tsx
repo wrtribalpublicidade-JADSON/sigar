@@ -4,37 +4,61 @@ import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { 
   ClipboardList, Plus, Search, Edit2, Trash2, Printer, 
-  X, Calendar, School as SchoolIcon, Bookmark, Save, Layers
+  X, Calendar, Bookmark, Save, Layers,
+  Link2, Check
 } from 'lucide-react';
 import { Escola, Coordenador } from '../types';
-import { supabase } from '../services/supabase';
 import { useNotification } from '../context/NotificationContext';
 
 interface PlanoCursoProps {
-  escolas: Escola[];
+  escolas: Escola[]; // Mantido na assinatura para evitar quebras em outros arquivos
   isDemoMode: boolean;
   isAdmin: boolean;
   userEmail: string | null;
   currentUser: Coordenador | null;
 }
 
-interface CoursePlan {
+export interface ObjetoConhecimento {
+  id: string;
+  descricao: string;
+}
+
+export interface Habilidade {
+  id: string;
+  codigo: string;
+  descricao: string;
+}
+
+export interface ObjetoHabilidadeLink {
+  objetoId: string;
+  habilidadeId: string;
+}
+
+export interface ItemPlano {
+  id: string;
+  eixoTematico: string;
+  sugestoesPedagogicas: string;
+  objetos: ObjetoConhecimento[];
+  habilidades: Habilidade[];
+  links: ObjetoHabilidadeLink[];
+}
+
+export interface CoursePlan {
   id: string;
   anoReferencia: string;
-  escolaId: string;
-  escolaNome: string;
-  turmaId: string;
-  turmaNome: string;
   componente: string;
   bimestre: string;
-  titulo: string;
-  objetivos: string;
-  conteudo: string;
-  metodologia: string;
-  recursos: string;
-  avaliacao: string;
   anoSerie: string;
+  itens: ItemPlano[];
   criadoEm: string;
+}
+
+interface RepositorioHabilidade {
+  id: string;
+  codigo: string;
+  descricao: string;
+  componente: string;
+  anoSerie: string;
 }
 
 const COMPONENTES = [
@@ -76,181 +100,326 @@ const ANOS_SERIES = [
   'Outros'
 ];
 
-export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isAdmin, userEmail, currentUser }) => {
+// BNCC Seed Skills Catalog
+const BNCC_HABILIDADES: RepositorioHabilidade[] = [
+  // Matemática - 1º Ano
+  { id: 'bncc-m1-01', codigo: 'EF01MA01', componente: 'Matemática', anoSerie: '1º Ano', descricao: 'Utilizar números naturais como indicador de quantidade ou de ordem em diferentes situações cotidianas e reconhecer situações em que os números não indicam contagem nem ordem, mas sim código de identificação.' },
+  { id: 'bncc-m1-02', codigo: 'EF01MA02', componente: 'Matemática', anoSerie: '1º Ano', descricao: 'Contar de maneira lúdica, em jogos e brincadeiras, identificando a contagem de rotina e a contagem de objetos de coleções.' },
+  { id: 'bncc-m1-08', codigo: 'EF01MA08', componente: 'Matemática', anoSerie: '1º Ano', descricao: 'Resolver e elaborar problemas de adição e de subtração, envolvendo números naturais de até dois algarismos, com os significados de juntar, acrescentar, separar e retirar, com o suporte de imagens e/ou material manipulável.' },
+  
+  // Língua Portuguesa - 1º Ano
+  { id: 'bncc-lp1-01', codigo: 'EF01LP01', componente: 'Língua Portuguesa', anoSerie: '1º Ano', descricao: 'Reconhecer que textos são lidos e escritos da esquerda para a direita e de cima para baixo.' },
+  { id: 'bncc-lp1-02', codigo: 'EF01LP02', componente: 'Língua Portuguesa', anoSerie: '1º Ano', descricao: 'Escrever, alfabeticamente, como e onde convier, de próprio punho ou por meio de outra tecnologia de escrita, palavras e frases, com autonomia.' },
+  { id: 'bncc-lp1-08', codigo: 'EF01LP08', componente: 'Língua Portuguesa', anoSerie: '1º Ano', descricao: 'Relacionar elements sonoros (sílabas, fonemas, partes de palavras) com sua representação escrita.' },
+
+  // Matemática - 2º Ano
+  { id: 'bncc-m2-01', codigo: 'EF02MA01', componente: 'Matemática', anoSerie: '2º Ano', descricao: 'Comparar e ordenar números naturais (até a ordem de centenas) pela compreensão de características do sistema de numeração decimal (valor posicional e função do zero).' },
+  { id: 'bncc-m2-05', codigo: 'EF02MA05', componente: 'Matemática', anoSerie: '2º Ano', descricao: 'Construir fatos básicos da adição e da subtração e utilizá-los no cálculo mental ou escrito.' },
+
+  // Língua Portuguesa - 2º Ano
+  { id: 'bncc-lp2-01', codigo: 'EF02LP01', componente: 'Língua Portuguesa', anoSerie: '2º Ano', descricao: 'Utilizar, ao escrever o texto, grafia correta de palavras conhecidas ou com estruturas silábicas regulares.' },
+  { id: 'bncc-lp2-04', codigo: 'EF02LP04', componente: 'Língua Portuguesa', anoSerie: '2º Ano', descricao: 'Ler e escrever palavras novas com precisão na decodificação e na ortografia.' },
+
+  // Matemática - 3º Ano
+  { id: 'bncc-m3-01', codigo: 'EF03MA01', componente: 'Matemática', anoSerie: '3º Ano', descricao: 'Ler, escrever e comparar números naturais de até quatro ordens, com a compreensão de características do sistema de numeração decimal.' },
+  { id: 'bncc-m3-05', codigo: 'EF03MA05', componente: 'Matemática', anoSerie: '3º Ano', descricao: 'Utilizar diferentes procedimentos de cálculo mental e escrito, resolvendo problemas de adição e subtração.' },
+
+  // Língua Portuguesa - 3º Ano
+  { id: 'bncc-lp3-01', codigo: 'EF03LP01', componente: 'Língua Portuguesa', anoSerie: '3º Ano', descricao: 'Ler e escrever palavras com sílabas complexas (consoante-vogal-consoante, consoante-consoante-vogal) focando na ortografia correta.' },
+
+  // Outros anos e componentes (exemplos)
+  { id: 'bncc-c1-01', codigo: 'EF01CI01', componente: 'Ciências', anoSerie: '1º Ano', descricao: 'Comparar características de diferentes materiais presentes em objetos de uso cotidiano, discutindo sua origem e descarte.' },
+  { id: 'bncc-h1-01', codigo: 'EF01HI01', componente: 'História', anoSerie: '1º Ano', descricao: 'Identificar aspectos do crescimento e da história pessoal, por meio do registro de lembranças e documentos.' },
+  { id: 'bncc-g1-01', codigo: 'EF01GE01', componente: 'Geografia', anoSerie: '1º Ano', descricao: 'Descrever características observadas de seus lugares de vivência (moradia, escola etc.) e identificar semelhanças e diferenças.' }
+];
+
+// Helper to generate IDs
+const generateId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+};
+
+const createDefaultItem = (): ItemPlano => ({
+  id: generateId(),
+  eixoTematico: '',
+  sugestoesPedagogicas: '',
+  objetos: [],
+  habilidades: [],
+  links: []
+});
+
+export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, userEmail, currentUser }) => {
   const { showNotification } = useNotification();
   const [plans, setPlans] = useState<CoursePlan[]>([]);
-  const [turmas, setTurmas] = useState<any[]>([]);
   
   // Form State
   const [editingId, setEditingId] = useState<string | null>(null);
   const [anoReferencia, setAnoReferencia] = useState(new Date().getFullYear().toString());
-  const [selectedEscolaId, setSelectedEscolaId] = useState('');
   const [anoSerie, setAnoSerie] = useState(ANOS_SERIES[0]);
-  const [selectedTurmaId, setSelectedTurmaId] = useState('');
   const [componente, setComponente] = useState(COMPONENTES[0]);
   const [bimestre, setBimestre] = useState(BIMESTRES[0]);
-  const [titulo, setTitulo] = useState('');
-  const [objetivos, setObjetivos] = useState('');
-  const [conteudo, setConteudo] = useState('');
-  const [metodologia, setMetodologia] = useState('');
-  const [recursos, setRecursos] = useState('');
-  const [avaliacao, setAvaliacao] = useState('');
+  
+  // Structured Planning Items
+  const [itens, setItens] = useState<ItemPlano[]>([createDefaultItem()]);
+
+  // Global Skills Repository
+  const [habRepository, setHabRepository] = useState<RepositorioHabilidade[]>([]);
+
+  // Habilidades Modal States
+  const [isHabModalOpen, setIsHabModalOpen] = useState(false);
+  const [activeItemIdForHab, setActiveItemIdForHab] = useState<string | null>(null);
+  const [modalTab, setModalTab] = useState<'select' | 'create'>('select');
+  const [modalSearchTerm, setModalSearchTerm] = useState('');
+  const [modalComponenteFilter, setModalComponenteFilter] = useState('ALL');
+  const [modalAnoSerieFilter, setModalAnoSerieFilter] = useState('ALL');
+
+  // Custom Habilidade Form States
+  const [newHabCode, setNewHabCode] = useState('');
+  const [newHabDesc, setNewHabDesc] = useState('');
+  const [newHabComponente, setNewHabComponente] = useState(COMPONENTES[0]);
+  const [newHabAnoSerie, setNewHabAnoSerie] = useState(ANOS_SERIES[0]);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
-  const [schoolFilter, setSchoolFilter] = useState('ALL');
-  const [classFilter, setClassFilter] = useState('ALL');
+  const [gradeFilter, setGradeFilter] = useState('ALL');
 
   // Print Mode State
   const [printPlan, setPrintPlan] = useState<CoursePlan | null>(null);
 
-  // Load from localStorage
+  // Load from localStorage with migration
   useEffect(() => {
     const saved = localStorage.getItem('sigar_planos_curso');
     if (saved) {
       try {
-        setPlans(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const migrated = parsed.map((p: any) => {
+            if (p.itens && Array.isArray(p.itens)) return p;
+            
+            // Migrate old structure
+            const migratedItem: ItemPlano = {
+              id: generateId(),
+              eixoTematico: p.titulo || 'Eixo Temático Geral',
+              sugestoesPedagogicas: [
+                p.metodologia ? `Metodologia: ${p.metodologia}` : '',
+                p.recursos ? `Recursos: ${p.recursos}` : '',
+                p.avaliacao ? `Avaliação: ${p.avaliacao}` : ''
+              ].filter(Boolean).join('\n'),
+              objetos: p.conteudo ? [{ id: 'old-content', descricao: p.conteudo }] : [],
+              habilidades: p.objetivos ? [{ id: 'old-objectives', codigo: 'HAB', descricao: p.objetivos }] : [],
+              links: p.conteudo && p.objetivos ? [{ objetoId: 'old-content', habilidadeId: 'old-objectives' }] : []
+            };
+            
+            return {
+              id: p.id,
+              anoReferencia: p.anoReferencia,
+              componente: p.componente,
+              bimestre: p.bimestre,
+              anoSerie: p.anoSerie || '',
+              itens: [migratedItem],
+              criadoEm: p.criadoEm || new Date().toISOString()
+            };
+          });
+          setPlans(migrated);
+        }
       } catch (e) {
         console.error(e);
       }
     }
 
-    if (escolas.length > 0) {
-      setSelectedEscolaId(escolas[0].id);
-    }
-  }, [escolas]);
-
-  // Load turmas when selected school changes
-  useEffect(() => {
-    const fetchTurmas = async () => {
-      if (!selectedEscolaId) {
-        setTurmas([]);
-        return;
-      }
-
-      if (isDemoMode) {
-        setTurmas([
-          { id: 'demo-t1', name: '1º ANO A', year: '1º Ano', shift: 'MANHÃ' },
-          { id: 'demo-t2', name: '2º ANO B', year: '2º Ano', shift: 'TARDE' },
-          { id: 'demo-t3', name: '5º ANO A', year: '5º Ano', shift: 'MANHÃ' },
-        ]);
-        return;
-      }
-
+    // Load global skills repository
+    const savedHabs = localStorage.getItem('sigar_repositorio_habilidades');
+    if (savedHabs) {
       try {
-        const { data, error } = await supabase
-          .from('turmas')
-          .select('*')
-          .eq('school_id', selectedEscolaId)
-          .order('name');
-
-        if (error) throw error;
-        setTurmas(data || []);
-      } catch (err) {
-        console.error('Erro ao carregar turmas:', err);
+        setHabRepository(JSON.parse(savedHabs));
+      } catch (e) {
+        console.error(e);
+        setHabRepository(BNCC_HABILIDADES);
       }
-    };
-
-    fetchTurmas();
-  }, [selectedEscolaId, isDemoMode]);
-
-  // Helpers for filtering and matching
-  const isTurmaInAnoSerie = (t: any, anoSerieVal: string): boolean => {
-    if (!t) return false;
-    const target = anoSerieVal.toLowerCase().trim();
-    const tYear = (t.year || '').toLowerCase().trim();
-    const tName = (t.name || '').toLowerCase().trim();
-    
-    if (tYear) {
-      if (tYear === target) return true;
-      if (target.includes(tYear) || tYear.includes(target)) return true;
+    } else {
+      setHabRepository(BNCC_HABILIDADES);
+      localStorage.setItem('sigar_repositorio_habilidades', JSON.stringify(BNCC_HABILIDADES));
     }
-    
-    if (tName) {
-      if (tName === target) return true;
-      if (tName.includes(target)) return true;
-      
-      const normalizedTarget = target.replace(/[-\s]/g, '');
-      const normalizedName = tName.replace(/[-\s]/g, '');
-      if (normalizedName.includes(normalizedTarget)) return true;
-    }
-    
-    return false;
+  }, []);
+
+  // --- Dynamic Item Planning Helpers ---
+  const updateItemField = (itemId: string, field: keyof ItemPlano, value: any) => {
+    setItens(prev => prev.map(item => item.id === itemId ? { ...item, [field]: value } : item));
   };
 
-  // Compute available Anos/Séries for the selected school
-  const availableAnosSeries = useMemo(() => {
-    if (turmas.length === 0) return ANOS_SERIES;
-    const filtered = ANOS_SERIES.filter(ano => 
-      turmas.some(t => isTurmaInAnoSerie(t, ano))
-    );
-    return filtered.length > 0 ? filtered : ANOS_SERIES;
-  }, [turmas]);
+  const addObjeto = (itemId: string, descricao: string) => {
+    if (!descricao.trim()) return;
+    const newObj: ObjetoConhecimento = {
+      id: generateId(),
+      descricao: descricao.trim()
+    };
+    setItens(prev => prev.map(item => {
+      if (item.id !== itemId) return item;
+      return {
+        ...item,
+        objetos: [...item.objetos, newObj]
+      };
+    }));
+  };
 
-  // Compute available Turmas for the selected school and Ano/Série
-  const availableTurmas = useMemo(() => {
-    return turmas.filter(t => isTurmaInAnoSerie(t, anoSerie));
-  }, [turmas, anoSerie]);
+  const removeObjeto = (itemId: string, objetoId: string) => {
+    setItens(prev => prev.map(item => {
+      if (item.id !== itemId) return item;
+      return {
+        ...item,
+        objetos: item.objetos.filter(o => o.id !== objetoId),
+        links: item.links.filter(l => l.objetoId !== objetoId)
+      };
+    }));
+  };
 
-  // Sync anoSerie selection when availableAnosSeries changes
-  useEffect(() => {
-    const turmasMatchSchool = turmas.length === 0 || 
-      turmas[0].school_id === selectedEscolaId || 
-      (isDemoMode && turmas[0].id?.startsWith('demo'));
+  const removePlanningItem = (itemId: string) => {
+    if (itens.length <= 1) return;
+    setItens(prev => prev.filter(item => item.id !== itemId));
+  };
 
-    if (turmasMatchSchool) {
-      if (availableAnosSeries.length > 0 && !availableAnosSeries.includes(anoSerie)) {
-        setAnoSerie(availableAnosSeries[0]);
-      }
-    }
-  }, [availableAnosSeries, anoSerie, selectedEscolaId, turmas, isDemoMode]);
+  // --- Modal Helpers ---
+  const openHabilidadesModal = (itemId: string) => {
+    setActiveItemIdForHab(itemId);
+    setModalComponenteFilter(componente);
+    setModalAnoSerieFilter(anoSerie);
+    setNewHabComponente(componente);
+    setNewHabAnoSerie(anoSerie);
+    setModalSearchTerm('');
+    setModalTab('select');
+    setIsHabModalOpen(true);
+  };
 
-  // Sync selectedTurmaId selection when availableTurmas changes
-  useEffect(() => {
-    const turmasMatchSchool = turmas.length === 0 || 
-      turmas[0].school_id === selectedEscolaId || 
-      (isDemoMode && turmas[0].id?.startsWith('demo'));
+  const isHabInActiveItem = (codigo: string) => {
+    const activeItem = itens.find(item => item.id === activeItemIdForHab);
+    return activeItem ? activeItem.habilidades.some(h => h.codigo === codigo) : false;
+  };
 
-    if (turmasMatchSchool) {
-      if (availableTurmas.length > 0) {
-        const exists = availableTurmas.some(t => t.id === selectedTurmaId);
-        if (!exists) {
-          setSelectedTurmaId(availableTurmas[0].id);
-        }
-      } else {
-        setSelectedTurmaId('');
-      }
-    }
-  }, [availableTurmas, selectedTurmaId, selectedEscolaId, turmas, isDemoMode]);
+  const addHabilidadeToItem = (itemId: string, hab: Omit<Habilidade, 'id'> | Habilidade) => {
+    setItens(prev => prev.map(item => {
+      if (item.id !== itemId) return item;
+      const exists = item.habilidades.some(h => h.codigo === hab.codigo);
+      if (exists) return item;
+      
+      const newHab: Habilidade = {
+        id: (hab as any).id || generateId(),
+        codigo: hab.codigo.trim().toUpperCase(),
+        descricao: hab.descricao.trim()
+      };
+      return {
+        ...item,
+        habilidades: [...item.habilidades, newHab]
+      };
+    }));
+  };
 
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
+  const removeHabilidadeByCode = (itemId: string, codigo: string) => {
+    setItens(prev => prev.map(item => {
+      if (item.id !== itemId) return item;
+      const habToRemove = item.habilidades.find(h => h.codigo === codigo);
+      if (!habToRemove) return item;
+      return {
+        ...item,
+        habilidades: item.habilidades.filter(h => h.codigo !== codigo),
+        links: item.links.filter(l => l.habilidadeId !== habToRemove.id)
+      };
+    }));
+  };
 
-    if (!selectedEscolaId || !selectedTurmaId || !titulo.trim() || !objetivos.trim() || !conteudo.trim()) {
-      showNotification('error', 'Preencha todos os campos obrigatórios (*).');
+  const handleCreateCustomHabilidade = () => {
+    if (!newHabCode.trim() || !newHabDesc.trim()) {
+      showNotification('error', 'Preencha todos os campos da nova habilidade.');
       return;
     }
 
-    const escolaNome = escolas.find(e => e.id === selectedEscolaId)?.nome || 'Unidade';
-    const turmaObj = turmas.find(t => t.id === selectedTurmaId);
-    const turmaNome = turmaObj ? `${turmaObj.name || turmaObj.year} • ${turmaObj.shift || ''}` : 'Turma';
+    const codeUpper = newHabCode.trim().toUpperCase();
+    const existsInRepo = habRepository.some(h => h.codigo === codeUpper);
+    let finalHab: RepositorioHabilidade;
+
+    if (existsInRepo) {
+      finalHab = habRepository.find(h => h.codigo === codeUpper)!;
+    } else {
+      finalHab = {
+        id: generateId(),
+        codigo: codeUpper,
+        descricao: newHabDesc.trim(),
+        componente: newHabComponente,
+        anoSerie: newHabAnoSerie
+      };
+      const updatedRepo = [...habRepository, finalHab];
+      setHabRepository(updatedRepo);
+      localStorage.setItem('sigar_repositorio_habilidades', JSON.stringify(updatedRepo));
+    }
+
+    if (activeItemIdForHab) {
+      addHabilidadeToItem(activeItemIdForHab, finalHab);
+      showNotification('success', `Habilidade ${codeUpper} vinculada ao eixo com sucesso!`);
+    }
+
+    setNewHabCode('');
+    setNewHabDesc('');
+    setModalTab('select');
+  };
+
+  const toggleLink = (itemId: string, objetoId: string, habId: string) => {
+    setItens(prev => prev.map(item => {
+      if (item.id !== itemId) return item;
+      const exists = item.links.some(l => l.objetoId === objetoId && l.habilidadeId === habId);
+      const updatedLinks = exists
+        ? item.links.filter(l => !(l.objetoId === objetoId && l.habilidadeId === habId))
+        : [...item.links, { objetoId, habilidadeId: habId }];
+      return {
+        ...item,
+        links: updatedLinks
+      };
+    }));
+  };
+
+  // Filter skills for display in the modal
+  const filteredCatalogHabs = useMemo(() => {
+    return habRepository.filter(hab => {
+      const matchesSearch = modalSearchTerm === '' || 
+                            hab.codigo.toLowerCase().includes(modalSearchTerm.toLowerCase()) || 
+                            hab.descricao.toLowerCase().includes(modalSearchTerm.toLowerCase());
+      const matchesComponent = modalComponenteFilter === 'ALL' || hab.componente === modalComponenteFilter;
+      const matchesGrade = modalAnoSerieFilter === 'ALL' || hab.anoSerie === modalAnoSerieFilter;
+      return matchesSearch && matchesComponent && matchesGrade;
+    });
+  }, [habRepository, modalSearchTerm, modalComponenteFilter, modalAnoSerieFilter]);
+
+  // --- Form Save, Edit, Delete ---
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const validItens = itens.filter(item => item.eixoTematico.trim() !== '');
+    if (validItens.length === 0) {
+      showNotification('error', 'Preencha o Eixo Temático de pelo menos um bloco do plano.');
+      return;
+    }
+
+    // Uniqueness validation
+    const duplicate = plans.find(p => 
+      p.id !== editingId &&
+      p.anoReferencia === anoReferencia &&
+      p.anoSerie === anoSerie &&
+      p.componente === componente &&
+      p.bimestre === bimestre
+    );
+
+    if (duplicate) {
+      showNotification('error', 'Já existe um plano cadastrado para este Ano, Série, Componente Curricular e Período.');
+      return;
+    }
 
     const payload: CoursePlan = {
-      id: editingId || crypto.randomUUID(),
+      id: editingId || generateId(),
       anoReferencia,
-      escolaId: selectedEscolaId,
-      escolaNome,
-      turmaId: selectedTurmaId,
-      turmaNome,
       componente,
       bimestre,
-      titulo,
-      objetivos,
-      conteudo,
-      metodologia,
-      recursos,
-      avaliacao,
       anoSerie,
+      itens: validItens,
       criadoEm: new Date().toISOString()
     };
 
@@ -260,7 +429,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
       showNotification('success', 'Plano de Curso atualizado com sucesso!');
     } else {
       updatedPlans = [payload, ...plans];
-      showNotification('success', 'Plano de Curso cadastrado com sucesso!');
+      showNotification('success', 'Plano de Curso unificado cadastrado com sucesso!');
     }
 
     setPlans(updatedPlans);
@@ -271,20 +440,10 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
   const handleEdit = (plan: CoursePlan) => {
     setEditingId(plan.id);
     setAnoReferencia(plan.anoReferencia);
-    setSelectedEscolaId(plan.escolaId);
     setAnoSerie(plan.anoSerie || ANOS_SERIES[0]);
-    // Timeout to let turmas update and then select
-    setTimeout(() => {
-      setSelectedTurmaId(plan.turmaId);
-    }, 150);
     setComponente(plan.componente);
     setBimestre(plan.bimestre);
-    setTitulo(plan.titulo);
-    setObjetivos(plan.objetivos);
-    setConteudo(plan.conteudo);
-    setMetodologia(plan.metodologia);
-    setRecursos(plan.recursos);
-    setAvaliacao(plan.avaliacao);
+    setItens(plan.itens && plan.itens.length > 0 ? JSON.parse(JSON.stringify(plan.itens)) : [createDefaultItem()]);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -299,20 +458,15 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
   const resetForm = () => {
     setEditingId(null);
     setAnoSerie(ANOS_SERIES[0]);
-    setTitulo('');
-    setObjetivos('');
-    setConteudo('');
-    setMetodologia('');
-    setRecursos('');
-    setAvaliacao('');
+    setItens([createDefaultItem()]);
   };
 
   const filteredPlans = plans.filter(p => {
-    const matchesSearch = p.titulo.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          p.componente.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesSchool = schoolFilter === 'ALL' || p.escolaId === schoolFilter;
-    const matchesClass = classFilter === 'ALL' || p.turmaId === classFilter;
-    return matchesSearch && matchesSchool && matchesClass;
+    const matchesSearch = searchTerm === '' || 
+                          p.componente.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          p.itens?.some(item => item.eixoTematico.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesGrade = gradeFilter === 'ALL' || p.anoSerie === gradeFilter;
+    return matchesSearch && matchesGrade;
   });
 
   const handlePrint = (plan: CoursePlan) => {
@@ -327,7 +481,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
     <div className="space-y-6 pb-12 animate-fade-in relative">
       <PageHeader 
         title="Plano de Curso"
-        subtitle="Elaboração e acompanhamento do planejamento curricular anual e bimestral"
+        subtitle="Elaboração e acompanhamento do planejamento curricular municipal"
         icon={ClipboardList}
         badgeText="DIÁRIO DE CLASSE"
         actions={[]}
@@ -338,52 +492,96 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
         <div className="hidden print:block fixed inset-0 bg-white z-[9999] p-8 text-black text-xs font-sans">
           <div className="text-center border-b pb-4 mb-6">
             <h1 className="text-lg font-black tracking-tight">SISTEMA INTEGRADO DE GESTÃO DE APRENDIZAGEM (SIGAR)</h1>
-            <p className="text-[10px] text-gray-500 uppercase font-bold mt-1">Instrumental - Plano de Curso Curricular</p>
+            <p className="text-[10px] text-gray-500 uppercase font-bold mt-1">Instrumental - Plano de Curso Curricular Unificado</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4 mb-6 border p-4 rounded-lg bg-gray-50">
             <div>
-              <p><strong>Unidade Escolar:</strong> {printPlan.escolaNome}</p>
-              <p><strong>Turma:</strong> {printPlan.turmaNome}</p>
               <p><strong>Ano/Série:</strong> {printPlan.anoSerie || '---'}</p>
               <p><strong>Ano de Referência:</strong> {printPlan.anoReferencia}</p>
+              <p className="mt-2 text-gray-400 text-[10px]"><strong>Unidade Escolar:</strong> ___________________________________</p>
             </div>
             <div>
               <p><strong>Componente Curricular:</strong> {printPlan.componente}</p>
               <p><strong>Período:</strong> {printPlan.bimestre}</p>
-              <p><strong>Tema/Título do Plano:</strong> {printPlan.titulo}</p>
+              <p className="mt-2 text-gray-400 text-[10px]"><strong>Turma(s):</strong> _________________________________________</p>
             </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="border p-3 rounded-lg">
-              <h3 className="font-bold border-b pb-1 mb-1 text-slate-800 uppercase text-[9px] tracking-widest">Objetivos de Aprendizagem / Competências</h3>
-              <p className="whitespace-pre-line text-gray-700">{printPlan.objetivos}</p>
-            </div>
-            
-            <div className="border p-3 rounded-lg">
-              <h3 className="font-bold border-b pb-1 mb-1 text-slate-800 uppercase text-[9px] tracking-widest">Conteúdo Programático</h3>
-              <p className="whitespace-pre-line text-gray-700">{printPlan.conteudo}</p>
-            </div>
+          <div className="space-y-6">
+            {printPlan.itens.map((item, index) => (
+              <div key={item.id} className="border rounded-lg overflow-hidden page-break-inside-avoid">
+                <div className="bg-slate-100 px-4 py-2 border-b">
+                  <h3 className="font-bold text-slate-800 text-[10px] uppercase tracking-wider">
+                    Item {index + 1}: Eixo Temático - {item.eixoTematico || 'Não Informado'}
+                  </h3>
+                </div>
+                
+                <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Left Column: Mapped Objects and Skills */}
+                  <div className="space-y-4">
+                    <h4 className="font-bold text-slate-700 border-b pb-1 text-[9px] uppercase tracking-wider">
+                      Objetos de Conhecimento & Habilidades Associadas
+                    </h4>
+                    {item.objetos.length === 0 ? (
+                      <p className="text-gray-400 italic">Nenhum objeto de conhecimento cadastrado.</p>
+                    ) : (
+                      item.objetos.map(obj => {
+                        const linkedHabs = item.links
+                          .filter(l => l.objetoId === obj.id)
+                          .map(l => item.habilidades.find(h => h.id === l.habilidadeId))
+                          .filter(Boolean);
 
-            <div className="border p-3 rounded-lg">
-              <h3 className="font-bold border-b pb-1 mb-1 text-slate-800 uppercase text-[9px] tracking-widest">Procedimentos Metodológicos / Estratégias</h3>
-              <p className="whitespace-pre-line text-gray-700">{printPlan.metodologia}</p>
-            </div>
+                        return (
+                          <div key={obj.id} className="pl-3 border-l-2 border-brand-orange py-1">
+                            <p className="font-bold text-slate-800 text-xs">{obj.descricao}</p>
+                            {linkedHabs.length > 0 ? (
+                              <div className="flex flex-wrap gap-1 mt-1.5">
+                                {linkedHabs.map(h => (
+                                  <span key={h!.id} className="bg-slate-100 text-slate-800 text-[8px] px-1.5 py-0.5 rounded font-mono font-bold border border-slate-200" title={h!.descricao}>
+                                    {h!.codigo}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-[9px] text-gray-400 italic mt-0.5">Sem habilidades vinculadas.</p>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
 
-            {printPlan.recursos && (
-              <div className="border p-3 rounded-lg">
-                <h3 className="font-bold border-b pb-1 mb-1 text-slate-800 uppercase text-[9px] tracking-widest">Recursos Didáticos</h3>
-                <p className="whitespace-pre-line text-gray-700">{printPlan.recursos}</p>
+                  {/* Right Column: Skills Detailing & Suggestions */}
+                  <div className="space-y-4 border-l pl-6">
+                    <h4 className="font-bold text-slate-700 border-b pb-1 text-[9px] uppercase tracking-wider">
+                      Detalhamento das Habilidades
+                    </h4>
+                    {item.habilidades.length === 0 ? (
+                      <p className="text-gray-400 italic">Nenhuma habilidade cadastrada.</p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {item.habilidades.map(h => (
+                          <li key={h.id} className="text-slate-700 text-[10px] leading-relaxed">
+                            <strong className="text-brand-orange font-mono mr-1.5">{h.codigo}:</strong>
+                            {h.descricao}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+
+                    {item.sugestoesPedagogicas && (
+                      <div className="mt-4 pt-3 border-t">
+                        <h4 className="font-bold text-slate-700 text-[9px] uppercase tracking-wider mb-1">
+                          Sugestões Pedagógicas
+                        </h4>
+                        <p className="whitespace-pre-line text-slate-600 text-[10px] leading-relaxed">{item.sugestoesPedagogicas}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
-            )}
-
-            {printPlan.avaliacao && (
-              <div className="border p-3 rounded-lg">
-                <h3 className="font-bold border-b pb-1 mb-1 text-slate-800 uppercase text-[9px] tracking-widest">Critérios e Instrumentos de Avaliação</h3>
-                <p className="whitespace-pre-line text-gray-700">{printPlan.avaliacao}</p>
-              </div>
-            )}
+            ))}
           </div>
 
           <div className="mt-16 flex justify-around">
@@ -402,12 +600,12 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
         <div className="flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
           <Bookmark className="text-brand-orange w-5 h-5" />
           <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight">
-            {editingId ? 'Editar Plano de Curso' : 'Novo Plano de Curso'}
+            {editingId ? 'Editar Plano de Curso Unificado' : 'Novo Plano de Curso Unificado'}
           </h2>
         </div>
 
-        <form onSubmit={handleSave} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+        <form onSubmit={handleSave} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50/50 p-4 rounded-xl border border-slate-100">
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Ano *</label>
               <div className="relative">
@@ -418,25 +616,8 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
                   onChange={e => setAnoReferencia(e.target.value)}
                   required
                   placeholder="Ex: 2026"
-                  className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
+                  className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
                 />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Escola *</label>
-              <div className="relative">
-                <SchoolIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                <select 
-                  value={selectedEscolaId}
-                  onChange={e => setSelectedEscolaId(e.target.value)}
-                  required
-                  className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all appearance-none"
-                >
-                  {escolas.map(e => (
-                    <option key={e.id} value={e.id}>{e.nome}</option>
-                  ))}
-                </select>
               </div>
             </div>
 
@@ -446,29 +627,11 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
                 value={anoSerie}
                 onChange={e => setAnoSerie(e.target.value)}
                 required
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
               >
-                {availableAnosSeries.map(a => (
+                {ANOS_SERIES.map(a => (
                   <option key={a} value={a}>{a}</option>
                 ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Turma *</label>
-              <select 
-                value={selectedTurmaId}
-                onChange={e => setSelectedTurmaId(e.target.value)}
-                required
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
-              >
-                {availableTurmas.length === 0 ? (
-                  <option value="">Nenhuma turma cadastrada</option>
-                ) : (
-                  availableTurmas.map(t => (
-                    <option key={t.id} value={t.id}>{`${t.name || t.year} • ${t.shift || ''}`}</option>
-                  ))
-                )}
               </select>
             </div>
 
@@ -478,7 +641,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
                 value={componente}
                 onChange={e => setComponente(e.target.value)}
                 required
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
               >
                 {COMPONENTES.map(c => (
                   <option key={c} value={c}>{c}</option>
@@ -492,7 +655,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
                 value={bimestre}
                 onChange={e => setBimestre(e.target.value)}
                 required
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
               >
                 {BIMESTRES.map(b => (
                   <option key={b} value={b}>{b}</option>
@@ -501,80 +664,237 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Tema / Título do Plano de Curso *</label>
-            <input 
-              type="text" 
-              value={titulo}
-              onChange={e => setTitulo(e.target.value)}
-              placeholder="Ex: Conteúdo de Álgebra Básica e Equações de 1º Grau"
-              required
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
-            />
+          {/* Dynamic Planning Items Section */}
+          <div className="space-y-6">
+            <div className="flex items-center justify-between border-b pb-2 border-slate-100">
+              <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <Layers className="text-brand-orange w-4 h-4" />
+                Estrutura de Planejamento Pedagógico (Eixos Temáticos)
+              </h3>
+            </div>
+
+            {itens.map((item, idx) => (
+              <div key={item.id} className="border border-slate-200 rounded-2xl p-5 bg-slate-50/50 space-y-4 relative animate-fade-in shadow-sm hover:shadow-md transition-shadow">
+                {itens.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removePlanningItem(item.id)}
+                    className="absolute top-4 right-4 text-slate-400 hover:text-red-500 transition-colors p-1"
+                    title="Remover este eixo de planejamento"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                )}
+                
+                <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+                  <span className="bg-brand-orange/10 text-brand-orange text-xs font-black px-2 py-0.5 rounded-full">
+                    Item #{idx + 1}
+                  </span>
+                </div>
+
+                {/* Eixo Tematico Input */}
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                    Eixo Temático *
+                  </label>
+                  <input
+                    type="text"
+                    value={item.eixoTematico}
+                    onChange={e => updateItemField(item.id, 'eixoTematico', e.target.value)}
+                    placeholder="Ex: Números, Geometria, Oralidade, Leitura, Corpo e Movimento..."
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Objetos de Conhecimento Panel */}
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
+                    <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider border-b pb-2 flex justify-between items-center">
+                      <span>Objetos de Conhecimento ({item.objetos.length})</span>
+                    </h4>
+                    
+                    {/* Add Object inline form */}
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        id={`new-objeto-${item.id}`}
+                        placeholder="Novo objeto de conhecimento..."
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const input = e.currentTarget;
+                            addObjeto(item.id, input.value);
+                            input.value = '';
+                          }
+                        }}
+                        className="flex-1 px-3 py-1.5 border border-slate-200 rounded-lg outline-none text-xs focus:border-brand-orange"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const input = document.getElementById(`new-objeto-${item.id}`) as HTMLInputElement;
+                          if (input) {
+                            addObjeto(item.id, input.value);
+                            input.value = '';
+                          }
+                        }}
+                        className="bg-brand-orange text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-orange-600 transition"
+                      >
+                        +
+                      </button>
+                    </div>
+
+                    {/* Objects List */}
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                      {item.objetos.length === 0 ? (
+                        <p className="text-slate-400 text-xs italic text-center py-4">Nenhum objeto adicionado.</p>
+                      ) : (
+                        item.objetos.map(obj => (
+                          <div key={obj.id} className="flex justify-between items-center bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 group">
+                            <span className="text-xs text-slate-700 font-medium">{obj.descricao}</span>
+                            <button
+                              type="button"
+                              onClick={() => removeObjeto(item.id, obj.id)}
+                              className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-0.5"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Habilidades Panel */}
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
+                    <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider border-b pb-2 flex justify-between items-center">
+                      <span>Habilidades ({item.habilidades.length})</span>
+                      <button
+                        type="button"
+                        onClick={() => openHabilidadesModal(item.id)}
+                        className="bg-brand-orange hover:bg-orange-600 text-white px-2.5 py-1 rounded-xl text-[10px] font-bold transition flex items-center gap-1 shadow-sm uppercase tracking-wider"
+                      >
+                        <Plus size={14} />
+                        Gerenciar
+                      </button>
+                    </h4>
+
+                    {/* Habilidades List */}
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                      {item.habilidades.length === 0 ? (
+                        <div className="text-slate-400 text-xs italic text-center py-6 flex flex-col items-center gap-2">
+                          <span>Nenhuma habilidade selecionada.</span>
+                          <button
+                            type="button"
+                            onClick={() => openHabilidadesModal(item.id)}
+                            className="text-brand-orange hover:underline text-[10px] font-bold"
+                          >
+                            Clique para selecionar habilidades
+                          </button>
+                        </div>
+                      ) : (
+                        item.habilidades.map(hab => (
+                          <div key={hab.id} className="flex justify-between items-start bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 group gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="bg-brand-orange/10 text-brand-orange text-[9px] font-black px-1.5 py-0.5 rounded font-mono">
+                                  {hab.codigo}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-slate-600 mt-1 font-medium leading-tight">{hab.descricao}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeHabilidadeByCode(item.id, hab.codigo)}
+                              className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 shrink-0 self-start"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Relational Mapping Grid N:N */}
+                {item.objetos.length > 0 && item.habilidades.length > 0 && (
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
+                    <div className="flex items-center gap-1.5 border-b pb-2 border-slate-100">
+                      <Link2 className="w-4 h-4 text-brand-orange" />
+                      <h4 className="text-xs font-black text-slate-700 uppercase tracking-tight">
+                        Associação de Objeto com Habilidade (Mapeamento N:N)
+                      </h4>
+                    </div>
+                    <p className="text-[10px] text-slate-400 italic">
+                      Vincule as habilidades correspondentes a cada objeto de conhecimento clicando sobre elas:
+                    </p>
+
+                    <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
+                      {item.objetos.map(obj => (
+                        <div key={obj.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-2">
+                          <div className="text-xs font-bold text-slate-800">
+                            {obj.descricao}
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {item.habilidades.map(hab => {
+                              const isLinked = item.links.some(l => l.objetoId === obj.id && l.habilidadeId === hab.id);
+                              return (
+                                <button
+                                  key={hab.id}
+                                  type="button"
+                                  onClick={() => toggleLink(item.id, obj.id, hab.id)}
+                                  title={hab.descricao}
+                                  className={`px-3 py-1 rounded-full text-[9px] font-black tracking-tight transition-all flex items-center gap-1 border
+                                    ${isLinked 
+                                      ? 'bg-brand-orange text-white border-brand-orange shadow-sm' 
+                                      : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'
+                                    }`}
+                                >
+                                  {isLinked && <Check className="w-2.5 h-2.5" />}
+                                  <span>{hab.codigo}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Pedagogical Suggestions */}
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                    Sugestões Pedagógicas / Recursos para este Eixo
+                  </label>
+                  <textarea
+                    value={item.sugestoesPedagogicas}
+                    onChange={e => updateItemField(item.id, 'sugestoesPedagogicas', e.target.value)}
+                    placeholder="Sugestões de estratégias metodológicas, intervenções pedagógicas e recursos para trabalhar com estes objetos..."
+                    rows={2}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none bg-white"
+                  />
+                </div>
+              </div>
+            ))}
+
+            {/* Add Axis Button */}
+            <div className="flex justify-start pt-2">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setItens(prev => [...prev, createDefaultItem()])}
+                className="rounded-xl text-xs font-bold py-2.5 flex items-center gap-1.5 border-dashed border-2 hover:border-brand-orange hover:bg-orange-50/20"
+              >
+                <Plus className="w-4 h-4" />
+                Adicionar Outro Eixo Temático
+              </Button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Objetivos de Aprendizagem / Competências *</label>
-              <textarea 
-                value={objetivos}
-                onChange={e => setObjetivos(e.target.value)}
-                placeholder="Indique as competências a serem desenvolvidas neste período..."
-                required
-                rows={3}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Conteúdo Programático *</label>
-              <textarea 
-                value={conteudo}
-                onChange={e => setConteudo(e.target.value)}
-                placeholder="Liste os principais conteúdos que serão abordados..."
-                required
-                rows={3}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Procedimentos Metodológicos</label>
-              <textarea 
-                value={metodologia}
-                onChange={e => setMetodologia(e.target.value)}
-                placeholder="Aulas expositivas, trabalhos em grupo, seminários..."
-                rows={2}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Recursos Didáticos</label>
-              <textarea 
-                value={recursos}
-                onChange={e => setRecursos(e.target.value)}
-                placeholder="Quadro, projetor, material manipulável, livros..."
-                rows={2}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Critérios de Avaliação</label>
-              <textarea 
-                value={avaliacao}
-                onChange={e => setAvaliacao(e.target.value)}
-                placeholder="Provas bimestrais, autoavaliação, participação..."
-                rows={2}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+          {/* Form Actions */}
+          <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
             {editingId && (
               <Button type="button" variant="secondary" onClick={resetForm} className="rounded-xl text-xs font-bold py-2">
                 Cancelar
@@ -588,12 +908,239 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
         </form>
       </Card>
 
+      {/* Habilidades Selection/Creation Modal */}
+      {isHabModalOpen && activeItemIdForHab && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden max-h-[85vh] flex flex-col animate-fade-in border border-slate-100">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <div className="flex items-center gap-2">
+                <Layers className="text-brand-orange w-5 h-5" />
+                <div>
+                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">
+                    Gerenciar Habilidades
+                  </h3>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">
+                    Selecione do repositório ou cadastre uma nova
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => {
+                  setIsHabModalOpen(false);
+                  setActiveItemIdForHab(null);
+                }}
+                className="text-slate-400 hover:text-slate-600 transition p-1 hover:bg-slate-200/50 rounded-xl"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Tabs */}
+            <div className="flex border-b border-slate-100 text-xs font-bold text-slate-500">
+              <button
+                type="button"
+                onClick={() => setModalTab('select')}
+                className={`flex-1 py-3 text-center transition-all ${modalTab === 'select' ? 'text-brand-orange border-b-2 border-brand-orange bg-orange-50/10' : 'hover:bg-slate-50'}`}
+              >
+                Selecionar do Repositório
+              </button>
+              <button
+                type="button"
+                onClick={() => setModalTab('create')}
+                className={`flex-1 py-3 text-center transition-all ${modalTab === 'create' ? 'text-brand-orange border-b-2 border-brand-orange bg-orange-50/10' : 'hover:bg-slate-50'}`}
+              >
+                Cadastrar Nova Habilidade
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {modalTab === 'select' ? (
+                <>
+                  {/* Search and Filters */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                      <input
+                        type="text"
+                        placeholder="Buscar por código/descrição..."
+                        value={modalSearchTerm}
+                        onChange={e => setModalSearchTerm(e.target.value)}
+                        className="w-full pl-9 pr-3 py-1.5 border border-slate-200 rounded-xl bg-white outline-none focus:border-brand-orange transition-all text-xs font-semibold"
+                      />
+                    </div>
+                    <div>
+                      <select
+                        value={modalComponenteFilter}
+                        onChange={e => setModalComponenteFilter(e.target.value)}
+                        className="w-full px-3 py-1.5 border border-slate-200 rounded-xl bg-white outline-none focus:border-brand-orange transition-all text-xs font-bold text-slate-600"
+                      >
+                        <option value="ALL">Todos Componentes</option>
+                        {COMPONENTES.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <select
+                        value={modalAnoSerieFilter}
+                        onChange={e => setModalAnoSerieFilter(e.target.value)}
+                        className="w-full px-3 py-1.5 border border-slate-200 rounded-xl bg-white outline-none focus:border-brand-orange transition-all text-xs font-bold text-slate-600"
+                      >
+                        <option value="ALL">Todas Séries</option>
+                        {ANOS_SERIES.map(a => <option key={a} value={a}>{a}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* List of Skills */}
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                    {filteredCatalogHabs.length === 0 ? (
+                      <p className="text-slate-400 text-xs italic text-center py-12">Nenhuma habilidade encontrada.</p>
+                    ) : (
+                      filteredCatalogHabs.map(hab => {
+                        const added = isHabInActiveItem(hab.codigo);
+                        return (
+                          <div key={hab.id} className="flex justify-between items-start bg-slate-50 hover:bg-slate-100/50 px-4 py-3 rounded-2xl border border-slate-200/50 transition-colors gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="bg-brand-orange/10 text-brand-orange text-[9px] font-black px-2 py-0.5 rounded font-mono">
+                                  {hab.codigo}
+                                </span>
+                                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
+                                  {hab.componente} • {hab.anoSerie}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-600 mt-1.5 font-medium leading-relaxed">
+                                {hab.descricao}
+                              </p>
+                            </div>
+                            <div className="shrink-0 self-center">
+                              {added ? (
+                                <button
+                                  type="button"
+                                  onClick={() => removeHabilidadeByCode(activeItemIdForHab, hab.codigo)}
+                                  className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-xl text-[10px] font-bold transition flex items-center gap-1 shadow-sm"
+                                >
+                                  <Check className="w-3 h-3" />
+                                  Adicionada
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => addHabilidadeToItem(activeItemIdForHab, hab)}
+                                  className="bg-brand-orange hover:bg-orange-600 text-white px-3 py-1.5 rounded-xl text-[10px] font-bold transition shadow-sm"
+                                >
+                                  Selecionar
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </>
+              ) : (
+                /* Create custom skill form */
+                <form
+                  onSubmit={e => {
+                    e.preventDefault();
+                    handleCreateCustomHabilidade();
+                  }}
+                  className="space-y-4"
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Código *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ex: EF01MA01"
+                        value={newHabCode}
+                        onChange={e => setNewHabCode(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all uppercase"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Componente Curricular
+                      </label>
+                      <select
+                        value={newHabComponente}
+                        onChange={e => setNewHabComponente(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-bold text-slate-600 focus:border-brand-orange transition-all bg-white"
+                      >
+                        {COMPONENTES.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Ano/Série
+                      </label>
+                      <select
+                        value={newHabAnoSerie}
+                        onChange={e => setNewHabAnoSerie(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-bold text-slate-600 focus:border-brand-orange transition-all bg-white"
+                      >
+                        {ANOS_SERIES.map(a => <option key={a} value={a}>{a}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                      Descrição da Habilidade *
+                    </label>
+                    <textarea
+                      required
+                      placeholder="Descreva detalhadamente a habilidade..."
+                      value={newHabDesc}
+                      onChange={e => setNewHabDesc(e.target.value)}
+                      rows={4}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
+                    />
+                  </div>
+
+                  <div className="flex justify-end pt-2">
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      className="bg-brand-orange hover:bg-orange-600 font-bold text-xs py-2 rounded-xl flex items-center gap-1.5"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Cadastrar e Adicionar ao Eixo
+                    </Button>
+                  </div>
+                </form>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-slate-100 flex justify-end bg-slate-50 gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  setIsHabModalOpen(false);
+                  setActiveItemIdForHab(null);
+                }}
+                className="rounded-xl text-xs font-bold py-2"
+              >
+                Fechar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Saved plans list */}
       <div className="space-y-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h3 className="text-md font-black text-slate-800 uppercase tracking-wider">Histórico de Planos de Curso</h3>
-            <p className="text-xs text-slate-500 mt-0.5">Consulte, edite ou exporte os planejamentos de curso já elaborados</p>
+            <p className="text-xs text-slate-500 mt-0.5">Consulte, edite ou exporte os planejamentos de curso municipais unificados</p>
           </div>
 
           <div className="flex flex-wrap gap-2 w-full md:w-auto">
@@ -601,7 +1148,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
               <input 
                 type="text" 
-                placeholder="Buscar por tema..."
+                placeholder="Buscar por componente/eixo..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 className="pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-white outline-none focus:border-brand-orange transition-all text-xs font-semibold"
@@ -609,12 +1156,12 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
             </div>
 
             <select 
-              value={schoolFilter}
-              onChange={e => setSchoolFilter(e.target.value)}
+              value={gradeFilter}
+              onChange={e => setGradeFilter(e.target.value)}
               className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 outline-none focus:border-brand-orange"
             >
-              <option value="ALL">Todas Unidades</option>
-              {escolas.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
+              <option value="ALL">Todas as Séries</option>
+              {ANOS_SERIES.map(a => <option key={a} value={a}>{a}</option>)}
             </select>
           </div>
         </div>
@@ -624,9 +1171,9 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
             <table className="w-full text-left border-collapse text-xs">
               <thead className="bg-slate-50 border-b border-slate-100 uppercase text-[10px] font-black text-slate-500 tracking-wider">
                 <tr>
-                  <th className="px-6 py-4">Período / Escola</th>
-                  <th className="px-6 py-4">Turma / Componente</th>
-                  <th className="px-6 py-4">Título do Plano</th>
+                  <th className="px-6 py-4">Período / Ano Letivo</th>
+                  <th className="px-6 py-4">Ano/Série / Componente</th>
+                  <th className="px-6 py-4">Eixos Planejados</th>
                   <th className="px-6 py-4 text-right">Ações</th>
                 </tr>
               </thead>
@@ -634,33 +1181,31 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
                 {filteredPlans.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="py-12 text-center text-slate-400 font-semibold">
-                      Nenhum plano de curso encontrado.
+                      Nenhum plano de curso unificado encontrado.
                     </td>
                   </tr>
                 ) : (
                   filteredPlans.map(plan => (
                     <tr key={plan.id} className="hover:bg-slate-50/50 transition-colors group">
-                      <td className="px-6 py-3">
-                        <div className="font-bold text-slate-800">
-                          {plan.bimestre} ({plan.anoReferencia})
-                        </div>
-                        <div className="text-[10px] text-slate-400 font-bold uppercase mt-0.5 tracking-tight truncate max-w-[200px]">
-                          {plan.escolaNome}
-                        </div>
+                      <td className="px-6 py-3 text-slate-800 font-bold">
+                        {plan.bimestre} ({plan.anoReferencia})
                       </td>
                       <td className="px-6 py-3">
-                        <div className="font-bold text-slate-700">{plan.turmaNome}</div>
-                        <div className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">
-                          Série: {plan.anoSerie || '---'}
-                        </div>
+                        <div className="font-bold text-slate-700">{plan.anoSerie || '---'}</div>
                         <div className="text-[10px] text-brand-orange font-bold uppercase mt-0.5">
                           {plan.componente}
                         </div>
                       </td>
                       <td className="px-6 py-3">
-                        <div className="font-semibold text-slate-800 line-clamp-1">{plan.titulo}</div>
-                        <div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">
-                          Conteúdo: {plan.conteudo}
+                        <div className="space-y-1.5 max-w-[420px]">
+                          {plan.itens?.map((item, index) => (
+                            <div key={item.id || index} className="text-slate-800 flex flex-col gap-0.5">
+                              <span className="font-bold text-slate-700">• {item.eixoTematico || 'Eixo Geral'}</span>
+                              <span className="text-[10px] text-slate-400 font-semibold pl-2.5">
+                                ({item.objetos?.length || 0} objetos, {item.habilidades?.length || 0} habilid., {item.links?.length || 0} vínc.)
+                              </span>
+                            </div>
+                          )) || <div className="text-slate-400 italic">Sem eixos vinculados</div>}
                         </div>
                       </td>
                       <td className="px-6 py-3 text-right">
@@ -668,7 +1213,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
                           <button 
                             onClick={() => handlePrint(plan)} 
                             className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" 
-                            title="Imprimir Plano"
+                            title="Imprimir Plano Unificado"
                           >
                             <Printer size={15} />
                           </button>
