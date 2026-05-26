@@ -45,7 +45,8 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
   const [formData, setFormData] = useState<DadosEducacionais>(escola.dadosEducacionais);
 
   const regionalCoordinator = useMemo(() => {
-    return coordenadores.find(c => c.escolasIds.includes(escola.id));
+    return coordenadores.find(c => c.escolasIds.includes(escola.id) && c.funcao === 'Coordenador Regional')
+      || coordenadores.find(c => c.escolasIds.includes(escola.id));
   }, [coordenadores, escola.id]);
 
   const handlePrint = (visita: Visita) => {

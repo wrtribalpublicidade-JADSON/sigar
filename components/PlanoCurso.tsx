@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { PageHeader } from './ui/PageHeader';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { 
   ClipboardList, Plus, Search, Edit2, Trash2, Printer, 
   X, Calendar, Bookmark, Save, Layers,
-  Link2, Check
+  Link2, Check, Download, Upload
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { Escola, Coordenador } from '../types';
 import { useNotification } from '../context/NotificationContext';
 
@@ -153,6 +154,250 @@ const createDefaultItem = (): ItemPlano => ({
 export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, userEmail, currentUser }) => {
   const { showNotification } = useNotification();
   const [plans, setPlans] = useState<CoursePlan[]>([]);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDownloadTemplate = () => {
+    // Columns headers
+    const headers = [
+      'Ano de Referência',
+      'Ano/Série',
+      'Componente Curricular',
+      'Bimestre / Período',
+      'Eixo Temático',
+      'Objetos de Conhecimento',
+      'Habilidades (Códigos separados por ;)',
+      'Habilidades (Descrições separadas por ;)',
+      'Sugestões Pedagógicas'
+    ];
+
+    // Some highly rich example rows
+    const data = [
+      {
+        'Ano de Referência': 2026,
+        'Ano/Série': '1º Ano',
+        'Componente Curricular': 'Matemática',
+        'Bimestre / Período': '1º Bimestre',
+        'Eixo Temático': 'Números',
+        'Objetos de Conhecimento': 'Leitura, escrita e comparação de números naturais; Contagem lúdica',
+        'Habilidades (Códigos separados por ;)': 'EF01MA01; EF01MA02',
+        'Habilidades (Descrições separadas por ;)': 'Utilizar números naturais como indicador de quantidade ou de ordem em diferentes situações cotidianas e reconhecer situações em que os números não indicam contagem nem ordem, mas sim código de identificação.; Contar de maneira lúdica, em jogos e brincadeiras, identificando a contagem de rotina e a contagem de objetos de coleções.',
+        'Sugestões Pedagógicas': 'Utilizar jogos de tabuleiro, tampinhas de garrafa e contagens de objetos cotidianos.'
+      },
+      {
+        'Ano de Referência': 2026,
+        'Ano/Série': '1º Ano',
+        'Componente Curricular': 'Língua Portuguesa',
+        'Bimestre / Período': '1º Bimestre',
+        'Eixo Temático': 'Oralidade',
+        'Objetos de Conhecimento': 'Constituição da oralidade; Escuta atenta',
+        'Habilidades (Códigos separados por ;)': 'EF01LP01; EF01LP02',
+        'Habilidades (Descrições separadas por ;)': 'Reconhecer que textos são lidos e escritos da esquerda para a direita e de cima para baixo.; Escrever, alfabeticamente, como e onde convier, de próprio punho ou por meio de outra tecnologia de escrita, palavras e frases, com autonomia.',
+        'Sugestões Pedagógicas': 'Roda de conversa diária, contação de histórias infantis e canto de parlendas.'
+      }
+    ];
+
+    const wsData = [headers, ...data.map(row => headers.map(h => row[h as keyof typeof row]))];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // Apply column widths to make it super premium
+    ws['!cols'] = [
+      { wch: 18 }, // Ano de Referencia
+      { wch: 15 }, // Ano/Serie
+      { wch: 25 }, // Componente Curricular
+      { wch: 20 }, // Bimestre / Periodo
+      { wch: 20 }, // Eixo Tematico
+      { wch: 50 }, // Objetos de Conhecimento
+      { wch: 40 }, // Habilidades Codigos
+      { wch: 60 }, // Habilidades Descricoes
+      { wch: 60 }  // Sugestoes Pedagogicas
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Plano de Curso Modelo');
+    XLSX.writeFile(wb, 'Modelo_Importacao_PlanoCurso.xlsx');
+    showNotification('success', 'Planilha modelo baixada com sucesso!');
+  };
+
+  const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsName = wb.SheetNames[0];
+        const ws = wb.Sheets[wsName];
+        
+        // Parse rows as raw objects
+        const rawRows = XLSX.utils.sheet_to_json<any>(ws);
+        
+        if (rawRows.length === 0) {
+          showNotification('error', 'A planilha está vazia.');
+          return;
+        }
+
+        // Map raw rows to Grouped Plans
+        const groups: Record<string, {
+          anoReferencia: string;
+          anoSerie: string;
+          componente: string;
+          bimestre: string;
+          itens: any[];
+        }> = {};
+
+        rawRows.forEach((row: any) => {
+          // Normalize column names in case they have whitespace/accents issues
+          const getValue = (keys: string[]) => {
+            const foundKey = Object.keys(row).find(k => 
+              keys.some(key => k.toLowerCase().replace(/[\s\-\_\/]/g, '').includes(key.toLowerCase().replace(/[\s\-\_\/]/g, '')))
+            );
+            return foundKey ? row[foundKey] : undefined;
+          };
+
+          const anoRefVal = String(getValue(['referência', 'referencia', 'ano']) || new Date().getFullYear()).trim();
+          const anoSerieVal = String(getValue(['série', 'serie', 'ano/série', 'ano/serie']) || '').trim();
+          const componenteVal = String(getValue(['componente', 'curricular']) || '').trim();
+          const bimestreVal = String(getValue(['bimestre', 'período', 'periodo']) || '').trim();
+          const eixoVal = String(getValue(['eixo', 'temático', 'tematico']) || '').trim();
+          const objetosVal = String(getValue(['objeto', 'conhecimento', 'objetos']) || '').trim();
+          const habsVal = String(getValue(['habilidade', 'código', 'codigo', 'habilidades']) || '').trim();
+          const descsVal = String(getValue(['descrição', 'descricao', 'descrições', 'descricoes']) || '').trim();
+          const sugestoesVal = String(getValue(['sugestões', 'sugestoes', 'recursos', 'pedagógicas', 'pedagogicas']) || '').trim();
+
+          // Validation
+          if (!anoSerieVal || !componenteVal || !bimestreVal || !eixoVal) {
+            // Skip invalid row
+            return;
+          }
+
+          // Match Component, Bimestre and AnoSerie to valid options in our system for normalization
+          const matchedComponente = COMPONENTES.find(c => 
+            c.toLowerCase().replace(/[\s]/g, '') === componenteVal.toLowerCase().replace(/[\s]/g, '')
+          ) || COMPONENTES.find(c => 
+            c.toLowerCase().includes(componenteVal.toLowerCase()) || componenteVal.toLowerCase().includes(c.toLowerCase())
+          ) || componenteVal;
+
+          const matchedBimestre = BIMESTRES.find(b => 
+            b.toLowerCase().replace(/[\s]/g, '') === bimestreVal.toLowerCase().replace(/[\s]/g, '')
+          ) || BIMESTRES.find(b => 
+            b.toLowerCase().includes(bimestreVal.toLowerCase()) || bimestreVal.toLowerCase().includes(b.toLowerCase())
+          ) || bimestreVal;
+
+          const matchedAnoSerie = ANOS_SERIES.find(a => 
+            a.toLowerCase().replace(/[\s]/g, '') === anoSerieVal.toLowerCase().replace(/[\s]/g, '')
+          ) || ANOS_SERIES.find(a => 
+            a.toLowerCase().includes(anoSerieVal.toLowerCase()) || anoSerieVal.toLowerCase().includes(a.toLowerCase())
+          ) || anoSerieVal;
+
+          const groupKey = `${anoRefVal}-${matchedAnoSerie}-${matchedComponente}-${matchedBimestre}`;
+
+          if (!groups[groupKey]) {
+            groups[groupKey] = {
+              anoReferencia: anoRefVal,
+              anoSerie: matchedAnoSerie,
+              componente: matchedComponente,
+              bimestre: matchedBimestre,
+              itens: []
+            };
+          }
+
+          // Parse objects (separated by semicolon)
+          const objetos: ObjetoConhecimento[] = objetosVal
+            .split(/[;;\n]/)
+            .map(desc => desc.trim())
+            .filter(Boolean)
+            .map(desc => ({
+              id: generateId(),
+              descricao: desc
+            }));
+
+          // Parse skills codes and manual descriptions
+          const parsedHabsList = habsVal.split(/[;;\n]/).map(code => code.trim().toUpperCase()).filter(Boolean);
+          const parsedDescsList = descsVal.split(/[;;\n]/).map(desc => desc.trim()).filter(Boolean);
+
+          const habilidades: Habilidade[] = parsedHabsList.map((code, idx) => {
+            // Check if there is a manual description at the same index
+            const manualDesc = parsedDescsList[idx]?.trim();
+            // Try to find the full description of this skill in our repository!
+            const matchedRepoHab = habRepository.find(h => h.codigo.trim().toUpperCase() === code);
+            return {
+              id: matchedRepoHab?.id || generateId(),
+              codigo: code,
+              descricao: manualDesc || matchedRepoHab?.descricao || `Habilidade ${code} importada.`
+            };
+          });
+
+          // Generate links between all objects and all skills in this Eixo Tematico row!
+          const links: ObjetoHabilidadeLink[] = [];
+          objetos.forEach(obj => {
+            habilidades.forEach(hab => {
+              links.push({
+                objetoId: obj.id,
+                habilidadeId: hab.id
+              });
+            });
+          });
+
+          groups[groupKey].itens.push({
+            id: generateId(),
+            eixoTematico: eixoVal,
+            sugestoesPedagogicas: sugestoesVal,
+            objetos,
+            habilidades,
+            links
+          });
+        });
+
+        // Add imported plans to plans list
+        const importedCount = Object.keys(groups).length;
+        if (importedCount === 0) {
+          showNotification('error', 'Nenhum plano válido encontrado na planilha. Verifique as colunas obrigatórias.');
+          return;
+        }
+
+        let updatedPlans = [...plans];
+        Object.values(groups).forEach((importedPlan) => {
+          // Check if there is an existing plan for this combination
+          const existingIdx = updatedPlans.findIndex(p => 
+            p.anoReferencia === importedPlan.anoReferencia &&
+            p.anoSerie === importedPlan.anoSerie &&
+            p.componente === importedPlan.componente &&
+            p.bimestre === importedPlan.bimestre
+          );
+
+          const payload: CoursePlan = {
+            id: existingIdx >= 0 ? updatedPlans[existingIdx].id : generateId(),
+            anoReferencia: importedPlan.anoReferencia,
+            anoSerie: importedPlan.anoSerie,
+            componente: importedPlan.componente,
+            bimestre: importedPlan.bimestre,
+            itens: importedPlan.itens,
+            criadoEm: new Date().toISOString()
+          };
+
+          if (existingIdx >= 0) {
+            updatedPlans[existingIdx] = payload;
+          } else {
+            updatedPlans = [payload, ...updatedPlans];
+          }
+        });
+
+        setPlans(updatedPlans);
+        localStorage.setItem('sigar_planos_curso', JSON.stringify(updatedPlans));
+        showNotification('success', `${importedCount} Plano(s) de Curso importado(s) e unificado(s) com sucesso!`);
+        
+        // Reset file input
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      } catch (err) {
+        console.error('Erro na importação:', err);
+        showNotification('error', 'Erro ao ler a planilha. Verifique a formatação do arquivo.');
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
   
   // Form State
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -180,6 +425,9 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
   const [newHabDesc, setNewHabDesc] = useState('');
   const [newHabComponente, setNewHabComponente] = useState(COMPONENTES[0]);
   const [newHabAnoSerie, setNewHabAnoSerie] = useState(ANOS_SERIES[0]);
+  const [newHabEixoTematico, setNewHabEixoTematico] = useState('');
+  const [newHabObjetoDesc, setNewHabObjetoDesc] = useState('');
+  const [newHabSugestoes, setNewHabSugestoes] = useState('');
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -287,6 +535,18 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
     setModalAnoSerieFilter(anoSerie);
     setNewHabComponente(componente);
     setNewHabAnoSerie(anoSerie);
+
+    // Pre-populate quick-form fields from current active planning item
+    const activeItem = itens.find(item => item.id === itemId);
+    if (activeItem) {
+      setNewHabEixoTematico(activeItem.eixoTematico || '');
+      setNewHabSugestoes(activeItem.sugestoesPedagogicas || '');
+    } else {
+      setNewHabEixoTematico('');
+      setNewHabSugestoes('');
+    }
+    setNewHabObjetoDesc('');
+
     setModalSearchTerm('');
     setModalTab('select');
     setIsHabModalOpen(true);
@@ -354,13 +614,76 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
     }
 
     if (activeItemIdForHab) {
-      addHabilidadeToItem(activeItemIdForHab, finalHab);
-      showNotification('success', `Habilidade ${codeUpper} vinculada ao eixo com sucesso!`);
+      const newHabId = finalHab.id;
+
+      setItens(prev => prev.map(item => {
+        if (item.id !== activeItemIdForHab) return item;
+
+        // 1. Add Habilidade to item if not already exists
+        const habExists = item.habilidades.some(h => h.codigo === codeUpper);
+        const newHab: Habilidade = {
+          id: newHabId,
+          codigo: codeUpper,
+          descricao: finalHab.descricao
+        };
+        const updatedHabilidades = habExists ? item.habilidades : [...item.habilidades, newHab];
+
+        // 2. Update Eixo Temático if filled
+        const updatedEixo = newHabEixoTematico.trim() || item.eixoTematico;
+
+        // 3. Update Sugestões Pedagógicas if filled
+        const updatedSugestoes = newHabSugestoes.trim() || item.sugestoesPedagogicas;
+
+        // 4. Update Objeto de Conhecimento and links
+        let updatedObjetos = [...item.objetos];
+        let updatedLinks = [...item.links];
+
+        if (newHabObjetoDesc.trim()) {
+          const hasObj = item.objetos.some(o => o.descricao.toLowerCase() === newHabObjetoDesc.trim().toLowerCase());
+          let targetObjId = '';
+
+          if (hasObj) {
+            targetObjId = item.objetos.find(o => o.descricao.toLowerCase() === newHabObjetoDesc.trim().toLowerCase())!.id;
+          } else {
+            const newObjId = generateId();
+            const newObj: ObjetoConhecimento = {
+              id: newObjId,
+              descricao: newHabObjetoDesc.trim()
+            };
+            updatedObjetos.push(newObj);
+            targetObjId = newObjId;
+          }
+
+          // Link them bilaterally (i.e., skill linked to object in item's links)
+          const linkExists = item.links.some(l => l.objetoId === targetObjId && l.habilidadeId === newHabId);
+          if (!linkExists) {
+            updatedLinks.push({
+              objetoId: targetObjId,
+              habilidadeId: newHabId
+            });
+          }
+        }
+
+        return {
+          ...item,
+          eixoTematico: updatedEixo,
+          sugestoesPedagogicas: updatedSugestoes,
+          habilidades: updatedHabilidades,
+          objetos: updatedObjetos,
+          links: updatedLinks
+        };
+      }));
+
+      showNotification('success', `Habilidade ${codeUpper} cadastrada e vinculada com sucesso!`);
     }
 
     setNewHabCode('');
     setNewHabDesc('');
-    setModalTab('select');
+    setNewHabEixoTematico('');
+    setNewHabObjetoDesc('');
+    setNewHabSugestoes('');
+    setIsHabModalOpen(false);
+    setActiveItemIdForHab(null);
   };
 
   const toggleLink = (itemId: string, objetoId: string, habId: string) => {
@@ -484,7 +807,28 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
         subtitle="Elaboração e acompanhamento do planejamento curricular municipal"
         icon={ClipboardList}
         badgeText="DIÁRIO DE CLASSE"
-        actions={[]}
+        actions={[
+          {
+            label: 'Baixar Modelo Excel',
+            icon: Download,
+            onClick: handleDownloadTemplate,
+            variant: 'outline'
+          },
+          {
+            label: 'Importar Excel',
+            icon: Upload,
+            onClick: () => fileInputRef.current?.click(),
+            variant: 'primary'
+          }
+        ]}
+      />
+
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        onChange={handleImportExcel} 
+        accept=".xlsx, .xls" 
+        className="hidden" 
       />
 
       {/* Printable Area - Hidden on Screen */}
@@ -1101,6 +1445,54 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                       rows={4}
                       className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
                     />
+                  </div>
+
+                  {/* Vinculação do Eixo, Objeto e Sugestões Pedagógicas */}
+                  <div className="border-t border-slate-100 pt-4 space-y-4">
+                    <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <Link2 className="w-4 h-4 text-brand-orange" />
+                      Vincular Eixo, Objeto e Sugestões (Opcional)
+                    </h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          Eixo Temático
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Definir ou alterar o Eixo Temático..."
+                          value={newHabEixoTematico}
+                          onChange={e => setNewHabEixoTematico(e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          Novo Objeto de Conhecimento
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Cadastrar novo objeto e vincular a esta habilidade..."
+                          value={newHabObjetoDesc}
+                          onChange={e => setNewHabObjetoDesc(e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Sugestões Pedagógicas / Recursos para o Eixo
+                      </label>
+                      <textarea
+                        placeholder="Definir ou complementar as sugestões pedagógicas..."
+                        value={newHabSugestoes}
+                        onChange={e => setNewHabSugestoes(e.target.value)}
+                        rows={2}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none bg-white"
+                      />
+                    </div>
                   </div>
 
                   <div className="flex justify-end pt-2">

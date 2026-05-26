@@ -1043,7 +1043,8 @@ export default function App() {
               <PrintableVisitReport
                 visita={selectedVisitForPrint}
                 escola={escolas.find(e => e.id === selectedVisitForPrint.escolaId)}
-                coordenador={coordenadores.find(c => c.escolasIds.includes(selectedVisitForPrint.escolaId))}
+                coordenador={coordenadores.find(c => c.escolasIds.includes(selectedVisitForPrint.escolaId) && c.funcao === 'Coordenador Regional')
+                  || coordenadores.find(c => c.escolasIds.includes(selectedVisitForPrint.escolaId))}
               />
             )}
           </div>

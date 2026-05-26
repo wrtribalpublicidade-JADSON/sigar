@@ -54,7 +54,8 @@ export const VisitForm: React.FC<VisitFormProps> = ({ escolas, coordenadores, on
   const [isEditingEncaminhamento, setIsEditingEncaminhamento] = useState(false);
 
   const selectedEscola = escolas.find(e => e.id === formData.escolaId);
-  const regionalCoordinator = coordenadores.find(c => c.escolasIds.includes(formData.escolaId));
+  const regionalCoordinator = coordenadores.find(c => c.escolasIds.includes(formData.escolaId) && c.funcao === 'Coordenador Regional')
+    || coordenadores.find(c => c.escolasIds.includes(formData.escolaId));
 
   const handleCheckboxChange = (value: string) => {
     setFormData(prev => ({
