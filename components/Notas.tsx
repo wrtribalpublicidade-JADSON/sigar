@@ -94,21 +94,76 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
     }
   }
 
-  // Load from localStorage
+  const fetchRealSheets = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('notas_sheets')
+        .select('*')
+        .eq('ativo', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Also get turmas to map names
+      const { data: allTurmas, error: turmasError } = await supabase
+        .from('turmas')
+        .select('id, name, year, shift');
+      
+      const turmaMap = new Map<string, string>();
+      if (!turmasError && allTurmas) {
+        allTurmas.forEach((t: any) => {
+          turmaMap.set(t.id, `${t.name || t.year} • ${t.shift || ''}`);
+        });
+      }
+
+      const formatted: GradeSheet[] = (data || []).map((p: any) => {
+        const escolaObj = escolas.find(esc => esc.id === p.escola_id);
+        const escolaNome = escolaObj ? escolaObj.nome : 'Unidade';
+        const turmaNome = turmaMap.get(p.turma_id) || 'Turma';
+
+        return {
+          id: p.id,
+          escolaId: p.escola_id,
+          escolaNome,
+          turmaId: p.turma_id,
+          turmaNome,
+          componente: p.componente,
+          bimestre: p.bimestre,
+          mediaTurma: Number(p.media_turma),
+          taxaAprovacao: p.taxa_aprovacao,
+          students: p.students || [],
+          criadoEm: p.created_at
+        };
+      });
+
+      setSheets(formatted);
+    } catch (err) {
+      console.error('Erro ao buscar pautas de notas do Supabase:', err);
+      showNotification('error', 'Erro ao carregar dados do Supabase. Utilizando dados locais.');
+    }
+  };
+
+  // Load from localStorage or Supabase
   useEffect(() => {
-    const saved = localStorage.getItem('sigar_notas_sheets');
-    if (saved) {
-      try {
-        setSheets(JSON.parse(saved));
-      } catch (e) {
-        console.error(e);
+    if (isDemoMode) {
+      const saved = localStorage.getItem('sigar_notas_sheets');
+      if (saved) {
+        try {
+          setSheets(JSON.parse(saved));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    } else {
+      if (escolas.length > 0) {
+        fetchRealSheets();
       }
     }
 
     if (escolas.length > 0) {
       setSelectedEscolaId(escolas[0].id);
     }
-  }, [escolas]);
+  }, [escolas, isDemoMode]);
 
   // Load turmas when selected school changes
   useEffect(() => {
@@ -312,7 +367,7 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
     return { mediaTurma, taxaAprovacao, recuperacaoCount };
   }, [students, gradesMap]);
 
-  const handleSaveGrades = () => {
+  const handleSaveGrades = async () => {
     if (students.length === 0) {
       showNotification('error', 'Não há estudantes carregados para lançar notas.');
       return;
@@ -356,26 +411,83 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
       s.bimestre === bimestre
     );
 
-    let updatedSheets: GradeSheet[];
     if (existingIndex > -1) {
-      updatedSheets = [...sheets];
-      updatedSheets[existingIndex] = payload;
-      showNotification('success', 'Pauta de notas atualizada com sucesso!');
-    } else {
-      updatedSheets = [payload, ...sheets];
-      showNotification('success', 'Notas salvas com sucesso!');
+      payload.id = sheets[existingIndex].id;
     }
 
-    setSheets(updatedSheets);
-    localStorage.setItem('sigar_notas_sheets', JSON.stringify(updatedSheets));
+    if (!isDemoMode) {
+      const dbPayload = {
+        id: payload.id,
+        escola_id: payload.escolaId,
+        turma_id: payload.turmaId,
+        componente: payload.componente,
+        bimestre: payload.bimestre,
+        media_turma: payload.mediaTurma,
+        taxa_aprovacao: payload.taxaAprovacao,
+        students: payload.students,
+        updated_at: new Date().toISOString(),
+        updated_by: userEmail || currentUser?.contato || 'user'
+      };
+
+      const { error } = await supabase
+        .from('notas_sheets')
+        .upsert(dbPayload);
+
+      if (error) {
+        console.error('Erro ao salvar notas no Supabase:', error);
+        showNotification('error', 'Erro ao salvar a pauta de notas no banco de dados.');
+        return;
+      }
+
+      if (existingIndex > -1) {
+        const updated = [...sheets];
+        updated[existingIndex] = payload;
+        setSheets(updated);
+        showNotification('success', 'Pauta de notas atualizada com sucesso no Supabase!');
+      } else {
+        setSheets([payload, ...sheets]);
+        showNotification('success', 'Notas salvas com sucesso no Supabase!');
+      }
+    } else {
+      let updatedSheets: GradeSheet[];
+      if (existingIndex > -1) {
+        updatedSheets = [...sheets];
+        updatedSheets[existingIndex] = payload;
+        showNotification('success', 'Pauta de notas atualizada com sucesso!');
+      } else {
+        updatedSheets = [payload, ...sheets];
+        showNotification('success', 'Notas salvas com sucesso!');
+      }
+
+      setSheets(updatedSheets);
+      localStorage.setItem('sigar_notas_sheets', JSON.stringify(updatedSheets));
+    }
   };
 
-  const handleDeleteSheet = (id: string) => {
+  const handleDeleteSheet = async (id: string) => {
     if (!confirm('Deseja realmente remover esta pauta de notas?')) return;
+    
+    if (!isDemoMode) {
+      const { error } = await supabase
+        .from('notas_sheets')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('Erro ao excluir pauta de notas no Supabase:', error);
+        showNotification('error', 'Erro ao excluir a pauta de notas no banco de dados.');
+        return;
+      }
+      showNotification('success', 'Pauta de notas removida do Supabase.');
+    } else {
+      showNotification('success', 'Pauta de notas removida.');
+    }
+
     const updated = sheets.filter(s => s.id !== id);
     setSheets(updated);
-    localStorage.setItem('sigar_notas_sheets', JSON.stringify(updated));
-    showNotification('success', 'Pauta de notas removida.');
+    if (isDemoMode) {
+      localStorage.setItem('sigar_notas_sheets', JSON.stringify(updated));
+    }
   };
 
   const filteredStudents = students.filter(s => 

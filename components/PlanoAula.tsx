@@ -104,9 +104,34 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
 
 
 
-  // Load course plans from localStorage
+  const fetchRealCoursePlans = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('planos_curso')
+        .select('*')
+        .eq('ativo', true);
+
+      if (error) throw error;
+
+      const formatted: any[] = (data || []).map((p: any) => ({
+        id: p.id,
+        anoReferencia: p.ano_referencia,
+        componente: p.componente,
+        bimestre: p.bimestre,
+        anoSerie: p.ano_serie,
+        itens: p.itens || [],
+        criadoEm: p.created_at
+      }));
+
+      setCoursePlans(formatted);
+    } catch (err) {
+      console.error('Erro ao buscar planos de curso do Supabase para guias:', err);
+    }
+  };
+
+  // Load course plans
   useEffect(() => {
-    const handleStorageChange = () => {
+    if (isDemoMode) {
       const saved = localStorage.getItem('sigar_planos_curso');
       if (saved) {
         try {
@@ -117,11 +142,10 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       } else {
         setCoursePlans([]);
       }
-    };
-    handleStorageChange();
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
+    } else {
+      fetchRealCoursePlans();
+    }
+  }, [isDemoMode]);
 
   // Get active Course Plan unificado matching selections
   const activeCoursePlan = useMemo(() => {
@@ -290,21 +314,81 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
   // Print Mode State
   const [printPlan, setPrintPlan] = useState<LessonPlan | null>(null);
 
-  // Load from localStorage
+  const fetchRealPlans = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('guias_aprendizagem')
+        .select('*')
+        .eq('ativo', true)
+        .order('data', { ascending: false });
+
+      if (error) throw error;
+
+      // Also we need to get turmas for all schools to map their names properly
+      const { data: allTurmas, error: turmasError } = await supabase
+        .from('turmas')
+        .select('id, name, year, shift');
+      
+      const turmaMap = new Map<string, string>();
+      if (!turmasError && allTurmas) {
+        allTurmas.forEach((t: any) => {
+          turmaMap.set(t.id, `${t.name || t.year} • ${t.shift || ''}`);
+        });
+      }
+
+      const formattedPlans: LessonPlan[] = (data || []).map((p: any) => {
+        const escolaObj = escolas.find(esc => esc.id === p.escola_id);
+        const escolaNome = escolaObj ? escolaObj.nome : 'Unidade';
+        const turmaNome = turmaMap.get(p.turma_id) || 'Turma';
+
+        return {
+          id: p.id,
+          data: p.data,
+          escolaId: p.escola_id,
+          escolaNome,
+          turmaId: p.turma_id,
+          turmaNome,
+          componente: p.componente,
+          titulo: p.titulo,
+          objetivos: p.objetivos || '',
+          habilidades: p.habilidades || '',
+          metodologia: p.metodologia || '',
+          recursos: p.recursos || '',
+          avaliacao: p.avaliacao || '',
+          anoSerie: p.ano_serie,
+          periodo: p.periodo,
+          criadoEm: p.created_at
+        };
+      });
+
+      setPlans(formattedPlans);
+    } catch (err) {
+      console.error('Erro ao buscar guias de aprendizagem do Supabase:', err);
+      showNotification('error', 'Erro ao carregar dados do Supabase. Utilizando dados locais.');
+    }
+  };
+
+  // Load from localStorage or Supabase
   useEffect(() => {
-    const saved = localStorage.getItem('sigar_planos_aula');
-    if (saved) {
-      try {
-        setPlans(JSON.parse(saved));
-      } catch (e) {
-        console.error(e);
+    if (isDemoMode) {
+      const saved = localStorage.getItem('sigar_planos_aula');
+      if (saved) {
+        try {
+          setPlans(JSON.parse(saved));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    } else {
+      if (escolas.length > 0) {
+        fetchRealPlans();
       }
     }
 
     if (escolas.length > 0) {
       setSelectedEscolaId(escolas[0].id);
     }
-  }, [escolas]);
+  }, [escolas, isDemoMode]);
 
   // Load turmas when selected school changes
   useEffect(() => {
@@ -409,7 +493,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
     }
   }, [availableTurmas, selectedTurmaId, selectedEscolaId, turmas, isDemoMode]);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!selectedEscolaId || !selectedTurmaId || !titulo.trim() || !objetivos.trim()) {
@@ -440,17 +524,56 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       criadoEm: new Date().toISOString()
     };
 
-    let updatedPlans: LessonPlan[];
-    if (editingId) {
-      updatedPlans = plans.map(p => p.id === editingId ? payload : p);
-      showNotification('success', 'Guia de Aprendizagem atualizada com sucesso!');
+    if (!isDemoMode) {
+      const dbPayload = {
+        id: payload.id,
+        data: payload.data,
+        escola_id: payload.escolaId,
+        turma_id: payload.turmaId,
+        componente: payload.componente,
+        titulo: payload.titulo,
+        objetivos: payload.objetivos,
+        habilidades: payload.habilidades,
+        metodologia: payload.metodologia,
+        recursos: payload.recursos,
+        avaliacao: payload.avaliacao,
+        ano_serie: payload.anoSerie,
+        periodo: payload.periodo,
+        updated_at: new Date().toISOString(),
+        updated_by: userEmail || currentUser?.contato || 'user'
+      };
+
+      const { error } = await supabase
+        .from('guias_aprendizagem')
+        .upsert(dbPayload);
+
+      if (error) {
+        console.error('Erro ao salvar guia no Supabase:', error);
+        showNotification('error', 'Erro ao salvar a guia de aprendizagem no banco de dados.');
+        return;
+      }
+
+      if (editingId) {
+        setPlans(plans.map(p => p.id === editingId ? payload : p));
+        showNotification('success', 'Guia de Aprendizagem atualizada com sucesso no Supabase!');
+      } else {
+        setPlans([payload, ...plans]);
+        showNotification('success', 'Guia de Aprendizagem cadastrada com sucesso no Supabase!');
+      }
     } else {
-      updatedPlans = [payload, ...plans];
-      showNotification('success', 'Guia de Aprendizagem cadastrada com sucesso!');
+      let updatedPlans: LessonPlan[];
+      if (editingId) {
+        updatedPlans = plans.map(p => p.id === editingId ? payload : p);
+        showNotification('success', 'Guia de Aprendizagem atualizada com sucesso!');
+      } else {
+        updatedPlans = [payload, ...plans];
+        showNotification('success', 'Guia de Aprendizagem cadastrada com sucesso!');
+      }
+
+      setPlans(updatedPlans);
+      localStorage.setItem('sigar_planos_aula', JSON.stringify(updatedPlans));
     }
 
-    setPlans(updatedPlans);
-    localStorage.setItem('sigar_planos_aula', JSON.stringify(updatedPlans));
     resetForm();
   };
 
@@ -474,12 +597,30 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!confirm('Deseja realmente excluir esta Guia de Aprendizagem?')) return;
+    
+    if (!isDemoMode) {
+      const { error } = await supabase
+        .from('guias_aprendizagem')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('Erro ao deletar guia no Supabase:', error);
+        showNotification('error', 'Erro ao excluir a guia de aprendizagem no banco de dados.');
+        return;
+      }
+      showNotification('success', 'Guia de Aprendizagem removida do Supabase.');
+    } else {
+      showNotification('success', 'Guia de Aprendizagem removida.');
+    }
+
     const updated = plans.filter(p => p.id !== id);
     setPlans(updated);
-    localStorage.setItem('sigar_planos_aula', JSON.stringify(updated));
-    showNotification('success', 'Guia de Aprendizagem removida.');
+    if (isDemoMode) {
+      localStorage.setItem('sigar_planos_aula', JSON.stringify(updated));
+    }
   };
 
   const resetForm = () => {

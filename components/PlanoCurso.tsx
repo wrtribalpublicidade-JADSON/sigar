@@ -10,6 +10,7 @@ import {
 import * as XLSX from 'xlsx';
 import { Escola, Coordenador } from '../types';
 import { useNotification } from '../context/NotificationContext';
+import { supabase } from '../services/supabase';
 
 interface PlanoCursoProps {
   escolas: Escola[]; // Mantido na assinatura para evitar quebras em outros arquivos
@@ -359,7 +360,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
         }
 
         let updatedPlans = [...plans];
-        Object.values(groups).forEach((importedPlan) => {
+        const importPromises = Object.values(groups).map(async (importedPlan) => {
           // Check if there is an existing plan for this combination
           const existingIdx = updatedPlans.findIndex(p => 
             p.anoReferencia === importedPlan.anoReferencia &&
@@ -383,14 +384,37 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
           } else {
             updatedPlans = [payload, ...updatedPlans];
           }
+
+          if (!isDemoMode) {
+            const dbPayload = {
+              id: payload.id,
+              ano_referencia: payload.anoReferencia,
+              componente: payload.componente,
+              bimestre: payload.bimestre,
+              ano_serie: payload.anoSerie,
+              itens: payload.itens,
+              updated_at: new Date().toISOString(),
+              updated_by: userEmail || currentUser?.contato || 'user'
+            };
+            const { error } = await supabase.from('planos_curso').upsert(dbPayload);
+            if (error) throw error;
+          }
         });
 
-        setPlans(updatedPlans);
-        localStorage.setItem('sigar_planos_curso', JSON.stringify(updatedPlans));
-        showNotification('success', `${importedCount} Plano(s) de Curso importado(s) e unificado(s) com sucesso!`);
-        
-        // Reset file input
-        if (fileInputRef.current) fileInputRef.current.value = '';
+        Promise.all(importPromises)
+          .then(() => {
+            setPlans(updatedPlans);
+            if (isDemoMode) {
+              localStorage.setItem('sigar_planos_curso', JSON.stringify(updatedPlans));
+            }
+            showNotification('success', `${importedCount} Plano(s) de Curso importado(s) e unificado(s) com sucesso!`);
+            // Reset file input
+            if (fileInputRef.current) fileInputRef.current.value = '';
+          })
+          .catch(err => {
+            console.error('Erro na importação Supabase:', err);
+            showNotification('error', 'Erro ao salvar os planos importados no banco de dados.');
+          });
       } catch (err) {
         console.error('Erro na importação:', err);
         showNotification('error', 'Erro ao ler a planilha. Verifique a formatação do arquivo.');
@@ -436,61 +460,120 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
   // Print Mode State
   const [printPlan, setPrintPlan] = useState<CoursePlan | null>(null);
 
+  const fetchRealData = async () => {
+    try {
+      // 1. Fetch planos_curso
+      const { data: plansData, error: plansError } = await supabase
+        .from('planos_curso')
+        .select('*')
+        .eq('ativo', true)
+        .order('created_at', { ascending: false });
+
+      if (plansError) throw plansError;
+
+      const formattedPlans: CoursePlan[] = (plansData || []).map((p: any) => ({
+        id: p.id,
+        anoReferencia: p.ano_referencia,
+        componente: p.componente,
+        bimestre: p.bimestre,
+        anoSerie: p.ano_serie,
+        itens: p.itens || [],
+        criadoEm: p.created_at
+      }));
+      setPlans(formattedPlans);
+
+      // 2. Fetch habilidades_repositorio
+      const { data: habsData, error: habsError } = await supabase
+        .from('habilidades_repositorio')
+        .select('*')
+        .order('codigo', { ascending: true });
+
+      if (habsError) throw habsError;
+
+      const formattedHabs: RepositorioHabilidade[] = (habsData || []).map((h: any) => ({
+        id: h.id,
+        codigo: h.codigo,
+        descricao: h.descricao,
+        componente: h.componente,
+        anoSerie: h.ano_serie
+      }));
+      
+      // Merge with BNCC seed just in case, but prioritize DB records
+      const combinedHabs = [...formattedHabs];
+      BNCC_HABILIDADES.forEach(seedHab => {
+        if (!combinedHabs.some(h => h.codigo === seedHab.codigo)) {
+          combinedHabs.push(seedHab);
+        }
+      });
+
+      setHabRepository(combinedHabs);
+    } catch (err) {
+      console.error('Erro ao buscar dados do Supabase:', err);
+      showNotification('error', 'Falha ao carregar dados do Supabase. Utilizando dados locais.');
+      setPlans([]);
+      setHabRepository(BNCC_HABILIDADES);
+    }
+  };
+
   // Load from localStorage with migration
   useEffect(() => {
-    const saved = localStorage.getItem('sigar_planos_curso');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          const migrated = parsed.map((p: any) => {
-            if (p.itens && Array.isArray(p.itens)) return p;
-            
-            // Migrate old structure
-            const migratedItem: ItemPlano = {
-              id: generateId(),
-              eixoTematico: p.titulo || 'Eixo Temático Geral',
-              sugestoesPedagogicas: [
-                p.metodologia ? `Metodologia: ${p.metodologia}` : '',
-                p.recursos ? `Recursos: ${p.recursos}` : '',
-                p.avaliacao ? `Avaliação: ${p.avaliacao}` : ''
-              ].filter(Boolean).join('\n'),
-              objetos: p.conteudo ? [{ id: 'old-content', descricao: p.conteudo }] : [],
-              habilidades: p.objetivos ? [{ id: 'old-objectives', codigo: 'HAB', descricao: p.objetivos }] : [],
-              links: p.conteudo && p.objetivos ? [{ objetoId: 'old-content', habilidadeId: 'old-objectives' }] : []
-            };
-            
-            return {
-              id: p.id,
-              anoReferencia: p.anoReferencia,
-              componente: p.componente,
-              bimestre: p.bimestre,
-              anoSerie: p.anoSerie || '',
-              itens: [migratedItem],
-              criadoEm: p.criadoEm || new Date().toISOString()
-            };
-          });
-          setPlans(migrated);
+    if (isDemoMode) {
+      const saved = localStorage.getItem('sigar_planos_curso');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            const migrated = parsed.map((p: any) => {
+              if (p.itens && Array.isArray(p.itens)) return p;
+              
+              // Migrate old structure
+              const migratedItem: ItemPlano = {
+                id: generateId(),
+                eixoTematico: p.titulo || 'Eixo Temático Geral',
+                sugestoesPedagogicas: [
+                  p.metodologia ? `Metodologia: ${p.metodologia}` : '',
+                  p.recursos ? `Recursos: ${p.recursos}` : '',
+                  p.avaliacao ? `Avaliação: ${p.avaliacao}` : ''
+                ].filter(Boolean).join('\n'),
+                objetos: p.conteudo ? [{ id: 'old-content', descricao: p.conteudo }] : [],
+                habilidades: p.objetivos ? [{ id: 'old-objectives', codigo: 'HAB', descricao: p.objetivos }] : [],
+                links: p.conteudo && p.objetivos ? [{ objetoId: 'old-content', habilidadeId: 'old-objectives' }] : []
+              };
+              
+              return {
+                id: p.id,
+                anoReferencia: p.anoReferencia,
+                componente: p.componente,
+                bimestre: p.bimestre,
+                anoSerie: p.anoSerie || '',
+                itens: [migratedItem],
+                criadoEm: p.criadoEm || new Date().toISOString()
+              };
+            });
+            setPlans(migrated);
+          }
+        } catch (e) {
+          console.error(e);
         }
-      } catch (e) {
-        console.error(e);
       }
-    }
 
-    // Load global skills repository
-    const savedHabs = localStorage.getItem('sigar_repositorio_habilidades');
-    if (savedHabs) {
-      try {
-        setHabRepository(JSON.parse(savedHabs));
-      } catch (e) {
-        console.error(e);
+      // Load global skills repository
+      const savedHabs = localStorage.getItem('sigar_repositorio_habilidades');
+      if (savedHabs) {
+        try {
+          setHabRepository(JSON.parse(savedHabs));
+        } catch (e) {
+          console.error(e);
+          setHabRepository(BNCC_HABILIDADES);
+        }
+      } else {
         setHabRepository(BNCC_HABILIDADES);
+        localStorage.setItem('sigar_repositorio_habilidades', JSON.stringify(BNCC_HABILIDADES));
       }
     } else {
-      setHabRepository(BNCC_HABILIDADES);
-      localStorage.setItem('sigar_repositorio_habilidades', JSON.stringify(BNCC_HABILIDADES));
+      fetchRealData();
     }
-  }, []);
+  }, [isDemoMode]);
 
   // --- Dynamic Item Planning Helpers ---
   const updateItemField = (itemId: string, field: keyof ItemPlano, value: any) => {
@@ -587,8 +670,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
       };
     }));
   };
-
-  const handleCreateCustomHabilidade = () => {
+  const handleCreateCustomHabilidade = async () => {
     if (!newHabCode.trim() || !newHabDesc.trim()) {
       showNotification('error', 'Preencha todos os campos da nova habilidade.');
       return;
@@ -598,19 +680,64 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
     const existsInRepo = habRepository.some(h => h.codigo === codeUpper);
     let finalHab: RepositorioHabilidade;
 
-    if (existsInRepo) {
-      finalHab = habRepository.find(h => h.codigo === codeUpper)!;
-    } else {
-      finalHab = {
-        id: generateId(),
+    if (!isDemoMode) {
+      // Real database fetch/upsert
+      const dbHab = {
+        id: existsInRepo ? habRepository.find(h => h.codigo === codeUpper)!.id : generateId(),
         codigo: codeUpper,
         descricao: newHabDesc.trim(),
         componente: newHabComponente,
-        anoSerie: newHabAnoSerie
+        ano_serie: newHabAnoSerie
       };
-      const updatedRepo = [...habRepository, finalHab];
-      setHabRepository(updatedRepo);
-      localStorage.setItem('sigar_repositorio_habilidades', JSON.stringify(updatedRepo));
+
+      const { data, error } = await supabase
+        .from('habilidades_repositorio')
+        .upsert(dbHab, { onConflict: 'codigo' })
+        .select();
+
+      if (error) {
+        console.error('Erro ao cadastrar habilidade no Supabase:', error);
+        showNotification('error', 'Erro ao cadastrar habilidade no banco de dados.');
+        return;
+      }
+      
+      if (data && data.length > 0) {
+        finalHab = {
+          id: data[0].id,
+          codigo: data[0].codigo,
+          descricao: data[0].descricao,
+          componente: data[0].componente,
+          anoSerie: data[0].ano_serie
+        };
+      } else {
+        finalHab = {
+          id: dbHab.id,
+          codigo: dbHab.codigo,
+          descricao: dbHab.descricao,
+          componente: dbHab.componente,
+          anoSerie: dbHab.ano_serie
+        };
+      }
+
+      if (!existsInRepo) {
+        setHabRepository([...habRepository, finalHab]);
+      }
+    } else {
+      // Demo Mode
+      if (existsInRepo) {
+        finalHab = habRepository.find(h => h.codigo === codeUpper)!;
+      } else {
+        finalHab = {
+          id: generateId(),
+          codigo: codeUpper,
+          descricao: newHabDesc.trim(),
+          componente: newHabComponente,
+          anoSerie: newHabAnoSerie
+        };
+        const updatedRepo = [...habRepository, finalHab];
+        setHabRepository(updatedRepo);
+        localStorage.setItem('sigar_repositorio_habilidades', JSON.stringify(updatedRepo));
+      }
     }
 
     if (activeItemIdForHab) {
@@ -685,7 +812,6 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
     setIsHabModalOpen(false);
     setActiveItemIdForHab(null);
   };
-
   const toggleLink = (itemId: string, objetoId: string, habId: string) => {
     setItens(prev => prev.map(item => {
       if (item.id !== itemId) return item;
@@ -713,7 +839,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
   }, [habRepository, modalSearchTerm, modalComponenteFilter, modalAnoSerieFilter]);
 
   // --- Form Save, Edit, Delete ---
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const validItens = itens.filter(item => item.eixoTematico.trim() !== '');
@@ -746,17 +872,49 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
       criadoEm: new Date().toISOString()
     };
 
-    let updatedPlans: CoursePlan[];
-    if (editingId) {
-      updatedPlans = plans.map(p => p.id === editingId ? payload : p);
-      showNotification('success', 'Plano de Curso atualizado com sucesso!');
-    } else {
-      updatedPlans = [payload, ...plans];
-      showNotification('success', 'Plano de Curso unificado cadastrado com sucesso!');
-    }
+    if (!isDemoMode) {
+      const dbPayload = {
+        id: payload.id,
+        ano_referencia: payload.anoReferencia,
+        componente: payload.componente,
+        bimestre: payload.bimestre,
+        ano_serie: payload.anoSerie,
+        itens: payload.itens,
+        updated_at: new Date().toISOString(),
+        updated_by: userEmail || currentUser?.contato || 'user'
+      };
 
-    setPlans(updatedPlans);
-    localStorage.setItem('sigar_planos_curso', JSON.stringify(updatedPlans));
+      const { error } = await supabase
+        .from('planos_curso')
+        .upsert(dbPayload);
+
+      if (error) {
+        console.error('Erro ao salvar plano no Supabase:', error);
+        showNotification('error', 'Erro ao salvar o plano de curso no banco de dados.');
+        return;
+      }
+      
+      if (editingId) {
+        setPlans(plans.map(p => p.id === editingId ? payload : p));
+        showNotification('success', 'Plano de Curso unificado atualizado com sucesso no Supabase!');
+      } else {
+        setPlans([payload, ...plans]);
+        showNotification('success', 'Plano de Curso unificado cadastrado com sucesso no Supabase!');
+      }
+    } else {
+      let updatedPlans: CoursePlan[];
+      if (editingId) {
+        updatedPlans = plans.map(p => p.id === editingId ? payload : p);
+        showNotification('success', 'Plano de Curso atualizado com sucesso!');
+      } else {
+        updatedPlans = [payload, ...plans];
+        showNotification('success', 'Plano de Curso unificado cadastrado com sucesso!');
+      }
+
+      setPlans(updatedPlans);
+      localStorage.setItem('sigar_planos_curso', JSON.stringify(updatedPlans));
+    }
+    
     resetForm();
   };
 
@@ -770,12 +928,30 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!confirm('Deseja realmente excluir este Plano de Curso?')) return;
+    
+    if (!isDemoMode) {
+      const { error } = await supabase
+        .from('planos_curso')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('Erro ao deletar plano no Supabase:', error);
+        showNotification('error', 'Erro ao excluir o plano de curso no banco de dados.');
+        return;
+      }
+      showNotification('success', 'Plano de Curso unificado excluído com sucesso do Supabase!');
+    } else {
+      showNotification('success', 'Plano de Curso removido.');
+    }
+
     const updated = plans.filter(p => p.id !== id);
     setPlans(updated);
-    localStorage.setItem('sigar_planos_curso', JSON.stringify(updated));
-    showNotification('success', 'Plano de Curso removido.');
+    if (isDemoMode) {
+      localStorage.setItem('sigar_planos_curso', JSON.stringify(updated));
+    }
   };
 
   const resetForm = () => {

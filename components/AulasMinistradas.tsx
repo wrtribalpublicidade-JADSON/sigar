@@ -108,25 +108,110 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
   // Print Mode State
   const [printLog, setPrintLog] = useState<ClassLog | null>(null);
 
-  // Load from localStorage
+  const fetchRealLogs = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('aulas_ministradas')
+        .select('*')
+        .eq('ativo', true)
+        .order('data', { ascending: false });
+
+      if (error) throw error;
+
+      // Also get turmas to map names
+      const { data: allTurmas, error: turmasError } = await supabase
+        .from('turmas')
+        .select('id, name, year, shift');
+      
+      const turmaMap = new Map<string, string>();
+      if (!turmasError && allTurmas) {
+        allTurmas.forEach((t: any) => {
+          turmaMap.set(t.id, `${t.name || t.year} • ${t.shift || ''}`);
+        });
+      }
+
+      const formatted: ClassLog[] = (data || []).map((p: any) => {
+        const escolaObj = escolas.find(esc => esc.id === p.escola_id);
+        const escolaNome = escolaObj ? escolaObj.nome : 'Unidade';
+        const turmaNome = turmaMap.get(p.turma_id) || 'Turma';
+
+        return {
+          id: p.id,
+          data: p.data,
+          escolaId: p.escola_id,
+          escolaNome,
+          turmaId: p.turma_id,
+          turmaNome,
+          componente: p.componente,
+          aulas: p.aulas,
+          conteudo: p.conteudo,
+          atividades: p.atividades || '',
+          observacoes: p.observacoes || '',
+          anoSerie: p.ano_serie,
+          periodo: p.periodo,
+          selectedObjetoIds: p.selected_objeto_ids || [],
+          selectedHabilidadeIds: p.selected_habilidade_ids || [],
+          criadoEm: p.created_at
+        };
+      });
+
+      setLogs(formatted);
+    } catch (err) {
+      console.error('Erro ao buscar aulas ministradas do Supabase:', err);
+      showNotification('error', 'Erro ao carregar dados do Supabase. Utilizando dados locais.');
+    }
+  };
+
+  const fetchRealCoursePlans = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('planos_curso')
+        .select('*')
+        .eq('ativo', true);
+
+      if (error) throw error;
+
+      const formatted: any[] = (data || []).map((p: any) => ({
+        id: p.id,
+        anoReferencia: p.ano_referencia,
+        componente: p.componente,
+        bimestre: p.bimestre,
+        anoSerie: p.ano_serie,
+        itens: p.itens || [],
+        criadoEm: p.created_at
+      }));
+
+      setCoursePlans(formatted);
+    } catch (err) {
+      console.error('Erro ao buscar planos de curso do Supabase para aulas:', err);
+    }
+  };
+
+  // Load logs
   useEffect(() => {
-    const saved = localStorage.getItem('sigar_aulas_ministradas');
-    if (saved) {
-      try {
-        setLogs(JSON.parse(saved));
-      } catch (e) {
-        console.error(e);
+    if (isDemoMode) {
+      const saved = localStorage.getItem('sigar_aulas_ministradas');
+      if (saved) {
+        try {
+          setLogs(JSON.parse(saved));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    } else {
+      if (escolas.length > 0) {
+        fetchRealLogs();
       }
     }
 
     if (escolas.length > 0) {
       setSelectedEscolaId(escolas[0].id);
     }
-  }, [escolas]);
+  }, [escolas, isDemoMode]);
 
-  // Load course plans from localStorage
+  // Load course plans
   useEffect(() => {
-    const handleStorageChange = () => {
+    if (isDemoMode) {
       const saved = localStorage.getItem('sigar_planos_curso');
       if (saved) {
         try {
@@ -137,11 +222,10 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
       } else {
         setCoursePlans([]);
       }
-    };
-    handleStorageChange();
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
+    } else {
+      fetchRealCoursePlans();
+    }
+  }, [isDemoMode]);
 
   // Get active Course Plan unificado matching selections
   const activeCoursePlan = useMemo(() => {
@@ -499,7 +583,7 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
     }
   }, [availableTurmas, selectedTurmaId, selectedEscolaId, turmas, isDemoMode]);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!selectedEscolaId || !selectedTurmaId || !conteudo.trim()) {
@@ -507,6 +591,7 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
       return;
     }
 
+    const htmlStrippedContent = conteudo.trim();
     const escolaNome = escolas.find(e => e.id === selectedEscolaId)?.nome || 'Unidade';
     const turmaObj = turmas.find(t => t.id === selectedTurmaId);
     const turmaNome = turmaObj ? `${turmaObj.name || turmaObj.year} • ${turmaObj.shift || ''}` : 'Turma';
@@ -520,7 +605,7 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
       turmaNome,
       componente,
       aulas,
-      conteudo,
+      conteudo: htmlStrippedContent,
       atividades,
       observacoes,
       anoSerie,
@@ -530,17 +615,56 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
       criadoEm: new Date().toISOString()
     };
 
-    let updatedLogs: ClassLog[];
-    if (editingId) {
-      updatedLogs = logs.map(l => l.id === editingId ? payload : l);
-      showNotification('success', 'Registro de aula atualizado com sucesso!');
+    if (!isDemoMode) {
+      const dbPayload = {
+        id: payload.id,
+        data: payload.data,
+        escola_id: payload.escolaId,
+        turma_id: payload.turmaId,
+        componente: payload.componente,
+        aulas: payload.aulas,
+        conteudo: payload.conteudo,
+        atividades: payload.atividades,
+        observacoes: payload.observacoes,
+        ano_serie: payload.anoSerie,
+        periodo: payload.periodo,
+        selected_objeto_ids: payload.selectedObjetoIds,
+        selected_habilidade_ids: payload.selectedHabilidadeIds,
+        updated_at: new Date().toISOString(),
+        updated_by: userEmail || currentUser?.contato || 'user'
+      };
+
+      const { error } = await supabase
+        .from('aulas_ministradas')
+        .upsert(dbPayload);
+
+      if (error) {
+        console.error('Erro ao salvar registro no Supabase:', error);
+        showNotification('error', 'Erro ao salvar o registro de aula no banco de dados.');
+        return;
+      }
+
+      if (editingId) {
+        setLogs(logs.map(l => l.id === editingId ? payload : l));
+        showNotification('success', 'Registro de aula atualizado com sucesso no Supabase!');
+      } else {
+        setLogs([payload, ...logs]);
+        showNotification('success', 'Aula ministrada registrada com sucesso no Supabase!');
+      }
     } else {
-      updatedLogs = [payload, ...logs];
-      showNotification('success', 'Aula ministrada registrada com sucesso!');
+      let updatedLogs: ClassLog[];
+      if (editingId) {
+        updatedLogs = logs.map(l => l.id === editingId ? payload : l);
+        showNotification('success', 'Registro de aula atualizado com sucesso!');
+      } else {
+        updatedLogs = [payload, ...logs];
+        showNotification('success', 'Aula ministrada registrada com sucesso!');
+      }
+
+      setLogs(updatedLogs);
+      localStorage.setItem('sigar_aulas_ministradas', JSON.stringify(updatedLogs));
     }
 
-    setLogs(updatedLogs);
-    localStorage.setItem('sigar_aulas_ministradas', JSON.stringify(updatedLogs));
     resetForm();
   };
 
@@ -564,12 +688,30 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!confirm('Deseja realmente excluir este registro de aula?')) return;
+    
+    if (!isDemoMode) {
+      const { error } = await supabase
+        .from('aulas_ministradas')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('Erro ao excluir registro no Supabase:', error);
+        showNotification('error', 'Erro ao excluir o registro de aula no banco de dados.');
+        return;
+      }
+      showNotification('success', 'Registro de aula removido do Supabase.');
+    } else {
+      showNotification('success', 'Registro de aula removido.');
+    }
+
     const updated = logs.filter(l => l.id !== id);
     setLogs(updated);
-    localStorage.setItem('sigar_aulas_ministradas', JSON.stringify(updated));
-    showNotification('success', 'Registro de aula removido.');
+    if (isDemoMode) {
+      localStorage.setItem('sigar_aulas_ministradas', JSON.stringify(updated));
+    }
   };
 
   const resetForm = () => {

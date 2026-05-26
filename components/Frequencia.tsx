@@ -69,21 +69,77 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
   // Search Filter
   const [studentSearch, setStudentSearch] = useState('');
 
-  // Load from localStorage & Set default school
+  const fetchRealSheets = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('frequencia_sheets')
+        .select('*')
+        .eq('ativo', true)
+        .order('data', { ascending: false });
+
+      if (error) throw error;
+
+      // Also get turmas to map names
+      const { data: allTurmas, error: turmasError } = await supabase
+        .from('turmas')
+        .select('id, name, year, shift');
+      
+      const turmaMap = new Map<string, string>();
+      if (!turmasError && allTurmas) {
+        allTurmas.forEach((t: any) => {
+          turmaMap.set(t.id, `${t.name || t.year} • ${t.shift || ''}`);
+        });
+      }
+
+      const formatted: AttendanceSheet[] = (data || []).map((p: any) => {
+        const escolaObj = escolas.find(esc => esc.id === p.escola_id);
+        const escolaNome = escolaObj ? escolaObj.nome : 'Unidade';
+        const turmaNome = turmaMap.get(p.turma_id) || 'Turma';
+
+        return {
+          id: p.id,
+          data: p.data,
+          escolaId: p.escola_id,
+          escolaNome,
+          turmaId: p.turma_id,
+          turmaNome,
+          componente: p.componente,
+          presentesCount: p.presentes_count,
+          totalCount: p.total_count,
+          rate: p.rate,
+          students: p.students || [],
+          criadoEm: p.created_at
+        };
+      });
+
+      setSheets(formatted);
+    } catch (err) {
+      console.error('Erro ao buscar pautas de frequência do Supabase:', err);
+      showNotification('error', 'Erro ao carregar dados do Supabase. Utilizando dados locais.');
+    }
+  };
+
+  // Load from localStorage or Supabase & Set default school
   useEffect(() => {
-    const saved = localStorage.getItem('sigar_frequencia_sheets');
-    if (saved) {
-      try {
-        setSheets(JSON.parse(saved));
-      } catch (e) {
-        console.error(e);
+    if (isDemoMode) {
+      const saved = localStorage.getItem('sigar_frequencia_sheets');
+      if (saved) {
+        try {
+          setSheets(JSON.parse(saved));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    } else {
+      if (escolas.length > 0) {
+        fetchRealSheets();
       }
     }
 
     if (escolas.length > 0) {
       setSelectedEscolaId(escolas[0].id);
     }
-  }, [escolas]);
+  }, [escolas, isDemoMode]);
 
   // Load turmas when selected school changes
   useEffect(() => {
@@ -210,7 +266,7 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
     return { total, presents, absents, rate };
   }, [students, attendanceMap]);
 
-  const handleSaveSheet = () => {
+  const handleSaveSheet = async () => {
     if (students.length === 0) {
       showNotification('error', 'Não há estudantes carregados para registrar a frequência.');
       return;
@@ -243,28 +299,88 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
 
     // Check if there is already a sheet for this class, date and component
     const existingIndex = sheets.findIndex(s => s.data === dataFreq && s.turmaId === selectedTurmaId && s.componente === componente);
-    let updatedSheets: AttendanceSheet[];
     
     if (existingIndex > -1) {
       if (!confirm('Já existe uma chamada salva para esta turma, data e componente. Deseja sobrescrever os dados?')) return;
-      updatedSheets = [...sheets];
-      updatedSheets[existingIndex] = payload;
-      showNotification('success', 'Chamada atualizada com sucesso!');
-    } else {
-      updatedSheets = [payload, ...sheets];
-      showNotification('success', 'Frequência registrada com sucesso!');
+      
+      // Keep same ID for primary key upsert
+      payload.id = sheets[existingIndex].id;
     }
 
-    setSheets(updatedSheets);
-    localStorage.setItem('sigar_frequencia_sheets', JSON.stringify(updatedSheets));
+    if (!isDemoMode) {
+      const dbPayload = {
+        id: payload.id,
+        data: payload.data,
+        escola_id: payload.escolaId,
+        turma_id: payload.turmaId,
+        componente: payload.componente,
+        presentes_count: payload.presentesCount,
+        total_count: payload.totalCount,
+        rate: payload.rate,
+        students: payload.students,
+        updated_at: new Date().toISOString(),
+        updated_by: userEmail || currentUser?.contato || 'user'
+      };
+
+      const { error } = await supabase
+        .from('frequencia_sheets')
+        .upsert(dbPayload);
+
+      if (error) {
+        console.error('Erro ao salvar chamada no Supabase:', error);
+        showNotification('error', 'Erro ao salvar a chamada no banco de dados.');
+        return;
+      }
+
+      if (existingIndex > -1) {
+        const updated = [...sheets];
+        updated[existingIndex] = payload;
+        setSheets(updated);
+        showNotification('success', 'Chamada atualizada com sucesso no Supabase!');
+      } else {
+        setSheets([payload, ...sheets]);
+        showNotification('success', 'Frequência registrada com sucesso no Supabase!');
+      }
+    } else {
+      let updatedSheets: AttendanceSheet[];
+      if (existingIndex > -1) {
+        updatedSheets = [...sheets];
+        updatedSheets[existingIndex] = payload;
+        showNotification('success', 'Chamada atualizada com sucesso!');
+      } else {
+        updatedSheets = [payload, ...sheets];
+        showNotification('success', 'Frequência registrada com sucesso!');
+      }
+
+      setSheets(updatedSheets);
+      localStorage.setItem('sigar_frequencia_sheets', JSON.stringify(updatedSheets));
+    }
   };
 
-  const handleDeleteSheet = (id: string) => {
+  const handleDeleteSheet = async (id: string) => {
     if (!confirm('Deseja realmente remover esta folha de frequência?')) return;
+    
+    if (!isDemoMode) {
+      const { error } = await supabase
+        .from('frequencia_sheets')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('Erro ao excluir chamada no Supabase:', error);
+        showNotification('error', 'Erro ao excluir a chamada no banco de dados.');
+        return;
+      }
+      showNotification('success', 'Registro de chamada removido do Supabase.');
+    } else {
+      showNotification('success', 'Registro de chamada removido.');
+    }
+
     const updated = sheets.filter(s => s.id !== id);
     setSheets(updated);
-    localStorage.setItem('sigar_frequencia_sheets', JSON.stringify(updated));
-    showNotification('success', 'Registro de chamada removido.');
+    if (isDemoMode) {
+      localStorage.setItem('sigar_frequencia_sheets', JSON.stringify(updated));
+    }
   };
 
   const filteredStudents = students.filter(s => 
