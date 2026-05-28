@@ -98,7 +98,8 @@ export default function App() {
         contato: c.contato,
         regiao: c.regiao,
         funcao: c.funcao, // Map function from DB
-        escolasIds: c.coordenador_escolas?.map((ce: any) => ce.escola_id) || []
+        escolasIds: c.coordenador_escolas?.map((ce: any) => ce.escola_id) || [],
+        created_at: c.created_at
       })) || [];
 
       let linkedSchoolIds: string[] = [];
@@ -533,14 +534,18 @@ export default function App() {
         const currentIds = registros.map(r => r.id);
         const { data: existing } = await supabase.from('registros_fluencia_parc').select('id').eq('escola_id', updatedEscola.id);
         const idsToDelete = (existing || []).map((r: any) => r.id).filter((id: string) => !currentIds.includes(id));
-        if (idsToDelete.length > 0) await supabase.from('registros_fluencia_parc').delete().in('id', idsToDelete);
+        if (idsToDelete.length > 0) {
+          const { error: delErr } = await supabase.from('registros_fluencia_parc').delete().in('id', idsToDelete);
+          if (delErr) throw delErr;
+        }
         if (registros.length > 0) {
-          await supabase.from('registros_fluencia_parc').upsert(registros.map(r => ({
+          const { error: upsertErr } = await supabase.from('registros_fluencia_parc').upsert(registros.map(r => ({
             id: r.id, escola_id: updatedEscola.id, polo: r.polo, ano: r.ano, edicao: r.edicao,
             etapa_aplicacao: r.etapaAplicacao, tipo_turma: r.tipoTurma, turma: r.turma,
             participacao: r.participacao, classificacao: r.classificacao,
             data_registro: r.dataRegistro, responsavel: r.responsavel
-          })), { onConflict: 'escola_id,ano,edicao,polo,tipo_turma,turma', ignoreDuplicates: false });
+          })), { onConflict: 'id', ignoreDuplicates: false });
+          if (upsertErr) throw upsertErr;
         }
       }
 
@@ -550,15 +555,19 @@ export default function App() {
         const currentIds = registros.map(r => r.id);
         const { data: existing } = await supabase.from('registros_cnca').select('id').eq('escola_id', updatedEscola.id);
         const idsToDelete = (existing || []).map((r: any) => r.id).filter((id: string) => !currentIds.includes(id));
-        if (idsToDelete.length > 0) await supabase.from('registros_cnca').delete().in('id', idsToDelete);
+        if (idsToDelete.length > 0) {
+          const { error: delErr } = await supabase.from('registros_cnca').delete().in('id', idsToDelete);
+          if (delErr) throw delErr;
+        }
         if (registros.length > 0) {
-          await supabase.from('registros_cnca').upsert(registros.map(r => ({
+          const { error: upsertErr } = await supabase.from('registros_cnca').upsert(registros.map(r => ({
             id: r.id, escola_id: updatedEscola.id, ano: r.ano, tipo_avaliacao: r.tipoAvaliacao,
             componente_curricular: r.componenteCurricular, ano_serie: r.anoSerie, tipo_turma: r.tipoTurma,
             estudantes_avaliados: r.estudantesAvaliados, estudantes_previstos: r.estudantesPrevistos,
             defasagem: r.defasagem, aprendizado_intermediario: r.aprendizadoIntermediario,
             aprendizado_adequado: r.aprendizadoAdequado, data_registro: r.dataRegistro, responsavel: r.responsavel
-          })), { onConflict: 'escola_id,ano,tipo_avaliacao,componente_curricular,ano_serie', ignoreDuplicates: false });
+          })), { onConflict: 'id', ignoreDuplicates: false });
+          if (upsertErr) throw upsertErr;
         }
       }
 
@@ -568,15 +577,19 @@ export default function App() {
         const currentIds = registros.map(r => r.id);
         const { data: existing } = await supabase.from('registros_seama').select('id').eq('escola_id', updatedEscola.id);
         const idsToDelete = (existing || []).map((r: any) => r.id).filter((id: string) => !currentIds.includes(id));
-        if (idsToDelete.length > 0) await supabase.from('registros_seama').delete().in('id', idsToDelete);
+        if (idsToDelete.length > 0) {
+          const { error: delErr } = await supabase.from('registros_seama').delete().in('id', idsToDelete);
+          if (delErr) throw delErr;
+        }
         if (registros.length > 0) {
-          await supabase.from('registros_seama').upsert(registros.map(r => ({
+          const { error: upsertErr } = await supabase.from('registros_seama').upsert(registros.map(r => ({
             id: r.id, escola_id: updatedEscola.id, ano: r.ano, tipo_avaliacao: r.tipoAvaliacao,
             componente_curricular: r.componenteCurricular, ano_serie: r.anoSerie,
             estudantes_avaliados: r.estudantesAvaliados, estudantes_previstos: r.estudantesPrevistos,
             abaixo_basico: r.abaixoBasico, basico: r.basico, adequado: r.adequado, avancado: r.avançado,
             proficiencia_media: r.proficienciaMedia, data_registro: r.dataRegistro, responsavel: r.responsavel
-          })), { onConflict: 'escola_id,ano,tipo_avaliacao,componente_curricular,ano_serie', ignoreDuplicates: false });
+          })), { onConflict: 'id', ignoreDuplicates: false });
+          if (upsertErr) throw upsertErr;
         }
       }
 
@@ -586,9 +599,12 @@ export default function App() {
         const currentIds = registros.map(r => r.id);
         const { data: existing } = await supabase.from('registros_saeb').select('id').eq('escola_id', updatedEscola.id);
         const idsToDelete = (existing || []).map((r: any) => r.id).filter((id: string) => !currentIds.includes(id));
-        if (idsToDelete.length > 0) await supabase.from('registros_saeb').delete().in('id', idsToDelete);
+        if (idsToDelete.length > 0) {
+          const { error: delErr } = await supabase.from('registros_saeb').delete().in('id', idsToDelete);
+          if (delErr) throw delErr;
+        }
         if (registros.length > 0) {
-          await supabase.from('registros_saeb').upsert(registros.map(r => ({
+          const { error: upsertErr } = await supabase.from('registros_saeb').upsert(registros.map(r => ({
             id: r.id, escola_id: updatedEscola.id, ano: r.ano, tipo_avaliacao: r.tipoAvaliacao,
             componente_curricular: r.componenteCurricular, ano_serie: r.anoSerie,
             estudantes_avaliados: r.estudantesAvaliados, estudantes_previstos: r.estudantesPrevistos,
@@ -597,7 +613,8 @@ export default function App() {
             proficiencia_mat: r.proficienciaMat, nota_padronizada_lp: r.notaPadronizadaLp,
             nota_padronizada_mat: r.notaPadronizadaMat, nota_saeb: r.notaSaeb,
             data_registro: r.dataRegistro, responsavel: r.responsavel
-          })), { onConflict: 'escola_id,ano,tipo_avaliacao,componente_curricular,ano_serie', ignoreDuplicates: false });
+          })), { onConflict: 'id', ignoreDuplicates: false });
+          if (upsertErr) throw upsertErr;
         }
       }
 
@@ -607,12 +624,16 @@ export default function App() {
         const currentIds = registros.map(r => r.id);
         const { data: existing } = await supabase.from('registros_ideb').select('id').eq('escola_id', updatedEscola.id);
         const idsToDelete = (existing || []).map((r: any) => r.id).filter((id: string) => !currentIds.includes(id));
-        if (idsToDelete.length > 0) await supabase.from('registros_ideb').delete().in('id', idsToDelete);
+        if (idsToDelete.length > 0) {
+          const { error: delErr } = await supabase.from('registros_ideb').delete().in('id', idsToDelete);
+          if (delErr) throw delErr;
+        }
         if (registros.length > 0) {
-          await supabase.from('registros_ideb').upsert(registros.map(r => ({
+          const { error: upsertErr } = await supabase.from('registros_ideb').upsert(registros.map(r => ({
             id: r.id, escola_id: updatedEscola.id, ano: r.ano, anos_iniciais: r.anosIniciais,
             anos_finais: r.anosFinais, data_registro: r.dataRegistro, responsavel: r.responsavel
-          })), { onConflict: 'escola_id,ano', ignoreDuplicates: false });
+          })), { onConflict: 'id', ignoreDuplicates: false });
+          if (upsertErr) throw upsertErr;
         }
       }
 
@@ -623,9 +644,12 @@ export default function App() {
         const currentIds = registros.map(r => r.id);
         const { data: existing } = await supabase.from('registros_fluencia_samahc').select('id').eq('escola_id', updatedEscola.id);
         const idsToDelete = (existing || []).map((r: any) => r.id).filter((id: string) => !currentIds.includes(id));
-        if (idsToDelete.length > 0) await supabase.from('registros_fluencia_samahc').delete().in('id', idsToDelete);
+        if (idsToDelete.length > 0) {
+          const { error: delErr } = await supabase.from('registros_fluencia_samahc').delete().in('id', idsToDelete);
+          if (delErr) throw delErr;
+        }
         if (registros.length > 0) {
-          await supabase.from('registros_fluencia_samahc').upsert(registros.map(r => ({
+          const { error: upsertErr } = await supabase.from('registros_fluencia_samahc').upsert(registros.map(r => ({
             id: r.id,
             escola_id: updatedEscola.id,
             polo: r.polo,
@@ -637,7 +661,8 @@ export default function App() {
             tipo_avaliacao: r.tipoAvaliacao,
             turma: r.turma,
             etapa: r.etapa
-          })));
+          })), { onConflict: 'id', ignoreDuplicates: false });
+          if (upsertErr) throw upsertErr;
         }
       }
 
@@ -869,7 +894,7 @@ export default function App() {
           );
         }
 
-        setCoordenadores([...coordenadores, { ...coord, id: newId }]);
+        setCoordenadores([...coordenadores, { ...coord, id: newId, created_at: new Date().toISOString() }]);
         showNotification('success', 'Coordenador cadastrado!');
       }
     } catch (error: any) {

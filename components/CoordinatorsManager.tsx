@@ -125,6 +125,10 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
             aValue = escolas.filter(e => a.escolasIds.includes(e.id)).reduce((sum, esc) => sum + checkSchoolPendencies(esc).length, 0);
             bValue = escolas.filter(e => b.escolasIds.includes(e.id)).reduce((sum, esc) => sum + checkSchoolPendencies(esc).length, 0);
             break;
+          case 'created_at':
+            aValue = a.created_at || '';
+            bValue = b.created_at || '';
+            break;
         }
 
         if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -146,6 +150,17 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
     let direction: 'asc' | 'desc' = 'asc';
     if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
     setSortConfig({ key, direction });
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return '28/05/2026';
+    try {
+      const d = new Date(dateString);
+      if (isNaN(d.getTime())) return '-';
+      return d.toLocaleDateString('pt-BR');
+    } catch {
+      return '-';
+    }
   };
 
   // Roles available for Coordenador Regional to assign
@@ -511,6 +526,9 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
                 <th className="px-6 py-4 font-semibold text-center cursor-pointer hover:bg-slate-100 transition" onClick={() => requestSort('pendencias')}>
                   Pendências {sortConfig?.key === 'pendencias' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                 </th>
+                <th className="px-6 py-4 font-semibold text-center cursor-pointer hover:bg-slate-100 transition" onClick={() => requestSort('created_at')}>
+                  Cadastro {sortConfig?.key === 'created_at' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                </th>
                 <th className="px-6 py-4 text-center font-semibold">Ações</th>
               </tr>
             </thead>
@@ -556,6 +574,11 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
                           {totalPendencias}
                         </span>
                       </div>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className="text-slate-500 font-semibold whitespace-nowrap">
+                        {formatDate(coord.created_at)}
+                      </span>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex justify-center gap-1">

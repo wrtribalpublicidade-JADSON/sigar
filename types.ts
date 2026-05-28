@@ -366,6 +366,7 @@ export interface Coordenador {
   funcao?: 'Administrador' | 'Coordenador Regional' | 'Gestor' | 'Coordenador Pedagógico' | 'Técnico' | 'Gestor Geral' | 'Gestor Pedagógico' | 'Professor'; // Papel no sistema
   status?: 'Ativo' | 'Inativo'; // Controle de acesso
   escolasIds: string[]; // Vínculo com escolas
+  created_at?: string;
 }
 
 export interface Visita {

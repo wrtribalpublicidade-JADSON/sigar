@@ -148,6 +148,10 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
                         aValue = a.status || '';
                         bValue = b.status || '';
                         break;
+                    case 'created_at':
+                        aValue = a.created_at || '';
+                        bValue = b.created_at || '';
+                        break;
                 }
 
                 if (aValue < bValue) {
@@ -168,6 +172,17 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
             direction = 'desc';
         }
         setSortConfig({ key, direction });
+    };
+
+    const formatDate = (dateString?: string) => {
+        if (!dateString) return '28/05/2026';
+        try {
+            const d = new Date(dateString);
+            if (isNaN(d.getTime())) return '-';
+            return d.toLocaleDateString('pt-BR');
+        } catch {
+            return '-';
+        }
     };
 
     const handleEditUser = (user: Coordenador) => {
@@ -356,20 +371,23 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
                                 <th className="p-4 font-bold text-center w-24 cursor-pointer hover:bg-slate-100 transition" onClick={() => requestSort('status')}>
                                     Status {sortConfig?.key === 'status' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
+                                <th className="p-4 font-bold text-center w-32 cursor-pointer hover:bg-slate-100 transition" onClick={() => requestSort('created_at')}>
+                                    Cadastro {sortConfig?.key === 'created_at' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                </th>
                                 <th className="p-4 pr-6 font-bold text-right w-32">Ações</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan={5} className="py-12 text-center text-slate-400">
+                                    <td colSpan={6} className="py-12 text-center text-slate-400">
                                         <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-3 text-slate-300" />
                                         <p>Carregando usuários...</p>
                                     </td>
                                 </tr>
                             ) : filteredUsers.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="py-12 text-center text-slate-400">
+                                    <td colSpan={6} className="py-12 text-center text-slate-400">
                                         <Users className="w-12 h-12 mx-auto mb-3 text-slate-300" />
                                         <p>Nenhum usuário encontrado com os filtros atuais.</p>
                                     </td>
@@ -409,6 +427,9 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
                                                 <span className={`w-1.5 h-1.5 rounded-full ${user.status !== 'Inativo' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
                                                 {user.status || 'Ativo'}
                                             </span>
+                                        </td>
+                                        <td className="p-4 text-center text-sm text-slate-500 font-semibold whitespace-nowrap">
+                                            {formatDate(user.created_at)}
                                         </td>
                                         <td className="p-4 pr-6 text-right">
                                             <div className="flex items-center justify-end gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
