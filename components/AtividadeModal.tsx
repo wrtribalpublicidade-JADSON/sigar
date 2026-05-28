@@ -3,6 +3,7 @@ import { X, Save, Info, Calendar, Target, Briefcase, Clock, MapPin, Users, BookO
 
 import { Atividade } from '../services/activitiesService';
 import { supabase } from '../services/supabase';
+import { normalizeCategoria } from './AtividadesComplementares';
 
 interface AtividadeModalProps {
     isOpen: boolean;
@@ -13,14 +14,6 @@ interface AtividadeModalProps {
 
 const DIAS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
-const CATEGORIAS = [
-    { id: 'esportes', name: 'Esportes' },
-    { id: 'artes', name: 'Artes' },
-    { id: 'musica', name: 'Música' },
-    { id: 'tecnologia', name: 'Tecnologia' },
-    { id: 'reforco', name: 'Reforço' },
-];
-
 const PUBLICOS = [
     'Infantil (4 a 5 anos)',
     'Fundamental I (1º ao 5º ano)',
@@ -29,10 +22,144 @@ const PUBLICOS = [
     'Todos'
 ];
 
+export const ATIVIDADES_ESTRUTURA = [
+    {
+        id: '1. Cultura, Artes e Educação Patrimonial',
+        nome: '1. Cultura, Artes e Educação Patrimonial',
+        subareas: [
+            {
+                nome: '11. Música',
+                atividades: ['Canto coral', 'Banda', 'Iniciação Musical']
+            },
+            {
+                nome: '12. Artes Plásticas',
+                atividades: ['Desenho', 'Grafite', 'Pintura']
+            },
+            {
+                nome: '13. Cinema',
+                atividades: ['Cinema']
+            },
+            {
+                nome: '14. Artes Cênicas',
+                atividades: ['Teatro', 'Danças']
+            },
+            {
+                nome: '15. Manifestações Culturais Regionais',
+                atividades: ['Capoeira', 'Artesanato']
+            },
+            {
+                nome: '16. Educação Patrimonial',
+                atividades: ['Educação Patrimonial']
+            },
+            {
+                nome: '17. Leituras e Salas Temáticas',
+                atividades: ['Leitura', 'Linguas Estrangeiras (Inglês)']
+            }
+        ]
+    },
+    {
+        id: '2. Esporte e Lazer',
+        nome: '2. Esporte e Lazer',
+        subareas: [
+            {
+                nome: '21. Recreação',
+                atividades: ['Recreação (Brinquedoteca e jogos)']
+            },
+            {
+                nome: '22. atividades Desportivas',
+                atividades: [
+                    'Atletismo', 'Basquete', 'Futebol', 'Futsal', 'Handebol', 
+                    'Judô', 'Karatê', 'Taekwondo', 'Voleibol', 'Vôlei de praia', 
+                    'Xadrez tradicional/virtual'
+                ]
+            }
+        ]
+    },
+    {
+        id: '3. Acompanhamento pedagógico',
+        nome: '3. Acompanhamento pedagógico',
+        subareas: [
+            {
+                nome: '31. Acompanhamento Pedagógico',
+                atividades: ['Português', 'Matemática']
+            }
+        ]
+    },
+    {
+        id: '7. Promoção da Saúde',
+        nome: '7. Promoção da Saúde',
+        subareas: [
+            {
+                nome: '71. Promoção da Saúde',
+                atividades: ['Promoção da Saúde']
+            }
+        ]
+    },
+    {
+        id: '10. Iniciação Cientifica',
+        nome: '10. Iniciação Cientifica',
+        subareas: [
+            {
+                nome: '101. Iniciação Cientifica',
+                atividades: ['Iniciação Cientifica']
+            }
+        ]
+    },
+    {
+        id: '13. Educação Ambiental e Desenvolvimento Sustentável',
+        nome: '13. Educação Ambiental e Desenvolvimento Sustentável',
+        subareas: [
+            {
+                nome: '133. Educação Ambiental e Desenvolvimento Sustentável',
+                atividades: [
+                    'Educação Ambiental e Desenvolvimento Sustentável',
+                    'Conservação do solo e composteira: canteiros sustentáveis (horta) e/ou jardinagem Escolar.'
+                ]
+            }
+        ]
+    },
+    {
+        id: '14. Comunicação, uso de mídias e cultura Digital e Tecnológica',
+        nome: '14. Comunicação, uso de mídias e cultura Digital e Tecnológica',
+        subareas: [
+            {
+                nome: '141. Comunicação, uso de mídias',
+                atividades: ['História em quadrinhos', 'Jornal Escolar', 'Rádio Escolar', 'Vídeo']
+            },
+            {
+                nome: '142. Cultura Digital e Tecnológica',
+                atividades: ['Robótica Educacional', 'Tecnológicas Educacionais', 'Ambientes de Redes Sociais']
+            }
+        ]
+    },
+    {
+        id: '15. Educação para Valorização do Multiculturalismo nas Matrizes Históricas e Culturais Brasileiras',
+        nome: '15. Educação para Valorização do Multiculturalismo nas Matrizes Históricas e Culturais Brasileiras',
+        subareas: [
+            {
+                nome: '151. Memória e História das Comunidades Tradicionais',
+                atividades: ['Memórias e Histórias das Comunidades Tradicionais']
+            },
+            {
+                nome: '152. Memória e História das Culturas Afro-Brasileira e Africana',
+                atividades: ['Memória e História das Culturas Afro-Brasileira e Africana']
+            },
+            {
+                nome: '153. Memorias e História das Culturas e Indígenas',
+                atividades: ['Memorias e História das Culturas e Indígenas']
+            }
+        ]
+    }
+];
+
 export const AtividadeModal: React.FC<AtividadeModalProps> = ({ isOpen, onClose, onSave, atividadeToEdit }) => {
+    const [selectedAreaId, setSelectedAreaId] = useState<string>('');
+    const [selectedSubareaName, setSelectedSubareaName] = useState<string>('');
+
     const [formData, setFormData] = useState<Omit<Atividade, 'id' | 'inscritos'>>({
         nome: '',
-        categoria: 'esportes',
+        categoria: '',
+        subarea: '',
         unidadeEscolar: '',
         instrutor: '',
         vagas: 20,
@@ -46,6 +173,33 @@ export const AtividadeModal: React.FC<AtividadeModalProps> = ({ isOpen, onClose,
         materiais: '',
         status: 'Ativa'
     });
+
+    const handleAreaChange = (areaId: string) => {
+        setSelectedAreaId(areaId);
+        setSelectedSubareaName('');
+        setFormData(prev => ({
+            ...prev,
+            categoria: areaId,
+            subarea: '',
+            nome: ''
+        }));
+    };
+
+    const handleSubareaChange = (subName: string) => {
+        setSelectedSubareaName(subName);
+        setFormData(prev => ({
+            ...prev,
+            subarea: subName,
+            nome: ''
+        }));
+    };
+
+    const handleActivityChange = (actName: string) => {
+        setFormData(prev => ({
+            ...prev,
+            nome: actName
+        }));
+    };
 
     const [escolasDisponiveis, setEscolasDisponiveis] = useState<{id: string, nome: string}[]>([]);
     const [monitoresDisponiveis, setMonitoresDisponiveis] = useState<string[]>([]);
@@ -90,9 +244,35 @@ export const AtividadeModal: React.FC<AtividadeModalProps> = ({ isOpen, onClose,
 
     useEffect(() => {
         if (atividadeToEdit) {
+            const normalizedCategory = normalizeCategoria(atividadeToEdit.categoria);
+            let resolvedAreaId = '';
+            let resolvedSubareaName = '';
+
+            for (const area of ATIVIDADES_ESTRUTURA) {
+                for (const sub of area.subareas) {
+                    if (sub.atividades.includes(atividadeToEdit.nome)) {
+                        resolvedAreaId = area.id;
+                        resolvedSubareaName = sub.nome;
+                        break;
+                    }
+                }
+                if (resolvedAreaId) break;
+            }
+
+            if (!resolvedAreaId) {
+                const matchedArea = ATIVIDADES_ESTRUTURA.find(a => a.id === normalizedCategory);
+                if (matchedArea) {
+                    resolvedAreaId = matchedArea.id;
+                }
+            }
+
+            setSelectedAreaId(resolvedAreaId);
+            setSelectedSubareaName(resolvedSubareaName);
+
             setFormData({
                 nome: atividadeToEdit.nome,
-                categoria: atividadeToEdit.categoria,
+                categoria: resolvedAreaId || normalizedCategory,
+                subarea: resolvedSubareaName || atividadeToEdit.subarea || '',
                 unidadeEscolar: atividadeToEdit.unidadeEscolar,
                 instrutor: atividadeToEdit.instrutor,
                 vagas: atividadeToEdit.vagas,
@@ -108,9 +288,12 @@ export const AtividadeModal: React.FC<AtividadeModalProps> = ({ isOpen, onClose,
                 escola_id: atividadeToEdit.escola_id
             });
         } else {
+            setSelectedAreaId('');
+            setSelectedSubareaName('');
             setFormData({
                 nome: '',
-                categoria: 'esportes',
+                categoria: '',
+                subarea: '',
                 unidadeEscolar: '',
                 instrutor: '',
                 vagas: 20,
@@ -131,6 +314,10 @@ export const AtividadeModal: React.FC<AtividadeModalProps> = ({ isOpen, onClose,
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        if (!selectedAreaId || !selectedSubareaName || !formData.nome) {
+            alert('Por favor, selecione a Área, Subárea e Nome da Atividade.');
+            return;
+        }
         onSave(formData);
         onClose();
     };
@@ -183,31 +370,53 @@ export const AtividadeModal: React.FC<AtividadeModalProps> = ({ isOpen, onClose,
 
                         <div className="space-y-4">
                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-500 ml-1">Nome da Atividade</label>
-                                <input 
-                                    type="text" 
-                                    required
-                                    placeholder="Ex: Oficina de Robótica Nível 1"
-                                    value={formData.nome}
-                                    onChange={e => setFormData({ ...formData, nome: e.target.value })}
-                                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-orange-500/10 focus:border-orange-500 outline-none transition-all"
-                                />
+                                <label className="text-[11px] font-bold text-slate-500 ml-1">Área (Código / Nome da Área)</label>
+                                <select 
+                                    value={selectedAreaId}
+                                    onChange={e => handleAreaChange(e.target.value)}
+                                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-orange-500/10 focus:border-orange-500 outline-none transition-all cursor-pointer text-slate-700"
+                                >
+                                    <option value="" disabled>Selecione a área de atuação</option>
+                                    {ATIVIDADES_ESTRUTURA.map(area => (
+                                        <option key={area.id} value={area.id}>{area.nome}</option>
+                                    ))}
+                                </select>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold text-slate-500 ml-1">Categoria</label>
+                                    <label className="text-[11px] font-bold text-slate-500 ml-1">Subárea (Código / Nome Subárea)</label>
                                     <select 
-                                        value={formData.categoria}
-                                        onChange={e => setFormData({ ...formData, categoria: e.target.value })}
-                                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-orange-500/10 focus:border-orange-500 outline-none transition-all cursor-pointer"
+                                        value={selectedSubareaName}
+                                        onChange={e => handleSubareaChange(e.target.value)}
+                                        disabled={!selectedAreaId}
+                                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-orange-500/10 focus:border-orange-500 outline-none transition-all cursor-pointer disabled:bg-slate-100 disabled:text-slate-400 text-slate-700"
                                     >
-                                        <option value="" disabled>Selecione a categoria</option>
-                                        {CATEGORIAS.map(cat => (
-                                            <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                        <option value="" disabled>Selecione a subárea</option>
+                                        {selectedAreaId && ATIVIDADES_ESTRUTURA.find(a => a.id === selectedAreaId)?.subareas.map(sub => (
+                                            <option key={sub.nome} value={sub.nome}>{sub.nome}</option>
                                         ))}
                                     </select>
                                 </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[11px] font-bold text-slate-500 ml-1">Nome da Atividade</label>
+                                    <select 
+                                        value={formData.nome}
+                                        onChange={e => handleActivityChange(e.target.value)}
+                                        disabled={!selectedSubareaName}
+                                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-orange-500/10 focus:border-orange-500 outline-none transition-all cursor-pointer disabled:bg-slate-100 disabled:text-slate-400 text-slate-700"
+                                    >
+                                        <option value="" disabled>Selecione a atividade</option>
+                                        {selectedSubareaName && ATIVIDADES_ESTRUTURA.find(a => a.id === selectedAreaId)?.subareas
+                                            .find(s => s.nome === selectedSubareaName)?.atividades.map(act => (
+                                                <option key={act} value={act}>{act}</option>
+                                            ))
+                                        }
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
                                     <label className="text-[11px] font-bold text-slate-500 ml-1">Unidade Escolar</label>
                                     <select 
@@ -220,7 +429,7 @@ export const AtividadeModal: React.FC<AtividadeModalProps> = ({ isOpen, onClose,
                                                 unidadeEscolar: selectedEscola?.nome || ''
                                             });
                                         }}
-                                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-orange-500/10 focus:border-orange-500 outline-none transition-all cursor-pointer"
+                                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-orange-500/10 focus:border-orange-500 outline-none transition-all cursor-pointer text-slate-700"
                                         disabled={isLoadingData}
                                     >
                                         <option value="" disabled>{isLoadingData ? 'Carregando unidades...' : 'Selecione a unidade'}</option>
@@ -232,24 +441,23 @@ export const AtividadeModal: React.FC<AtividadeModalProps> = ({ isOpen, onClose,
                                         )}
                                     </select>
                                 </div>
-                            </div>
-
-                            <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-500 ml-1">Monitor / Professor da Atividade</label>
-                                <select 
-                                    value={formData.instrutor}
-                                    onChange={e => setFormData({ ...formData, instrutor: e.target.value })}
-                                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-orange-500/10 focus:border-orange-500 outline-none transition-all cursor-pointer"
-                                    disabled={isLoadingData}
-                                >
-                                    <option value="" disabled>{isLoadingData ? 'Carregando monitores...' : 'Selecione o monitor responsável'}</option>
-                                    {monitoresDisponiveis.map(monitor => (
-                                        <option key={monitor} value={monitor}>{monitor}</option>
-                                    ))}
-                                    {!isLoadingData && monitoresDisponiveis.length === 0 && (
-                                        <option value="" disabled>Nenhum monitor encontrado no RH</option>
-                                    )}
-                                </select>
+                                <div className="space-y-1.5">
+                                    <label className="text-[11px] font-bold text-slate-500 ml-1">Monitor / Professor da Atividade</label>
+                                    <select 
+                                        value={formData.instrutor}
+                                        onChange={e => setFormData({ ...formData, instrutor: e.target.value })}
+                                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-orange-500/10 focus:border-orange-500 outline-none transition-all cursor-pointer text-slate-700"
+                                        disabled={isLoadingData}
+                                    >
+                                        <option value="" disabled>{isLoadingData ? 'Carregando monitores...' : 'Selecione o monitor responsável'}</option>
+                                        {monitoresDisponiveis.map(monitor => (
+                                            <option key={monitor} value={monitor}>{monitor}</option>
+                                        ))}
+                                        {!isLoadingData && monitoresDisponiveis.length === 0 && (
+                                            <option value="" disabled>Nenhum monitor encontrado no RH</option>
+                                        )}
+                                    </select>
+                                </div>
                             </div>
                         </div>
                     </div>

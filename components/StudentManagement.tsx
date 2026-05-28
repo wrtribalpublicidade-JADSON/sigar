@@ -28,6 +28,14 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
   const [stageFilter, setStageFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, schoolFilter, stageFilter, statusFilter]);
+  
   const [isCadastroModalOpen, setIsCadastroModalOpen] = useState(false);
   const [isTurmaModalOpen, setIsTurmaModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -161,6 +169,13 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
       return matchSearch && matchSchool && matchStage && matchStatus;
     });
   }, [students, searchTerm, schoolFilter, stageFilter, statusFilter, escolas, turmas]);
+
+  const paginatedStudents = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredStudents.slice(startIndex, startIndex + pageSize);
+  }, [filteredStudents, currentPage, pageSize]);
+
+  const totalPages = Math.ceil(filteredStudents.length / pageSize) || 1;
 
   const getStudentTurmaInfo = (classId?: string) => {
     if (!classId) return '---';
@@ -341,7 +356,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
                                 </td>
                             </tr>
                         ) : (
-                            filteredStudents.map(student => (
+                            paginatedStudents.map(student => (
                                 <tr key={student.id} className="hover:bg-slate-50/50 transition-colors group">
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
@@ -393,6 +408,66 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
                         )}
                     </tbody>
                 </table>
+            </div>
+
+            {/* Pagination Footer */}
+            <div className="bg-slate-50/50 p-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-4 text-xs font-semibold text-slate-500">
+                    <div className="flex items-center gap-2">
+                        <span>Exibir</span>
+                        <select
+                            value={pageSize}
+                            onChange={(e) => {
+                                setPageSize(Number(e.target.value));
+                                setCurrentPage(1);
+                            }}
+                            className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-700 font-bold focus:outline-none focus:ring-2 focus:ring-brand-orange/20 cursor-pointer"
+                        >
+                            <option value={10}>10</option>
+                            <option value={20}>20</option>
+                            <option value={30}>30</option>
+                            <option value={50}>50</option>
+                            <option value={100}>100</option>
+                        </select>
+                        <span>por vez</span>
+                    </div>
+                    <span className="hidden sm:inline text-slate-300">|</span>
+                    <p>
+                        Exibindo <span className="text-slate-800 font-bold">{filteredStudents.length > 0 ? (currentPage - 1) * pageSize + 1 : 0}</span> a{' '}
+                        <span className="text-slate-800 font-bold">{Math.min(currentPage * pageSize, filteredStudents.length)}</span> de{' '}
+                        <span className="text-slate-800 font-bold">{filteredStudents.length}</span> estudantes
+                    </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        disabled={currentPage === 1}
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        className={`px-4 py-2 rounded-xl text-xs font-black border border-slate-200 transition-all ${
+                            currentPage === 1
+                                ? 'bg-slate-50 text-slate-300 cursor-not-allowed'
+                                : 'bg-white text-slate-600 shadow-sm hover:border-orange-500 hover:text-orange-500 active:scale-95'
+                        }`}
+                    >
+                        Anterior
+                    </button>
+                    <span className="text-xs font-bold text-slate-500 px-2 whitespace-nowrap">
+                        Página {currentPage} de {totalPages}
+                    </span>
+                    <button
+                        type="button"
+                        disabled={currentPage >= totalPages}
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        className={`px-4 py-2 rounded-xl text-xs font-black border border-slate-200 transition-all ${
+                            currentPage >= totalPages
+                                ? 'bg-slate-50 text-slate-300 cursor-not-allowed'
+                                : 'bg-white text-slate-600 shadow-sm hover:border-orange-500 hover:text-orange-500 active:scale-95'
+                        }`}
+                    >
+                        Próximo
+                    </button>
+                </div>
             </div>
         </Card>
 

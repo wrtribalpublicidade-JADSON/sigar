@@ -150,6 +150,13 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         }
     }, [selectedEscolaId, onEscolaChange]);
 
+    // Force revert from 'ALL' when single-school tabs are active
+    useEffect(() => {
+        if ((activeTab === 'estudantil' || activeTab === 'avaliacao') && selectedEscolaId === 'ALL') {
+            setSelectedEscolaId(escolas[0]?.id || '');
+        }
+    }, [activeTab, escolas, selectedEscolaId]);
+
     // Get current school context
     const currentEscola = useMemo(() => {
         return escolas.find(e => e.id === selectedEscolaId) || escolas[0];
@@ -228,6 +235,9 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                 onChange={(e) => setSelectedEscolaId(e.target.value)}
                                 className="bg-transparent text-sm font-bold text-slate-800 border-none p-0 focus:ring-0 focus:outline-none cursor-pointer hover:text-orange-500 transition-colors uppercase outline-none appearance-none font-sans"
                             >
+                                { (isAdmin || escolas.length > 1) && (
+                                    <option value="ALL">TODAS AS UNIDADES</option>
+                                )}
                                 {escolas.map(e => (
                                     <option key={e.id} value={e.id}>{e.nome}</option>
                                 ))}
@@ -286,15 +296,22 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                     {/* TURMA / ANO */}
                     <div className="flex flex-col justify-center pt-4 sm:pt-0 sm:px-4">
                         <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase mb-1">TURMA / ANO</span>
-                        {turmasCadastradas.length > 0 ? (
+                        {turmasCadastradas.length > 0 || selectedEscolaId === 'ALL' ? (
                             <select
-                                value={activeTurma?.id || ''}
+                                value={activeTurma?.id || 'ALL'}
                                 onChange={(e) => {
-                                    const selected = turmasCadastradas.find(t => t.id === e.target.value);
-                                    if (selected) setActiveTurma(selected);
+                                    if (e.target.value === 'ALL') {
+                                        setActiveTurma(null);
+                                    } else {
+                                        const selected = turmasCadastradas.find(t => t.id === e.target.value);
+                                        if (selected) setActiveTurma(selected);
+                                    }
                                 }}
                                 className="bg-transparent text-sm font-bold text-slate-800 border-none p-0 focus:ring-0 focus:outline-none cursor-pointer hover:text-orange-500 transition-colors uppercase outline-none appearance-none font-sans"
                             >
+                                {selectedEscolaId === 'ALL' && (
+                                    <option value="ALL">TODAS AS TURMAS</option>
+                                )}
                                 {turmasCadastradas.map(t => (
                                     <option key={t.id} value={t.id}>{getTurmaLabel(t)}</option>
                                 ))}
@@ -391,15 +408,23 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     // Load turmas from DB when school changes
     useEffect(() => {
         const loadTurmas = async () => {
-            if (!currentEscolaId) return;
             setIsLoadingTurmas(true);
             try {
-                const turmas = await ccTurmaService.getBySchool(currentEscolaId);
-                setTurmasCadastradas(turmas);
-                if (turmas.length > 0) {
-                    setActiveTurma(turmas[0]);
-                } else {
+                if (selectedEscolaId === 'ALL') {
+                    const promises = escolas.map(e => ccTurmaService.getBySchool(e.id));
+                    const results = await Promise.all(promises);
+                    const allTurmas = results.flat();
+                    setTurmasCadastradas(allTurmas);
                     setActiveTurma(null);
+                } else {
+                    if (!currentEscolaId) return;
+                    const turmas = await ccTurmaService.getBySchool(currentEscolaId);
+                    setTurmasCadastradas(turmas);
+                    if (turmas.length > 0) {
+                        setActiveTurma(turmas[0]);
+                    } else {
+                        setActiveTurma(null);
+                    }
                 }
             } catch (err) {
                 console.error('Erro ao carregar turmas:', err);
@@ -408,7 +433,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             }
         };
         loadTurmas();
-    }, [currentEscolaId]);
+    }, [selectedEscolaId, currentEscolaId, escolas]);
     const [showSuccessToast, setShowSuccessToast] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isCadastroEstudanteOpen, setIsCadastroEstudanteOpen] = useState(false);
@@ -1737,11 +1762,15 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         const loadDocs = async () => {
             setIsLoading(true);
             try {
+                const fetchEscolaId = selectedEscolaId === 'ALL'
+                    ? (isAdmin ? undefined : escolas.map(e => e.id))
+                    : selectedEscolaId;
+
                 const [acomp, acompInfantil, encs, encsInfantil] = await Promise.all([
-                    ccAcompanhamentoDocenteService.getAll(currentEscolaId, 'fundamental'),
-                    ccAcompanhamentoDocenteService.getAll(currentEscolaId, 'infantil'),
-                    ccEncaminhamentosService.getAll(currentEscolaId, 'fundamental'),
-                    ccEncaminhamentosService.getAll(currentEscolaId, 'infantil')
+                    ccAcompanhamentoDocenteService.getAll(fetchEscolaId, 'fundamental'),
+                    ccAcompanhamentoDocenteService.getAll(fetchEscolaId, 'infantil'),
+                    ccEncaminhamentosService.getAll(fetchEscolaId, 'fundamental'),
+                    ccEncaminhamentosService.getAll(fetchEscolaId, 'infantil')
                 ]);
 
                 if (acomp) {
@@ -1814,7 +1843,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         };
 
         loadDocs();
-    }, [currentEscolaId]);
+    }, [selectedEscolaId, currentEscolaId, escolas, isAdmin]);
 
     const renderTabContent = () => {
         const isBemPequena = ['Creche II', 'Creche III'].includes(activeTurma?.anoSerie || '');
@@ -1974,6 +2003,9 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                         onChange={(e) => setSelectedEscolaId(e.target.value)}
                                         className="w-full bg-transparent text-sm font-semibold text-slate-800 focus:outline-none appearance-none cursor-pointer hover:text-blue-600 transition-colors"
                                     >
+                                        { (isAdmin || escolas.length > 1) && (
+                                            <option value="ALL">TODAS AS UNIDADES</option>
+                                        )}
                                         {escolas.map(e => (
                                             <option key={e.id} value={e.id}>{e.nome}</option>
                                         ))}
@@ -2977,7 +3009,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    {!isEditingAcomp && !isEditingAcompInfantil && (
+                                    {!isEditingAcomp && !isEditingAcompInfantil && selectedEscolaId !== 'ALL' && (
                                         <button
                                             onClick={() => {
                                                 if (acompEtapa === 'infantil') {
@@ -3414,7 +3446,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    {!isEditingEnc && !isEditingEncInfantil && (
+                                    {!isEditingEnc && !isEditingEncInfantil && selectedEscolaId !== 'ALL' && (
                                         <button
                                             onClick={() => {
                                                 if (encEtapa === 'infantil') {

@@ -4,6 +4,7 @@ export interface Atividade {
     id: string;
     nome: string;
     categoria: string;
+    subarea?: string;
     unidadeEscolar: string;
     escola_id?: string;
     instrutor: string;
@@ -67,6 +68,7 @@ export const activitiesService = {
         const payload = {
             nome: atv.nome,
             categoria: atv.categoria,
+            subarea: atv.subarea,
             unidade_escolar: atv.unidadeEscolar,
             escola_id: atv.escola_id,
             instrutor: atv.instrutor,

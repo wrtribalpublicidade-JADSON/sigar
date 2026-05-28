@@ -2,18 +2,31 @@ import React, { useState } from 'react';
 import { 
     BookOpen, Trophy, Music, Palette, Code, Users, 
     Calendar, Search, Plus, Filter, ChevronRight, 
-    Clock, MapPin, Star, Pencil, Trash2
+    Clock, MapPin, Star, Pencil, Trash2, Heart, Brain, Leaf
 } from 'lucide-react';
 import { AtividadeModal } from './AtividadeModal';
 import { DiarioAtividadeModal } from './DiarioAtividadeModal';
 import { activitiesService, Atividade } from '../services/activitiesService';
 
+export const normalizeCategoria = (cat: string): string => {
+    if (!cat) return '1. Cultura, Artes e Educação Patrimonial';
+    const c = cat.trim().toLowerCase();
+    if (c === 'esportes') return '2. Esporte e Lazer';
+    if (c === 'artes' || c === 'musica') return '1. Cultura, Artes e Educação Patrimonial';
+    if (c === 'reforco') return '3. Acompanhamento pedagógico';
+    if (c === 'tecnologia') return '14. Comunicação, uso de mídias e cultura Digital e Tecnológica';
+    return cat;
+};
+
 const CATEGORIAS = [
-    { id: 'esportes', name: 'Esportes', icon: Trophy, color: 'text-orange-500', bg: 'bg-orange-50' },
-    { id: 'artes', name: 'Artes', icon: Palette, color: 'text-pink-500', bg: 'bg-pink-50' },
-    { id: 'musica', name: 'Música', icon: Music, color: 'text-purple-500', bg: 'bg-purple-50' },
-    { id: 'tecnologia', name: 'Tecnologia', icon: Code, color: 'text-blue-500', bg: 'bg-blue-50' },
-    { id: 'reforco', name: 'Reforço', icon: BookOpen, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+    { id: '1. Cultura, Artes e Educação Patrimonial', name: 'Cultura e Artes', icon: Palette, color: 'text-pink-500', bg: 'bg-pink-50' },
+    { id: '2. Esporte e Lazer', name: 'Esporte e Lazer', icon: Trophy, color: 'text-orange-500', bg: 'bg-orange-50' },
+    { id: '3. Acompanhamento pedagógico', name: 'Acompanhamento Pedagógico', icon: BookOpen, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+    { id: '7. Promoção da Saúde', name: 'Promoção da Saúde', icon: Heart, color: 'text-rose-500', bg: 'bg-rose-50' },
+    { id: '10. Iniciação Cientifica', name: 'Iniciação Científica', icon: Brain, color: 'text-indigo-500', bg: 'bg-indigo-50' },
+    { id: '13. Educação Ambiental e Desenvolvimento Sustentável', name: 'Educação Ambiental', icon: Leaf, color: 'text-teal-500', bg: 'bg-teal-50' },
+    { id: '14. Comunicação, uso de mídias e cultura Digital e Tecnológica', name: 'Tecnologia e Mídia', icon: Code, color: 'text-blue-500', bg: 'bg-blue-50' },
+    { id: '15. Educação para Valorização do Multiculturalismo nas Matrizes Históricas e Culturais Brasileiras', name: 'Multiculturalismo', icon: Users, color: 'text-purple-500', bg: 'bg-purple-50' },
 ];
 
 interface AtividadesComplementaresProps {
@@ -95,7 +108,8 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
         const search = searchTerm.toLowerCase();
         const matchesSearch = (atv.nome?.toLowerCase()?.includes(search) || 
                                atv.instrutor?.toLowerCase()?.includes(search) || false);
-        const matchesCat = selectedCat === 'todas' || atv.categoria === selectedCat;
+        const normalizedCat = normalizeCategoria(atv.categoria);
+        const matchesCat = selectedCat === 'todas' || normalizedCat === selectedCat;
         return matchesSearch && matchesCat;
     });
 
@@ -196,7 +210,8 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
             {/* Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                 {filteredAtividades.map(atv => {
-                    const cat = CATEGORIAS.find(c => c.id === atv.categoria);
+                    const normalizedCat = normalizeCategoria(atv.categoria);
+                    const cat = CATEGORIAS.find(c => c.id === normalizedCat);
                     const percentInscritos = (atv.inscritos / atv.vagas) * 100;
                     
                     return (

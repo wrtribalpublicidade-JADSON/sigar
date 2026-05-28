@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { PageHeader } from './ui/PageHeader';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
@@ -29,6 +30,7 @@ export interface Habilidade {
   id: string;
   codigo: string;
   descricao: string;
+  sugestoesPedagogicas?: string;
 }
 
 export interface ObjetoHabilidadeLink {
@@ -61,6 +63,7 @@ interface RepositorioHabilidade {
   descricao: string;
   componente: string;
   anoSerie: string;
+  sugestoesPedagogicas?: string;
 }
 
 const COMPONENTES = [
@@ -169,7 +172,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
       'Objetos de Conhecimento',
       'Habilidades (Códigos separados por ;)',
       'Habilidades (Descrições separadas por ;)',
-      'Sugestões Pedagógicas'
+      'Sugestões Pedagógicas (Separadas por ;)'
     ];
 
     // Some highly rich example rows
@@ -182,8 +185,8 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
         'Eixo Temático': 'Números',
         'Objetos de Conhecimento': 'Leitura, escrita e comparação de números naturais; Contagem lúdica',
         'Habilidades (Códigos separados por ;)': 'EF01MA01; EF01MA02',
-        'Habilidades (Descrições separadas por ;)': 'Utilizar números naturais como indicador de quantidade ou de ordem em diferentes situações cotidianas e reconhecer situações em que os números não indicam contagem nem ordem, mas sim código de identificação.; Contar de maneira lúdica, em jogos e brincadeiras, identificando a contagem de rotina e a contagem de objetos de coleções.',
-        'Sugestões Pedagógicas': 'Utilizar jogos de tabuleiro, tampinhas de garrafa e contagens de objetos cotidianos.'
+        'Habilidades (Descrições separadas por ;)': 'Utilizar números naturais como indicador de quantidade ou de ordem em diferentes situações cotidianas e reconhecer situações in que os números não indicam contagem nem ordem, mas sim código de identificação.; Contar de maneira lúdica, em jogos e brincadeiras, identificando a contagem de rotina e a contagem de objetos de coleções.',
+        'Sugestões Pedagógicas (Separadas por ;)': 'Utilizar jogos de tabuleiro, tampinhas de garrafa e contagens de objetos cotidianos.; Contar em roda, brincando com parlendas e cantigas de roda de forma dinâmica.'
       },
       {
         'Ano de Referência': 2026,
@@ -194,7 +197,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
         'Objetos de Conhecimento': 'Constituição da oralidade; Escuta atenta',
         'Habilidades (Códigos separados por ;)': 'EF01LP01; EF01LP02',
         'Habilidades (Descrições separadas por ;)': 'Reconhecer que textos são lidos e escritos da esquerda para a direita e de cima para baixo.; Escrever, alfabeticamente, como e onde convier, de próprio punho ou por meio de outra tecnologia de escrita, palavras e frases, com autonomia.',
-        'Sugestões Pedagógicas': 'Roda de conversa diária, contação de histórias infantis e canto de parlendas.'
+        'Sugestões Pedagógicas (Separadas por ;)': 'Roda de conversa diária, contação de histórias infantis e canto de parlendas.; Escrita espontânea no quadro, formação de palavras com alfabeto móvel.'
       }
     ];
 
@@ -264,7 +267,11 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
           const bimestreVal = String(getValue(['bimestre', 'período', 'periodo']) || '').trim();
           const eixoVal = String(getValue(['eixo', 'temático', 'tematico']) || '').trim();
           const objetosVal = String(getValue(['objeto', 'conhecimento', 'objetos']) || '').trim();
-          const habsVal = String(getValue(['habilidade', 'código', 'codigo', 'habilidades']) || '').trim();
+          const habsVal = String(
+            getValue(['código', 'codigo', 'códigos', 'codigos']) || 
+            getValue(['habilidade', 'habilidades']) || 
+            ''
+          ).trim();
           const descsVal = String(getValue(['descrição', 'descricao', 'descrições', 'descricoes']) || '').trim();
           const sugestoesVal = String(getValue(['sugestões', 'sugestoes', 'recursos', 'pedagógicas', 'pedagogicas']) || '').trim();
 
@@ -315,19 +322,22 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
               descricao: desc
             }));
 
-          // Parse skills codes and manual descriptions
-          const parsedHabsList = habsVal.split(/[;;\n]/).map(code => code.trim().toUpperCase()).filter(Boolean);
-          const parsedDescsList = descsVal.split(/[;;\n]/).map(desc => desc.trim()).filter(Boolean);
+          // Parse skills codes and manual descriptions strictly by semicolon
+          const parsedHabsList = habsVal.split(';').map(code => code.trim().toUpperCase()).filter(Boolean);
+          const parsedDescsList = descsVal.split(';').map(desc => desc.trim()).filter(Boolean);
+          const parsedSugestoesList = sugestoesVal.split(';').map(s => s.trim()).filter(Boolean);
 
           const habilidades: Habilidade[] = parsedHabsList.map((code, idx) => {
             // Check if there is a manual description at the same index
             const manualDesc = parsedDescsList[idx]?.trim();
+            const manualSugestao = parsedSugestoesList[idx]?.trim();
             // Try to find the full description of this skill in our repository!
             const matchedRepoHab = habRepository.find(h => h.codigo.trim().toUpperCase() === code);
             return {
               id: matchedRepoHab?.id || generateId(),
               codigo: code,
-              descricao: manualDesc || matchedRepoHab?.descricao || `Habilidade ${code} importada.`
+              descricao: manualDesc || matchedRepoHab?.descricao || `Habilidade ${code} importada.`,
+              sugestoesPedagogicas: manualSugestao || matchedRepoHab?.sugestoesPedagogicas || ''
             };
           });
 
@@ -443,6 +453,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
   const [modalSearchTerm, setModalSearchTerm] = useState('');
   const [modalComponenteFilter, setModalComponenteFilter] = useState('ALL');
   const [modalAnoSerieFilter, setModalAnoSerieFilter] = useState('ALL');
+  const [editingHabId, setEditingHabId] = useState<string | null>(null);
 
   // Custom Habilidade Form States
   const [newHabCode, setNewHabCode] = useState('');
@@ -495,7 +506,8 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
         codigo: h.codigo,
         descricao: h.descricao,
         componente: h.componente,
-        anoSerie: h.ano_serie
+        anoSerie: h.ano_serie,
+        sugestoesPedagogicas: h.sugestoes_pedagogicas
       }));
       
       // Merge with BNCC seed just in case, but prioritize DB records
@@ -649,7 +661,8 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
       const newHab: Habilidade = {
         id: (hab as any).id || generateId(),
         codigo: hab.codigo.trim().toUpperCase(),
-        descricao: hab.descricao.trim()
+        descricao: hab.descricao.trim(),
+        sugestoesPedagogicas: hab.sugestoesPedagogicas || ''
       };
       return {
         ...item,
@@ -670,6 +683,80 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
       };
     }));
   };
+  const handleEditHabilidade = (hab: RepositorioHabilidade) => {
+    setEditingHabId(hab.id);
+    setNewHabCode(hab.codigo);
+    setNewHabDesc(hab.descricao);
+    setNewHabComponente(hab.componente);
+    setNewHabAnoSerie(hab.anoSerie);
+    
+    let resolvedEixo = '';
+    let resolvedObjeto = '';
+    let resolvedSugestoes = hab.sugestoesPedagogicas || '';
+
+    if (activeItemIdForHab) {
+      const activeItem = itens.find(it => it.id === activeItemIdForHab);
+      if (activeItem) {
+        resolvedEixo = activeItem.eixoTematico || '';
+
+        const skillInItem = activeItem.habilidades.find(h => h.codigo === hab.codigo || h.id === hab.id);
+        if (skillInItem) {
+          if (skillInItem.sugestoesPedagogicas !== undefined) {
+            resolvedSugestoes = skillInItem.sugestoesPedagogicas;
+          }
+          const link = activeItem.links.find(l => l.habilidadeId === skillInItem.id);
+          if (link) {
+            const obj = activeItem.objetos.find(o => o.id === link.objetoId);
+            if (obj) {
+              resolvedObjeto = obj.descricao || '';
+            }
+          }
+        }
+      }
+    }
+
+    setNewHabEixoTematico(resolvedEixo);
+    setNewHabObjetoDesc(resolvedObjeto);
+    setNewHabSugestoes(resolvedSugestoes);
+    setModalTab('create');
+  };
+
+  const handleDeleteHabilidade = async (hab: RepositorioHabilidade) => {
+    if (confirm(`Tem certeza que deseja excluir permanentemente a habilidade "${hab.codigo}" do repositório?`)) {
+      try {
+        if (!isDemoMode) {
+          const { error } = await supabase
+            .from('habilidades_repositorio')
+            .delete()
+            .eq('id', hab.id);
+
+          if (error) throw error;
+        }
+
+        const updatedRepo = habRepository.filter(h => h.id !== hab.id);
+        setHabRepository(updatedRepo);
+
+        if (isDemoMode) {
+          localStorage.setItem('sigar_repositorio_habilidades', JSON.stringify(updatedRepo));
+        }
+
+        // Also remove from current items if active
+        setItens(prev => prev.map(item => {
+          return {
+            ...item,
+            habilidades: item.habilidades.filter(h => h.codigo !== hab.codigo),
+            links: item.links.filter(l => l.habilidadeId !== hab.id)
+          };
+        }));
+
+        showNotification('success', `Habilidade ${hab.codigo} excluída com sucesso do repositório.`);
+      } catch (err) {
+        console.error('Erro ao excluir habilidade:', err);
+        showNotification('error', 'Erro ao excluir habilidade do repositório.');
+      }
+    }
+  };
+
   const handleCreateCustomHabilidade = async () => {
     if (!newHabCode.trim() || !newHabDesc.trim()) {
       showNotification('error', 'Preencha todos os campos da nova habilidade.');
@@ -677,6 +764,112 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
     }
 
     const codeUpper = newHabCode.trim().toUpperCase();
+
+    if (editingHabId) {
+      // Editing Mode
+      let updatedHab: RepositorioHabilidade = {
+        id: editingHabId,
+        codigo: codeUpper,
+        descricao: newHabDesc.trim(),
+        componente: newHabComponente,
+        anoSerie: newHabAnoSerie,
+        sugestoesPedagogicas: newHabSugestoes.trim()
+      };
+
+      if (!isDemoMode) {
+        const dbHab = {
+          id: editingHabId,
+          codigo: codeUpper,
+          descricao: newHabDesc.trim(),
+          componente: newHabComponente,
+          ano_serie: newHabAnoSerie,
+          sugestoes_pedagogicas: newHabSugestoes.trim()
+        };
+
+        const { error } = await supabase
+          .from('habilidades_repositorio')
+          .upsert(dbHab, { onConflict: 'id' });
+
+        if (error) {
+          console.error('Erro ao salvar habilidade no Supabase:', error);
+          showNotification('error', 'Erro ao salvar alterações da habilidade no banco de dados.');
+          return;
+        }
+      }
+
+      const updatedRepo = habRepository.map(h => h.id === editingHabId ? updatedHab : h);
+      setHabRepository(updatedRepo);
+
+      if (isDemoMode) {
+        localStorage.setItem('sigar_repositorio_habilidades', JSON.stringify(updatedRepo));
+      }
+
+      // Update in active and other items
+      setItens(prev => prev.map(item => {
+        const hasHab = item.habilidades.some(h => h.id === editingHabId);
+        const isCurrentlyActive = item.id === activeItemIdForHab;
+
+        if (!hasHab && !isCurrentlyActive) return item;
+
+        let updatedHabilidades = [...item.habilidades];
+        if (hasHab) {
+          updatedHabilidades = item.habilidades.map(h => h.id === editingHabId ? { ...h, codigo: codeUpper, descricao: updatedHab.descricao, sugestoesPedagogicas: newHabSugestoes.trim() } : h);
+        }
+
+        let updatedEixo = item.eixoTematico;
+        let updatedObjetos = [...item.objetos];
+        let updatedLinks = [...item.links];
+
+        if (isCurrentlyActive) {
+          updatedEixo = newHabEixoTematico.trim() || item.eixoTematico;
+
+          if (newHabObjetoDesc.trim()) {
+            const hasObj = item.objetos.some(o => o.descricao.toLowerCase() === newHabObjetoDesc.trim().toLowerCase());
+            let targetObjId = '';
+
+            if (hasObj) {
+              targetObjId = item.objetos.find(o => o.descricao.toLowerCase() === newHabObjetoDesc.trim().toLowerCase())!.id;
+            } else {
+              const newObjId = generateId();
+              const newObj: ObjetoConhecimento = {
+                id: newObjId,
+                descricao: newHabObjetoDesc.trim()
+              };
+              updatedObjetos.push(newObj);
+              targetObjId = newObjId;
+            }
+
+            // Link skill to this object (and clear previous links for this skill in the item)
+            updatedLinks = item.links.filter(l => l.habilidadeId !== editingHabId);
+            updatedLinks.push({
+              objetoId: targetObjId,
+              habilidadeId: editingHabId
+            });
+          }
+        }
+
+        return {
+          ...item,
+          eixoTematico: updatedEixo,
+          habilidades: updatedHabilidades,
+          objetos: updatedObjetos,
+          links: updatedLinks
+        };
+      }));
+
+      showNotification('success', `Habilidade ${codeUpper} atualizada com sucesso!`);
+      
+      setEditingHabId(null);
+      setNewHabCode('');
+      setNewHabDesc('');
+      setNewHabEixoTematico('');
+      setNewHabObjetoDesc('');
+      setNewHabSugestoes('');
+      setModalTab('select');
+      return;
+    }
+
+    // Creating Mode
     const existsInRepo = habRepository.some(h => h.codigo === codeUpper);
     let finalHab: RepositorioHabilidade;
 
@@ -687,7 +880,8 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
         codigo: codeUpper,
         descricao: newHabDesc.trim(),
         componente: newHabComponente,
-        ano_serie: newHabAnoSerie
+        ano_serie: newHabAnoSerie,
+        sugestoes_pedagogicas: newHabSugestoes.trim()
       };
 
       const { data, error } = await supabase
@@ -707,7 +901,8 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
           codigo: data[0].codigo,
           descricao: data[0].descricao,
           componente: data[0].componente,
-          anoSerie: data[0].ano_serie
+          anoSerie: data[0].ano_serie,
+          sugestoesPedagogicas: data[0].sugestoes_pedagogicas
         };
       } else {
         finalHab = {
@@ -715,7 +910,8 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
           codigo: dbHab.codigo,
           descricao: dbHab.descricao,
           componente: dbHab.componente,
-          anoSerie: dbHab.ano_serie
+          anoSerie: dbHab.ano_serie,
+          sugestoesPedagogicas: dbHab.sugestoes_pedagogicas
         };
       }
 
@@ -732,7 +928,8 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
           codigo: codeUpper,
           descricao: newHabDesc.trim(),
           componente: newHabComponente,
-          anoSerie: newHabAnoSerie
+          anoSerie: newHabAnoSerie,
+          sugestoesPedagogicas: newHabSugestoes.trim()
         };
         const updatedRepo = [...habRepository, finalHab];
         setHabRepository(updatedRepo);
@@ -751,15 +948,15 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
         const newHab: Habilidade = {
           id: newHabId,
           codigo: codeUpper,
-          descricao: finalHab.descricao
+          descricao: finalHab.descricao,
+          sugestoesPedagogicas: newHabSugestoes.trim() || finalHab.sugestoesPedagogicas || ''
         };
-        const updatedHabilidades = habExists ? item.habilidades : [...item.habilidades, newHab];
+        const updatedHabilidades = habExists 
+          ? item.habilidades.map(h => h.codigo === codeUpper ? { ...h, sugestoesPedagogicas: newHabSugestoes.trim() || h.sugestoesPedagogicas || '' } : h)
+          : [...item.habilidades, newHab];
 
         // 2. Update Eixo Temático if filled
         const updatedEixo = newHabEixoTematico.trim() || item.eixoTematico;
-
-        // 3. Update Sugestões Pedagógicas if filled
-        const updatedSugestoes = newHabSugestoes.trim() || item.sugestoesPedagogicas;
 
         // 4. Update Objeto de Conhecimento and links
         let updatedObjetos = [...item.objetos];
@@ -781,7 +978,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
             targetObjId = newObjId;
           }
 
-          // Link them bilaterally (i.e., skill linked to object in item's links)
+          // Link them bilaterally
           const linkExists = item.links.some(l => l.objetoId === targetObjId && l.habilidadeId === newHabId);
           if (!linkExists) {
             updatedLinks.push({
@@ -794,7 +991,6 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
         return {
           ...item,
           eixoTematico: updatedEixo,
-          sugestoesPedagogicas: updatedSugestoes,
           habilidades: updatedHabilidades,
           objetos: updatedObjetos,
           links: updatedLinks
@@ -1008,111 +1204,142 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
       />
 
       {/* Printable Area - Hidden on Screen */}
-      {printPlan && (
-        <div className="hidden print:block fixed inset-0 bg-white z-[9999] p-8 text-black text-xs font-sans">
-          <div className="text-center border-b pb-4 mb-6">
-            <h1 className="text-lg font-black tracking-tight">SISTEMA INTEGRADO DE GESTÃO DE APRENDIZAGEM (SIGAR)</h1>
-            <p className="text-[10px] text-gray-500 uppercase font-bold mt-1">Instrumental - Plano de Curso Curricular Unificado</p>
-          </div>
+      {printPlan && createPortal(
+        (() => {
+          const totalHabilidades = printPlan.itens.reduce((acc, item) => {
+            item.habilidades.forEach(h => acc.add(h.codigo));
+            return acc;
+          }, new Set<string>()).size;
 
-          <div className="grid grid-cols-2 gap-4 mb-6 border p-4 rounded-lg bg-gray-50">
-            <div>
-              <p><strong>Ano/Série:</strong> {printPlan.anoSerie || '---'}</p>
-              <p><strong>Ano de Referência:</strong> {printPlan.anoReferencia}</p>
-              <p className="mt-2 text-gray-400 text-[10px]"><strong>Unidade Escolar:</strong> ___________________________________</p>
-            </div>
-            <div>
-              <p><strong>Componente Curricular:</strong> {printPlan.componente}</p>
-              <p><strong>Período:</strong> {printPlan.bimestre}</p>
-              <p className="mt-2 text-gray-400 text-[10px]"><strong>Turma(s):</strong> _________________________________________</p>
-            </div>
-          </div>
+          return (
+            <div id="print-report" className="hidden print:block bg-white p-8 text-black text-xs font-sans">
+              {/* ====== INSTITUTIONAL HEADER ====== */}
+              <div className="text-center mb-4 pb-3" style={{ borderBottom: '2pt solid #0f172a' }}>
+                <p style={{ fontSize: '7pt', fontWeight: 700, letterSpacing: '0.25em', textTransform: 'uppercase', color: '#64748b', marginBottom: '1pt', marginTop: '0px' }}>
+                  ESTADO DO MARANHÃO
+                </p>
+                <p style={{ fontSize: '9pt', fontWeight: 900, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#0f172a', marginBottom: '1pt', marginTop: '0px' }}>
+                  PREFEITURA MUNICIPAL DE HUMBERTO DE CAMPOS
+                </p>
+                <p style={{ fontSize: '7pt', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#64748b', marginBottom: '8pt', marginTop: '0px' }}>
+                  SECRETARIA MUNICIPAL DE EDUCAÇÃO
+                </p>
+                <div style={{ width: '50pt', height: '1.5pt', background: '#f97316', margin: '0 auto 5pt' }} />
+                <h1 style={{ fontSize: '13pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#0f172a', margin: '0 0 3pt' }}>
+                  Plano de Curso Curricular Unificado
+                </h1>
+                <p style={{ fontSize: '7pt', fontWeight: 700, color: '#64748b', letterSpacing: '0.15em', textTransform: 'uppercase', marginTop: '0px' }}>
+                  Acompanhamento de Unidades Escolares — {printPlan.anoReferencia}
+                </p>
+              </div>
 
-          <div className="space-y-6">
-            {printPlan.itens.map((item, index) => (
-              <div key={item.id} className="border rounded-lg overflow-hidden page-break-inside-avoid">
-                <div className="bg-slate-100 px-4 py-2 border-b">
-                  <h3 className="font-bold text-slate-800 text-[10px] uppercase tracking-wider">
-                    Item {index + 1}: Eixo Temático - {item.eixoTematico || 'Não Informado'}
-                  </h3>
-                </div>
-                
-                <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Left Column: Mapped Objects and Skills */}
-                  <div className="space-y-4">
-                    <h4 className="font-bold text-slate-700 border-b pb-1 text-[9px] uppercase tracking-wider">
-                      Objetos de Conhecimento & Habilidades Associadas
-                    </h4>
-                    {item.objetos.length === 0 ? (
-                      <p className="text-gray-400 italic">Nenhum objeto de conhecimento cadastrado.</p>
-                    ) : (
-                      item.objetos.map(obj => {
-                        const linkedHabs = item.links
-                          .filter(l => l.objetoId === obj.id)
-                          .map(l => item.habilidades.find(h => h.id === l.habilidadeId))
-                          .filter(Boolean);
-
-                        return (
-                          <div key={obj.id} className="pl-3 border-l-2 border-brand-orange py-1">
-                            <p className="font-bold text-slate-800 text-xs">{obj.descricao}</p>
-                            {linkedHabs.length > 0 ? (
-                              <div className="flex flex-wrap gap-1 mt-1.5">
-                                {linkedHabs.map(h => (
-                                  <span key={h!.id} className="bg-slate-100 text-slate-800 text-[8px] px-1.5 py-0.5 rounded font-mono font-bold border border-slate-200" title={h!.descricao}>
-                                    {h!.codigo}
-                                  </span>
-                                ))}
-                              </div>
-                            ) : (
-                              <p className="text-[9px] text-gray-400 italic mt-0.5">Sem habilidades vinculadas.</p>
-                            )}
-                          </div>
-                        );
-                      })
-                    )}
+              {/* ====== METADATA PANEL ====== */}
+              <div className="bg-slate-50 border border-slate-300 rounded-xl p-4 mb-6 font-sans text-xs">
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="flex flex-col">
+                    <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Componente Curricular</span>
+                    <span className="font-extrabold text-slate-900 text-[11px] leading-tight">{printPlan.componente}</span>
                   </div>
-
-                  {/* Right Column: Skills Detailing & Suggestions */}
-                  <div className="space-y-4 border-l pl-6">
-                    <h4 className="font-bold text-slate-700 border-b pb-1 text-[9px] uppercase tracking-wider">
-                      Detalhamento das Habilidades
-                    </h4>
-                    {item.habilidades.length === 0 ? (
-                      <p className="text-gray-400 italic">Nenhuma habilidade cadastrada.</p>
-                    ) : (
-                      <ul className="space-y-2">
-                        {item.habilidades.map(h => (
-                          <li key={h.id} className="text-slate-700 text-[10px] leading-relaxed">
-                            <strong className="text-brand-orange font-mono mr-1.5">{h.codigo}:</strong>
-                            {h.descricao}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-
-                    {item.sugestoesPedagogicas && (
-                      <div className="mt-4 pt-3 border-t">
-                        <h4 className="font-bold text-slate-700 text-[9px] uppercase tracking-wider mb-1">
-                          Sugestões Pedagógicas
-                        </h4>
-                        <p className="whitespace-pre-line text-slate-600 text-[10px] leading-relaxed">{item.sugestoesPedagogicas}</p>
-                      </div>
-                    )}
+                  <div className="flex flex-col border-l border-slate-200 pl-4">
+                    <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Ano / Série</span>
+                    <span className="font-extrabold text-slate-900 text-[11px] leading-tight">{printPlan.anoSerie || '---'}</span>
+                  </div>
+                  <div className="flex flex-col border-l border-slate-200 pl-4">
+                    <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Período Letivo</span>
+                    <span className="font-extrabold text-slate-900 text-[11px] leading-tight">{printPlan.bimestre}</span>
+                  </div>
+                  <div className="flex flex-col border-l border-slate-200 pl-4">
+                    <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Total de Habilidades</span>
+                    <span className="font-extrabold text-slate-900 text-[11px] leading-tight">{totalHabilidades}</span>
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
 
-          <div className="mt-16 flex justify-around">
-            <div className="text-center w-60 border-t pt-2">
-              <p className="font-bold text-[10px] text-gray-600">Assinatura do Docente</p>
+              <div className="space-y-6">
+                {printPlan.itens.map((item, index) => (
+                  <div key={item.id} className="border rounded-lg overflow-hidden page-break-inside-avoid">
+                    <div className="bg-slate-100 px-4 py-2 border-b">
+                      <h3 className="font-bold text-slate-800 text-[10px] uppercase tracking-wider">
+                        Item {index + 1}: Eixo Temático - {item.eixoTematico || 'Não Informado'}
+                      </h3>
+                    </div>
+                    
+                    <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Left Column: Mapped Objects and Skills */}
+                      <div className="space-y-4">
+                        <h4 className="font-bold text-slate-700 border-b pb-1 text-[9px] uppercase tracking-wider">
+                          Objetos de Conhecimento & Habilidades Associadas
+                        </h4>
+                        {item.objetos.length === 0 ? (
+                          <p className="text-gray-400 italic">Nenhum objeto de conhecimento cadastrado.</p>
+                        ) : (
+                          item.objetos.map(obj => {
+                            const linkedHabs = item.links
+                              .filter(l => l.objetoId === obj.id)
+                              .map(l => item.habilidades.find(h => h.id === l.habilidadeId))
+                              .filter(Boolean);
+
+                            return (
+                              <div key={obj.id} className="pl-3 border-l-2 border-brand-orange py-1">
+                                <p className="font-bold text-slate-800 text-xs">{obj.descricao}</p>
+                                {linkedHabs.length > 0 ? (
+                                  <div className="flex flex-wrap gap-1 mt-1.5">
+                                    {linkedHabs.map(h => (
+                                      <span key={h!.id} className="bg-slate-100 text-slate-800 text-[8px] px-1.5 py-0.5 rounded font-mono font-bold border border-slate-200" title={h!.descricao}>
+                                        {h!.codigo}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p className="text-[9px] text-gray-400 italic mt-0.5">Sem habilidades vinculadas.</p>
+                                )}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+
+                      {/* Right Column: Skills Detailing & Suggestions */}
+                      <div className="space-y-4 border-l pl-6">
+                        <h4 className="font-bold text-slate-700 border-b pb-1 text-[9px] uppercase tracking-wider">
+                          Detalhamento das Habilidades
+                        </h4>
+                        {item.habilidades.length === 0 ? (
+                          <p className="text-gray-400 italic">Nenhuma habilidade cadastrada.</p>
+                        ) : (
+                          <ul className="space-y-3">
+                            {item.habilidades.map(h => (
+                              <li key={h.id} className="text-slate-700 text-[10px] leading-relaxed border-b pb-2 last:border-b-0 last:pb-0 last:mb-0">
+                                <strong className="text-brand-orange font-mono mr-1.5">{h.codigo}:</strong>
+                                {h.descricao}
+                                {h.sugestoesPedagogicas && (
+                                  <div className="mt-1.5 bg-slate-50 p-2 rounded border border-slate-200 pl-3 border-l-2 border-l-brand-orange">
+                                    <p className="text-[8px] text-gray-500 uppercase font-black tracking-wider mb-0.5">Sugestão Pedagógica para {h.codigo}</p>
+                                    <p className="text-slate-600 text-[9px] whitespace-pre-line leading-relaxed">{h.sugestoesPedagogicas}</p>
+                                  </div>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-16 flex justify-around">
+                <div className="text-center w-60 border-t pt-2">
+                  <p className="font-bold text-[10px] text-gray-600">Assinatura do Docente</p>
+                </div>
+                <div className="text-center w-60 border-t pt-2">
+                  <p className="font-bold text-[10px] text-gray-600">Coordenação Pedagógica</p>
+                </div>
+              </div>
             </div>
-            <div className="text-center w-60 border-t pt-2">
-              <p className="font-bold text-[10px] text-gray-600">Coordenação Pedagógica</p>
-            </div>
-          </div>
-        </div>
+          );
+        })(),
+        document.body
       )}
 
       {/* Main Content Form */}
@@ -1213,8 +1440,9 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                 </div>
 
                 {/* Eixo Tematico Input */}
-                <div>
-                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                <div className="bg-orange-50/40 p-4 rounded-2xl border border-orange-100/60 shadow-sm border-l-4 border-l-brand-orange space-y-2">
+                  <label className="flex items-center gap-1.5 text-[10px] font-black text-brand-orange uppercase tracking-wider">
+                    <Layers className="w-3.5 h-3.5" />
                     Eixo Temático *
                   </label>
                   <input
@@ -1222,7 +1450,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                     value={item.eixoTematico}
                     onChange={e => updateItemField(item.id, 'eixoTematico', e.target.value)}
                     placeholder="Ex: Números, Geometria, Oralidade, Leitura, Corpo e Movimento..."
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+                    className="w-full px-4 py-2.5 border border-orange-200 rounded-xl outline-none text-xs font-bold text-slate-800 focus:border-brand-orange focus:ring-4 focus:ring-brand-orange/10 transition-all bg-white shadow-sm"
                   />
                 </div>
 
@@ -1383,19 +1611,48 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                   </div>
                 )}
 
-                {/* Pedagogical Suggestions */}
-                <div>
-                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
-                    Sugestões Pedagógicas / Recursos para este Eixo
-                  </label>
-                  <textarea
-                    value={item.sugestoesPedagogicas}
-                    onChange={e => updateItemField(item.id, 'sugestoesPedagogicas', e.target.value)}
-                    placeholder="Sugestões de estratégias metodológicas, intervenções pedagógicas e recursos para trabalhar com estes objetos..."
-                    rows={2}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none bg-white"
-                  />
-                </div>
+                {/* Detalhamento das Habilidades */}
+                {item.habilidades.length > 0 && (
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-4">
+                    <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider border-b pb-2 flex items-center gap-1.5">
+                      <Layers className="text-brand-orange w-4 h-4" />
+                      <span>Detalhamento das Habilidades</span>
+                    </h4>
+                    <div className="space-y-6">
+                      {item.habilidades.map(hab => (
+                        <div key={hab.id} className="space-y-2">
+                          <div className="text-xs text-slate-700 font-medium leading-relaxed">
+                            <strong className="text-brand-orange font-mono mr-1.5">{hab.codigo}:</strong>
+                            {hab.descricao}
+                          </div>
+                          
+                          {/* Styled Suggestion Card matching print layout (Image 2) */}
+                          <div className="bg-slate-50/60 p-3.5 rounded-xl border border-slate-200/60 pl-4 border-l-4 border-l-brand-orange shadow-sm space-y-1">
+                            <label className="block text-[9px] font-black text-slate-500 uppercase tracking-wider">
+                              Sugestão Pedagógica para {hab.codigo}
+                            </label>
+                            <textarea
+                              value={hab.sugestoesPedagogicas || ''}
+                              onChange={e => {
+                                const newVal = e.target.value;
+                                setItens(prev => prev.map(it => {
+                                  if (it.id !== item.id) return it;
+                                  return {
+                                    ...it,
+                                    habilidades: it.habilidades.map(h => h.id === hab.id ? { ...h, sugestoesPedagogicas: newVal } : h)
+                                  };
+                                }));
+                              }}
+                              placeholder="Digite as sugestões de estratégias metodológicas, recursos didáticos e intervenções para esta habilidade..."
+                              rows={3}
+                              className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-medium focus:border-brand-orange transition-all resize-y bg-white leading-relaxed"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
 
@@ -1431,7 +1688,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
       {/* Habilidades Selection/Creation Modal */}
       {isHabModalOpen && activeItemIdForHab && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[999] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden max-h-[85vh] flex flex-col animate-fade-in border border-slate-100">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden max-h-[85vh] flex flex-col animate-fade-in border border-slate-100">
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <div className="flex items-center gap-2">
@@ -1460,17 +1717,29 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
             <div className="flex border-b border-slate-100 text-xs font-bold text-slate-500">
               <button
                 type="button"
-                onClick={() => setModalTab('select')}
+                onClick={() => {
+                  setModalTab('select');
+                  setEditingHabId(null);
+                }}
                 className={`flex-1 py-3 text-center transition-all ${modalTab === 'select' ? 'text-brand-orange border-b-2 border-brand-orange bg-orange-50/10' : 'hover:bg-slate-50'}`}
               >
                 Selecionar do Repositório
               </button>
               <button
                 type="button"
-                onClick={() => setModalTab('create')}
+                onClick={() => {
+                  setModalTab('create');
+                  if (!editingHabId) {
+                    setNewHabCode('');
+                    setNewHabDesc('');
+                    setNewHabEixoTematico('');
+                    setNewHabObjetoDesc('');
+                    setNewHabSugestoes('');
+                  }
+                }}
                 className={`flex-1 py-3 text-center transition-all ${modalTab === 'create' ? 'text-brand-orange border-b-2 border-brand-orange bg-orange-50/10' : 'hover:bg-slate-50'}`}
               >
-                Cadastrar Nova Habilidade
+                {editingHabId ? 'Editar Habilidade' : 'Cadastrar Nova Habilidade'}
               </button>
             </div>
 
@@ -1534,7 +1803,27 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                                 {hab.descricao}
                               </p>
                             </div>
-                            <div className="shrink-0 self-center">
+                            <div className="shrink-0 self-center flex items-center gap-2">
+                              {/* Edit Button */}
+                              <button
+                                type="button"
+                                onClick={() => handleEditHabilidade(hab)}
+                                className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                                title="Editar Habilidade"
+                              >
+                                <Edit2 size={14} />
+                              </button>
+                              
+                              {/* Delete Button */}
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteHabilidade(hab)}
+                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                title="Excluir Habilidade"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+
                               {added ? (
                                 <button
                                   type="button"
@@ -1677,8 +1966,8 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                       variant="primary"
                       className="bg-brand-orange hover:bg-orange-600 font-bold text-xs py-2 rounded-xl flex items-center gap-1.5"
                     >
-                      <Plus className="w-4 h-4" />
-                      Cadastrar e Adicionar ao Eixo
+                      {editingHabId ? <Save className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                      {editingHabId ? 'Salvar Alterações' : 'Cadastrar e Adicionar ao Eixo'}
                     </Button>
                   </div>
                 </form>

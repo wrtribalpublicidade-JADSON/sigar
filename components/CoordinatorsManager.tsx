@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Coordenador, Escola, StatusMeta, Visita } from '../types';
 import {
   UserPlus, Edit2, Trash2, MapPin, Mail, School as SchoolIcon,
@@ -83,6 +83,14 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
   const [schoolFilter, setSchoolFilter] = useState<string>('ALL');
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, roleFilter, regionFilter, schoolFilter]);
+
   const baseCoordenadores = isAdmin
     ? coordenadores
     : coordenadores.filter(c => {
@@ -126,6 +134,13 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
     }
     return result;
   }, [baseCoordenadores, searchTerm, roleFilter, regionFilter, schoolFilter, sortConfig, escolas]);
+
+  const paginatedCoordenadores = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return displayCoordenadores.slice(startIndex, startIndex + pageSize);
+  }, [displayCoordenadores, currentPage, pageSize]);
+
+  const totalPages = Math.ceil(displayCoordenadores.length / pageSize) || 1;
 
   const requestSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -500,7 +515,7 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {displayCoordenadores.map(coord => {
+              {paginatedCoordenadores.map(coord => {
                 const escolasDoCoord = escolas.filter(e => coord.escolasIds.includes(e.id));
                 const totalPendencias = escolasDoCoord.reduce((sum, escola) => sum + checkSchoolPendencies(escola).length, 0);
                 const isSelf = coord.id === loggedInCoordId;
@@ -571,6 +586,66 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
               })}
             </tbody>
           </table>
+        </div>
+
+        {/* Pagination Footer */}
+        <div className="bg-slate-50/50 p-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-4 text-xs font-semibold text-slate-500">
+            <div className="flex items-center gap-2">
+              <span>Exibir</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-700 font-bold focus:outline-none focus:ring-2 focus:ring-brand-orange/20 cursor-pointer"
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={30}>30</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+              <span>por vez</span>
+            </div>
+            <span className="hidden sm:inline text-slate-300">|</span>
+            <p>
+              Exibindo <span className="text-slate-800 font-bold">{displayCoordenadores.length > 0 ? (currentPage - 1) * pageSize + 1 : 0}</span> a{' '}
+              <span className="text-slate-800 font-bold">{Math.min(currentPage * pageSize, displayCoordenadores.length)}</span> de{' '}
+              <span className="text-slate-800 font-bold">{displayCoordenadores.length}</span> usuários
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              className={`px-4 py-2 rounded-xl text-xs font-black border border-slate-200 transition-all ${
+                currentPage === 1
+                  ? 'bg-slate-50 text-slate-300 cursor-not-allowed'
+                  : 'bg-white text-slate-600 shadow-sm hover:border-orange-500 hover:text-orange-500 active:scale-95'
+              }`}
+            >
+              Anterior
+            </button>
+            <span className="text-xs font-bold text-slate-500 px-2 whitespace-nowrap">
+              Página {currentPage} de {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              className={`px-4 py-2 rounded-xl text-xs font-black border border-slate-200 transition-all ${
+                currentPage >= totalPages
+                  ? 'bg-slate-50 text-slate-300 cursor-not-allowed'
+                  : 'bg-white text-slate-600 shadow-sm hover:border-orange-500 hover:text-orange-500 active:scale-95'
+              }`}
+            >
+              Próximo
+            </button>
+          </div>
         </div>
       </div>
       <ConfirmModal isOpen={deleteConfirmationId !== null} onClose={() => setDeleteConfirmationId(null)} onConfirm={confirmDelete} title="Remover Usuário?" message="Esta ação removerá o acesso do profissional." icon={Trash2} iconColor="red" confirmText="Sim, Remover" cancelText="Cancelar" variant="danger" />

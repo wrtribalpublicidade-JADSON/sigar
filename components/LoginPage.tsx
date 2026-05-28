@@ -277,8 +277,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onDemoLogin }) =>
         </div>
 
         {/* Footer */}
-        <div className="text-center text-xs text-slate-500 mt-8">
-          © {new Date().getFullYear()} Secretaria Municipal de Educação. Todos os direitos reservados.
+        <div className="text-center text-xs text-slate-500 mt-8 space-y-1">
+          <div>
+            © {new Date().getFullYear()} Secretaria Municipal de Educação. Todos os direitos reservados.
+          </div>
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">
+            SIGAR • Versão 1.0.0
+          </div>
         </div>
       </div>
     </div>

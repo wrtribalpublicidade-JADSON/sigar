@@ -677,10 +677,16 @@ const mapToUiAcompanhamento = (db: any): any => {
 };
 
 export const ccAcompanhamentoDocenteService = {
-    async getAll(escolaId?: string, stage: EducationalStage = 'fundamental'): Promise<any[]> {
+    async getAll(escolaId?: string | string[], stage: EducationalStage = 'fundamental'): Promise<any[]> {
         const table = getTableName('acompanhamento', stage);
         let query = supabase.from(table).select('*').order('data_registro', { ascending: false });
-        if (escolaId) query = query.eq('escola_id', escolaId);
+        if (escolaId) {
+            if (Array.isArray(escolaId)) {
+                query = query.in('escola_id', escolaId);
+            } else {
+                query = query.eq('escola_id', escolaId);
+            }
+        }
         const { data, error } = await query;
         if (error) throw error;
         return (data || []).map(mapToUiAcompanhamento).filter((item: any) => item && item.id);
@@ -731,10 +737,16 @@ export const ccAcompanhamentoDocenteService = {
 
 // 9. Encaminhamentos
 export const ccEncaminhamentosService = {
-    async getAll(escolaId?: string, stage: EducationalStage = 'fundamental') {
+    async getAll(escolaId?: string | string[], stage: EducationalStage = 'fundamental') {
         const table = getTableName('encaminhamento', stage);
         let query = supabase.from(table).select('*').order('data_registro', { ascending: false });
-        if (escolaId) query = query.eq('escola_id', escolaId);
+        if (escolaId) {
+            if (Array.isArray(escolaId)) {
+                query = query.in('escola_id', escolaId);
+            } else {
+                query = query.eq('escola_id', escolaId);
+            }
+        }
         const { data, error } = await query;
         if (error) throw error;
         return data;
