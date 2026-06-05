@@ -275,6 +275,7 @@ export interface RegistroCNCA {
   componenteCurricular: 'Língua Portuguesa' | 'Matemática';
   anoSerie: '1º ANO' | '2º ANO' | '3º ANO' | '4º ANO' | '5º ANO' | '6º ANO' | '7º ANO' | '8º ANO' | '9º ANO';
   tipoTurma: 'Regular' | 'Multiseriada';
+  turma?: string;
   estudantesAvaliados: number;
   estudantesPrevistos: number;
   defasagem: number;

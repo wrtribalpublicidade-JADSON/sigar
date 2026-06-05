@@ -41,6 +41,7 @@ export const CncaPnraDashboard: React.FC<CncaPnraDashboardProps> = ({ escolas = 
     const [selectedLocalidade, setSelectedLocalidade] = useState<string>('Todas');
     const [selectedCoordenador, setSelectedCoordenador] = useState<string>('Todos');
     const [selectedTipoTurma, setSelectedTipoTurma] = useState<string>('Todos');
+    const [selectedTurma, setSelectedTurma] = useState<string>('Todas');
     const [selectedComponente, setSelectedComponente] = useState<string>('Todos');
     const [selectedSerie, setSelectedSerie] = useState<string>('Todas');
     const [showFilters, setShowFilters] = useState(true);
@@ -73,6 +74,7 @@ export const CncaPnraDashboard: React.FC<CncaPnraDashboardProps> = ({ escolas = 
         const components = Array.from(new Set(allRecords.map(r => r.componenteCurricular))).sort();
         const series = Array.from(new Set(allRecords.map(r => r.anoSerie))).sort();
         const types = Array.from(new Set(allRecords.map(r => r.tipoTurma))).sort();
+        const classes = Array.from(new Set(allRecords.map(r => r.turma).filter(Boolean))).sort();
 
         return {
             years: years.length > 0 ? years : [new Date().getFullYear(), new Date().getFullYear() - 1],
@@ -82,7 +84,8 @@ export const CncaPnraDashboard: React.FC<CncaPnraDashboardProps> = ({ escolas = 
             coordenadores: ['Todos', ...coords],
             componentes: ['Todos', ...components],
             series: ['Todas', ...series],
-            tiposTurma: ['Todos', ...types]
+            tiposTurma: ['Todos', ...types],
+            turmas: ['Todas', ...classes]
         };
     }, [allRecords]);
 
@@ -101,13 +104,14 @@ export const CncaPnraDashboard: React.FC<CncaPnraDashboardProps> = ({ escolas = 
             const matchAval = selectedAvaliacao === 'Todas' || r.tipoAvaliacao === selectedAvaliacao;
             const matchLocal = selectedLocalidade === 'Todas' || r.localizacao === selectedLocalidade;
             const matchCoord = selectedCoordenador === 'Todos' || r.coordenadorEscola === selectedCoordenador;
-            const matchTurma = selectedTipoTurma === 'Todos' || r.tipoTurma === selectedTipoTurma;
+            const matchTurmaType = selectedTipoTurma === 'Todos' || r.tipoTurma === selectedTipoTurma;
+            const matchTurma = selectedTurma === 'Todas' || r.turma === selectedTurma;
             const matchComp = selectedComponente === 'Todos' || r.componenteCurricular === selectedComponente;
             const matchSerie = selectedSerie === 'Todas' || r.anoSerie === selectedSerie;
 
-            return matchYear && matchPolo && matchEscola && matchAval && matchLocal && matchCoord && matchTurma && matchComp && matchSerie;
+            return matchYear && matchPolo && matchEscola && matchAval && matchLocal && matchCoord && matchTurmaType && matchTurma && matchComp && matchSerie;
         });
-    }, [allRecords, selectedYear, selectedPolo, selectedEscola, selectedAvaliacao, selectedLocalidade, selectedCoordenador, selectedTipoTurma, selectedComponente, selectedSerie]);
+    }, [allRecords, selectedYear, selectedPolo, selectedEscola, selectedAvaliacao, selectedLocalidade, selectedCoordenador, selectedTipoTurma, selectedTurma, selectedComponente, selectedSerie]);
 
     // Cálculos Gerais
     const analysisData = useMemo(() => {
@@ -223,10 +227,11 @@ export const CncaPnraDashboard: React.FC<CncaPnraDashboardProps> = ({ escolas = 
                 const matchEscola = selectedEscola === 'Todas' || r.escolaNome === selectedEscola;
                 const matchLocal = selectedLocalidade === 'Todas' || r.localizacao === selectedLocalidade;
                 const matchCoord = selectedCoordenador === 'Todos' || r.coordenadorEscola === selectedCoordenador;
-                const matchTurma = selectedTipoTurma === 'Todos' || r.tipoTurma === selectedTipoTurma;
+                const matchTurmaType = selectedTipoTurma === 'Todos' || r.tipoTurma === selectedTipoTurma;
+                const matchTurma = selectedTurma === 'Todas' || r.turma === selectedTurma;
                 const matchComp = selectedComponente === 'Todos' || r.componenteCurricular === selectedComponente;
                 const matchSerie = selectedSerie === 'Todas' || r.anoSerie === selectedSerie;
-                return matchPolo && matchEscola && matchLocal && matchCoord && matchTurma && matchComp && matchSerie;
+                return matchPolo && matchEscola && matchLocal && matchCoord && matchTurmaType && matchTurma && matchComp && matchSerie;
             });
 
             const avg = (field: string) => {
@@ -251,13 +256,13 @@ export const CncaPnraDashboard: React.FC<CncaPnraDashboardProps> = ({ escolas = 
         const avgAde = timelineData.length > 0 ? timelineData.reduce((acc, d) => acc + d.ade, 0) / timelineData.length : 0;
 
         return { timelineData, deltaAde, avgAde };
-    }, [allRecords, selectedPolo, selectedEscola, selectedLocalidade, selectedCoordenador, selectedTipoTurma, selectedComponente, selectedSerie]);
+    }, [allRecords, selectedPolo, selectedEscola, selectedLocalidade, selectedCoordenador, selectedTipoTurma, selectedTurma, selectedComponente, selectedSerie]);
 
     const classAnalysis = useMemo(() => {
         const classMap = new Map();
         filteredRecords.forEach(r => {
-            const key = `${r.escolaNome}|${r.anoSerie}|${r.componenteCurricular}`;
-            const cur = classMap.get(key) || { escola: r.escolaNome, serie: r.anoSerie, comp: r.componenteCurricular, ade: 0, int: 0, def: 0, count: 0, aval: 0, prev: 0 };
+            const key = `${r.escolaNome}|${r.anoSerie}|${r.turma || ''}|${r.componenteCurricular}`;
+            const cur = classMap.get(key) || { escola: r.escolaNome, serie: r.anoSerie, turma: r.turma || '', comp: r.componenteCurricular, ade: 0, int: 0, def: 0, count: 0, aval: 0, prev: 0 };
             cur.ade += (r.aprendizadoAdequado || 0);
             cur.int += (r.aprendizadoIntermediario || 0);
             cur.def += (r.defasagem || 0);
@@ -268,7 +273,7 @@ export const CncaPnraDashboard: React.FC<CncaPnraDashboardProps> = ({ escolas = 
         });
         return Array.from(classMap.values()).map(c => ({
             ...c,
-            label: `${c.serie} - ${c.comp}`,
+            label: `${c.serie}${c.turma ? ` - ${c.turma}` : ''} - ${c.comp}`,
             pAde: Number((c.ade / c.count).toFixed(1)),
             pInt: Number((c.int / c.count).toFixed(1)),
             pDef: Number((c.def / c.count).toFixed(1))
@@ -286,6 +291,7 @@ export const CncaPnraDashboard: React.FC<CncaPnraDashboardProps> = ({ escolas = 
             { header: 'Componente Curricular', key: 'componenteCurricular' },
             { header: 'Tipo de Avaliação', key: 'tipoAvaliacao' },
             { header: 'Tipo de Turma', key: 'tipoTurma' },
+            { header: 'Turma', key: 'turma' },
             { header: 'Estudantes Previstos', key: 'estudantesPrevistos' },
             { header: 'Estudantes Avaliados', key: 'estudantesAvaliados' },
             { header: 'Aprendizado Adequado (%)', key: 'aprendizadoAdequado' },
@@ -339,6 +345,7 @@ export const CncaPnraDashboard: React.FC<CncaPnraDashboardProps> = ({ escolas = 
                         componenteCurricular: (row['Componente Curricular'] as 'Língua Portuguesa' | 'Matemática') || 'Língua Portuguesa',
                         anoSerie: (row['Série'] as '1º ANO' | '2º ANO' | '3º ANO' | '4º ANO' | '5º ANO' | '6º ANO' | '7º ANO' | '8º ANO' | '9º ANO') || '2º ANO',
                         tipoTurma: (row['Tipo de Turma'] as 'Regular' | 'Multiseriada') || 'Regular',
+                        turma: row['Turma'] || '',
                         estudantesPrevistos: parseInt(row['Estudantes Previstos']) || 0,
                         estudantesAvaliados: parseInt(row['Estudantes Avaliados']) || 0,
                         aprendizadoAdequado: parseFloat(row['Aprendizado Adequado (%)']) || 0,
@@ -352,7 +359,8 @@ export const CncaPnraDashboard: React.FC<CncaPnraDashboardProps> = ({ escolas = 
                         r => r.ano === newRecord.ano &&
                             r.componenteCurricular === newRecord.componenteCurricular &&
                             r.anoSerie === newRecord.anoSerie &&
-                            r.tipoAvaliacao === newRecord.tipoAvaliacao
+                            r.tipoAvaliacao === newRecord.tipoAvaliacao &&
+                            (r.turma || '') === (newRecord.turma || '')
                     );
 
                     if (existingIndex >= 0) {
@@ -616,13 +624,15 @@ export const CncaPnraDashboard: React.FC<CncaPnraDashboardProps> = ({ escolas = 
             </div>
 
             {showFilters && (
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-8 gap-3 mb-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-9 gap-3 mb-6">
                     {[
                         { label: 'Unidade', val: selectedEscola, set: setSelectedEscola, opts: filterOptions.escolas },
                         { label: 'Ano', val: selectedYear, set: (v: any) => setSelectedYear(Number(v)), opts: filterOptions.years },
                         { label: 'Avaliação', val: selectedAvaliacao, set: setSelectedAvaliacao, opts: ['Todas', 'Diagnóstica', 'Formativa', 'Somativa'] },
                         { label: 'Componente', val: selectedComponente, set: setSelectedComponente, opts: filterOptions.componentes },
                         { label: 'Série', val: selectedSerie, set: setSelectedSerie, opts: filterOptions.series },
+                        { label: 'Tipo Turma', val: selectedTipoTurma, set: setSelectedTipoTurma, opts: filterOptions.tiposTurma },
+                        { label: 'Turma', val: selectedTurma, set: setSelectedTurma, opts: filterOptions.turmas },
                         { label: 'Polo', val: selectedPolo, set: setSelectedPolo, opts: filterOptions.polos },
                         { label: 'Localidade', val: selectedLocalidade, set: setSelectedLocalidade, opts: filterOptions.localidades },
                         { label: 'Regional', val: selectedCoordenador, set: setSelectedCoordenador, opts: filterOptions.coordenadores }

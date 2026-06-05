@@ -26,6 +26,7 @@ export const CncaModal: React.FC<CncaModalProps> = ({
         componenteCurricular: 'Língua Portuguesa' as 'Língua Portuguesa' | 'Matemática',
         anoSerie: '1º ANO' as any,
         tipoTurma: 'Regular' as 'Regular' | 'Multiseriada',
+        turma: '',
         estudantesAvaliados: 0,
         estudantesPrevistos: 0,
         defasagem: 0,
@@ -44,6 +45,7 @@ export const CncaModal: React.FC<CncaModalProps> = ({
                 componenteCurricular: 'Língua Portuguesa',
                 anoSerie: '1º ANO',
                 tipoTurma: 'Regular',
+                turma: '',
                 estudantesAvaliados: 0,
                 estudantesPrevistos: 0,
                 defasagem: 0,
@@ -74,6 +76,7 @@ export const CncaModal: React.FC<CncaModalProps> = ({
                 componenteCurricular: formData.componenteCurricular,
                 anoSerie: formData.anoSerie,
                 tipoTurma: formData.tipoTurma,
+                turma: formData.turma,
                 estudantesAvaliados: Number(formData.estudantesAvaliados),
                 estudantesPrevistos: Number(formData.estudantesPrevistos),
                 defasagem: Number(formData.defasagem),
@@ -107,6 +110,7 @@ export const CncaModal: React.FC<CncaModalProps> = ({
             componenteCurricular: reg.componenteCurricular,
             anoSerie: reg.anoSerie,
             tipoTurma: reg.tipoTurma,
+            turma: reg.turma || '',
             estudantesAvaliados: reg.estudantesAvaliados,
             estudantesPrevistos: reg.estudantesPrevistos,
             defasagem: reg.defasagem,
@@ -193,7 +197,7 @@ export const CncaModal: React.FC<CncaModalProps> = ({
                                 </select>
                             </div>
 
-                            <div className="space-y-2">
+                            <div className="space-y-2 md:col-span-2">
                                 <label className="text-[10px] font-bold text-slate-500 uppercase block tracking-tight">Componente Curricular</label>
                                 <select
                                     name="componenteCurricular"
@@ -218,6 +222,23 @@ export const CncaModal: React.FC<CncaModalProps> = ({
                                 >
                                     <option value="Regular">Regular</option>
                                     <option value="Multiseriada">Multiseriada</option>
+                                </select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase block tracking-tight">Turma</label>
+                                <select
+                                    name="turma"
+                                    value={formData.turma}
+                                    onChange={handleChange}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-800 focus:ring-4 focus:ring-orange-500/10 focus:border-orange-500 transition-all outline-none shadow-sm appearance-none cursor-pointer"
+                                >
+                                    <option value="">Selecione a Turma</option>
+                                    <option value="Turma A">Turma A</option>
+                                    <option value="Turma B">Turma B</option>
+                                    <option value="Turma C">Turma C</option>
+                                    <option value="Turma D">Turma D</option>
+                                    <option value="Turma E">Turma E</option>
                                 </select>
                             </div>
 
@@ -368,9 +389,16 @@ export const CncaModal: React.FC<CncaModalProps> = ({
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-4">
-                                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${reg.tipoTurma === 'Regular' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}`}>
-                                                            {reg.tipoTurma}
-                                                        </span>
+                                                        <div className="flex flex-col gap-1 items-start">
+                                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${reg.tipoTurma === 'Regular' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}`}>
+                                                                {reg.tipoTurma}
+                                                            </span>
+                                                            {reg.turma && (
+                                                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                                                                    {reg.turma}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                     <td className="px-4 py-4 text-center">
                                                         <span className="font-bold text-slate-600">{reg.estudantesAvaliados}</span>

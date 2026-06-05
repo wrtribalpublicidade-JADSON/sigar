@@ -215,6 +215,7 @@ export default function App() {
           registrosCNCA: cncaData?.filter((r: any) => r.escola_id === e.id).map((r: any) => ({
             id: r.id, escolaId: r.escola_id, ano: r.ano, tipoAvaliacao: r.tipo_avaliacao,
             componenteCurricular: r.componente_curricular, anoSerie: r.ano_serie, tipoTurma: r.tipo_turma,
+            turma: r.turma,
             estudantesAvaliados: r.estudantes_avaliados, estudantesPrevistos: r.estudantes_previstos,
             defasagem: r.defasagem, aprendizadoIntermediario: r.aprendizado_intermediario,
             aprendizadoAdequado: r.aprendizado_adequado, dataRegistro: r.data_registro, responsavel: r.responsavel
@@ -563,6 +564,7 @@ export default function App() {
           const { error: upsertErr } = await supabase.from('registros_cnca').upsert(registros.map(r => ({
             id: r.id, escola_id: updatedEscola.id, ano: r.ano, tipo_avaliacao: r.tipoAvaliacao,
             componente_curricular: r.componenteCurricular, ano_serie: r.anoSerie, tipo_turma: r.tipoTurma,
+            turma: r.turma,
             estudantes_avaliados: r.estudantesAvaliados, estudantes_previstos: r.estudantesPrevistos,
             defasagem: r.defasagem, aprendizado_intermediario: r.aprendizadoIntermediario,
             aprendizado_adequado: r.aprendizadoAdequado, data_registro: r.dataRegistro, responsavel: r.responsavel
