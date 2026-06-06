@@ -7,6 +7,7 @@ interface ModalProps {
   children: React.ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl';
   showCloseButton?: boolean;
+  closeOnOutsideClick?: boolean;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -14,7 +15,8 @@ export const Modal: React.FC<ModalProps> = ({
   onClose,
   children,
   size = 'md',
-  showCloseButton = false
+  showCloseButton = false,
+  closeOnOutsideClick = true
 }) => {
   if (!isOpen) return null;
 
@@ -31,7 +33,7 @@ export const Modal: React.FC<ModalProps> = ({
   return (
     <div
       className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in"
-      onClick={onClose}
+      onClick={closeOnOutsideClick ? onClose : undefined}
     >
       <div
         className={`bg-white rounded-2xl shadow-2xl ${sizeClasses[size]} w-full overflow-hidden border border-slate-100 relative`}

@@ -128,7 +128,7 @@ export const CncaModal: React.FC<CncaModalProps> = ({
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} size="4xl" showCloseButton={false}>
+        <Modal isOpen={isOpen} onClose={onClose} size="4xl" showCloseButton={false} closeOnOutsideClick={false}>
             <div className="overflow-hidden bg-white rounded-2xl">
                 {/* Header Premium */}
                 <div className="relative overflow-hidden bg-slate-900 px-5 py-5 leading-tight">
