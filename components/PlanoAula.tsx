@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { PageHeader } from './ui/PageHeader';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
@@ -664,8 +665,8 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       />
 
       {/* Printable Area - Hidden on Screen */}
-      {printPlan && (
-        <div className="hidden print:block fixed inset-0 bg-white z-[9999] p-8 text-black text-xs font-sans">
+      {printPlan && createPortal(
+        <div id="print-report" className="hidden print:block bg-white p-8 text-black text-xs font-sans">
           <div className="text-center border-b pb-4 mb-6">
             <h1 className="text-lg font-black tracking-tight">SISTEMA INTEGRADO DE GESTÃO DE APRENDIZAGEM (SIGAR)</h1>
             <p className="text-[10px] text-gray-500 uppercase font-bold mt-1">Instrumental - Guia de Aprendizagem Docente</p>
@@ -724,7 +725,8 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
               <p className="font-bold text-[10px] text-gray-600">Coordenação Pedagógica</p>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Main Content Form */}

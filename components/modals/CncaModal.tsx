@@ -65,6 +65,20 @@ export const CncaModal: React.FC<CncaModalProps> = ({
             return;
         }
 
+        const isDuplicate = (escola.dadosEducacionais.registrosCNCA || []).some(r => 
+            r.id !== editingId &&
+            Number(r.ano) === Number(formData.ano) &&
+            r.tipoAvaliacao === formData.tipoAvaliacao &&
+            r.componenteCurricular === formData.componenteCurricular &&
+            r.anoSerie === formData.anoSerie &&
+            (r.turma || '') === (formData.turma || '')
+        );
+
+        if (isDuplicate) {
+            setError('Já existe um lançamento com o mesmo Ano, Avaliação, Componente Curricular, Série e Turma.');
+            return;
+        }
+
         setError(null);
         setLoading(true);
 

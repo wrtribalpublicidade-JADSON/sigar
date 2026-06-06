@@ -597,8 +597,19 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
     const handleSaveParc = (registro: Omit<RegistroFluenciaPARC, 'id' | 'escolaId' | 'dataRegistro' | 'responsavel'> & { id?: string }) => {
         if (!selectedSchoolForParc) return;
         let novosRegistros = [...(selectedSchoolForParc.dadosEducacionais.registrosFluenciaParc || [])];
+        const existingIndex = novosRegistros.findIndex(r => 
+            Number(r.ano) === Number(registro.ano) &&
+            r.edicao === registro.edicao &&
+            (r.polo || '') === (registro.polo || '') &&
+            r.tipoTurma === registro.tipoTurma &&
+            r.turma?.nome === registro.turma?.nome &&
+            r.turma?.anoSerie === registro.turma?.anoSerie
+        );
+
         if (registro.id) {
             novosRegistros = novosRegistros.map(r => r.id === registro.id ? { ...r, ...registro, id: r.id, escolaId: r.escolaId, dataRegistro: new Date().toISOString(), responsavel: r.responsavel } as RegistroFluenciaPARC : r);
+        } else if (existingIndex >= 0) {
+            novosRegistros = novosRegistros.map((r, idx) => idx === existingIndex ? { ...r, ...registro, id: r.id, escolaId: r.escolaId, dataRegistro: new Date().toISOString(), responsavel: r.responsavel } as RegistroFluenciaPARC : r);
         } else {
             const novoRegistro: RegistroFluenciaPARC = { ...(registro as any), id: generateUUID(), escolaId: selectedSchoolForParc.id, dataRegistro: new Date().toISOString(), responsavel: 'Coordenador Regional' };
             novosRegistros.push(novoRegistro);
@@ -611,8 +622,18 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
     const handleSaveCnca = (registro: Omit<RegistroCNCA, 'id' | 'escolaId' | 'dataRegistro' | 'responsavel'> & { id?: string }) => {
         if (!selectedSchoolForCnca) return;
         let novosRegistros = [...(selectedSchoolForCnca.dadosEducacionais.registrosCNCA || [])];
+        const existingIndex = novosRegistros.findIndex(r => 
+            Number(r.ano) === Number(registro.ano) &&
+            r.tipoAvaliacao === registro.tipoAvaliacao &&
+            r.componenteCurricular === registro.componenteCurricular &&
+            r.anoSerie === registro.anoSerie &&
+            (r.turma || '') === (registro.turma || '')
+        );
+
         if (registro.id) {
             novosRegistros = novosRegistros.map(r => r.id === registro.id ? { ...r, ...registro, id: r.id, escolaId: r.escolaId, dataRegistro: new Date().toISOString(), responsavel: r.responsavel } as RegistroCNCA : r);
+        } else if (existingIndex >= 0) {
+            novosRegistros = novosRegistros.map((r, idx) => idx === existingIndex ? { ...r, ...registro, id: r.id, escolaId: r.escolaId, dataRegistro: new Date().toISOString(), responsavel: r.responsavel } as RegistroCNCA : r);
         } else {
             const novoRegistro: RegistroCNCA = { ...(registro as any), id: generateUUID(), escolaId: selectedSchoolForCnca.id, dataRegistro: new Date().toISOString(), responsavel: 'Coordenador Regional' };
             novosRegistros.push(novoRegistro);
@@ -653,8 +674,17 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
     const handleSaveSeama = (registro: Omit<RegistroSEAMA, 'id' | 'escolaId' | 'dataRegistro' | 'responsavel'> & { id?: string }) => {
         if (!selectedSchoolForSeama) return;
         let novosRegistros = [...(selectedSchoolForSeama.dadosEducacionais.registrosSEAMA || [])];
+        const existingIndex = novosRegistros.findIndex(r => 
+            Number(r.ano) === Number(registro.ano) &&
+            r.tipoAvaliacao === registro.tipoAvaliacao &&
+            r.componenteCurricular === registro.componenteCurricular &&
+            r.anoSerie === registro.anoSerie
+        );
+
         if (registro.id) {
             novosRegistros = novosRegistros.map(r => r.id === registro.id ? { ...r, ...registro, id: r.id, escolaId: r.escolaId, dataRegistro: new Date().toISOString(), responsavel: r.responsavel } as RegistroSEAMA : r);
+        } else if (existingIndex >= 0) {
+            novosRegistros = novosRegistros.map((r, idx) => idx === existingIndex ? { ...r, ...registro, id: r.id, escolaId: r.escolaId, dataRegistro: new Date().toISOString(), responsavel: r.responsavel } as RegistroSEAMA : r);
         } else {
             const novoRegistro: RegistroSEAMA = { ...(registro as any), id: generateUUID(), escolaId: selectedSchoolForSeama.id, dataRegistro: new Date().toISOString(), responsavel: 'Coordenador Regional' };
             novosRegistros.push(novoRegistro);
@@ -685,8 +715,17 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
     const handleSaveSaeb = (registro: Omit<RegistroSAEB, 'id' | 'escolaId' | 'dataRegistro' | 'responsavel'> & { id?: string }) => {
         if (!selectedSchoolForSaeb) return;
         let novosRegistros = [...(selectedSchoolForSaeb.dadosEducacionais.registrosSAEB || [])];
+        const existingIndex = novosRegistros.findIndex(r => 
+            Number(r.ano) === Number(registro.ano) &&
+            r.tipoAvaliacao === registro.tipoAvaliacao &&
+            r.componenteCurricular === registro.componenteCurricular &&
+            r.anoSerie === registro.anoSerie
+        );
+
         if (registro.id) {
             novosRegistros = novosRegistros.map(r => r.id === registro.id ? { ...r, ...registro, id: r.id, escolaId: r.escolaId, dataRegistro: new Date().toISOString(), responsavel: r.responsavel } as RegistroSAEB : r);
+        } else if (existingIndex >= 0) {
+            novosRegistros = novosRegistros.map((r, idx) => idx === existingIndex ? { ...r, ...registro, id: r.id, escolaId: r.escolaId, dataRegistro: new Date().toISOString(), responsavel: r.responsavel } as RegistroSAEB : r);
         } else {
             const novoRegistro: RegistroSAEB = { ...(registro as any), id: generateUUID(), escolaId: selectedSchoolForSaeb.id, dataRegistro: new Date().toISOString(), responsavel: 'Coordenador Regional' };
             novosRegistros.push(novoRegistro);
@@ -717,8 +756,14 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
     const handleSaveIdeb = (registro: Omit<RegistroIDEB, 'id' | 'escolaId' | 'dataRegistro' | 'responsavel'> & { id?: string }) => {
         if (!selectedSchoolForIdeb) return;
         let novosRegistros = [...(selectedSchoolForIdeb.dadosEducacionais.registrosIDEB || [])];
+        const existingIndex = novosRegistros.findIndex(r => 
+            Number(r.ano) === Number(registro.ano)
+        );
+
         if (registro.id) {
             novosRegistros = novosRegistros.map(r => r.id === registro.id ? { ...r, ...registro, id: r.id, escolaId: r.escolaId, dataRegistro: new Date().toISOString(), responsavel: r.responsavel } as RegistroIDEB : r);
+        } else if (existingIndex >= 0) {
+            novosRegistros = novosRegistros.map((r, idx) => idx === existingIndex ? { ...r, ...registro, id: r.id, escolaId: r.escolaId, dataRegistro: new Date().toISOString(), responsavel: r.responsavel } as RegistroIDEB : r);
         } else {
             const novoRegistro: RegistroIDEB = { ...(registro as any), id: generateUUID(), escolaId: selectedSchoolForIdeb.id, dataRegistro: new Date().toISOString(), responsavel: 'Coordenador Regional' };
             novosRegistros.push(novoRegistro);
