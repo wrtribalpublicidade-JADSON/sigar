@@ -12,8 +12,9 @@ import * as XLSX from 'xlsx';
 import { Escola, Coordenador } from '../types';
 import { useNotification } from '../context/NotificationContext';
 import { supabase } from '../services/supabase';
+import { BNCC_INFANTIL } from './ConselhoClasse';
 
-interface PlanoCursoProps {
+interface PlanoCursoInfantilProps {
   escolas: Escola[]; // Mantido na assinatura para evitar quebras em outros arquivos
   isDemoMode: boolean;
   isAdmin: boolean;
@@ -41,10 +42,10 @@ export interface ObjetoHabilidadeLink {
 
 export interface ItemPlano {
   id: string;
-  eixoTematico: string;
+  eixoTematico: string; // Direito de Aprendizagem
   sugestoesPedagogicas: string;
-  objetos: ObjetoConhecimento[];
-  habilidades: Habilidade[];
+  objetos: ObjetoConhecimento[]; // Campo de Experiência
+  habilidades: Habilidade[]; // Objetivo de Aprendizagem e Desenvolvimento
   links: ObjetoHabilidadeLink[];
 }
 
@@ -67,18 +68,17 @@ interface RepositorioHabilidade {
   sugestoesPedagogicas?: string;
 }
 
-const COMPONENTES = [
-  'Língua Portuguesa',
-  'Matemática',
-  'Ciências',
-  'História',
-  'Geografia',
-  'Arte',
-  'Educação Física',
-  'Língua Inglesa',
-  'Ensino Religioso',
-  'Campos de Experiência (EI)'
+const FAiXAS_ETARIAS = ['Creche II', 'Creche III', 'Pré I', 'Pré II'];
+
+const CAMPOS_EXPERIENCIA = [
+  'O eu, o outro e o nós',
+  'Corpo, gestos e movimentos',
+  'Traços, sons, cores e formas',
+  'Escuta, fala, pensamento e imaginação',
+  'Espaços, tempos, quantidades, relações e transformações'
 ];
+
+const COMPONENTES = CAMPOS_EXPERIENCIA;
 
 const BIMESTRES = [
   '1º Bimestre',
@@ -88,58 +88,15 @@ const BIMESTRES = [
   'Anual'
 ];
 
-const ANOS_SERIES = [
-  '1º Ano',
-  '2º Ano',
-  '3º Ano',
-  '4º Ano',
-  '5º Ano',
-  '6º Ano',
-  '7º Ano',
-  '8º Ano',
-  '9º Ano',
-  'Creche II',
-  'Creche III',
-  'Pré I',
-  'Pré II',
-  'EJA',
-  'Outros'
+const DIREITOS_APRENDIZAGEM = [
+  { id: 'conviver', label: 'Conviver' },
+  { id: 'brincar', label: 'Brincar' },
+  { id: 'participar', label: 'Participar' },
+  { id: 'explorar', label: 'Explorar' },
+  { id: 'expressar', label: 'Expressar' },
+  { id: 'conhecerse', label: 'Conhecer-se' }
 ];
 
-// BNCC Seed Skills Catalog
-const BNCC_HABILIDADES: RepositorioHabilidade[] = [
-  // Matemática - 1º Ano
-  { id: 'bncc-m1-01', codigo: 'EF01MA01', componente: 'Matemática', anoSerie: '1º Ano', descricao: 'Utilizar números naturais como indicador de quantidade ou de ordem em diferentes situações cotidianas e reconhecer situações em que os números não indicam contagem nem ordem, mas sim código de identificação.' },
-  { id: 'bncc-m1-02', codigo: 'EF01MA02', componente: 'Matemática', anoSerie: '1º Ano', descricao: 'Contar de maneira lúdica, em jogos e brincadeiras, identificando a contagem de rotina e a contagem de objetos de coleções.' },
-  { id: 'bncc-m1-08', codigo: 'EF01MA08', componente: 'Matemática', anoSerie: '1º Ano', descricao: 'Resolver e elaborar problemas de adição e de subtração, envolvendo números naturais de até dois algarismos, com os significados de juntar, acrescentar, separar e retirar, com o suporte de imagens e/ou material manipulável.' },
-  
-  // Língua Portuguesa - 1º Ano
-  { id: 'bncc-lp1-01', codigo: 'EF01LP01', componente: 'Língua Portuguesa', anoSerie: '1º Ano', descricao: 'Reconhecer que textos são lidos e escritos da esquerda para a direita e de cima para baixo.' },
-  { id: 'bncc-lp1-02', codigo: 'EF01LP02', componente: 'Língua Portuguesa', anoSerie: '1º Ano', descricao: 'Escrever, alfabeticamente, como e onde convier, de próprio punho ou por meio de outra tecnologia de escrita, palavras e frases, com autonomia.' },
-  { id: 'bncc-lp1-08', codigo: 'EF01LP08', componente: 'Língua Portuguesa', anoSerie: '1º Ano', descricao: 'Relacionar elements sonoros (sílabas, fonemas, partes de palavras) com sua representação escrita.' },
-
-  // Matemática - 2º Ano
-  { id: 'bncc-m2-01', codigo: 'EF02MA01', componente: 'Matemática', anoSerie: '2º Ano', descricao: 'Comparar e ordenar números naturais (até a ordem de centenas) pela compreensão de características do sistema de numeração decimal (valor posicional e função do zero).' },
-  { id: 'bncc-m2-05', codigo: 'EF02MA05', componente: 'Matemática', anoSerie: '2º Ano', descricao: 'Construir fatos básicos da adição e da subtração e utilizá-los no cálculo mental ou escrito.' },
-
-  // Língua Portuguesa - 2º Ano
-  { id: 'bncc-lp2-01', codigo: 'EF02LP01', componente: 'Língua Portuguesa', anoSerie: '2º Ano', descricao: 'Utilizar, ao escrever o texto, grafia correta de palavras conhecidas ou com estruturas silábicas regulares.' },
-  { id: 'bncc-lp2-04', codigo: 'EF02LP04', componente: 'Língua Portuguesa', anoSerie: '2º Ano', descricao: 'Ler e escrever palavras novas com precisão na decodificação e na ortografia.' },
-
-  // Matemática - 3º Ano
-  { id: 'bncc-m3-01', codigo: 'EF03MA01', componente: 'Matemática', anoSerie: '3º Ano', descricao: 'Ler, escrever e comparar números naturais de até quatro ordens, com a compreensão de características do sistema de numeração decimal.' },
-  { id: 'bncc-m3-05', codigo: 'EF03MA05', componente: 'Matemática', anoSerie: '3º Ano', descricao: 'Utilizar diferentes procedimentos de cálculo mental e escrito, resolvendo problemas de adição e subtração.' },
-
-  // Língua Portuguesa - 3º Ano
-  { id: 'bncc-lp3-01', codigo: 'EF03LP01', componente: 'Língua Portuguesa', anoSerie: '3º Ano', descricao: 'Ler e escrever palavras com sílabas complexas (consoante-vogal-consoante, consoante-consoante-vogal) focando na ortografia correta.' },
-
-  // Outros anos e componentes (exemplos)
-  { id: 'bncc-c1-01', codigo: 'EF01CI01', componente: 'Ciências', anoSerie: '1º Ano', descricao: 'Comparar características de diferentes materiais presentes em objetos de uso cotidiano, discutindo sua origem e descarte.' },
-  { id: 'bncc-h1-01', codigo: 'EF01HI01', componente: 'História', anoSerie: '1º Ano', descricao: 'Identificar aspectos do crescimento e da história pessoal, por meio do registro de lembranças e documentos.' },
-  { id: 'bncc-g1-01', codigo: 'EF01GE01', componente: 'Geografia', anoSerie: '1º Ano', descricao: 'Descrever características observadas de seus lugares de vivência (moradia, escola etc.) e identificar semelhanças e diferenças.' }
-];
-
-// Helper to generate IDs
 const generateId = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
@@ -156,72 +113,90 @@ const createDefaultItem = (): ItemPlano => ({
   links: []
 });
 
-export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, userEmail, currentUser, subHeader }) => {
+export const PlanoCursoInfantil: React.FC<PlanoCursoInfantilProps> = ({ 
+  isDemoMode, 
+  isAdmin, 
+  userEmail, 
+  currentUser, 
+  subHeader 
+}) => {
   const { showNotification } = useNotification();
   const [plans, setPlans] = useState<CoursePlan[]>([]);
-
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Dynamic ECE Objectives repository generated from BNCC_INFANTIL
+  const baseECEObjectives = useMemo(() => {
+    const list: RepositorioHabilidade[] = [];
+    Object.entries(BNCC_INFANTIL).forEach(([campo, ageGroups]) => {
+      Object.entries(ageGroups).forEach(([ageGroup, objectives]) => {
+        objectives.forEach((obj: any) => {
+          // Map ECE BNCC groups to specific grade selections
+          const seriesList = ageGroup === 'Crianças bem pequenas' 
+            ? ['Creche II', 'Creche III'] 
+            : ['Pré I', 'Pré II'];
+          
+          seriesList.forEach(serie => {
+            list.push({
+              id: `ece-${obj.code}-${serie.replace(/\s/g, '')}`,
+              codigo: obj.code,
+              componente: campo,
+              anoSerie: serie,
+              descricao: obj.desc,
+              sugestoesPedagogicas: ''
+            });
+          });
+        });
+      });
+    });
+    return list;
+  }, []);
+
   const handleDownloadTemplate = () => {
-    // Columns headers
     const headers = [
       'Ano de Referência',
       'Ano/Série',
-      'Componente Curricular',
+      'Campo de experiência',
       'Bimestre / Período',
-      'Eixo Temático',
-      'Objetos de Conhecimento',
-      'Habilidades (Códigos separados por ;)',
-      'Habilidades (Descrições separadas por ;)',
+      'Direito de Aprendizagem',
+      'Saberes e Conhecimentos',
+      'Objetivos de Aprendizagem (Códigos separados por ;)',
+      'Objetivos de Aprendizagem (Descrições separadas por ;)',
       'Sugestões Pedagógicas (Separadas por ;)'
     ];
 
-    // Some highly rich example rows
     const data = [
       {
         'Ano de Referência': 2026,
-        'Ano/Série': '1º Ano',
-        'Componente Curricular': 'Matemática',
+        'Ano/Série': 'Creche III',
+        'Campo de experiência': 'O eu, o outro e o nós',
         'Bimestre / Período': '1º Bimestre',
-        'Eixo Temático': 'Números',
-        'Objetos de Conhecimento': 'Leitura, escrita e comparação de números naturais; Contagem lúdica',
-        'Habilidades (Códigos separados por ;)': 'EF01MA01; EF01MA02',
-        'Habilidades (Descrições separadas por ;)': 'Utilizar números naturais como indicador de quantidade ou de ordem em diferentes situações cotidianas e reconhecer situações in que os números não indicam contagem nem ordem, mas sim código de identificação.; Contar de maneira lúdica, em jogos e brincadeiras, identificando a contagem de rotina e a contagem de objetos de coleções.',
-        'Sugestões Pedagógicas (Separadas por ;)': 'Utilizar jogos de tabuleiro, tampinhas de garrafa e contagens de objetos cotidianos.; Contar em roda, brincando com parlendas e cantigas de roda de forma dinâmica.'
-      },
-      {
-        'Ano de Referência': 2026,
-        'Ano/Série': '1º Ano',
-        'Componente Curricular': 'Língua Portuguesa',
-        'Bimestre / Período': '1º Bimestre',
-        'Eixo Temático': 'Oralidade',
-        'Objetos de Conhecimento': 'Constituição da oralidade; Escuta atenta',
-        'Habilidades (Códigos separados por ;)': 'EF01LP01; EF01LP02',
-        'Habilidades (Descrições separadas por ;)': 'Reconhecer que textos são lidos e escritos da esquerda para a direita e de cima para baixo.; Escrever, alfabeticamente, como e onde convier, de próprio punho ou por meio de outra tecnologia de escrita, palavras e frases, com autonomia.',
-        'Sugestões Pedagógicas (Separadas por ;)': 'Roda de conversa diária, contação de histórias infantis e canto de parlendas.; Escrita espontânea no quadro, formação de palavras com alfabeto móvel.'
+        'Direito de Aprendizagem': 'Brincar',
+        'Saberes e Conhecimentos': 'Demonstrar atitudes de cuidado e solidariedade na interação com crianças e adultos.',
+        'Objetivos de Aprendizagem (Códigos separados por ;)': 'EI02EO01; EI02EO02',
+        'Objetivos de Aprendizagem (Descrições separadas por ;)': 'Demonstrar atitudes de cuidado e solidariedade na interação com crianças e adultos.; Demonstrar imagem positiva de si e confiança em sua capacidade para enfrentar dificuldades e desafios.',
+        'Sugestões Pedagógicas (Separadas por ;)': 'Promover momentos de interação e acolhida.; Estimular a autonomia das crianças em pequenas ações diárias.'
       }
     ];
 
     const wsData = [headers, ...data.map(row => headers.map(h => row[h as keyof typeof row]))];
     const ws = XLSX.utils.aoa_to_sheet(wsData);
 
-    // Apply column widths to make it super premium
     ws['!cols'] = [
       { wch: 18 }, // Ano de Referencia
       { wch: 15 }, // Ano/Serie
-      { wch: 25 }, // Componente Curricular
+      { wch: 25 }, // Campo de experiência
       { wch: 20 }, // Bimestre / Periodo
-      { wch: 20 }, // Eixo Tematico
-      { wch: 50 }, // Objetos de Conhecimento
-      { wch: 40 }, // Habilidades Codigos
-      { wch: 60 }, // Habilidades Descricoes
+      { wch: 25 }, // Direito de Aprendizagem
+      { wch: 30 }, // Saberes e Conhecimentos
+      { wch: 45 }, // Objetivos Codigos
+      { wch: 60 }, // Objetivos Descricoes
       { wch: 60 }  // Sugestoes Pedagogicas
     ];
 
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Plano de Curso Modelo');
-    XLSX.writeFile(wb, 'Modelo_Importacao_PlanoCurso.xlsx');
-    showNotification('success', 'Planilha modelo baixada com sucesso!');
+    XLSX.utils.book_append_sheet(wb, ws, 'Plano de Curso ECE Modelo');
+    XLSX.writeFile(wb, 'Modelo_Importacao_PlanoCurso_Infantil.xlsx');
+    showNotification('success', 'Planilha modelo de Educação Infantil baixada com sucesso!');
   };
 
   const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -236,7 +211,6 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
         const wsName = wb.SheetNames[0];
         const ws = wb.Sheets[wsName];
         
-        // Parse rows as raw objects
         const rawRows = XLSX.utils.sheet_to_json<any>(ws);
         
         if (rawRows.length === 0) {
@@ -244,7 +218,6 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
           return;
         }
 
-        // Map raw rows to Grouped Plans
         const groups: Record<string, {
           anoReferencia: string;
           anoSerie: string;
@@ -254,7 +227,6 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
         }> = {};
 
         rawRows.forEach((row: any) => {
-          // Normalize column names in case they have whitespace/accents issues
           const getValue = (keys: string[]) => {
             const foundKey = Object.keys(row).find(k => 
               keys.some(key => k.toLowerCase().replace(/[\s\-\_\/]/g, '').includes(key.toLowerCase().replace(/[\s\-\_\/]/g, '')))
@@ -264,30 +236,20 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
 
           const anoRefVal = String(getValue(['referência', 'referencia', 'ano']) || new Date().getFullYear()).trim();
           const anoSerieVal = String(getValue(['série', 'serie', 'ano/série', 'ano/serie']) || '').trim();
-          const componenteVal = String(getValue(['componente', 'curricular']) || '').trim();
           const bimestreVal = String(getValue(['bimestre', 'período', 'periodo']) || '').trim();
-          const eixoVal = String(getValue(['eixo', 'temático', 'tematico']) || '').trim();
-          const objetosVal = String(getValue(['objeto', 'conhecimento', 'objetos']) || '').trim();
+          const direitoVal = String(getValue(['direito', 'eixo', 'temático', 'tematico']) || '').trim();
+          const campoVal = String(getValue(['saber', 'saberes', 'conhecimento', 'conhecimentos', 'campo', 'experiência', 'experiencia', 'objeto', 'conhecimento', 'objetos']) || '').trim();
+          const componenteVal = String(getValue(['componente', 'campoexperiência', 'campo_experiencia', 'campoexperiencia', 'experiência']) || 'O eu, o outro e o nós').trim();
           const habsVal = String(
-            getValue(['código', 'codigo', 'códigos', 'codigos']) || 
-            getValue(['habilidade', 'habilidades']) || 
+            getValue(['código', 'codigo', 'códigos', 'codigos', 'objetivo', 'objetivos']) || 
             ''
           ).trim();
           const descsVal = String(getValue(['descrição', 'descricao', 'descrições', 'descricoes']) || '').trim();
           const sugestoesVal = String(getValue(['sugestões', 'sugestoes', 'recursos', 'pedagógicas', 'pedagogicas']) || '').trim();
 
-          // Validation
-          if (!anoSerieVal || !componenteVal || !bimestreVal || !eixoVal) {
-            // Skip invalid row
-            return;
+          if (!anoSerieVal || !bimestreVal || !direitoVal) {
+            return; // Skip invalid row
           }
-
-          // Match Component, Bimestre and AnoSerie to valid options in our system for normalization
-          const matchedComponente = COMPONENTES.find(c => 
-            c.toLowerCase().replace(/[\s]/g, '') === componenteVal.toLowerCase().replace(/[\s]/g, '')
-          ) || COMPONENTES.find(c => 
-            c.toLowerCase().includes(componenteVal.toLowerCase()) || componenteVal.toLowerCase().includes(c.toLowerCase())
-          ) || componenteVal;
 
           const matchedBimestre = BIMESTRES.find(b => 
             b.toLowerCase().replace(/[\s]/g, '') === bimestreVal.toLowerCase().replace(/[\s]/g, '')
@@ -295,26 +257,25 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
             b.toLowerCase().includes(bimestreVal.toLowerCase()) || bimestreVal.toLowerCase().includes(b.toLowerCase())
           ) || bimestreVal;
 
-          const matchedAnoSerie = ANOS_SERIES.find(a => 
+          const matchedAnoSerie = FAiXAS_ETARIAS.find(a => 
             a.toLowerCase().replace(/[\s]/g, '') === anoSerieVal.toLowerCase().replace(/[\s]/g, '')
-          ) || ANOS_SERIES.find(a => 
+          ) || FAiXAS_ETARIAS.find(a => 
             a.toLowerCase().includes(anoSerieVal.toLowerCase()) || anoSerieVal.toLowerCase().includes(a.toLowerCase())
           ) || anoSerieVal;
 
-          const groupKey = `${anoRefVal}-${matchedAnoSerie}-${matchedComponente}-${matchedBimestre}`;
+          const groupKey = `${anoRefVal}-${matchedAnoSerie}-${matchedBimestre}`;
 
           if (!groups[groupKey]) {
             groups[groupKey] = {
               anoReferencia: anoRefVal,
               anoSerie: matchedAnoSerie,
-              componente: matchedComponente,
+              componente: CAMPOS_EXPERIENCIA.includes(componenteVal) ? componenteVal : (CAMPOS_EXPERIENCIA.find(c => c.toLowerCase().includes(componenteVal.toLowerCase())) || 'O eu, o outro e o nós'),
               bimestre: matchedBimestre,
               itens: []
             };
           }
 
-          // Parse objects (separated by semicolon)
-          const objetos: ObjetoConhecimento[] = objetosVal
+          const objetos: ObjetoConhecimento[] = campoVal
             .split(/[;;\n]/)
             .map(desc => desc.trim())
             .filter(Boolean)
@@ -323,26 +284,22 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
               descricao: desc
             }));
 
-          // Parse skills codes and manual descriptions strictly by semicolon
           const parsedHabsList = habsVal.split(';').map(code => code.trim().toUpperCase()).filter(Boolean);
           const parsedDescsList = descsVal.split(';').map(desc => desc.trim()).filter(Boolean);
           const parsedSugestoesList = sugestoesVal.split(';').map(s => s.trim()).filter(Boolean);
 
           const habilidades: Habilidade[] = parsedHabsList.map((code, idx) => {
-            // Check if there is a manual description at the same index
             const manualDesc = parsedDescsList[idx]?.trim();
             const manualSugestao = parsedSugestoesList[idx]?.trim();
-            // Try to find the full description of this skill in our repository!
             const matchedRepoHab = habRepository.find(h => h.codigo.trim().toUpperCase() === code);
             return {
               id: matchedRepoHab?.id || generateId(),
               codigo: code,
-              descricao: manualDesc || matchedRepoHab?.descricao || `Habilidade ${code} importada.`,
+              descricao: manualDesc || matchedRepoHab?.descricao || `Objetivo ${code} importado.`,
               sugestoesPedagogicas: manualSugestao || matchedRepoHab?.sugestoesPedagogicas || ''
             };
           });
 
-          // Generate links between all objects and all skills in this Eixo Tematico row!
           const links: ObjetoHabilidadeLink[] = [];
           objetos.forEach(obj => {
             habilidades.forEach(hab => {
@@ -355,7 +312,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
 
           groups[groupKey].itens.push({
             id: generateId(),
-            eixoTematico: eixoVal,
+            eixoTematico: direitoVal,
             sugestoesPedagogicas: sugestoesVal,
             objetos,
             habilidades,
@@ -363,29 +320,26 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
           });
         });
 
-        // Add imported plans to plans list
         const importedCount = Object.keys(groups).length;
         if (importedCount === 0) {
-          showNotification('error', 'Nenhum plano válido encontrado na planilha. Verifique as colunas obrigatórias.');
+          showNotification('error', 'Nenhum plano válido encontrado na planilha.');
           return;
         }
 
         let updatedPlans = [...plans];
         const importPromises = Object.values(groups).map(async (importedPlan) => {
-          // Check if there is an existing plan for this combination
           const existingIdx = updatedPlans.findIndex(p => 
             p.anoReferencia === importedPlan.anoReferencia &&
             p.anoSerie === importedPlan.anoSerie &&
-            p.componente === importedPlan.componente &&
             p.bimestre === importedPlan.bimestre
           );
 
           const payload: CoursePlan = {
             id: existingIdx >= 0 ? updatedPlans[existingIdx].id : generateId(),
             anoReferencia: importedPlan.anoReferencia,
-            anoSerie: importedPlan.anoSerie,
             componente: importedPlan.componente,
             bimestre: importedPlan.bimestre,
+            anoSerie: importedPlan.anoSerie,
             itens: importedPlan.itens,
             criadoEm: new Date().toISOString()
           };
@@ -400,14 +354,14 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
             const dbPayload = {
               id: payload.id,
               ano_referencia: payload.anoReferencia,
-              componente: payload.componente,
+              campo_experiencia: payload.componente,
               bimestre: payload.bimestre,
               ano_serie: payload.anoSerie,
               itens: payload.itens,
               updated_at: new Date().toISOString(),
               updated_by: userEmail || currentUser?.contato || 'user'
             };
-            const { error } = await supabase.from('planos_curso').upsert(dbPayload);
+            const { error } = await supabase.from('planos_curso_infantil').upsert(dbPayload);
             if (error) throw error;
           }
         });
@@ -416,38 +370,37 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
           .then(() => {
             setPlans(updatedPlans);
             if (isDemoMode) {
-              localStorage.setItem('sigar_planos_curso', JSON.stringify(updatedPlans));
+              localStorage.setItem('sigar_planos_curso_infantil', JSON.stringify(updatedPlans));
             }
-            showNotification('success', `${importedCount} Plano(s) de Curso importado(s) e unificado(s) com sucesso!`);
-            // Reset file input
+            showNotification('success', `${importedCount} Plano(s) de Curso ECE importado(s) com sucesso!`);
             if (fileInputRef.current) fileInputRef.current.value = '';
           })
           .catch(err => {
             console.error('Erro na importação Supabase:', err);
-            showNotification('error', 'Erro ao salvar os planos importados no banco de dados.');
+            showNotification('error', 'Erro ao salvar os planos importados no banco.');
           });
       } catch (err) {
         console.error('Erro na importação:', err);
-        showNotification('error', 'Erro ao ler a planilha. Verifique a formatação do arquivo.');
+        showNotification('error', 'Erro ao ler a planilha. Verifique a formatação.');
       }
     };
     reader.readAsBinaryString(file);
   };
-  
+
   // Form State
   const [editingId, setEditingId] = useState<string | null>(null);
   const [anoReferencia, setAnoReferencia] = useState(new Date().getFullYear().toString());
-  const [anoSerie, setAnoSerie] = useState(ANOS_SERIES[0]);
+  const [anoSerie, setAnoSerie] = useState(FAiXAS_ETARIAS[0]);
   const [componente, setComponente] = useState(COMPONENTES[0]);
   const [bimestre, setBimestre] = useState(BIMESTRES[0]);
-  
-  // Structured Planning Items
-  const [itens, setItens] = useState<ItemPlano[]>([createDefaultItem()]);
 
-  // Global Skills Repository
+  // Structured Planning Items
+  const [itens, setItens] = useState<ItemPlano[] | any[]>([createDefaultItem()]);
+
+  // Global Skills/Objectives Repository
   const [habRepository, setHabRepository] = useState<RepositorioHabilidade[]>([]);
 
-  // Habilidades Modal States
+  // Objectives Modal States
   const [isHabModalOpen, setIsHabModalOpen] = useState(false);
   const [activeItemIdForHab, setActiveItemIdForHab] = useState<string | null>(null);
   const [modalTab, setModalTab] = useState<'select' | 'create'>('select');
@@ -456,16 +409,16 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
   const [modalAnoSerieFilter, setModalAnoSerieFilter] = useState('ALL');
   const [editingHabId, setEditingHabId] = useState<string | null>(null);
 
-  // Custom Habilidade Form States
+  // Custom Objective Form States
   const [newHabCode, setNewHabCode] = useState('');
   const [newHabDesc, setNewHabDesc] = useState('');
-  const [newHabComponente, setNewHabComponente] = useState(COMPONENTES[0]);
-  const [newHabAnoSerie, setNewHabAnoSerie] = useState(ANOS_SERIES[0]);
+  const [newHabComponente, setNewHabComponente] = useState(CAMPOS_EXPERIENCIA[0]);
+  const [newHabAnoSerie, setNewHabAnoSerie] = useState(FAiXAS_ETARIAS[0]);
   const [newHabEixoTematico, setNewHabEixoTematico] = useState('');
   const [newHabObjetoDesc, setNewHabObjetoDesc] = useState('');
   const [newHabSugestoes, setNewHabSugestoes] = useState('');
 
-  // Filters
+  // Filters for History Table
   const [searchTerm, setSearchTerm] = useState('');
   const [gradeFilter, setGradeFilter] = useState('ALL');
 
@@ -474,27 +427,69 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
 
   const fetchRealData = async () => {
     try {
-      // 1. Fetch planos_curso
       const { data: plansData, error: plansError } = await supabase
-        .from('planos_curso')
+        .from('planos_curso_infantil')
         .select('*')
         .eq('ativo', true)
         .order('created_at', { ascending: false });
 
       if (plansError) throw plansError;
 
-      const formattedPlans: CoursePlan[] = (plansData || []).map((p: any) => ({
-        id: p.id,
-        anoReferencia: p.ano_referencia,
-        componente: p.componente,
-        bimestre: p.bimestre,
-        anoSerie: p.ano_serie,
-        itens: p.itens || [],
-        criadoEm: p.created_at
-      }));
+      // On-the-fly migration of ECE legacy course plans
+      const formattedPlans: CoursePlan[] = (plansData || []).map((p: any) => {
+        // If the legacy course plan has old ECE items format, migrate them on the fly
+        const migratedItens = (p.itens || []).map((it: any) => {
+          if (it.eixoTematico !== undefined) return it;
+          
+          const rightsLabel = (it.direitos || []).map((d: string) => {
+            const match = DIREITOS_APRENDIZAGEM.find(x => x.id === d);
+            return match ? match.label : d;
+          }).join(', ') || 'Direitos Gerais';
+
+          const objetosList = p.campo_experiencia && p.campo_experiencia !== 'Educação Infantil'
+            ? [{ id: 'migrated-obj', descricao: p.campo_experiencia }]
+            : [];
+          
+          const habilidadesList = (it.objetivos || []).map((o: any) => ({
+            id: o.id || `migrated-obj-${o.code}`,
+            codigo: o.code,
+            descricao: o.desc || o.short || '',
+            sugestoesPedagogicas: it.sugestoesPedagogicas || ''
+          }));
+
+          const linksList: ObjetoHabilidadeLink[] = [];
+          objetosList.forEach(obj => {
+            habilidadesList.forEach((hab: Habilidade) => {
+              linksList.push({
+                objetoId: obj.id,
+                habilidadeId: hab.id
+              });
+            });
+          });
+
+          return {
+            id: it.id || generateId(),
+            eixoTematico: rightsLabel,
+            sugestoesPedagogicas: it.sugestoesPedagogicas || '',
+            objetos: objetosList,
+            habilidades: habilidadesList,
+            links: linksList
+          };
+        });
+
+        return {
+          id: p.id,
+          anoReferencia: p.ano_referencia,
+          componente: p.campo_experiencia || '',
+          bimestre: p.bimestre,
+          anoSerie: p.ano_serie,
+          itens: migratedItens,
+          criadoEm: p.created_at
+        };
+      });
       setPlans(formattedPlans);
 
-      // 2. Fetch habilidades_repositorio
+      // Fetch additional custom objectives
       const { data: habsData, error: habsError } = await supabase
         .from('habilidades_repositorio')
         .select('*')
@@ -511,10 +506,9 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
         sugestoesPedagogicas: h.sugestoes_pedagogicas
       }));
       
-      // Merge with BNCC seed just in case, but prioritize DB records
       const combinedHabs = [...formattedHabs];
-      BNCC_HABILIDADES.forEach(seedHab => {
-        if (!combinedHabs.some(h => h.codigo === seedHab.codigo)) {
+      baseECEObjectives.forEach(seedHab => {
+        if (!combinedHabs.some(h => h.codigo === seedHab.codigo && h.anoSerie === seedHab.anoSerie)) {
           combinedHabs.push(seedHab);
         }
       });
@@ -524,42 +518,65 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
       console.error('Erro ao buscar dados do Supabase:', err);
       showNotification('error', 'Falha ao carregar dados do Supabase. Utilizando dados locais.');
       setPlans([]);
-      setHabRepository(BNCC_HABILIDADES);
+      setHabRepository(baseECEObjectives);
     }
   };
 
-  // Load from localStorage with migration
   useEffect(() => {
     if (isDemoMode) {
-      const saved = localStorage.getItem('sigar_planos_curso');
+      const saved = localStorage.getItem('sigar_planos_curso_infantil');
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed)) {
+            // Apply similar on-the-fly migration to demo data if needed
             const migrated = parsed.map((p: any) => {
-              if (p.itens && Array.isArray(p.itens)) return p;
-              
-              // Migrate old structure
-              const migratedItem: ItemPlano = {
-                id: generateId(),
-                eixoTematico: p.titulo || 'Eixo Temático Geral',
-                sugestoesPedagogicas: [
-                  p.metodologia ? `Metodologia: ${p.metodologia}` : '',
-                  p.recursos ? `Recursos: ${p.recursos}` : '',
-                  p.avaliacao ? `Avaliação: ${p.avaliacao}` : ''
-                ].filter(Boolean).join('\n'),
-                objetos: p.conteudo ? [{ id: 'old-content', descricao: p.conteudo }] : [],
-                habilidades: p.objetivos ? [{ id: 'old-objectives', codigo: 'HAB', descricao: p.objetivos }] : [],
-                links: p.conteudo && p.objetivos ? [{ objetoId: 'old-content', habilidadeId: 'old-objectives' }] : []
-              };
-              
+              const migratedItens = (p.itens || []).map((it: any) => {
+                if (it.eixoTematico !== undefined) return it;
+
+                const rightsLabel = (it.direitos || []).map((d: string) => {
+                  const match = DIREITOS_APRENDIZAGEM.find(x => x.id === d);
+                  return match ? match.label : d;
+                }).join(', ') || 'Direitos Gerais';
+
+                const objetosList = p.campoExperiencia && p.campoExperiencia !== 'Educação Infantil'
+                  ? [{ id: 'migrated-obj', descricao: p.campoExperiencia }]
+                  : [];
+
+                const habilidadesList = (it.objetivos || []).map((o: any) => ({
+                  id: o.id || `migrated-obj-${o.code}`,
+                  codigo: o.code,
+                  descricao: o.desc || o.short || '',
+                  sugestoesPedagogicas: it.sugestoesPedagogicas || ''
+                }));
+
+                const linksList: ObjetoHabilidadeLink[] = [];
+                objetosList.forEach((obj: any) => {
+                  habilidadesList.forEach((hab: Habilidade) => {
+                    linksList.push({
+                      objetoId: obj.id,
+                      habilidadeId: hab.id
+                    });
+                  });
+                });
+
+                return {
+                  id: it.id || generateId(),
+                  eixoTematico: rightsLabel,
+                  sugestoesPedagogicas: it.sugestoesPedagogicas || '',
+                  objetos: objetosList,
+                  habilidades: habilidadesList,
+                  links: linksList
+                };
+              });
+
               return {
                 id: p.id,
                 anoReferencia: p.anoReferencia,
-                componente: p.componente,
+                componente: p.campoExperiencia || p.componente || '',
                 bimestre: p.bimestre,
                 anoSerie: p.anoSerie || '',
-                itens: [migratedItem],
+                itens: migratedItens,
                 criadoEm: p.criadoEm || new Date().toISOString()
               };
             });
@@ -570,23 +587,22 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
         }
       }
 
-      // Load global skills repository
-      const savedHabs = localStorage.getItem('sigar_repositorio_habilidades');
+      const savedHabs = localStorage.getItem('sigar_repositorio_objetivos_infantil');
       if (savedHabs) {
         try {
           setHabRepository(JSON.parse(savedHabs));
         } catch (e) {
           console.error(e);
-          setHabRepository(BNCC_HABILIDADES);
+          setHabRepository(baseECEObjectives);
         }
       } else {
-        setHabRepository(BNCC_HABILIDADES);
-        localStorage.setItem('sigar_repositorio_habilidades', JSON.stringify(BNCC_HABILIDADES));
+        setHabRepository(baseECEObjectives);
+        localStorage.setItem('sigar_repositorio_objetivos_infantil', JSON.stringify(baseECEObjectives));
       }
     } else {
       fetchRealData();
     }
-  }, [isDemoMode]);
+  }, [isDemoMode, baseECEObjectives]);
 
   // --- Dynamic Item Planning Helpers ---
   const updateItemField = (itemId: string, field: keyof ItemPlano, value: any) => {
@@ -613,8 +629,8 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
       if (item.id !== itemId) return item;
       return {
         ...item,
-        objetos: item.objetos.filter(o => o.id !== objetoId),
-        links: item.links.filter(l => l.objetoId !== objetoId)
+        objetos: item.objetos.filter((o: ObjetoConhecimento) => o.id !== objetoId),
+        links: item.links.filter((l: ObjetoHabilidadeLink) => l.objetoId !== objetoId)
       };
     }));
   };
@@ -627,12 +643,11 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
   // --- Modal Helpers ---
   const openHabilidadesModal = (itemId: string) => {
     setActiveItemIdForHab(itemId);
-    setModalComponenteFilter(componente);
+    setModalComponenteFilter('ALL');
     setModalAnoSerieFilter(anoSerie);
-    setNewHabComponente(componente);
+    setNewHabComponente(CAMPOS_EXPERIENCIA[0]);
     setNewHabAnoSerie(anoSerie);
 
-    // Pre-populate quick-form fields from current active planning item
     const activeItem = itens.find(item => item.id === itemId);
     if (activeItem) {
       setNewHabEixoTematico(activeItem.eixoTematico || '');
@@ -650,13 +665,13 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
 
   const isHabInActiveItem = (codigo: string) => {
     const activeItem = itens.find(item => item.id === activeItemIdForHab);
-    return activeItem ? activeItem.habilidades.some(h => h.codigo === codigo) : false;
+    return activeItem ? activeItem.habilidades.some((h: Habilidade) => h.codigo === codigo) : false;
   };
 
   const addHabilidadeToItem = (itemId: string, hab: Omit<Habilidade, 'id'> | Habilidade) => {
     setItens(prev => prev.map(item => {
       if (item.id !== itemId) return item;
-      const exists = item.habilidades.some(h => h.codigo === hab.codigo);
+      const exists = item.habilidades.some((h: Habilidade) => h.codigo === hab.codigo);
       if (exists) return item;
       
       const newHab: Habilidade = {
@@ -675,15 +690,16 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
   const removeHabilidadeByCode = (itemId: string, codigo: string) => {
     setItens(prev => prev.map(item => {
       if (item.id !== itemId) return item;
-      const habToRemove = item.habilidades.find(h => h.codigo === codigo);
+      const habToRemove = item.habilidades.find((h: Habilidade) => h.codigo === codigo);
       if (!habToRemove) return item;
       return {
         ...item,
-        habilidades: item.habilidades.filter(h => h.codigo !== codigo),
-        links: item.links.filter(l => l.habilidadeId !== habToRemove.id)
+        habilidades: item.habilidades.filter((h: Habilidade) => h.codigo !== codigo),
+        links: item.links.filter((l: ObjetoHabilidadeLink) => l.habilidadeId !== habToRemove.id)
       };
     }));
   };
+
   const handleEditHabilidade = (hab: RepositorioHabilidade) => {
     setEditingHabId(hab.id);
     setNewHabCode(hab.codigo);
@@ -696,18 +712,18 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
     let resolvedSugestoes = hab.sugestoesPedagogicas || '';
 
     if (activeItemIdForHab) {
-      const activeItem = itens.find(it => it.id === activeItemIdForHab);
+      const activeItem = itens.find((it: ItemPlano) => it.id === activeItemIdForHab);
       if (activeItem) {
         resolvedEixo = activeItem.eixoTematico || '';
 
-        const skillInItem = activeItem.habilidades.find(h => h.codigo === hab.codigo || h.id === hab.id);
+        const skillInItem = activeItem.habilidades.find((h: Habilidade) => h.codigo === hab.codigo || h.id === hab.id);
         if (skillInItem) {
           if (skillInItem.sugestoesPedagogicas !== undefined) {
             resolvedSugestoes = skillInItem.sugestoesPedagogicas;
           }
-          const link = activeItem.links.find(l => l.habilidadeId === skillInItem.id);
+          const link = activeItem.links.find((l: ObjetoHabilidadeLink) => l.habilidadeId === skillInItem.id);
           if (link) {
-            const obj = activeItem.objetos.find(o => o.id === link.objetoId);
+            const obj = activeItem.objetos.find((o: ObjetoConhecimento) => o.id === link.objetoId);
             if (obj) {
               resolvedObjeto = obj.descricao || '';
             }
@@ -723,7 +739,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
   };
 
   const handleDeleteHabilidade = async (hab: RepositorioHabilidade) => {
-    if (confirm(`Tem certeza que deseja excluir permanentemente a habilidade "${hab.codigo}" do repositório?`)) {
+    if (confirm(`Tem certeza que deseja excluir permanentemente o objetivo "${hab.codigo}" do repositório?`)) {
       try {
         if (!isDemoMode) {
           const { error } = await supabase
@@ -734,40 +750,38 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
           if (error) throw error;
         }
 
-        const updatedRepo = habRepository.filter(h => h.id !== hab.id);
+        const updatedRepo = habRepository.filter((h: RepositorioHabilidade) => h.id !== hab.id);
         setHabRepository(updatedRepo);
 
         if (isDemoMode) {
-          localStorage.setItem('sigar_repositorio_habilidades', JSON.stringify(updatedRepo));
+          localStorage.setItem('sigar_repositorio_objetivos_infantil', JSON.stringify(updatedRepo));
         }
 
-        // Also remove from current items if active
-        setItens(prev => prev.map(item => {
+        setItens(prev => prev.map((item: ItemPlano) => {
           return {
             ...item,
-            habilidades: item.habilidades.filter(h => h.codigo !== hab.codigo),
-            links: item.links.filter(l => l.habilidadeId !== hab.id)
+            habilidades: item.habilidades.filter((h: Habilidade) => h.codigo !== hab.codigo),
+            links: item.links.filter((l: ObjetoHabilidadeLink) => l.habilidadeId !== hab.id)
           };
         }));
 
-        showNotification('success', `Habilidade ${hab.codigo} excluída com sucesso do repositório.`);
+        showNotification('success', `Objetivo ${hab.codigo} excluído com sucesso do repositório.`);
       } catch (err) {
-        console.error('Erro ao excluir habilidade:', err);
-        showNotification('error', 'Erro ao excluir habilidade do repositório.');
+        console.error('Erro ao excluir objetivo:', err);
+        showNotification('error', 'Erro ao excluir objetivo do repositório.');
       }
     }
   };
 
   const handleCreateCustomHabilidade = async () => {
     if (!newHabCode.trim() || !newHabDesc.trim()) {
-      showNotification('error', 'Preencha todos os campos da nova habilidade.');
+      showNotification('error', 'Preencha todos os campos do novo objetivo.');
       return;
     }
 
     const codeUpper = newHabCode.trim().toUpperCase();
 
     if (editingHabId) {
-      // Editing Mode
       let updatedHab: RepositorioHabilidade = {
         id: editingHabId,
         codigo: codeUpper,
@@ -792,29 +806,28 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
           .upsert(dbHab, { onConflict: 'id' });
 
         if (error) {
-          console.error('Erro ao salvar habilidade no Supabase:', error);
-          showNotification('error', 'Erro ao salvar alterações da habilidade no banco de dados.');
+          console.error('Erro ao salvar no Supabase:', error);
+          showNotification('error', 'Erro ao salvar alterações no banco.');
           return;
         }
       }
 
-      const updatedRepo = habRepository.map(h => h.id === editingHabId ? updatedHab : h);
+      const updatedRepo = habRepository.map((h: RepositorioHabilidade) => h.id === editingHabId ? updatedHab : h);
       setHabRepository(updatedRepo);
 
       if (isDemoMode) {
-        localStorage.setItem('sigar_repositorio_habilidades', JSON.stringify(updatedRepo));
+        localStorage.setItem('sigar_repositorio_objetivos_infantil', JSON.stringify(updatedRepo));
       }
 
-      // Update in active and other items
-      setItens(prev => prev.map(item => {
-        const hasHab = item.habilidades.some(h => h.id === editingHabId);
+      setItens(prev => prev.map((item: ItemPlano) => {
+        const hasHab = item.habilidades.some((h: Habilidade) => h.id === editingHabId);
         const isCurrentlyActive = item.id === activeItemIdForHab;
 
         if (!hasHab && !isCurrentlyActive) return item;
 
         let updatedHabilidades = [...item.habilidades];
         if (hasHab) {
-          updatedHabilidades = item.habilidades.map(h => h.id === editingHabId ? { ...h, codigo: codeUpper, descricao: updatedHab.descricao, sugestoesPedagogicas: newHabSugestoes.trim() } : h);
+          updatedHabilidades = item.habilidades.map((h: Habilidade) => h.id === editingHabId ? { ...h, codigo: codeUpper, descricao: updatedHab.descricao, sugestoesPedagogicas: newHabSugestoes.trim() } : h);
         }
 
         let updatedEixo = item.eixoTematico;
@@ -825,11 +838,11 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
           updatedEixo = newHabEixoTematico.trim() || item.eixoTematico;
 
           if (newHabObjetoDesc.trim()) {
-            const hasObj = item.objetos.some(o => o.descricao.toLowerCase() === newHabObjetoDesc.trim().toLowerCase());
+            const hasObj = item.objetos.some((o: ObjetoConhecimento) => o.descricao.toLowerCase() === newHabObjetoDesc.trim().toLowerCase());
             let targetObjId = '';
 
             if (hasObj) {
-              targetObjId = item.objetos.find(o => o.descricao.toLowerCase() === newHabObjetoDesc.trim().toLowerCase())!.id;
+              targetObjId = item.objetos.find((o: ObjetoConhecimento) => o.descricao.toLowerCase() === newHabObjetoDesc.trim().toLowerCase())!.id;
             } else {
               const newObjId = generateId();
               const newObj: ObjetoConhecimento = {
@@ -840,8 +853,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
               targetObjId = newObjId;
             }
 
-            // Link skill to this object (and clear previous links for this skill in the item)
-            updatedLinks = item.links.filter(l => l.habilidadeId !== editingHabId);
+            updatedLinks = item.links.filter((l: ObjetoHabilidadeLink) => l.habilidadeId !== editingHabId);
             updatedLinks.push({
               objetoId: targetObjId,
               habilidadeId: editingHabId
@@ -858,7 +870,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
         };
       }));
 
-      showNotification('success', `Habilidade ${codeUpper} atualizada com sucesso!`);
+      showNotification('success', `Objetivo ${codeUpper} atualizado com sucesso!`);
       
       setEditingHabId(null);
       setNewHabCode('');
@@ -870,12 +882,10 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
       return;
     }
 
-    // Creating Mode
     const existsInRepo = habRepository.some(h => h.codigo === codeUpper);
     let finalHab: RepositorioHabilidade;
 
     if (!isDemoMode) {
-      // Real database fetch/upsert
       const dbHab = {
         id: existsInRepo ? habRepository.find(h => h.codigo === codeUpper)!.id : generateId(),
         codigo: codeUpper,
@@ -891,8 +901,8 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
         .select();
 
       if (error) {
-        console.error('Erro ao cadastrar habilidade no Supabase:', error);
-        showNotification('error', 'Erro ao cadastrar habilidade no banco de dados.');
+        console.error('Erro ao cadastrar objetivo:', error);
+        showNotification('error', 'Erro ao cadastrar objetivo no banco de dados.');
         return;
       }
       
@@ -920,9 +930,8 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
         setHabRepository([...habRepository, finalHab]);
       }
     } else {
-      // Demo Mode
       if (existsInRepo) {
-        finalHab = habRepository.find(h => h.codigo === codeUpper)!;
+        finalHab = habRepository.find((h: RepositorioHabilidade) => h.codigo === codeUpper)!;
       } else {
         finalHab = {
           id: generateId(),
@@ -934,18 +943,17 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
         };
         const updatedRepo = [...habRepository, finalHab];
         setHabRepository(updatedRepo);
-        localStorage.setItem('sigar_repositorio_habilidades', JSON.stringify(updatedRepo));
+        localStorage.setItem('sigar_repositorio_objetivos_infantil', JSON.stringify(updatedRepo));
       }
     }
 
     if (activeItemIdForHab) {
       const newHabId = finalHab.id;
 
-      setItens(prev => prev.map(item => {
+      setItens(prev => prev.map((item: ItemPlano) => {
         if (item.id !== activeItemIdForHab) return item;
 
-        // 1. Add Habilidade to item if not already exists
-        const habExists = item.habilidades.some(h => h.codigo === codeUpper);
+        const habExists = item.habilidades.some((h: Habilidade) => h.codigo === codeUpper);
         const newHab: Habilidade = {
           id: newHabId,
           codigo: codeUpper,
@@ -953,22 +961,20 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
           sugestoesPedagogicas: newHabSugestoes.trim() || finalHab.sugestoesPedagogicas || ''
         };
         const updatedHabilidades = habExists 
-          ? item.habilidades.map(h => h.codigo === codeUpper ? { ...h, sugestoesPedagogicas: newHabSugestoes.trim() || h.sugestoesPedagogicas || '' } : h)
+          ? item.habilidades.map((h: Habilidade) => h.codigo === codeUpper ? { ...h, sugestoesPedagogicas: newHabSugestoes.trim() || h.sugestoesPedagogicas || '' } : h)
           : [...item.habilidades, newHab];
 
-        // 2. Update Eixo Temático if filled
         const updatedEixo = newHabEixoTematico.trim() || item.eixoTematico;
 
-        // 4. Update Objeto de Conhecimento and links
         let updatedObjetos = [...item.objetos];
         let updatedLinks = [...item.links];
 
         if (newHabObjetoDesc.trim()) {
-          const hasObj = item.objetos.some(o => o.descricao.toLowerCase() === newHabObjetoDesc.trim().toLowerCase());
+          const hasObj = item.objetos.some((o: ObjetoConhecimento) => o.descricao.toLowerCase() === newHabObjetoDesc.trim().toLowerCase());
           let targetObjId = '';
 
           if (hasObj) {
-            targetObjId = item.objetos.find(o => o.descricao.toLowerCase() === newHabObjetoDesc.trim().toLowerCase())!.id;
+            targetObjId = item.objetos.find((o: ObjetoConhecimento) => o.descricao.toLowerCase() === newHabObjetoDesc.trim().toLowerCase())!.id;
           } else {
             const newObjId = generateId();
             const newObj: ObjetoConhecimento = {
@@ -979,8 +985,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
             targetObjId = newObjId;
           }
 
-          // Link them bilaterally
-          const linkExists = item.links.some(l => l.objetoId === targetObjId && l.habilidadeId === newHabId);
+          const linkExists = item.links.some((l: ObjetoHabilidadeLink) => l.objetoId === targetObjId && l.habilidadeId === newHabId);
           if (!linkExists) {
             updatedLinks.push({
               objetoId: targetObjId,
@@ -998,7 +1003,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
         };
       }));
 
-      showNotification('success', `Habilidade ${codeUpper} cadastrada e vinculada com sucesso!`);
+      showNotification('success', `Objetivo ${codeUpper} cadastrado e vinculado com sucesso!`);
     }
 
     setNewHabCode('');
@@ -1009,12 +1014,13 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
     setIsHabModalOpen(false);
     setActiveItemIdForHab(null);
   };
+
   const toggleLink = (itemId: string, objetoId: string, habId: string) => {
-    setItens(prev => prev.map(item => {
+    setItens(prev => prev.map((item: ItemPlano) => {
       if (item.id !== itemId) return item;
-      const exists = item.links.some(l => l.objetoId === objetoId && l.habilidadeId === habId);
+      const exists = item.links.some((l: ObjetoHabilidadeLink) => l.objetoId === objetoId && l.habilidadeId === habId);
       const updatedLinks = exists
-        ? item.links.filter(l => !(l.objetoId === objetoId && l.habilidadeId === habId))
+        ? item.links.filter((l: ObjetoHabilidadeLink) => !(l.objetoId === objetoId && l.habilidadeId === habId))
         : [...item.links, { objetoId, habilidadeId: habId }];
       return {
         ...item,
@@ -1023,9 +1029,8 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
     }));
   };
 
-  // Filter skills for display in the modal
   const filteredCatalogHabs = useMemo(() => {
-    return habRepository.filter(hab => {
+    return habRepository.filter((hab: RepositorioHabilidade) => {
       const matchesSearch = modalSearchTerm === '' || 
                             hab.codigo.toLowerCase().includes(modalSearchTerm.toLowerCase()) || 
                             hab.descricao.toLowerCase().includes(modalSearchTerm.toLowerCase());
@@ -1035,27 +1040,25 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
     });
   }, [habRepository, modalSearchTerm, modalComponenteFilter, modalAnoSerieFilter]);
 
-  // --- Form Save, Edit, Delete ---
+  // --- Form Actions ---
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const validItens = itens.filter(item => item.eixoTematico.trim() !== '');
     if (validItens.length === 0) {
-      showNotification('error', 'Preencha o Eixo Temático de pelo menos um bloco do plano.');
+      showNotification('error', 'Preencha o Direito de Aprendizagem de pelo menos um bloco do plano.');
       return;
     }
 
-    // Uniqueness validation
     const duplicate = plans.find(p => 
       p.id !== editingId &&
       p.anoReferencia === anoReferencia &&
       p.anoSerie === anoSerie &&
-      p.componente === componente &&
       p.bimestre === bimestre
     );
 
     if (duplicate) {
-      showNotification('error', 'Já existe um plano cadastrado para este Ano, Série, Componente Curricular e Período.');
+      showNotification('error', 'Já existe um plano cadastrado para este Ano, Série e Período.');
       return;
     }
 
@@ -1073,7 +1076,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
       const dbPayload = {
         id: payload.id,
         ano_referencia: payload.anoReferencia,
-        componente: payload.componente,
+        campo_experiencia: payload.componente,
         bimestre: payload.bimestre,
         ano_serie: payload.anoSerie,
         itens: payload.itens,
@@ -1082,7 +1085,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
       };
 
       const { error } = await supabase
-        .from('planos_curso')
+        .from('planos_curso_infantil')
         .upsert(dbPayload);
 
       if (error) {
@@ -1093,23 +1096,23 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
       
       if (editingId) {
         setPlans(plans.map(p => p.id === editingId ? payload : p));
-        showNotification('success', 'Plano de Curso unificado atualizado com sucesso no Supabase!');
+        showNotification('success', 'Plano de Curso ECE atualizado com sucesso!');
       } else {
         setPlans([payload, ...plans]);
-        showNotification('success', 'Plano de Curso unificado cadastrado com sucesso no Supabase!');
+        showNotification('success', 'Plano de Curso ECE cadastrado com sucesso!');
       }
     } else {
       let updatedPlans: CoursePlan[];
       if (editingId) {
         updatedPlans = plans.map(p => p.id === editingId ? payload : p);
-        showNotification('success', 'Plano de Curso atualizado com sucesso!');
+        showNotification('success', 'Plano de Curso ECE atualizado com sucesso!');
       } else {
         updatedPlans = [payload, ...plans];
-        showNotification('success', 'Plano de Curso unificado cadastrado com sucesso!');
+        showNotification('success', 'Plano de Curso ECE cadastrado com sucesso!');
       }
 
       setPlans(updatedPlans);
-      localStorage.setItem('sigar_planos_curso', JSON.stringify(updatedPlans));
+      localStorage.setItem('sigar_planos_curso_infantil', JSON.stringify(updatedPlans));
     }
     
     resetForm();
@@ -1118,19 +1121,19 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
   const handleEdit = (plan: CoursePlan) => {
     setEditingId(plan.id);
     setAnoReferencia(plan.anoReferencia);
-    setAnoSerie(plan.anoSerie || ANOS_SERIES[0]);
-    setComponente(plan.componente);
+    setAnoSerie(plan.anoSerie || FAiXAS_ETARIAS[0]);
+    setComponente(plan.componente || COMPONENTES[0]);
     setBimestre(plan.bimestre);
     setItens(plan.itens && plan.itens.length > 0 ? JSON.parse(JSON.stringify(plan.itens)) : [createDefaultItem()]);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Deseja realmente excluir este Plano de Curso?')) return;
+    if (!confirm('Deseja realmente excluir este Plano de Curso ECE?')) return;
     
     if (!isDemoMode) {
       const { error } = await supabase
-        .from('planos_curso')
+        .from('planos_curso_infantil')
         .delete()
         .eq('id', id);
 
@@ -1139,7 +1142,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
         showNotification('error', 'Erro ao excluir o plano de curso no banco de dados.');
         return;
       }
-      showNotification('success', 'Plano de Curso unificado excluído com sucesso do Supabase!');
+      showNotification('success', 'Plano de Curso ECE excluído com sucesso do Supabase!');
     } else {
       showNotification('success', 'Plano de Curso removido.');
     }
@@ -1147,19 +1150,18 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
     const updated = plans.filter(p => p.id !== id);
     setPlans(updated);
     if (isDemoMode) {
-      localStorage.setItem('sigar_planos_curso', JSON.stringify(updated));
+      localStorage.setItem('sigar_planos_curso_infantil', JSON.stringify(updated));
     }
   };
 
   const resetForm = () => {
     setEditingId(null);
-    setAnoSerie(ANOS_SERIES[0]);
+    setAnoSerie(FAiXAS_ETARIAS[0]);
     setItens([createDefaultItem()]);
   };
 
   const filteredPlans = plans.filter(p => {
     const matchesSearch = searchTerm === '' || 
-                          p.componente.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           p.itens?.some(item => item.eixoTematico.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesGrade = gradeFilter === 'ALL' || p.anoSerie === gradeFilter;
     return matchesSearch && matchesGrade;
@@ -1174,10 +1176,10 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
   };
 
   return (
-    <div className="space-y-6 pb-12 animate-fade-in relative">
+    <div className="space-y-6 pb-12 animate-fade-in relative text-left">
       <PageHeader 
-        title="Plano de Curso"
-        subtitle="Elaboração e acompanhamento do planejamento curricular municipal"
+        title="Plano de Curso - Educação Infantil"
+        subtitle="Elaboração e acompanhamento do planejamento curricular infantil municipal"
         icon={ClipboardList}
         badgeText="DIÁRIO DE CLASSE"
         actions={[
@@ -1185,7 +1187,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
             label: 'Baixar Modelo Excel',
             icon: Download,
             onClick: handleDownloadTemplate,
-            variant: 'outline'
+            variant: 'secondary'
           },
           {
             label: 'Importar Excel',
@@ -1209,14 +1211,13 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
       {/* Printable Area - Hidden on Screen */}
       {printPlan && createPortal(
         (() => {
-          const totalHabilidades = printPlan.itens.reduce((acc, item) => {
+          const totalObjectives = printPlan.itens.reduce((acc, item) => {
             item.habilidades.forEach(h => acc.add(h.codigo));
             return acc;
           }, new Set<string>()).size;
 
           return (
             <div id="print-report" className="hidden print:block bg-white p-8 text-black text-xs font-sans">
-              {/* ====== INSTITUTIONAL HEADER ====== */}
               <div className="text-center mb-4 pb-3" style={{ borderBottom: '2pt solid #0f172a' }}>
                 <p style={{ fontSize: '7pt', fontWeight: 700, letterSpacing: '0.25em', textTransform: 'uppercase', color: '#64748b', marginBottom: '1pt', marginTop: '0px' }}>
                   ESTADO DO MARANHÃO
@@ -1229,7 +1230,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                 </p>
                 <div style={{ width: '50pt', height: '1.5pt', background: '#f97316', margin: '0 auto 5pt' }} />
                 <h1 style={{ fontSize: '13pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#0f172a', margin: '0 0 3pt' }}>
-                  Plano de Curso Curricular Unificado
+                  Plano de Curso da Educação Infantil
                 </h1>
                 <p style={{ fontSize: '7pt', fontWeight: 700, color: '#64748b', letterSpacing: '0.15em', textTransform: 'uppercase', marginTop: '0px' }}>
                   Acompanhamento de Unidades Escolares — {printPlan.anoReferencia}
@@ -1237,14 +1238,14 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
               </div>
 
               {/* ====== METADATA PANEL ====== */}
-              <div className="bg-slate-50 border border-slate-300 rounded-xl p-4 mb-6 font-sans text-xs">
+              <div className="bg-slate-50 border border-slate-300 rounded-xl p-4 mb-6 font-sans text-xs text-left">
                 <div className="grid grid-cols-4 gap-4">
                   <div className="flex flex-col">
-                    <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Componente Curricular</span>
+                    <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Campo de Experiência</span>
                     <span className="font-extrabold text-slate-900 text-[11px] leading-tight">{printPlan.componente}</span>
                   </div>
                   <div className="flex flex-col border-l border-slate-200 pl-4">
-                    <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Ano / Série</span>
+                    <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Faixa Etária / Grupo</span>
                     <span className="font-extrabold text-slate-900 text-[11px] leading-tight">{printPlan.anoSerie || '---'}</span>
                   </div>
                   <div className="flex flex-col border-l border-slate-200 pl-4">
@@ -1252,29 +1253,28 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                     <span className="font-extrabold text-slate-900 text-[11px] leading-tight">{printPlan.bimestre}</span>
                   </div>
                   <div className="flex flex-col border-l border-slate-200 pl-4">
-                    <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Total de Habilidades</span>
-                    <span className="font-extrabold text-slate-900 text-[11px] leading-tight">{totalHabilidades}</span>
+                    <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Total de Objetivos</span>
+                    <span className="font-extrabold text-slate-900 text-[11px] leading-tight">{totalObjectives}</span>
                   </div>
                 </div>
               </div>
 
               <div className="space-y-6">
                 {printPlan.itens.map((item, index) => (
-                  <div key={item.id} className="border rounded-lg overflow-hidden page-break-inside-avoid">
+                  <div key={item.id} className="border rounded-lg overflow-hidden page-break-inside-avoid text-left">
                     <div className="bg-slate-100 px-4 py-2 border-b">
                       <h3 className="font-bold text-slate-800 text-[10px] uppercase tracking-wider">
-                        Item {index + 1}: Eixo Temático - {item.eixoTematico || 'Não Informado'}
+                        Item {index + 1}: Direito de Aprendizagem - {item.eixoTematico || 'Não Informado'}
                       </h3>
                     </div>
                     
                     <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Left Column: Mapped Objects and Skills */}
                       <div className="space-y-4">
                         <h4 className="font-bold text-slate-700 border-b pb-1 text-[9px] uppercase tracking-wider">
-                          Objetos de Conhecimento & Habilidades Associadas
+                          Campos de Experiência & Objetivos Associados
                         </h4>
                         {item.objetos.length === 0 ? (
-                          <p className="text-gray-400 italic">Nenhum objeto de conhecimento cadastrado.</p>
+                          <p className="text-gray-400 italic">Nenhum campo de experiência cadastrado.</p>
                         ) : (
                           item.objetos.map(obj => {
                             const linkedHabs = item.links
@@ -1294,7 +1294,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                                     ))}
                                   </div>
                                 ) : (
-                                  <p className="text-[9px] text-gray-400 italic mt-0.5">Sem habilidades vinculadas.</p>
+                                  <p className="text-[9px] text-gray-400 italic mt-0.5">Sem objetivos vinculados.</p>
                                 )}
                               </div>
                             );
@@ -1302,13 +1302,12 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                         )}
                       </div>
 
-                      {/* Right Column: Skills Detailing & Suggestions */}
                       <div className="space-y-4 border-l pl-6">
                         <h4 className="font-bold text-slate-700 border-b pb-1 text-[9px] uppercase tracking-wider">
-                          Detalhamento das Habilidades
+                          Detalhamento dos Objetivos de Aprendizagem
                         </h4>
                         {item.habilidades.length === 0 ? (
-                          <p className="text-gray-400 italic">Nenhuma habilidade cadastrada.</p>
+                          <p className="text-gray-400 italic">Nenhum objetivo cadastrado.</p>
                         ) : (
                           <ul className="space-y-3">
                             {item.habilidades.map(h => (
@@ -1350,7 +1349,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
         <div className="flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
           <Bookmark className="text-brand-orange w-5 h-5" />
           <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight">
-            {editingId ? 'Editar Plano de Curso Unificado' : 'Novo Plano de Curso Unificado'}
+            {editingId ? 'Editar Plano de Curso ECE' : 'Novo Plano de Curso ECE'}
           </h2>
         </div>
 
@@ -1372,27 +1371,30 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Ano/Série *</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Grupo/Faixa Etária *</label>
               <select 
                 value={anoSerie}
                 onChange={e => setAnoSerie(e.target.value)}
                 required
                 className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
               >
-                {ANOS_SERIES.map(a => (
+                {FAiXAS_ETARIAS.map(a => (
                   <option key={a} value={a}>{a}</option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Componente Curricular *</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Campo de experiência *</label>
               <select 
                 value={componente}
                 onChange={e => setComponente(e.target.value)}
                 required
                 className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
               >
+                {!COMPONENTES.includes(componente) && componente && (
+                  <option value={componente}>{componente}</option>
+                )}
                 {COMPONENTES.map(c => (
                   <option key={c} value={c}>{c}</option>
                 ))}
@@ -1419,7 +1421,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
             <div className="flex items-center justify-between border-b pb-2 border-slate-100">
               <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                 <Layers className="text-brand-orange w-4 h-4" />
-                Estrutura de Planejamento Pedagógico (Eixos Temáticos)
+                Estrutura de Planejamento Pedagógico (Educação Infantil)
               </h3>
             </div>
 
@@ -1430,7 +1432,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                     type="button"
                     onClick={() => removePlanningItem(item.id)}
                     className="absolute top-4 right-4 text-slate-400 hover:text-red-500 transition-colors p-1"
-                    title="Remover este eixo de planejamento"
+                    title="Remover este bloco"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -1438,38 +1440,37 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                 
                 <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
                   <span className="bg-brand-orange/10 text-brand-orange text-xs font-black px-2 py-0.5 rounded-full">
-                    Item #{idx + 1}
+                    Bloco #{idx + 1}
                   </span>
                 </div>
 
-                {/* Eixo Tematico Input */}
+                {/* Direito de Aprendizagem Input */}
                 <div className="bg-orange-50/40 p-4 rounded-2xl border border-orange-100/60 shadow-sm border-l-4 border-l-brand-orange space-y-2">
                   <label className="flex items-center gap-1.5 text-[10px] font-black text-brand-orange uppercase tracking-wider">
                     <Layers className="w-3.5 h-3.5" />
-                    Eixo Temático *
+                    Direito de Aprendizagem *
                   </label>
                   <input
                     type="text"
                     value={item.eixoTematico}
                     onChange={e => updateItemField(item.id, 'eixoTematico', e.target.value)}
-                    placeholder="Ex: Números, Geometria, Oralidade, Leitura, Corpo e Movimento..."
+                    placeholder="Ex: Conviver, Brincar, Participar, Explorar, Expressar, Conhecer-se..."
                     className="w-full px-4 py-2.5 border border-orange-200 rounded-xl outline-none text-xs font-bold text-slate-800 focus:border-brand-orange focus:ring-4 focus:ring-brand-orange/10 transition-all bg-white shadow-sm"
                   />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Objetos de Conhecimento Panel */}
+                  {/* Campos de Experiência Panel */}
                   <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
                     <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider border-b pb-2 flex justify-between items-center">
-                      <span>Objetos de Conhecimento ({item.objetos.length})</span>
+                      <span>Saberes e Conhecimentos ({item.objetos.length})</span>
                     </h4>
                     
-                    {/* Add Object inline form */}
                     <div className="flex gap-2">
                       <input
                         type="text"
                         id={`new-objeto-${item.id}`}
-                        placeholder="Novo objeto de conhecimento..."
+                        placeholder="Novo saber ou conhecimento..."
                         onKeyDown={e => {
                           if (e.key === 'Enter') {
                             e.preventDefault();
@@ -1495,12 +1496,11 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                       </button>
                     </div>
 
-                    {/* Objects List */}
                     <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
                       {item.objetos.length === 0 ? (
-                        <p className="text-slate-400 text-xs italic text-center py-4">Nenhum objeto adicionado.</p>
+                        <p className="text-slate-400 text-xs italic text-center py-4">Nenhum saber adicionado.</p>
                       ) : (
-                        item.objetos.map(obj => (
+                        item.objetos.map((obj: ObjetoConhecimento) => (
                           <div key={obj.id} className="flex justify-between items-center bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 group">
                             <span className="text-xs text-slate-700 font-medium">{obj.descricao}</span>
                             <button
@@ -1516,10 +1516,10 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                     </div>
                   </div>
 
-                  {/* Habilidades Panel */}
+                  {/* Objetivos de Aprendizagem Panel */}
                   <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
                     <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider border-b pb-2 flex justify-between items-center">
-                      <span>Habilidades ({item.habilidades.length})</span>
+                      <span>Objetivo de Aprendizagem e Des. ({item.habilidades.length})</span>
                       <button
                         type="button"
                         onClick={() => openHabilidadesModal(item.id)}
@@ -1530,21 +1530,20 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                       </button>
                     </h4>
 
-                    {/* Habilidades List */}
                     <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
                       {item.habilidades.length === 0 ? (
                         <div className="text-slate-400 text-xs italic text-center py-6 flex flex-col items-center gap-2">
-                          <span>Nenhuma habilidade selecionada.</span>
+                          <span>Nenhum objetivo selecionado.</span>
                           <button
                             type="button"
                             onClick={() => openHabilidadesModal(item.id)}
                             className="text-brand-orange hover:underline text-[10px] font-bold"
                           >
-                            Clique para selecionar habilidades
+                            Clique para selecionar objetivos
                           </button>
                         </div>
                       ) : (
-                        item.habilidades.map(hab => (
+                        item.habilidades.map((hab: Habilidade) => (
                           <div key={hab.id} className="flex justify-between items-start bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 group gap-2">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1.5">
@@ -1574,22 +1573,22 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                     <div className="flex items-center gap-1.5 border-b pb-2 border-slate-100">
                       <Link2 className="w-4 h-4 text-brand-orange" />
                       <h4 className="text-xs font-black text-slate-700 uppercase tracking-tight">
-                        Associação de Objeto com Habilidade (Mapeamento N:N)
+                        Associação de Saberes e Conhecimentos com Objetivos (Mapeamento N:N)
                       </h4>
                     </div>
                     <p className="text-[10px] text-slate-400 italic">
-                      Vincule as habilidades correspondentes a cada objeto de conhecimento clicando sobre elas:
+                      Vincule os objetivos correspondentes a cada saber ou conhecimento clicando sobre eles:
                     </p>
 
                     <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
-                      {item.objetos.map(obj => (
+                      {item.objetos.map((obj: ObjetoConhecimento) => (
                         <div key={obj.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-2">
                           <div className="text-xs font-bold text-slate-800">
                             {obj.descricao}
                           </div>
                           <div className="flex flex-wrap gap-2">
-                            {item.habilidades.map(hab => {
-                              const isLinked = item.links.some(l => l.objetoId === obj.id && l.habilidadeId === hab.id);
+                            {item.habilidades.map((hab: Habilidade) => {
+                              const isLinked = item.links.some((l: ObjetoHabilidadeLink) => l.objetoId === obj.id && l.habilidadeId === hab.id);
                               return (
                                 <button
                                   key={hab.id}
@@ -1614,22 +1613,21 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                   </div>
                 )}
 
-                {/* Detalhamento das Habilidades */}
+                {/* Detalhamento dos Objetivos */}
                 {item.habilidades.length > 0 && (
                   <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-4">
                     <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider border-b pb-2 flex items-center gap-1.5">
                       <Layers className="text-brand-orange w-4 h-4" />
-                      <span>Detalhamento das Habilidades</span>
+                      <span>Detalhamento dos Objetivos de Aprendizagem</span>
                     </h4>
                     <div className="space-y-6">
-                      {item.habilidades.map(hab => (
+                      {item.habilidades.map((hab: Habilidade) => (
                         <div key={hab.id} className="space-y-2">
                           <div className="text-xs text-slate-700 font-medium leading-relaxed">
                             <strong className="text-brand-orange font-mono mr-1.5">{hab.codigo}:</strong>
                             {hab.descricao}
                           </div>
                           
-                          {/* Styled Suggestion Card matching print layout (Image 2) */}
                           <div className="bg-slate-50/60 p-3.5 rounded-xl border border-slate-200/60 pl-4 border-l-4 border-l-brand-orange shadow-sm space-y-1">
                             <label className="block text-[9px] font-black text-slate-500 uppercase tracking-wider">
                               Sugestão Pedagógica para {hab.codigo}
@@ -1638,15 +1636,15 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                               value={hab.sugestoesPedagogicas || ''}
                               onChange={e => {
                                 const newVal = e.target.value;
-                                setItens(prev => prev.map(it => {
+                                setItens(prev => prev.map((it: ItemPlano) => {
                                   if (it.id !== item.id) return it;
                                   return {
                                     ...it,
-                                    habilidades: it.habilidades.map(h => h.id === hab.id ? { ...h, sugestoesPedagogicas: newVal } : h)
+                                    habilidades: it.habilidades.map((h: Habilidade) => h.id === hab.id ? { ...h, sugestoesPedagogicas: newVal } : h)
                                   };
                                 }));
                               }}
-                              placeholder="Digite as sugestões de estratégias metodológicas, recursos didáticos e intervenções para esta habilidade..."
+                              placeholder="Digite as sugestões de estratégias metodológicas, recursos didáticos e intervenções para este objetivo..."
                               rows={3}
                               className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-medium focus:border-brand-orange transition-all resize-y bg-white leading-relaxed"
                             />
@@ -1659,7 +1657,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
               </div>
             ))}
 
-            {/* Add Axis Button */}
+            {/* Add Block Button */}
             <div className="flex justify-start pt-2">
               <Button
                 type="button"
@@ -1668,7 +1666,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                 className="rounded-xl text-xs font-bold py-2.5 flex items-center gap-1.5 border-dashed border-2 hover:border-brand-orange hover:bg-orange-50/20"
               >
                 <Plus className="w-4 h-4" />
-                Adicionar Outro Eixo Temático
+                Adicionar Outro Direito de Aprendizagem
               </Button>
             </div>
           </div>
@@ -1691,17 +1689,17 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
       {/* Habilidades Selection/Creation Modal */}
       {isHabModalOpen && activeItemIdForHab && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[999] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden max-h-[85vh] flex flex-col animate-fade-in border border-slate-100">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden max-h-[85vh] flex flex-col animate-scale-in border border-slate-100">
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <div className="flex items-center gap-2">
                 <Layers className="text-brand-orange w-5 h-5" />
                 <div>
                   <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">
-                    Gerenciar Habilidades
+                    Gerenciar Objetivos de Aprendizagem
                   </h3>
                   <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">
-                    Selecione do repositório ou cadastre uma nova
+                    Selecione do repositório ou cadastre um novo
                   </p>
                 </div>
               </div>
@@ -1742,7 +1740,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                 }}
                 className={`flex-1 py-3 text-center transition-all ${modalTab === 'create' ? 'text-brand-orange border-b-2 border-brand-orange bg-orange-50/10' : 'hover:bg-slate-50'}`}
               >
-                {editingHabId ? 'Editar Habilidade' : 'Cadastrar Nova Habilidade'}
+                {editingHabId ? 'Editar Objetivo' : 'Cadastrar Novo Objetivo'}
               </button>
             </div>
 
@@ -1768,8 +1766,8 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                         onChange={e => setModalComponenteFilter(e.target.value)}
                         className="w-full px-3 py-1.5 border border-slate-200 rounded-xl bg-white outline-none focus:border-brand-orange transition-all text-xs font-bold text-slate-600"
                       >
-                        <option value="ALL">Todos Componentes</option>
-                        {COMPONENTES.map(c => <option key={c} value={c}>{c}</option>)}
+                        <option value="ALL">Todos Campos de Experiência</option>
+                        {CAMPOS_EXPERIENCIA.map(c => <option key={c} value={c}>{c}</option>)}
                       </select>
                     </div>
                     <div>
@@ -1778,16 +1776,16 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                         onChange={e => setModalAnoSerieFilter(e.target.value)}
                         className="w-full px-3 py-1.5 border border-slate-200 rounded-xl bg-white outline-none focus:border-brand-orange transition-all text-xs font-bold text-slate-600"
                       >
-                        <option value="ALL">Todas Séries</option>
-                        {ANOS_SERIES.map(a => <option key={a} value={a}>{a}</option>)}
+                        <option value="ALL">Todas Faixas Etárias</option>
+                        {FAiXAS_ETARIAS.map(a => <option key={a} value={a}>{a}</option>)}
                       </select>
                     </div>
                   </div>
 
-                  {/* List of Skills */}
+                  {/* List of ECE Objectives */}
                   <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
                     {filteredCatalogHabs.length === 0 ? (
-                      <p className="text-slate-400 text-xs italic text-center py-12">Nenhuma habilidade encontrada.</p>
+                      <p className="text-slate-400 text-xs italic text-center py-12">Nenhum objetivo encontrado.</p>
                     ) : (
                       filteredCatalogHabs.map(hab => {
                         const added = isHabInActiveItem(hab.codigo);
@@ -1802,7 +1800,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                                   {hab.componente} • {hab.anoSerie}
                                 </span>
                               </div>
-                              <p className="text-xs text-slate-600 mt-1.5 font-medium leading-relaxed">
+                              <p className="text-xs text-slate-600 mt-1.5 font-medium leading-relaxed text-left">
                                 {hab.descricao}
                               </p>
                             </div>
@@ -1812,7 +1810,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                                 type="button"
                                 onClick={() => handleEditHabilidade(hab)}
                                 className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
-                                title="Editar Habilidade"
+                                title="Editar"
                               >
                                 <Edit2 size={14} />
                               </button>
@@ -1822,7 +1820,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                                 type="button"
                                 onClick={() => handleDeleteHabilidade(hab)}
                                 className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                                title="Excluir Habilidade"
+                                title="Excluir"
                               >
                                 <Trash2 size={14} />
                               </button>
@@ -1834,7 +1832,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                                   className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-xl text-[10px] font-bold transition flex items-center gap-1 shadow-sm"
                                 >
                                   <Check className="w-3 h-3" />
-                                  Adicionada
+                                  Adicionado
                                 </button>
                               ) : (
                                 <button
@@ -1853,7 +1851,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                   </div>
                 </>
               ) : (
-                /* Create custom skill form */
+                /* Create custom ECE Objective Form */
                 <form
                   onSubmit={e => {
                     e.preventDefault();
@@ -1869,7 +1867,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                       <input
                         type="text"
                         required
-                        placeholder="Ex: EF01MA01"
+                        placeholder="Ex: EI02EO01"
                         value={newHabCode}
                         onChange={e => setNewHabCode(e.target.value)}
                         className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all uppercase"
@@ -1877,37 +1875,37 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                        Componente Curricular
+                        Campo de Experiência
                       </label>
                       <select
                         value={newHabComponente}
                         onChange={e => setNewHabComponente(e.target.value)}
                         className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-bold text-slate-600 focus:border-brand-orange transition-all bg-white"
                       >
-                        {COMPONENTES.map(c => <option key={c} value={c}>{c}</option>)}
+                        {CAMPOS_EXPERIENCIA.map(c => <option key={c} value={c}>{c}</option>)}
                       </select>
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                        Ano/Série
+                        Faixa Etária / Série
                       </label>
                       <select
                         value={newHabAnoSerie}
                         onChange={e => setNewHabAnoSerie(e.target.value)}
                         className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-bold text-slate-600 focus:border-brand-orange transition-all bg-white"
                       >
-                        {ANOS_SERIES.map(a => <option key={a} value={a}>{a}</option>)}
+                        {FAiXAS_ETARIAS.map(a => <option key={a} value={a}>{a}</option>)}
                       </select>
                     </div>
                   </div>
 
                   <div>
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                      Descrição da Habilidade *
+                      Descrição do Objetivo *
                     </label>
                     <textarea
                       required
-                      placeholder="Descreva detalhadamente a habilidade..."
+                      placeholder="Descreva detalhadamente o objetivo de aprendizagem..."
                       value={newHabDesc}
                       onChange={e => setNewHabDesc(e.target.value)}
                       rows={4}
@@ -1915,21 +1913,21 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                     />
                   </div>
 
-                  {/* Vinculação do Eixo, Objeto e Sugestões Pedagógicas */}
+                  {/* Optional linking section */}
                   <div className="border-t border-slate-100 pt-4 space-y-4">
                     <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                       <Link2 className="w-4 h-4 text-brand-orange" />
-                      Vincular Eixo, Objeto e Sugestões (Opcional)
+                      Vincular Direito, Campo e Sugestões (Opcional)
                     </h4>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                          Eixo Temático
+                          Direito de Aprendizagem
                         </label>
                         <input
                           type="text"
-                          placeholder="Definir ou alterar o Eixo Temático..."
+                          placeholder="Definir ou alterar o Direito..."
                           value={newHabEixoTematico}
                           onChange={e => setNewHabEixoTematico(e.target.value)}
                           className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
@@ -1937,11 +1935,11 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                          Novo Objeto de Conhecimento
+                          Novo Saber ou Conhecimento
                         </label>
                         <input
                           type="text"
-                          placeholder="Cadastrar novo objeto e vincular a esta habilidade..."
+                          placeholder="Cadastrar novo saber/conhecimento e vincular a este objetivo..."
                           value={newHabObjetoDesc}
                           onChange={e => setNewHabObjetoDesc(e.target.value)}
                           className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
@@ -1951,7 +1949,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
 
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                        Sugestões Pedagógicas / Recursos para o Eixo
+                        Sugestões Pedagógicas / Recursos para o Direito
                       </label>
                       <textarea
                         placeholder="Definir ou complementar as sugestões pedagógicas..."
@@ -1970,7 +1968,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                       className="bg-brand-orange hover:bg-orange-600 font-bold text-xs py-2 rounded-xl flex items-center gap-1.5"
                     >
                       {editingHabId ? <Save className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-                      {editingHabId ? 'Salvar Alterações' : 'Cadastrar e Adicionar ao Eixo'}
+                      {editingHabId ? 'Salvar Alterações' : 'Cadastrar e Adicionar'}
                     </Button>
                   </div>
                 </form>
@@ -1999,8 +1997,8 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
       <div className="space-y-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h3 className="text-md font-black text-slate-800 uppercase tracking-wider">Histórico de Planos de Curso</h3>
-            <p className="text-xs text-slate-500 mt-0.5">Consulte, edite ou exporte os planejamentos de curso municipais unificados</p>
+            <h3 className="text-md font-black text-slate-800 uppercase tracking-wider">Histórico de Planos de Curso ECE</h3>
+            <p className="text-xs text-slate-500 mt-0.5">Consulte, edite ou exporte os planejamentos de curso municipais da Educação Infantil</p>
           </div>
 
           <div className="flex flex-wrap gap-2 w-full md:w-auto">
@@ -2008,7 +2006,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
               <input 
                 type="text" 
-                placeholder="Buscar por componente/eixo..."
+                placeholder="Buscar por direito/eixo..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 className="pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-white outline-none focus:border-brand-orange transition-all text-xs font-semibold"
@@ -2020,8 +2018,8 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
               onChange={e => setGradeFilter(e.target.value)}
               className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 outline-none focus:border-brand-orange"
             >
-              <option value="ALL">Todas as Séries</option>
-              {ANOS_SERIES.map(a => <option key={a} value={a}>{a}</option>)}
+              <option value="ALL">Todas Faixas Etárias</option>
+              {FAiXAS_ETARIAS.map(a => <option key={a} value={a}>{a}</option>)}
             </select>
           </div>
         </div>
@@ -2032,8 +2030,8 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
               <thead className="bg-slate-50 border-b border-slate-100 uppercase text-[10px] font-black text-slate-500 tracking-wider">
                 <tr>
                   <th className="px-6 py-4">Período / Ano Letivo</th>
-                  <th className="px-6 py-4">Ano/Série / Componente</th>
-                  <th className="px-6 py-4">Eixos Planejados</th>
+                  <th className="px-6 py-4">Faixa Etária / Campo de Experiência</th>
+                  <th className="px-6 py-4">Direitos Planejados</th>
                   <th className="px-6 py-4 text-right">Ações</th>
                 </tr>
               </thead>
@@ -2041,7 +2039,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                 {filteredPlans.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="py-12 text-center text-slate-400 font-semibold">
-                      Nenhum plano de curso unificado encontrado.
+                      Nenhum plano de curso unificado de Educação Infantil encontrado.
                     </td>
                   </tr>
                 ) : (
@@ -2060,12 +2058,12 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                         <div className="space-y-1.5 max-w-[420px]">
                           {plan.itens?.map((item, index) => (
                             <div key={item.id || index} className="text-slate-800 flex flex-col gap-0.5">
-                              <span className="font-bold text-slate-700">• {item.eixoTematico || 'Eixo Geral'}</span>
+                              <span className="font-bold text-slate-700">• {item.eixoTematico || 'Direito Geral'}</span>
                               <span className="text-[10px] text-slate-400 font-semibold pl-2.5">
-                                ({item.objetos?.length || 0} objetos, {item.habilidades?.length || 0} habilid., {item.links?.length || 0} vínc.)
+                                ({item.objetos?.length || 0} saberes, {item.habilidades?.length || 0} objetivos, {item.links?.length || 0} vínc.)
                               </span>
                             </div>
-                          )) || <div className="text-slate-400 italic">Sem eixos vinculados</div>}
+                          ))}
                         </div>
                       </td>
                       <td className="px-6 py-3 text-right">

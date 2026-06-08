@@ -106,11 +106,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
     ];
 
     const diarioClasseNavItems = [
-        { icon: ClipboardList, label: 'Plano de Curso', view: 'PLANO_CURSO' as ViewState },
-        { icon: BookOpen, label: 'Guia de Aprendizagem', view: 'PLANO_AULA' as ViewState },
-        { icon: FileText, label: 'Aulas ministradas', view: 'AULAS_MINISTRADAS' as ViewState },
-        { icon: ClipboardCheck, label: 'Frequencia', view: 'FREQUENCIA' as ViewState },
-        { icon: GraduationCap, label: 'Notas', view: 'NOTAS' as ViewState },
+        { icon: ClipboardList, label: 'Ensino Fundamental', view: 'DIARIO_FUNDAMENTAL' as ViewState },
+        { icon: Baby, label: 'Educação Infantil', view: 'DIARIO_INFANTIL' as ViewState },
     ];
 
     // Filter items based on user role permissions (admins bypass)

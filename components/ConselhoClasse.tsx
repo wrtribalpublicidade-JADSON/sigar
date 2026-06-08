@@ -13,7 +13,7 @@ import { Escola, Segmento, Coordenador } from '../types';
 import { supabase } from '../services/supabase';
 
 
-const BNCC_INFANTIL = {
+export const BNCC_INFANTIL = {
     'O EU, O OUTRO E O NÓS': {
         'Crianças bem pequenas': [
             { code: 'EI02EO01', short: 'Cuidado e Solidariedade', desc: 'Demonstrar atitudes de cuidado e solidariedade na interação com crianças e adultos.' },

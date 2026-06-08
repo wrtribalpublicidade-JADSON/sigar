@@ -1,14 +1,16 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { PageHeader } from './ui/PageHeader';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { 
   GraduationCap, School as SchoolIcon, Search, Save, Percent, 
-  TrendingUp, Award, AlertTriangle, Loader2, ListFilter, Trash2
+  TrendingUp, Award, AlertTriangle, Loader2, ListFilter, Trash2,
+  Printer, Edit
 } from 'lucide-react';
 import { Escola, Coordenador } from '../types';
 import { supabase } from '../services/supabase';
 import { useNotification } from '../context/NotificationContext';
+import { PrintableBoletim } from './PrintableBoletim';
 
 interface NotasProps {
   escolas: Escola[];
@@ -16,6 +18,7 @@ interface NotasProps {
   isAdmin: boolean;
   userEmail: string | null;
   currentUser: Coordenador | null;
+  subHeader?: React.ReactNode;
 }
 
 interface StudentGrade {
@@ -62,7 +65,7 @@ const BIMESTRES = [
   '4º Bimestre'
 ];
 
-export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, userEmail, currentUser }) => {
+export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, userEmail, currentUser, subHeader }) => {
   const { showNotification } = showNotificationContext();
   const [sheets, setSheets] = useState<GradeSheet[]>([]);
   const [turmas, setTurmas] = useState<any[]>([]);
@@ -70,6 +73,9 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
   
   // Spreadsheet States
   const [gradesMap, setGradesMap] = useState<Record<string | number, Omit<StudentGrade, 'id' | 'name'>>>({});
+
+  const editTurmaIdRef = useRef<string | null>(null);
+  const [selectedSheetForPrint, setSelectedSheetForPrint] = useState<GradeSheet | null>(null);
 
   // Filter & Selection State
   const [selectedEscolaId, setSelectedEscolaId] = useState('');
@@ -174,11 +180,18 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
       }
 
       if (isDemoMode) {
-        setTurmas([
+        const demoTurmas = [
           { id: 'demo-t1', name: '1º ANO A', shift: 'MANHÃ' },
           { id: 'demo-t2', name: '2º ANO B', shift: 'TARDE' },
           { id: 'demo-t3', name: '5º ANO A', shift: 'MANHÃ' },
-        ]);
+        ];
+        setTurmas(demoTurmas);
+        if (editTurmaIdRef.current) {
+          setSelectedTurmaId(editTurmaIdRef.current);
+          editTurmaIdRef.current = null;
+        } else {
+          setSelectedTurmaId('demo-t1');
+        }
         return;
       }
 
@@ -191,7 +204,11 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
 
         if (error) throw error;
         setTurmas(data || []);
-        if (data && data.length > 0) {
+        
+        if (editTurmaIdRef.current) {
+          setSelectedTurmaId(editTurmaIdRef.current);
+          editTurmaIdRef.current = null;
+        } else if (data && data.length > 0) {
           setSelectedTurmaId(data[0].id);
         } else {
           setSelectedTurmaId('');
@@ -464,6 +481,27 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
     }
   };
 
+  const handleEditSheet = (sheet: GradeSheet) => {
+    setComponente(sheet.componente);
+    setBimestre(sheet.bimestre);
+    if (selectedEscolaId === sheet.escolaId) {
+      setSelectedTurmaId(sheet.turmaId);
+      editTurmaIdRef.current = null;
+    } else {
+      editTurmaIdRef.current = sheet.turmaId;
+      setSelectedEscolaId(sheet.escolaId);
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handlePrintSheet = (sheet: GradeSheet) => {
+    setSelectedSheetForPrint(sheet);
+    setTimeout(() => {
+      window.print();
+      setSelectedSheetForPrint(null);
+    }, 200);
+  };
+
   const handleDeleteSheet = async (id: string) => {
     if (!confirm('Deseja realmente remover esta pauta de notas?')) return;
     
@@ -503,6 +541,8 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
         badgeText="DIÁRIO DE CLASSE"
         actions={[]}
       />
+
+      {subHeader}
 
       {/* Configuration & Selection Bar */}
       <Card className="bg-white border-slate-200 shadow-sm p-6 rounded-2xl">
@@ -800,6 +840,20 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
                       <td className="px-6 py-3 text-right">
                         <div className="flex items-center justify-end gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
                           <button 
+                            onClick={() => handlePrintSheet(sheet)} 
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" 
+                            title="Imprimir Boletim"
+                          >
+                            <Printer size={15} />
+                          </button>
+                          <button 
+                            onClick={() => handleEditSheet(sheet)} 
+                            className="p-1.5 text-slate-400 hover:text-brand-orange hover:bg-orange-50 rounded-lg transition-all" 
+                            title="Editar Notas"
+                          >
+                            <Edit size={15} />
+                          </button>
+                          <button 
                             onClick={() => handleDeleteSheet(sheet.id)} 
                             className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" 
                             title="Remover Pauta"
@@ -816,6 +870,10 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
           </div>
         </Card>
       </div>
+
+      {selectedSheetForPrint && (
+        <PrintableBoletim sheet={selectedSheetForPrint} />
+      )}
     </div>
   );
 };

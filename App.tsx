@@ -34,6 +34,8 @@ import { PlanoAula } from './components/PlanoAula';
 import { AulasMinistradas } from './components/AulasMinistradas';
 import { Frequencia } from './components/Frequencia';
 import { Notas } from './components/Notas';
+import { DiarioFundamental } from './components/DiarioFundamental';
+import { DiarioInfantil } from './components/DiarioInfantil';
 import { ViewState, Escola, Visita, Coordenador, Segmento } from './types';
 import { supabase } from './services/supabase';
 import { useNotification } from './context/NotificationContext';
@@ -1203,6 +1205,10 @@ export default function App() {
         return <Frequencia escolas={escolas} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={effectiveUser || null} />;
       case 'NOTAS':
         return <Notas escolas={escolas} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={effectiveUser || null} />;
+      case 'DIARIO_FUNDAMENTAL':
+        return <DiarioFundamental escolas={escolas} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={effectiveUser || null} />;
+      case 'DIARIO_INFANTIL':
+        return <DiarioInfantil escolas={escolas} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={effectiveUser || null} />;
       default:
         return <div>Página não encontrada</div>;
     }

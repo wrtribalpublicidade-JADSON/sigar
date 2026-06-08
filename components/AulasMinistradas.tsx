@@ -18,6 +18,7 @@ interface AulasMinistradasProps {
   isAdmin: boolean;
   userEmail: string | null;
   currentUser: Coordenador | null;
+  subHeader?: React.ReactNode;
 }
 
 interface ClassLog {
@@ -78,7 +79,7 @@ const ANOS_SERIES = [
   'Outros'
 ];
 
-export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isDemoMode, isAdmin, userEmail, currentUser }) => {
+export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isDemoMode, isAdmin, userEmail, currentUser, subHeader }) => {
   const { showNotification } = useNotification();
   const [logs, setLogs] = useState<ClassLog[]>([]);
   const [turmas, setTurmas] = useState<any[]>([]);
@@ -752,6 +753,8 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
         badgeText="DIÁRIO DE CLASSE"
         actions={[]}
       />
+
+      {subHeader}
 
       {/* Printable Area - Hidden on Screen */}
       {printLog && createPortal(

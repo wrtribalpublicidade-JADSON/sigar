@@ -29,6 +29,8 @@ const VIEW_TO_MODULE: Record<string, string> = {
     'AULAS_MINISTRADAS': 'diario_classe',
     'FREQUENCIA': 'diario_classe',
     'NOTAS': 'diario_classe',
+    'DIARIO_FUNDAMENTAL': 'diario_classe',
+    'DIARIO_INFANTIL': 'diario_classe',
 };
 
 // Sidebar label → moduleId mapping
@@ -54,6 +56,8 @@ const SIDEBAR_LABEL_TO_MODULE: Record<string, string> = {
     'Aulas ministradas': 'diario_classe',
     'Frequencia': 'diario_classe',
     'Notas': 'diario_classe',
+    'Ensino Fundamental': 'diario_classe',
+    'Educação Infantil': 'diario_classe',
 };
 
 export const ALL_MODULES = [

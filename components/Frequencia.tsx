@@ -16,6 +16,7 @@ interface FrequenciaProps {
   isAdmin: boolean;
   userEmail: string | null;
   currentUser: Coordenador | null;
+  subHeader?: React.ReactNode;
 }
 
 interface StudentAttendance {
@@ -52,7 +53,7 @@ const COMPONENTES = [
   'Campos de Experiência (EI)'
 ];
 
-export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isAdmin, userEmail, currentUser }) => {
+export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isAdmin, userEmail, currentUser, subHeader }) => {
   const { showNotification } = useNotification();
   const [sheets, setSheets] = useState<AttendanceSheet[]>([]);
   const [turmas, setTurmas] = useState<any[]>([]);
@@ -396,6 +397,8 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
         badgeText="DIÁRIO DE CLASSE"
         actions={[]}
       />
+
+      {subHeader}
 
       {/* Filters & Configuration */}
       <Card className="bg-white border-slate-200 shadow-sm p-6 rounded-2xl">
