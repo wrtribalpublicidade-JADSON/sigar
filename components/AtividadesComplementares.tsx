@@ -3,13 +3,14 @@ import {
     BookOpen, Trophy, Music, Palette, Code, Users, 
     Calendar, Search, Plus, Filter, ChevronRight, 
     Clock, MapPin, Star, Pencil, Trash2, Heart, Brain, Leaf,
-    UserPlus, X, CheckCircle2
+    UserPlus, X, CheckCircle2, Printer
 } from 'lucide-react';
 import { AtividadeModal } from './AtividadeModal';
 import { DiarioAtividadeModal } from './DiarioAtividadeModal';
 import { activitiesService, Atividade } from '../services/activitiesService';
 import { supabase } from '../services/supabase';
 import { turmaCompService, TurmaComp } from '../services/turmaCompService';
+import { PrintableTurmaCompReport } from './PrintableTurmaCompReport';
 
 interface Student {
     id: number;
@@ -63,6 +64,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
     const [selectedTurmaId, setSelectedTurmaId] = useState<string | null>(null);
     const [turmaDetails, setTurmaDetails] = useState<{ students: Student[], activitiesIds: string[] }>({ students: [], activitiesIds: [] });
     const [isLoadingTurmaDetails, setIsLoadingTurmaDetails] = useState(false);
+    const [isPrintingTurma, setIsPrintingTurma] = useState(false);
 
     // Modals
     const [isTurmaModalOpen, setIsTurmaModalOpen] = useState(false);
@@ -264,6 +266,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
 
     React.useEffect(() => {
         fetchAtividades();
+        fetchTurmasComp();
     }, [userEscolaIds]);
 
     const handleSaveAtividade = async (newAtv: Omit<Atividade, 'id' | 'inscritos'>) => {
@@ -909,12 +912,21 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                             </button>
                                         </div>
                                     </div>
-                                    <button
-                                        onClick={() => setIsAddingStudent(true)}
-                                        className="bg-indigo-600 text-white px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 active:scale-95 self-stretch md:self-auto text-center justify-center animate-in fade-in"
-                                    >
-                                        <UserPlus size={16} /> Vincular Aluno
-                                    </button>
+                                    <div className="flex flex-col sm:flex-row gap-3 items-center self-stretch md:self-auto">
+                                        <button
+                                            onClick={() => setIsPrintingTurma(true)}
+                                            className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 transition-all active:scale-95 self-stretch sm:self-auto text-center justify-center"
+                                            title="Imprimir Informações da Turma"
+                                        >
+                                            <Printer size={16} /> Imprimir
+                                        </button>
+                                        <button
+                                            onClick={() => setIsAddingStudent(true)}
+                                            className="bg-indigo-600 text-white px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 active:scale-95 self-stretch sm:self-auto text-center justify-center animate-in fade-in"
+                                        >
+                                            <UserPlus size={16} /> Vincular Aluno
+                                        </button>
+                                    </div>
                                 </div>
 
                                 {/* Current Enrolled Students Card */}
@@ -1045,6 +1057,16 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                 onClose={() => setIsDiarioOpen(false)}
                 atividade={activityForDiario}
             />
+
+            {isPrintingTurma && selectedTurma && (
+                <PrintableTurmaCompReport
+                    turma={selectedTurma}
+                    students={turmaDetails.students}
+                    linkedActivities={linkedActivities}
+                    escolaName={escolaName}
+                    onClose={() => setIsPrintingTurma(false)}
+                />
+            )}
         </div>
     );
 };
