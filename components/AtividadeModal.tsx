@@ -152,6 +152,88 @@ export const ATIVIDADES_ESTRUTURA = [
     }
 ];
 
+interface SearchableSelectProps {
+    value: string;
+    onChange: (val: string) => void;
+    options: string[];
+    placeholder: string;
+    disabled: boolean;
+}
+
+const SearchableSelect: React.FC<SearchableSelectProps> = ({
+    value,
+    onChange,
+    options,
+    placeholder,
+    disabled
+}) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [search, setSearch] = useState('');
+    const containerRef = React.useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        setSearch(value || '');
+    }, [value]);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+                setSearch(value || '');
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [value]);
+
+    const filtered = options.filter(opt =>
+        opt.toLowerCase().includes(search.toLowerCase())
+    );
+
+    return (
+        <div ref={containerRef} className="relative w-full">
+            <input
+                type="text"
+                value={search}
+                onChange={e => {
+                    setSearch(e.target.value);
+                    setIsOpen(true);
+                    if (!e.target.value) {
+                        onChange('');
+                    }
+                }}
+                onFocus={() => setIsOpen(true)}
+                placeholder={placeholder}
+                disabled={disabled}
+                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-orange-500/10 focus:border-orange-500 outline-none transition-all text-slate-700 disabled:bg-slate-100 disabled:text-slate-400"
+            />
+            {isOpen && !disabled && (
+                <div className="absolute z-[110] left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto py-1 animate-in fade-in slide-in-from-top-1 duration-200">
+                    {filtered.map(opt => (
+                        <button
+                            key={opt}
+                            type="button"
+                            onClick={() => {
+                                onChange(opt);
+                                setSearch(opt);
+                                setIsOpen(false);
+                            }}
+                            className={`w-full text-left px-4 py-2.5 text-sm transition-all hover:bg-slate-50 ${opt === value ? 'bg-orange-50/50 text-orange-600 font-bold' : 'text-slate-700'}`}
+                        >
+                            {opt}
+                        </button>
+                    ))}
+                    {filtered.length === 0 && (
+                        <div className="px-4 py-3 text-xs text-slate-400 italic text-center">
+                            Nenhum profissional encontrado
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+
 export const AtividadeModal: React.FC<AtividadeModalProps> = ({ isOpen, onClose, onSave, atividadeToEdit }) => {
     const [selectedAreaId, setSelectedAreaId] = useState<string>('');
     const [selectedSubareaName, setSelectedSubareaName] = useState<string>('');
@@ -221,15 +303,32 @@ export const AtividadeModal: React.FC<AtividadeModalProps> = ({ isOpen, onClose,
                 }
 
                 // Fetch monitors (servidores in recursos_humanos with specific function)
-                const { data: personnel } = await supabase
-                    .from('recursos_humanos')
-                    .select('nome')
-                    .eq('funcao', 'Monitor(a) de Atividade Complementar')
-                    .order('nome');
+                // and recomposition teachers
+                const [personnelRes, recomposicaoRes] = await Promise.all([
+                    supabase
+                        .from('recursos_humanos')
+                        .select('nome')
+                        .eq('funcao', 'Monitor(a) de Atividade Complementar'),
+                    supabase
+                        .from('recursos_humanos')
+                        .select('nome')
+                        .in('etapa_atuacao', ['Recomposição - Língua Portuguesa', 'Recomposição - Matemática'])
+                ]);
 
-                if (personnel) {
-                    setMonitoresDisponiveis(personnel.map(p => p.nome));
+                const names = new Set<string>();
+                if (personnelRes.data) {
+                    personnelRes.data.forEach(p => {
+                        if (p.nome) names.add(p.nome);
+                    });
                 }
+                if (recomposicaoRes.data) {
+                    recomposicaoRes.data.forEach(p => {
+                        if (p.nome) names.add(p.nome);
+                    });
+                }
+                
+                const sortedNames = Array.from(names).sort((a, b) => a.localeCompare(b));
+                setMonitoresDisponiveis(sortedNames);
             } catch (error) {
                 console.error('Error fetching modal data:', error);
             } finally {
@@ -443,20 +542,13 @@ export const AtividadeModal: React.FC<AtividadeModalProps> = ({ isOpen, onClose,
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-[11px] font-bold text-slate-500 ml-1">Monitor / Professor da Atividade</label>
-                                    <select 
+                                    <SearchableSelect
                                         value={formData.instrutor}
-                                        onChange={e => setFormData({ ...formData, instrutor: e.target.value })}
-                                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-orange-500/10 focus:border-orange-500 outline-none transition-all cursor-pointer text-slate-700"
+                                        onChange={value => setFormData({ ...formData, instrutor: value })}
+                                        options={monitoresDisponiveis}
+                                        placeholder={isLoadingData ? "Carregando..." : "Selecione ou digite para buscar..."}
                                         disabled={isLoadingData}
-                                    >
-                                        <option value="" disabled>{isLoadingData ? 'Carregando monitores...' : 'Selecione o monitor responsável'}</option>
-                                        {monitoresDisponiveis.map(monitor => (
-                                            <option key={monitor} value={monitor}>{monitor}</option>
-                                        ))}
-                                        {!isLoadingData && monitoresDisponiveis.length === 0 && (
-                                            <option value="" disabled>Nenhum monitor encontrado no RH</option>
-                                        )}
-                                    </select>
+                                    />
                                 </div>
                             </div>
                         </div>

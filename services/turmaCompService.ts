@@ -55,6 +55,18 @@ export const turmaCompService = {
         return data;
     },
 
+    async updateTurma(id: string, nome: string, escolaId: string): Promise<TurmaComp> {
+        const { data, error } = await supabase
+            .from('turmas_atividades_comp')
+            .update({ nome, escola_id: escolaId })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
     async deleteTurma(id: string): Promise<void> {
         // First get linked activities and students to delete records from atividade_alunos
         const [alunosRes, atividadesRes] = await Promise.all([

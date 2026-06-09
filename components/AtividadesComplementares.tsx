@@ -69,6 +69,9 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
     // Modals
     const [isTurmaModalOpen, setIsTurmaModalOpen] = useState(false);
     const [newTurmaNome, setNewTurmaNome] = useState('');
+    const [selectedSchoolIdForNewTurma, setSelectedSchoolIdForNewTurma] = useState<string>('');
+    const [editingTurma, setEditingTurma] = useState<TurmaComp | null>(null);
+    const [escolasComplementares, setEscolasComplementares] = useState<{ id: string; nome: string }[]>([]);
     const [isManageActivitiesOpen, setIsManageActivitiesOpen] = useState(false);
     const [selectedActivitiesForTurma, setSelectedActivitiesForTurma] = useState<string[]>([]);
     const [isAddingStudent, setIsAddingStudent] = useState(false);
@@ -140,25 +143,75 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
         }
     };
 
-    const handleCreateTurma = async (e: React.FormEvent) => {
+    const fetchEscolasComplementares = async () => {
+        try {
+            let query = supabase
+                .from('escolas')
+                .select('id, nome')
+                .eq('oferta_atividade_complementar', true);
+            
+            if (userEscolaIds && userEscolaIds.length > 0) {
+                query = query.in('id', userEscolaIds);
+            }
+            
+            const { data, error } = await query.order('nome');
+            if (error) throw error;
+            if (data) {
+                setEscolasComplementares(data);
+            }
+        } catch (err) {
+            console.error('Error fetching schools:', err);
+        }
+    };
+
+    const openNewTurmaModal = () => {
+        setNewTurmaNome('');
+        setEditingTurma(null);
+        if (escolasComplementares.length === 1) {
+            setSelectedSchoolIdForNewTurma(escolasComplementares[0].id);
+        } else if (userEscolaIds && userEscolaIds.length === 1) {
+            setSelectedSchoolIdForNewTurma(userEscolaIds[0]);
+        } else {
+            setSelectedSchoolIdForNewTurma('');
+        }
+        setIsTurmaModalOpen(true);
+    };
+
+    const openEditTurmaModal = (turma: TurmaComp) => {
+        setNewTurmaNome(turma.nome);
+        setEditingTurma(turma);
+        setSelectedSchoolIdForNewTurma(turma.escola_id);
+        setIsTurmaModalOpen(true);
+    };
+
+    const handleSaveTurma = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newTurmaNome.trim()) return;
-
-        const schoolId = userEscolaIds && userEscolaIds.length > 0 ? userEscolaIds[0] : null;
-        if (!schoolId) {
-            alert('Não foi possível associar a turma a uma unidade escolar. Verifique suas permissões.');
+        if (!selectedSchoolIdForNewTurma) {
+            alert('Por favor, selecione uma unidade escolar.');
             return;
         }
 
         try {
-            const newTurma = await turmaCompService.createTurma(newTurmaNome.trim(), schoolId);
-            await fetchTurmasComp();
-            setNewTurmaNome('');
-            setIsTurmaModalOpen(false);
-            handleSelectTurma(newTurma.id);
+            if (editingTurma) {
+                const updated = await turmaCompService.updateTurma(editingTurma.id, newTurmaNome.trim(), selectedSchoolIdForNewTurma);
+                await fetchTurmasComp();
+                setNewTurmaNome('');
+                setSelectedSchoolIdForNewTurma('');
+                setEditingTurma(null);
+                setIsTurmaModalOpen(false);
+                handleSelectTurma(updated.id);
+            } else {
+                const newTurma = await turmaCompService.createTurma(newTurmaNome.trim(), selectedSchoolIdForNewTurma);
+                await fetchTurmasComp();
+                setNewTurmaNome('');
+                setSelectedSchoolIdForNewTurma('');
+                setIsTurmaModalOpen(false);
+                handleSelectTurma(newTurma.id);
+            }
         } catch (err) {
-            console.error('Error creating class:', err);
-            alert('Erro ao cadastrar turma.');
+            console.error('Error saving class:', err);
+            alert('Erro ao salvar turma.');
         }
     };
 
@@ -267,6 +320,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
     React.useEffect(() => {
         fetchAtividades();
         fetchTurmasComp();
+        fetchEscolasComplementares();
     }, [userEscolaIds]);
 
     const handleSaveAtividade = async (newAtv: Omit<Atividade, 'id' | 'inscritos'>) => {
@@ -446,10 +500,10 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
             {/* Turma Creation Modal */}
             {isTurmaModalOpen && (
                 <div className="fixed inset-0 z-[120] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
-                    <form onSubmit={handleCreateTurma} className="bg-white w-full max-w-md rounded-[2rem] shadow-2xl border border-slate-100 flex flex-col animate-in zoom-in-95 duration-300">
+                    <form onSubmit={handleSaveTurma} className="bg-white w-full max-w-md rounded-[2rem] shadow-2xl border border-slate-100 flex flex-col animate-in zoom-in-95 duration-300">
                         <div className="p-6 border-b border-slate-100 flex justify-between items-center">
                             <div>
-                                <h3 className="text-xl font-black text-slate-800 tracking-tight">Cadastrar Nova Turma</h3>
+                                <h3 className="text-xl font-black text-slate-800 tracking-tight">{editingTurma ? 'Editar Turma' : 'Cadastrar Nova Turma'}</h3>
                                 <p className="text-slate-400 font-bold text-xs uppercase tracking-widest mt-1">Atividades Complementares</p>
                             </div>
                             <button 
@@ -473,6 +527,23 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                     required
                                 />
                             </div>
+                            <div>
+                                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Unidade Escolar</label>
+                                <select 
+                                    value={selectedSchoolIdForNewTurma}
+                                    onChange={e => setSelectedSchoolIdForNewTurma(e.target.value)}
+                                    className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-indigo-500/10 transition-all outline-none text-slate-700 cursor-pointer"
+                                    required
+                                >
+                                    <option value="" disabled>Selecione a unidade escolar</option>
+                                    {escolasComplementares.map(esc => (
+                                        <option key={esc.id} value={esc.id}>{esc.nome}</option>
+                                    ))}
+                                    {escolasComplementares.length === 0 && (
+                                        <option value="" disabled>Carregando unidades...</option>
+                                    )}
+                                </select>
+                            </div>
                         </div>
                         <div className="p-6 bg-slate-50 rounded-b-[2rem] flex justify-end gap-3">
                             <button 
@@ -486,7 +557,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                 type="submit"
                                 className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-indigo-100 transition-all"
                             >
-                                Cadastrar Turma
+                                {editingTurma ? 'Salvar Alterações' : 'Cadastrar Turma'}
                             </button>
                         </div>
                     </form>
@@ -806,7 +877,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                         <div className="flex justify-between items-center pb-2 border-b border-slate-50">
                             <h3 className="font-black text-slate-800 text-base uppercase tracking-tight">Turmas Complementares</h3>
                             <button 
-                                onClick={() => setIsTurmaModalOpen(true)}
+                                onClick={openNewTurmaModal}
                                 className="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 p-1.5 rounded-lg transition-all"
                                 title="Cadastrar Nova Turma"
                             >
@@ -851,13 +922,28 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                                 </span>
                                             </div>
                                         </button>
-                                        <button
-                                            onClick={() => handleDeleteTurma(t.id, t.nome)}
-                                            className="absolute top-4 right-4 p-1 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                                            title="Excluir Turma"
-                                        >
-                                            <Trash2 size={14} />
-                                        </button>
+                                        <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    openEditTurmaModal(t);
+                                                }}
+                                                className="p-1 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                                                title="Editar Turma"
+                                            >
+                                                <Pencil size={14} />
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDeleteTurma(t.id, t.nome);
+                                                }}
+                                                className="p-1 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                                                title="Excluir Turma"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
                                     </div>
                                 );
                             })}
