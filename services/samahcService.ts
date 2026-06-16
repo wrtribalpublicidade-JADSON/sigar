@@ -181,5 +181,31 @@ export const samahcService = {
     }
 
     return allRecords;
+  },
+
+  async getPrintRecords(schoolId: string, year: number, grade?: string) {
+    let query = supabase
+      .from('registros_fluencia_samahc')
+      .select('nivel_desempenho, tipo_avaliacao, estudante_nome, ano_serie, etapa, created_at')
+      .eq('escola_id', schoolId)
+      .eq('ano', year);
+
+    if (grade && grade !== 'Toda a escola (consolidado)' && grade !== 'Todas') {
+      query = query.eq('ano_serie', grade);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      console.error('Error fetching print records:', error);
+      throw error;
+    }
+    return data.map(r => ({
+      ...r,
+      estudanteNome: r.estudante_nome,
+      anoSerie: r.ano_serie,
+      nivelDesempenho: r.nivel_desempenho,
+      tipoAvaliacao: r.tipo_avaliacao,
+      createdAt: r.created_at
+    }));
   }
 };
