@@ -63,9 +63,22 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
   // Filter & Context State
   const [dataFreq, setDataFreq] = useState(new Date().toISOString().split('T')[0]);
   const [selectedEscolaId, setSelectedEscolaId] = useState('');
+  const [selectedAnoSerie, setSelectedAnoSerie] = useState('');
   const [selectedTurmaId, setSelectedTurmaId] = useState('');
   const [componente, setComponente] = useState(COMPONENTES[0]);
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
+
+  // Extract unique available Year/Grade levels
+  const availableAnosSeries = useMemo(() => {
+    const years = turmas.map(t => t.year).filter(Boolean);
+    return Array.from(new Set(years)).sort();
+  }, [turmas]);
+
+  // Filter available classes based on the selected Year/Grade
+  const availableTurmas = useMemo(() => {
+    if (!selectedAnoSerie) return [];
+    return turmas.filter(t => t.year === selectedAnoSerie);
+  }, [turmas, selectedAnoSerie]);
 
   // Search Filter
   const [studentSearch, setStudentSearch] = useState('');
@@ -152,9 +165,9 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
 
       if (isDemoMode) {
         setTurmas([
-          { id: 'demo-t1', name: '1º ANO A', shift: 'MANHÃ' },
-          { id: 'demo-t2', name: '2º ANO B', shift: 'TARDE' },
-          { id: 'demo-t3', name: '5º ANO A', shift: 'MANHÃ' },
+          { id: 'demo-t1', name: '1º ANO A', year: '1º ANO', shift: 'MANHÃ' },
+          { id: 'demo-t2', name: '2º ANO B', year: '2º ANO', shift: 'TARDE' },
+          { id: 'demo-t3', name: '5º ANO A', year: '5º ANO', shift: 'MANHÃ' },
         ]);
         return;
       }
@@ -168,11 +181,6 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
 
         if (error) throw error;
         setTurmas(data || []);
-        if (data && data.length > 0) {
-          setSelectedTurmaId(data[0].id);
-        } else {
-          setSelectedTurmaId('');
-        }
       } catch (err) {
         console.error('Erro ao carregar turmas:', err);
       }
@@ -180,6 +188,29 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
 
     fetchTurmas();
   }, [selectedEscolaId, isDemoMode]);
+
+  // Sync selectedAnoSerie when availableAnosSeries changes
+  useEffect(() => {
+    if (availableAnosSeries.length > 0) {
+      if (!availableAnosSeries.includes(selectedAnoSerie)) {
+        setSelectedAnoSerie(availableAnosSeries[0]);
+      }
+    } else {
+      setSelectedAnoSerie('');
+    }
+  }, [availableAnosSeries, selectedAnoSerie]);
+
+  // Sync selectedTurmaId when availableTurmas changes
+  useEffect(() => {
+    if (availableTurmas.length > 0) {
+      const exists = availableTurmas.some(t => t.id === selectedTurmaId);
+      if (!exists) {
+        setSelectedTurmaId(availableTurmas[0].id);
+      }
+    } else {
+      setSelectedTurmaId('');
+    }
+  }, [availableTurmas, selectedTurmaId]);
 
   // Load students when selected class changes
   useEffect(() => {
@@ -407,7 +438,7 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
           <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight">Seleção de Turma e Período</h2>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Data da Chamada *</label>
             <div className="relative">
@@ -440,6 +471,22 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
           </div>
 
           <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Ano/Série *</label>
+            <select 
+              value={selectedAnoSerie}
+              onChange={e => setSelectedAnoSerie(e.target.value)}
+              required
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
+            >
+              {availableAnosSeries.length === 0 ? (
+                <option value="">Nenhum ano cadastrado</option>
+              ) : (
+                availableAnosSeries.map(a => <option key={a} value={a}>{a}</option>)
+              )}
+            </select>
+          </div>
+
+          <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Turma *</label>
             <select 
               value={selectedTurmaId}
@@ -447,10 +494,10 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
               required
               className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
             >
-              {turmas.length === 0 ? (
+              {availableTurmas.length === 0 ? (
                 <option value="">Nenhuma turma cadastrada</option>
               ) : (
-                turmas.map(t => (
+                availableTurmas.map(t => (
                   <option key={t.id} value={t.id}>{`${t.name || t.year} • ${t.shift || ''}`}</option>
                 ))
               )}

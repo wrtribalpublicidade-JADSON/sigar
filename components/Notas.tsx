@@ -100,10 +100,23 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
 
   // Filter & Selection State
   const [selectedEscolaId, setSelectedEscolaId] = useState('');
+  const [selectedAnoSerie, setSelectedAnoSerie] = useState('');
   const [selectedTurmaId, setSelectedTurmaId] = useState('');
   const [componente, setComponente] = useState(COMPONENTES[0]);
   const [bimestre, setBimestre] = useState(BIMESTRES[0]);
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
+
+  // Extract unique available Year/Grade levels
+  const availableAnosSeries = useMemo(() => {
+    const years = turmas.map(t => t.year).filter(Boolean);
+    return Array.from(new Set(years)).sort();
+  }, [turmas]);
+
+  // Filter available classes based on the selected Year/Grade
+  const availableTurmas = useMemo(() => {
+    if (!selectedAnoSerie) return [];
+    return turmas.filter(t => t.year === selectedAnoSerie);
+  }, [turmas, selectedAnoSerie]);
 
   // Search Filter
   const [studentSearch, setStudentSearch] = useState('');
@@ -202,17 +215,11 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
 
       if (isDemoMode) {
         const demoTurmas = [
-          { id: 'demo-t1', name: '1º ANO A', shift: 'MANHÃ' },
-          { id: 'demo-t2', name: '2º ANO B', shift: 'TARDE' },
-          { id: 'demo-t3', name: '5º ANO A', shift: 'MANHÃ' },
+          { id: 'demo-t1', name: '1º ANO A', year: '1º ANO', shift: 'MANHÃ' },
+          { id: 'demo-t2', name: '2º ANO B', year: '2º ANO', shift: 'TARDE' },
+          { id: 'demo-t3', name: '5º ANO A', year: '5º ANO', shift: 'MANHÃ' },
         ];
         setTurmas(demoTurmas);
-        if (editTurmaIdRef.current) {
-          setSelectedTurmaId(editTurmaIdRef.current);
-          editTurmaIdRef.current = null;
-        } else {
-          setSelectedTurmaId('demo-t1');
-        }
         return;
       }
 
@@ -225,15 +232,6 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
 
         if (error) throw error;
         setTurmas(data || []);
-        
-        if (editTurmaIdRef.current) {
-          setSelectedTurmaId(editTurmaIdRef.current);
-          editTurmaIdRef.current = null;
-        } else if (data && data.length > 0) {
-          setSelectedTurmaId(data[0].id);
-        } else {
-          setSelectedTurmaId('');
-        }
       } catch (err) {
         console.error('Erro ao carregar turmas:', err);
       }
@@ -241,6 +239,51 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
 
     fetchTurmas();
   }, [selectedEscolaId, isDemoMode]);
+
+  // Sync selectedAnoSerie and selectedTurmaId when turmas change
+  useEffect(() => {
+    if (turmas.length > 0) {
+      // 1. If we are editing/loading a historical sheet, we must resolve the target class
+      if (editTurmaIdRef.current) {
+        const targetTurma = turmas.find(t => t.id === editTurmaIdRef.current);
+        if (targetTurma) {
+          if (targetTurma.year) {
+            setSelectedAnoSerie(targetTurma.year);
+          }
+          setSelectedTurmaId(targetTurma.id);
+          editTurmaIdRef.current = null;
+          return;
+        }
+      }
+      
+      // 2. Normal sync: Ensure selectedAnoSerie is valid
+      const years = Array.from(new Set(turmas.map(t => t.year).filter(Boolean))).sort();
+      if (years.length > 0) {
+        if (!years.includes(selectedAnoSerie)) {
+          setSelectedAnoSerie(years[0]);
+        }
+      } else {
+        setSelectedAnoSerie('');
+      }
+    } else {
+      setSelectedAnoSerie('');
+      setSelectedTurmaId('');
+    }
+  }, [turmas, selectedAnoSerie]);
+
+  // Sync selectedTurmaId when availableTurmas changes
+  useEffect(() => {
+    if (editTurmaIdRef.current) return;
+
+    if (availableTurmas.length > 0) {
+      const exists = availableTurmas.some(t => t.id === selectedTurmaId);
+      if (!exists) {
+        setSelectedTurmaId(availableTurmas[0].id);
+      }
+    } else {
+      setSelectedTurmaId('');
+    }
+  }, [availableTurmas, selectedTurmaId]);
 
   // Load students and matching sheet values when selected class/subject/term changes
   useEffect(() => {
@@ -578,6 +621,10 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
     setComponente(sheet.componente);
     setBimestre(sheet.bimestre);
     if (selectedEscolaId === sheet.escolaId) {
+      const targetTurma = turmas.find(t => t.id === sheet.turmaId);
+      if (targetTurma && targetTurma.year) {
+        setSelectedAnoSerie(targetTurma.year);
+      }
       setSelectedTurmaId(sheet.turmaId);
       editTurmaIdRef.current = null;
     } else {
@@ -644,7 +691,7 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
           <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight">Filtros de Lançamento</h2>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-6 gap-4">
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Escola *</label>
             <div className="relative">
@@ -663,6 +710,22 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
           </div>
 
           <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Ano/Série *</label>
+            <select 
+              value={selectedAnoSerie}
+              onChange={e => setSelectedAnoSerie(e.target.value)}
+              required
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
+            >
+              {availableAnosSeries.length === 0 ? (
+                <option value="">Nenhum ano cadastrado</option>
+              ) : (
+                availableAnosSeries.map(a => <option key={a} value={a}>{a}</option>)
+              )}
+            </select>
+          </div>
+
+          <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Turma *</label>
             <select 
               value={selectedTurmaId}
@@ -670,10 +733,10 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
               required
               className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
             >
-              {turmas.length === 0 ? (
+              {availableTurmas.length === 0 ? (
                 <option value="">Nenhuma turma cadastrada</option>
               ) : (
-                turmas.map(t => (
+                availableTurmas.map(t => (
                   <option key={t.id} value={t.id}>{`${t.name || t.year} • ${t.shift || ''}`}</option>
                 ))
               )}
