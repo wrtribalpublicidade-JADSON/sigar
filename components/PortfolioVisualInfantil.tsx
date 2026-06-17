@@ -175,7 +175,19 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
     return valuesToCheck.some(val => {
       if (!val) return false;
       if (val === targetClean) return true;
-      if ((val === 'prei' && targetClean === 'preii') || (val === 'preii' && targetClean === 'prei')) return false;
+      
+      // Evitar colisão entre Creche I, Creche II e Creche III
+      if (val.includes('crecheiii') && targetClean.includes('crecheii') && !targetClean.includes('crecheiii')) return false;
+      if (targetClean.includes('crecheiii') && val.includes('crecheii') && !val.includes('crecheiii')) return false;
+      if (val.includes('crecheiii') && targetClean.includes('crechei') && !targetClean.includes('crecheiii')) return false;
+      if (targetClean.includes('crecheiii') && val.includes('crechei') && !val.includes('crecheiii')) return false;
+      if (val.includes('crecheii') && targetClean.includes('crechei') && !targetClean.includes('crecheii')) return false;
+      if (targetClean.includes('crecheii') && val.includes('crechei') && !val.includes('crecheii')) return false;
+
+      // Evitar colisão entre Pré I e Pré II
+      if (val.includes('preii') && targetClean.includes('prei') && !targetClean.includes('preii')) return false;
+      if (targetClean.includes('preii') && val.includes('prei') && !val.includes('preii')) return false;
+
       if (val.includes(targetClean) || targetClean.includes(val)) return true;
       return false;
     });

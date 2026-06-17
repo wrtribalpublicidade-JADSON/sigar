@@ -20,6 +20,7 @@ import { generateAcompanhamentoMensal } from '../constants';
 import { Button } from './ui/Button';
 import { Escola, Visita, DadosEducacionais, ItemAcompanhamento, RecursoHumano, MetaAcao, StatusMeta, Coordenador, Segmento } from '../types';
 import { igPlanoAcaoService } from '../services/gestaoConselhoService';
+import { supabase } from '../services/supabase';
 
 interface SchoolDetailProps {
   escola: Escola;
@@ -28,6 +29,7 @@ interface SchoolDetailProps {
   onBack: () => void;
   onUpdate: (escola: Escola) => void;
   onUpdateVisitStatus: (visitId: string, newStatus: Visita['status']) => void;
+  isDemoMode: boolean;
 }
 
 const COLORS = {
@@ -38,8 +40,31 @@ const COLORS = {
   signal: '#FF1F00'
 };
 
-export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadores = [], historicoVisitas, onBack, onUpdate, onUpdateVisitStatus }) => {
-  const [activeTab, setActiveTab] = useState<'plano' | 'visitas' | 'turmas' | 'rh' | 'acompanhamento'>('acompanhamento');
+const ETAPAS_COHORTS = [
+  {
+    id: 'infantil',
+    title: 'Educação Infantil',
+    cohorts: ['Creche II', 'Creche III', 'Pré-Escola I', 'Pré-Escola II', 'Pré I', 'Pré II']
+  },
+  {
+    id: 'anos_iniciais',
+    title: 'Ensino Fundamental - Anos Iniciais',
+    cohorts: ['1º ANO', '2º ANO', '3º ANO', '4º ANO', '5º ANO']
+  },
+  {
+    id: 'anos_finais',
+    title: 'Ensino Fundamental - Anos Finais',
+    cohorts: ['6º ANO', '7º ANO', '8º ANO', '9º ANO']
+  },
+  {
+    id: 'eja',
+    title: 'EJA (Educação de Jovens e Adultos)',
+    cohorts: ['I ETAPA', 'II ETAPA', 'III ETAPA', 'IV ETAPA']
+  }
+];
+
+export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadores = [], historicoVisitas, onBack, onUpdate, onUpdateVisitStatus, isDemoMode }) => {
+  const [activeTab, setActiveTab] = useState<'plano' | 'visitas' | 'turmas' | 'rh' | 'acompanhamento' | 'detalhamento_turmas'>('acompanhamento');
   const [selectedVisitForPrint, setSelectedVisitForPrint] = useState<Visita | null>(null);
   const [selectedServidorForCarta, setSelectedServidorForCarta] = useState<RecursoHumano | null>(null);
   const [formData, setFormData] = useState<DadosEducacionais>(escola.dadosEducacionais);
@@ -121,6 +146,132 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
   useEffect(() => {
     setLocalAcompanhamento(initialAcompanhamento);
   }, [initialAcompanhamento]);
+
+  const [schoolTurmas, setSchoolTurmas] = useState<any[]>([]);
+  const [isLoadingTurmas, setIsLoadingTurmas] = useState(false);
+
+  useEffect(() => {
+    const fetchTurmas = async () => {
+      if (!escola.id || activeTab !== 'detalhamento_turmas') return;
+      setIsLoadingTurmas(true);
+      try {
+        if (isDemoMode) {
+          // Generate demo turmas for the school
+          const demoTurmas = [
+            { id: 'dt-1', stage: 'Educação Infantil', year: 'Creche II', name: 'Turma A', shift: 'MANHÃ', modality: 'REGULAR' },
+            { id: 'dt-2', stage: 'Educação Infantil', year: 'Pré-Escola I', name: 'Turma A', shift: 'MANHÃ', modality: 'REGULAR' },
+            { id: 'dt-3', stage: 'Educação Infantil', year: 'Pré-Escola I', name: 'Turma B', shift: 'TARDE', modality: 'REGULAR' },
+            { id: 'dt-4', stage: 'Anos Iniciais', year: '1º ANO', name: 'Turma A', shift: 'MANHÃ', modality: 'REGULAR' },
+            { id: 'dt-5', stage: 'Anos Iniciais', year: '2º ANO', name: 'Turma A', shift: 'MANHÃ', modality: 'REGULAR' },
+            { id: 'dt-6', stage: 'Anos Iniciais', year: '5º ANO', name: 'Turma B', shift: 'TARDE', modality: 'REGULAR' },
+            { id: 'dt-7', stage: 'Anos Finais', year: '6º ANO', name: 'Turma A', shift: 'MANHÃ', modality: 'REGULAR' },
+            { id: 'dt-8', stage: 'Anos Finais', year: '9º ANO', name: 'Turma A', shift: 'INTEGRAL', modality: 'REGULAR' },
+            { id: 'dt-9', stage: 'EJA', year: 'I ETAPA', name: 'Turma A', shift: 'NOITE', modality: 'REGULAR' }
+          ];
+          setSchoolTurmas(demoTurmas);
+        } else {
+          const { data, error } = await supabase
+            .from('turmas')
+            .select('*')
+            .eq('school_id', escola.id)
+            .order('name');
+          
+          if (error) throw error;
+          setSchoolTurmas(data || []);
+        }
+      } catch (err) {
+        console.error('Erro ao buscar turmas:', err);
+      } finally {
+        setIsLoadingTurmas(false);
+      }
+    };
+
+    fetchTurmas();
+  }, [escola.id, activeTab, isDemoMode]);
+
+  const visibleEtapas = useMemo(() => {
+    return ETAPAS_COHORTS.filter(etapa => {
+      // Check if school has this segment in its segmentos array
+      const hasSegment = (
+        (etapa.id === 'infantil' && escola.segmentos.includes(Segmento.INFANTIL)) ||
+        (etapa.id === 'anos_iniciais' && escola.segmentos.includes(Segmento.FUNDAMENTAL_I)) ||
+        (etapa.id === 'anos_finais' && escola.segmentos.includes(Segmento.FUNDAMENTAL_II))
+      );
+      
+      // Or if there's any active schoolTurma matching this stage
+      const hasTurmas = schoolTurmas.some(t => {
+        const tStage = (t.stage || '').toLowerCase();
+        if (etapa.id === 'infantil') return tStage.includes('infantil') || tStage.includes('creche') || tStage.includes('pré');
+        if (etapa.id === 'anos_iniciais') return tStage.includes('iniciais') || tStage.includes('fundamental i');
+        if (etapa.id === 'anos_finais') return tStage.includes('finais') || tStage.includes('fundamental ii');
+        if (etapa.id === 'eja') return tStage.includes('eja');
+        return false;
+      });
+
+      return hasSegment || hasTurmas;
+    });
+  }, [escola.segmentos, schoolTurmas]);
+
+  const classifiedTurmas = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    const unclassified: any[] = [];
+    
+    schoolTurmas.forEach(t => {
+      let matched = false;
+      const tYear = (t.year || '').toLowerCase().trim();
+      const tStage = (t.stage || '').toLowerCase().trim();
+      const tYearNorm = tYear.replace(/[^a-z0-9]/g, '');
+
+      // Try to match stage first
+      for (const etapa of ETAPAS_COHORTS) {
+        const stageMatches = (
+          (etapa.id === 'infantil' && (tStage.includes('infantil') || tStage.includes('creche') || tStage.includes('pré'))) ||
+          (etapa.id === 'anos_iniciais' && (tStage.includes('iniciais') || tStage.includes('fundamental i'))) ||
+          (etapa.id === 'anos_finais' && (tStage.includes('finais') || tStage.includes('fundamental ii'))) ||
+          (etapa.id === 'eja' && tStage.includes('eja'))
+        );
+
+        if (stageMatches) {
+          const matchedCohort = etapa.cohorts.find(c => {
+            const cNorm = c.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+            return tYearNorm === cNorm || tYear === c.toLowerCase().trim();
+          });
+
+          if (matchedCohort) {
+            const key = `${etapa.id}_${matchedCohort}`;
+            if (!map[key]) map[key] = [];
+            map[key].push(t);
+            matched = true;
+            break;
+          }
+        }
+      }
+
+      if (!matched) {
+        // Fallback: try to match just the cohort name without stage constraint
+        for (const etapa of ETAPAS_COHORTS) {
+          const matchedCohort = etapa.cohorts.find(c => {
+            const cNorm = c.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+            return tYearNorm === cNorm || tYear === c.toLowerCase().trim();
+          });
+
+          if (matchedCohort) {
+            const key = `${etapa.id}_${matchedCohort}`;
+            if (!map[key]) map[key] = [];
+            map[key].push(t);
+            matched = true;
+            break;
+          }
+        }
+      }
+
+      if (!matched) {
+        unclassified.push(t);
+      }
+    });
+
+    return { map, unclassified };
+  }, [schoolTurmas]);
 
   const [isAddingRh, setIsAddingRh] = useState(false);
   const [editingRhId, setEditingRhId] = useState<string | null>(null);
@@ -427,6 +578,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
         {[
           { id: 'acompanhamento', icon: ClipboardCheck, label: 'Monitoramento' },
           { id: 'turmas', icon: CheckSquare, label: 'Turmas' },
+          { id: 'detalhamento_turmas', icon: GraduationCap, label: 'Detalhamento de Turmas' },
           { id: 'rh', icon: Briefcase, label: 'Recursos Humanos' },
           { id: 'plano', icon: Target, label: 'Plano de Ação' },
           { id: 'visitas', icon: History, label: 'Histórico' }
@@ -575,7 +727,169 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
           }
 
           {
+            activeTab === 'detalhamento_turmas' && (
+              <div className="space-y-6 animate-fade-in">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-5">
+                  <div>
+                    <h3 className="text-2xl font-bold text-slate-800">Detalhamento de Turmas</h3>
+                    <p className="text-slate-500 text-sm mt-1">
+                      Relação de todas as turmas vinculadas à unidade escolar por etapa, ano/série e turno.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 px-4 py-2.5 bg-orange-50 border border-orange-100 rounded-xl shrink-0">
+                    <GraduationCap className="w-4 h-4 text-orange-500" />
+                    <span className="text-xs font-black text-orange-600 uppercase tracking-wider whitespace-nowrap">
+                      {schoolTurmas.length} {schoolTurmas.length === 1 ? 'turma ativa' : 'turmas ativas'}
+                    </span>
+                  </div>
+                </div>
 
+                {isLoadingTurmas ? (
+                  <div className="flex flex-col items-center justify-center py-20 bg-slate-50 border border-slate-100 rounded-2xl">
+                    <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-4" />
+                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Buscando turmas vinculadas...</p>
+                  </div>
+                ) : schoolTurmas.length === 0 ? (
+                  <div className="text-center py-20 bg-slate-50 border border-slate-100 rounded-2xl">
+                    <GraduationCap className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                    <h4 className="text-sm font-bold text-slate-700">Nenhuma turma cadastrada</h4>
+                    <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                      Use o módulo de Gestão de Estudantes para cadastrar turmas para esta unidade escolar.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-8">
+                    {visibleEtapas.map(etapa => {
+                      const hasTurmasInEtapa = etapa.cohorts.some(cohort => {
+                        const key = `${etapa.id}_${cohort}`;
+                        return classifiedTurmas.map[key]?.length > 0;
+                      });
+
+                      if (!hasTurmasInEtapa) return null;
+
+                      return (
+                        <div key={etapa.id} className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm bg-white">
+                          <div className="bg-gradient-to-r from-slate-800 to-slate-900 px-6 py-4 border-b border-slate-200">
+                            <h4 className="text-white font-bold text-sm uppercase tracking-wider">
+                              {etapa.title}
+                            </h4>
+                          </div>
+                          <div className="divide-y divide-slate-100">
+                            {etapa.cohorts.map(cohort => {
+                              const key = `${etapa.id}_${cohort}`;
+                              const cohortTurmas = classifiedTurmas.map[key] || [];
+
+                              if (cohortTurmas.length === 0) return null;
+
+                              return (
+                                <div key={cohort} className="p-5 flex flex-col sm:flex-row sm:items-start gap-4 hover:bg-slate-50/50 transition-colors">
+                                  <div className="sm:w-1/4 shrink-0 pt-1">
+                                    <span className="inline-block px-3 py-1 bg-slate-100 text-slate-700 text-xs font-bold rounded-lg uppercase tracking-wide">
+                                      {cohort}
+                                    </span>
+                                  </div>
+                                  <div className="flex-1 flex flex-wrap gap-3">
+                                    {cohortTurmas.map(turma => {
+                                      const isManha = (turma.shift || '').toUpperCase() === 'MANHÃ';
+                                      const isTarde = (turma.shift || '').toUpperCase() === 'TARDE';
+                                      const isIntegral = (turma.shift || '').toUpperCase() === 'INTEGRAL';
+                                      const isNoite = (turma.shift || '').toUpperCase() === 'NOITE';
+
+                                      const shiftColor = isManha 
+                                        ? 'bg-amber-100 text-amber-800 border-amber-200' 
+                                        : isTarde 
+                                        ? 'bg-orange-100 text-orange-800 border-orange-200' 
+                                        : isIntegral 
+                                        ? 'bg-indigo-100 text-indigo-800 border-indigo-200' 
+                                        : 'bg-slate-100 text-slate-800 border-slate-200';
+
+                                      return (
+                                        <div 
+                                          key={turma.id} 
+                                          className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl p-3 shadow-sm hover:border-orange-300 transition-all min-w-[140px]"
+                                        >
+                                          <div>
+                                            <div className="font-bold text-slate-800 uppercase text-xs">
+                                              {turma.name}
+                                            </div>
+                                            <div className="flex items-center gap-1.5 mt-1.5">
+                                              <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border ${shiftColor}`}>
+                                                {turma.shift || 'MANHÃ'}
+                                              </span>
+                                              <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-slate-50 text-slate-500 border border-slate-150">
+                                                {turma.modality || 'REGULAR'}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {classifiedTurmas.unclassified.length > 0 && (
+                      <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm bg-white">
+                        <div className="bg-slate-700 px-6 py-4 border-b border-slate-200">
+                          <h4 className="text-white font-bold text-sm uppercase tracking-wider">
+                            Outras Turmas / Não Classificadas
+                          </h4>
+                        </div>
+                        <div className="p-5 flex flex-col sm:flex-row sm:items-start gap-4">
+                          <div className="sm:w-1/4 shrink-0 pt-1">
+                            <span className="inline-block px-3 py-1 bg-slate-100 text-slate-700 text-xs font-bold rounded-lg uppercase tracking-wide">
+                              Diversas
+                            </span>
+                          </div>
+                          <div className="flex-1 flex flex-wrap gap-3">
+                            {classifiedTurmas.unclassified.map(turma => {
+                              const isManha = (turma.shift || '').toUpperCase() === 'MANHÃ';
+                              const isTarde = (turma.shift || '').toUpperCase() === 'TARDE';
+                              const isIntegral = (turma.shift || '').toUpperCase() === 'INTEGRAL';
+                              const isNoite = (turma.shift || '').toUpperCase() === 'NOITE';
+
+                              const shiftColor = isManha 
+                                ? 'bg-amber-100 text-amber-800 border-amber-200' 
+                                : isTarde 
+                                ? 'bg-orange-100 text-orange-800 border-orange-200' 
+                                : isIntegral 
+                                ? 'bg-indigo-100 text-indigo-800 border-indigo-200' 
+                                : 'bg-slate-100 text-slate-800 border-slate-200';
+
+                              return (
+                                <div 
+                                  key={turma.id} 
+                                  className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl p-3 shadow-sm hover:border-orange-300 transition-all min-w-[140px]"
+                                >
+                                  <div>
+                                    <div className="font-bold text-slate-800 uppercase text-xs">
+                                      {turma.name} {turma.year ? `(${turma.year})` : ''}
+                                    </div>
+                                    <div className="flex items-center gap-1.5 mt-1.5">
+                                      <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border ${shiftColor}`}>
+                                        {turma.shift || 'MANHÃ'}
+                                      </span>
+                                      <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-slate-50 text-slate-500 border border-slate-150">
+                                        {turma.modality || 'REGULAR'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
           }
 
           {

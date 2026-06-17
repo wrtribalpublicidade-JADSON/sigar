@@ -152,7 +152,19 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
     return valuesToCheck.some(val => {
       if (!val) return false;
       if (val === targetClean) return true;
-      if ((val === 'prei' && targetClean === 'preii') || (val === 'preii' && targetClean === 'prei')) return false;
+      
+      // Evitar colisão entre Creche I, Creche II e Creche III
+      if (val.includes('crecheiii') && targetClean.includes('crecheii') && !targetClean.includes('crecheiii')) return false;
+      if (targetClean.includes('crecheiii') && val.includes('crecheii') && !val.includes('crecheiii')) return false;
+      if (val.includes('crecheiii') && targetClean.includes('crechei') && !targetClean.includes('crecheiii')) return false;
+      if (targetClean.includes('crecheiii') && val.includes('crechei') && !val.includes('crecheiii')) return false;
+      if (val.includes('crecheii') && targetClean.includes('crechei') && !targetClean.includes('crecheii')) return false;
+      if (targetClean.includes('crecheii') && val.includes('crechei') && !val.includes('crecheii')) return false;
+
+      // Evitar colisão entre Pré I e Pré II
+      if (val.includes('preii') && targetClean.includes('prei') && !targetClean.includes('preii')) return false;
+      if (targetClean.includes('preii') && val.includes('prei') && !val.includes('preii')) return false;
+
       if (val.includes(targetClean) || targetClean.includes(val)) return true;
       return false;
     });
@@ -267,7 +279,7 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
           .from('alunos')
           .select('id, name')
           .eq('class_id', selectedTurmaId)
-          .eq('status', 'active')
+          .in('status', ['active', 'Ativo'])
           .order('name', { ascending: true });
 
         if (error) throw error;
@@ -327,15 +339,15 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
   // Calculate statistics
   const stats = useMemo(() => {
     const total = students.length;
-    if (total === 0) return { total: 0, present: 0, absent: 0, rate: 0 };
+    if (total === 0) return { total: 0, presents: 0, absents: 0, rate: 0 };
     
-    let present = 0;
+    let presents = 0;
     students.forEach(s => {
-      if (attendanceMap[s.id]) present++;
+      if (attendanceMap[s.id]) presents++;
     });
-    const absent = total - present;
-    const rate = Math.round((present / total) * 100);
-    return { total, present, absent, rate };
+    const absents = total - presents;
+    const rate = Math.round((presents / total) * 100);
+    return { total, presents, absents, rate };
   }, [students, attendanceMap]);
 
   // Handle Save
@@ -371,7 +383,7 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
       turmaNome,
       anoSerie,
       periodo,
-      presentesCount: stats.present,
+      presentesCount: stats.presents,
       totalCount: stats.total,
       rate: stats.rate,
       students: listStudents,
@@ -473,42 +485,53 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
 
       {subHeader}
 
-      {/* FILTERS & CONFIGURATION */}
+      {/* Filters & Configuration */}
       <Card className="bg-white border-slate-200 shadow-sm p-6 rounded-2xl">
         <div className="flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
           <ListFilter className="text-brand-orange w-5 h-5" />
-          <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight text-left">Filtros de Turma e Chamada</h2>
+          <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight">Seleção de Turma e Período</h2>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Data da Chamada *</label>
             <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
               <input 
-                type="date"
+                type="date" 
                 value={dataFreq}
                 onChange={e => setDataFreq(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 outline-none focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/10 shadow-sm"
+                required
+                className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
               />
             </div>
           </div>
+
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Unidade Escolar *</label>
-            <select
-              value={selectedEscolaId}
-              onChange={e => setSelectedEscolaId(e.target.value)}
-              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/10 appearance-none shadow-sm"
-            >
-              <option value="">Selecione a Unidade Escolar</option>
-              {escolasInfantil.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
-            </select>
+            <div className="relative">
+              <SchoolIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+              <select 
+                value={selectedEscolaId}
+                onChange={e => setSelectedEscolaId(e.target.value)}
+                required
+                className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all appearance-none"
+              >
+                <option value="">Selecione a Unidade Escolar</option>
+                {escolasInfantil.map(e => (
+                  <option key={e.id} value={e.id}>{e.nome}</option>
+                ))}
+              </select>
+            </div>
           </div>
+
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Grupo/Faixa Etária *</label>
-            <select
+            <select 
               value={anoSerie}
               onChange={e => setAnoSerie(e.target.value)}
-              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/10 appearance-none shadow-sm"
+              required
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
             >
               {availableAnosSeries.length === 0 ? (
                 <option value="">Nenhum grupo cadastrado</option>
@@ -517,205 +540,43 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
               )}
             </select>
           </div>
+
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Turma *</label>
-            <select
+            <select 
               value={selectedTurmaId}
               onChange={e => setSelectedTurmaId(e.target.value)}
-              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/10 appearance-none shadow-sm"
+              required
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
             >
               {availableTurmas.length === 0 ? (
                 <option value="">Nenhuma turma cadastrada</option>
               ) : (
-                availableTurmas.map(t => <option key={t.id} value={t.id}>{t.name || t.anoSerie} • {t.turno || t.shift || ''}</option>)
+                availableTurmas.map(t => (
+                  <option key={t.id} value={t.id}>{`${t.name || t.anoSerie} • ${t.turno || t.shift || ''}`}</option>
+                ))
               )}
             </select>
           </div>
+
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Período Letivo *</label>
-            <select
+            <select 
               value={periodo}
               onChange={e => setPeriodo(e.target.value)}
-              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/10 appearance-none shadow-sm"
+              required
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
             >
-              {PERIODOS.map(p => <option key={p} value={p}>{p}</option>)}
+              {PERIODOS.map(p => (
+                <option key={p} value={p}>{p}</option>
+              ))}
             </select>
           </div>
         </div>
       </Card>
 
       {/* ATTENDANCE INTERACTION BLOCK */}
-      {selectedTurmaId ? (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          
-          {/* Attendance Checklist */}
-          <div className="lg:col-span-8 space-y-4">
-            <Card className="bg-white border-slate-200 shadow-sm p-6 rounded-2xl">
-              
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4 mb-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-3 text-slate-400 w-4 h-4" />
-                  <input 
-                    type="text"
-                    placeholder="Filtrar aluno pelo nome..."
-                    value={studentSearch}
-                    onChange={e => setStudentSearch(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-xs font-medium text-slate-700 placeholder-slate-400 outline-none focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/10 shadow-sm"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    onClick={() => toggleAll(true)}
-                    variant="secondary"
-                    size="sm"
-                    className="text-xs flex items-center gap-1.5 font-bold"
-                  >
-                    <CheckCircle className="w-3.5 h-3.5 text-emerald-500" /> Todos Presentes
-                  </Button>
-                  <Button
-                    onClick={() => toggleAll(false)}
-                    variant="secondary"
-                    size="sm"
-                    className="text-xs flex items-center gap-1.5 font-bold"
-                  >
-                    <XCircle className="w-3.5 h-3.5 text-red-500" /> Todos Ausentes
-                  </Button>
-                </div>
-              </div>
-
-              {loading ? (
-                <div className="py-16 flex flex-col items-center justify-center gap-2">
-                  <Loader2 className="w-8 h-8 text-brand-orange animate-spin" />
-                  <p className="text-xs text-slate-400">Buscando lista de alunos...</p>
-                </div>
-              ) : filteredStudents.length > 0 ? (
-                <div className="divide-y divide-slate-50 max-h-[500px] overflow-y-auto pr-2">
-                  {filteredStudents.map((student, index) => {
-                    const isPresent = !!attendanceMap[student.id];
-                    return (
-                      <div 
-                        key={student.id}
-                        className="py-3 flex items-center justify-between hover:bg-slate-50/50 rounded-lg px-2 transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="text-[10px] font-bold text-slate-300 w-5">
-                            {String(index + 1).padStart(2, '0')}
-                          </span>
-                          <span className="text-sm font-bold text-slate-700 uppercase">
-                            {student.name}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => toggleAttendance(student.id)}
-                            className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all border ${
-                              isPresent
-                                ? 'bg-emerald-50 border-emerald-200 text-emerald-600 shadow-sm'
-                                : 'bg-red-50 border-red-200 text-red-600 shadow-sm'
-                            }`}
-                          >
-                            {isPresent ? 'PRESENTE' : 'AUSENTE'}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="py-12 text-center text-slate-400 italic text-xs">
-                  Nenhum aluno encontrado para os critérios selecionados.
-                </div>
-              )}
-
-              {students.length > 0 && (
-                <div className="border-t border-slate-100 pt-4 mt-6 flex justify-end">
-                  <Button
-                    onClick={handleSave}
-                    disabled={saving}
-                    variant="primary"
-                    className="flex items-center gap-2 font-bold"
-                  >
-                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                    Salvar Frequência Diária
-                  </Button>
-                </div>
-              )}
-
-            </Card>
-          </div>
-
-          {/* Quick Stats & History */}
-          <div className="lg:col-span-4 space-y-6">
-            
-            {/* Class Stats */}
-            <Card className="bg-white border-slate-200 shadow-sm p-6 rounded-2xl">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b pb-2">Estatísticas do Dia</h3>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex flex-col justify-between">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">Presenças</span>
-                  <span className="text-2xl font-black text-emerald-600 mt-1">{stats.present}</span>
-                </div>
-                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex flex-col justify-between">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">Faltas</span>
-                  <span className="text-2xl font-black text-red-500 mt-1">{stats.absent}</span>
-                </div>
-                <div className="col-span-2 bg-slate-50 p-3 rounded-xl border border-slate-100 flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">Assiduidade</span>
-                    <span className="text-2xl font-black text-brand-orange block mt-0.5">{stats.rate}%</span>
-                  </div>
-                  <Percent className="w-8 h-8 text-orange-200" />
-                </div>
-              </div>
-
-              <div className="mt-4 flex items-center gap-2 text-[10px] font-bold text-slate-400 bg-blue-50/50 border border-blue-100 p-2.5 rounded-xl text-left">
-                <Users className="w-4 h-4 text-blue-500 flex-shrink-0" />
-                <span>Total de matriculados na turma: {stats.total} alunos.</span>
-              </div>
-            </Card>
-
-            {/* Attendance History list */}
-            <Card className="bg-white border-slate-200 shadow-sm p-6 rounded-2xl">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b pb-2">Histórico de Chamadas</h3>
-              
-              <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
-                {sheets.filter(s => s.turmaId === selectedTurmaId).length > 0 ? (
-                  sheets.filter(s => s.turmaId === selectedTurmaId).map(sheet => (
-                    <div key={sheet.id} className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex items-center justify-between text-left">
-                      <div>
-                        <span className="text-xs font-black text-slate-700">
-                          {new Date(sheet.data).toLocaleDateString('pt-BR')}
-                        </span>
-                        <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-400 font-bold">
-                          <span>Rate: {sheet.rate}%</span>
-                          <span>•</span>
-                          <span>Presenças: {sheet.presentesCount}/{sheet.totalCount}</span>
-                        </div>
-                      </div>
-                      
-                      <button
-                        onClick={() => handleDeleteSheet(sheet.id)}
-                        className="p-1.5 hover:bg-white rounded-lg text-slate-400 hover:text-red-500 border border-transparent hover:border-slate-200 transition-all"
-                        title="Deletar Chamada"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-center py-6 text-slate-400 italic text-[10px]">Sem histórico para esta turma.</p>
-                )}
-              </div>
-            </Card>
-
-          </div>
-
-        </div>
-      ) : (
+      {!selectedTurmaId ? (
         <Card className="bg-white border-slate-200 shadow-sm p-16 rounded-2xl text-center flex flex-col items-center justify-center">
           <SchoolIcon className="w-12 h-12 text-slate-300 mb-4" />
           <h3 className="text-base font-bold text-slate-700">Seleção Requerida</h3>
@@ -723,7 +584,247 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
             Selecione uma Escola e Turma do segmento de Educação Infantil nos filtros acima para carregar a lista de chamada.
           </p>
         </Card>
+      ) : (
+        <>
+          {/* Stats Summary cards */}
+          {students.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              <Card className="bg-white border-slate-100 p-4 rounded-2xl flex items-center justify-between shadow-sm">
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Alunos</p>
+                  <h3 className="text-2xl font-black text-slate-800 mt-1">{stats.total}</h3>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500">
+                  <Users className="w-5 h-5" />
+                </div>
+              </Card>
+
+              <Card className="bg-white border-slate-100 p-4 rounded-2xl flex items-center justify-between shadow-sm">
+                <div>
+                  <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Presentes</p>
+                  <h3 className="text-2xl font-black text-emerald-600 mt-1">{stats.presents}</h3>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-500">
+                  <CheckCircle className="w-5 h-5" />
+                </div>
+              </Card>
+
+              <Card className="bg-white border-slate-100 p-4 rounded-2xl flex items-center justify-between shadow-sm">
+                <div>
+                  <p className="text-[10px] font-bold text-red-400 uppercase tracking-wider">Ausentes</p>
+                  <h3 className="text-2xl font-black text-red-500 mt-1">{stats.absents}</h3>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center text-red-400">
+                  <XCircle className="w-5 h-5" />
+                </div>
+              </Card>
+
+              <Card className="bg-white border-slate-100 p-4 rounded-2xl flex items-center justify-between shadow-sm">
+                <div className="flex-1">
+                  <p className="text-[10px] font-bold text-brand-orange uppercase tracking-wider">Frequência da Aula</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <h3 className="text-2xl font-black text-brand-orange">{stats.rate}%</h3>
+                    <div className="w-full bg-slate-100 rounded-full h-2">
+                      <div 
+                        className="bg-brand-orange h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${stats.rate}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-brand-orange shrink-0 ml-2">
+                  <Percent className="w-5 h-5" />
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {/* Student List Sheet & Quick Action buttons */}
+          <Card className="bg-white border-slate-200 shadow-sm rounded-2xl overflow-hidden p-0">
+            <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-3">
+              <div className="relative flex-1 w-full">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <input 
+                  type="text" 
+                  placeholder="Buscar estudante..."
+                  value={studentSearch}
+                  onChange={e => setStudentSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 outline-none text-xs font-semibold focus:border-brand-orange transition-all"
+                />
+              </div>
+
+              <div className="flex gap-2 shrink-0">
+                <Button 
+                  variant="secondary" 
+                  onClick={() => toggleAll(true)}
+                  className="rounded-xl text-[10px] font-bold py-1.5 px-3 uppercase bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100"
+                >
+                  Presente Todos
+                </Button>
+                <Button 
+                  variant="secondary" 
+                  onClick={() => toggleAll(false)}
+                  className="rounded-xl text-[10px] font-bold py-1.5 px-3 uppercase bg-red-50 text-red-600 border-red-100 hover:bg-red-100"
+                >
+                  Ausente Todos
+                </Button>
+              </div>
+            </div>
+
+            <div className="overflow-y-auto max-h-[450px]">
+              {loading ? (
+                <div className="flex flex-col items-center justify-center py-16">
+                  <Loader2 className="w-8 h-8 text-brand-orange animate-spin mb-3" />
+                  <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Carregando lista de alunos...</p>
+                </div>
+              ) : filteredStudents.length === 0 ? (
+                <div className="text-center py-16 text-slate-400 font-bold">
+                  Nenhum estudante encontrado para os filtros selecionados.
+                </div>
+              ) : (
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-100 uppercase text-[9px] font-black text-slate-500 tracking-wider">
+                    <tr>
+                      <th className="px-6 py-3">Número / Nome</th>
+                      <th className="px-6 py-3 text-center w-40">Status de Presença</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredStudents.map((student, idx) => {
+                      const isPresent = !!attendanceMap[student.id];
+                      return (
+                        <tr 
+                          key={student.id} 
+                          className={`transition-colors hover:bg-slate-50/50 cursor-pointer ${isPresent ? '' : 'bg-red-50/10'}`}
+                          onClick={() => toggleAttendance(student.id)}
+                        >
+                          <td className="px-6 py-3.5">
+                            <div className="flex items-center gap-3">
+                              <span className="text-[10px] font-black text-slate-400 w-5">
+                                {String(idx + 1).padStart(2, '0')}
+                              </span>
+                              <span className="font-bold text-slate-800 uppercase tracking-tight text-left">
+                                {student.name}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-3 text-center" onClick={e => e.stopPropagation()}>
+                            <div className="inline-flex items-center">
+                              <button
+                                onClick={() => toggleAttendance(student.id)}
+                                className={`relative inline-flex h-6 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out outline-none
+                                  ${isPresent ? 'bg-emerald-500' : 'bg-red-500'}`}
+                              >
+                                <span
+                                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out
+                                    ${isPresent ? 'translate-x-6' : 'translate-x-0'}`}
+                                />
+                              </button>
+                              <span className={`text-[10px] font-black uppercase tracking-wider ml-2.5 w-12 text-left
+                                ${isPresent ? 'text-emerald-600' : 'text-red-500'}`}
+                              >
+                                {isPresent ? 'Pres' : 'Falt'}
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-end">
+              <Button 
+                onClick={handleSave}
+                disabled={loading || students.length === 0 || saving}
+                className="rounded-xl text-xs font-black py-2.5 bg-brand-orange hover:bg-orange-600 shadow-md flex items-center gap-1.5"
+              >
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Salvar Chamada
+              </Button>
+            </div>
+          </Card>
+        </>
       )}
+
+      {/* Saved Sheets History */}
+      <div className="space-y-4">
+        <div>
+          <h3 className="text-md font-black text-slate-800 uppercase tracking-wider">Histórico de Chamadas Registradas</h3>
+          <p className="text-xs text-slate-500 mt-0.5 font-medium">Histórico de pautas de frequências salvas no sistema</p>
+        </div>
+
+        <Card className="p-0 overflow-hidden border-slate-200 shadow-sm bg-white rounded-2xl">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead className="bg-slate-50 border-b border-slate-100 uppercase text-[10px] font-black text-slate-500 tracking-wider">
+                <tr>
+                  <th className="px-6 py-4">Data / Escola</th>
+                  <th className="px-6 py-4">Turma / Grupo (Período)</th>
+                  <th className="px-6 py-4 text-center">Frequência</th>
+                  <th className="px-6 py-4 text-center">Presentes / Total</th>
+                  <th className="px-6 py-4 text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {sheets.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-12 text-center text-slate-400 font-semibold">
+                      Nenhum registro de frequência salvo no histórico.
+                    </td>
+                  </tr>
+                ) : (
+                  sheets.map(sheet => (
+                    <tr key={sheet.id} className="hover:bg-slate-50/50 transition-colors group">
+                      <td className="px-6 py-3">
+                        <div className="font-bold text-slate-800">
+                          {new Date(sheet.data + 'T12:00:00').toLocaleDateString()}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-bold uppercase mt-0.5 tracking-tight truncate max-w-[200px]">
+                          {sheet.escolaNome}
+                        </div>
+                      </td>
+                      <td className="px-6 py-3">
+                        <div className="font-bold text-slate-700">{sheet.turmaNome}</div>
+                        <div className="text-[10px] text-brand-orange font-bold uppercase mt-0.5">
+                          {sheet.anoSerie} • {sheet.periodo}
+                        </div>
+                      </td>
+                      <td className="px-6 py-3 text-center">
+                        <span className={`inline-block font-black px-2.5 py-0.5 rounded-full text-[10px]
+                          ${sheet.rate >= 90 
+                            ? 'bg-emerald-50 text-emerald-700' 
+                            : sheet.rate >= 75 
+                              ? 'bg-amber-50 text-amber-700' 
+                              : 'bg-red-50 text-red-500'}`}
+                        >
+                          {sheet.rate}%
+                        </span>
+                      </td>
+                      <td className="px-6 py-3 text-center font-semibold text-slate-600">
+                        {sheet.presentesCount} / {sheet.totalCount}
+                      </td>
+                      <td className="px-6 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
+                          <button 
+                            onClick={() => handleDeleteSheet(sheet.id)} 
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" 
+                            title="Excluir Registro"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </div>
 
     </div>
   );

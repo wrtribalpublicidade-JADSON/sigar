@@ -965,6 +965,7 @@ export default function App() {
             onBack={() => setCurrentView('LISTA_ESCOLAS')}
             onUpdate={handleUpdateEscola}
             onUpdateVisitStatus={handleUpdateVisitStatus}
+            isDemoMode={isDemoMode}
           />
         );
       case 'NOVA_VISITA':
