@@ -96,25 +96,56 @@ export const ParecerDescritivoInfantil: React.FC<ParecerDescritivoInfantilProps>
 
   const FAiXAS_ETARIAS = ['Creche II', 'Creche III', 'Pré I', 'Pré II'];
 
+  const isTurmaInAnoSerie = (t: any, anoSerieVal: string): boolean => {
+    if (!t || !anoSerieVal) return false;
+    
+    const normalize = (val: string) => {
+      return val.toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[-\s]/g, '');
+    };
+
+    const targetNorm = normalize(anoSerieVal);
+    
+    const getCleanGroup = (v: string) => {
+      if (v === 'preescolai' || v === 'prei') return 'prei';
+      if (v === 'preescolaii' || v === 'preii') return 'preii';
+      if (v === 'crechei') return 'crechei';
+      if (v === 'crecheii') return 'crecheii';
+      if (v === 'crecheiii') return 'crecheiii';
+      return v;
+    };
+
+    const targetClean = getCleanGroup(targetNorm);
+
+    const valuesToCheck = [
+      t.anoSerie || '',
+      t.year || '',
+      t.name || ''
+    ].map(v => getCleanGroup(normalize(v)));
+
+    return valuesToCheck.some(val => {
+      if (!val) return false;
+      if (val === targetClean) return true;
+      if ((val === 'prei' && targetClean === 'preii') || (val === 'preii' && targetClean === 'prei')) return false;
+      if (val.includes(targetClean) || targetClean.includes(val)) return true;
+      return false;
+    });
+  };
+
   // Derive unique Ano/Série values directly from loaded turmas
   const availableAnosSeries = useMemo(() => {
-    if (turmas.length === 0) return FAiXAS_ETARIAS;
-    const unique = new Set<string>();
-    turmas.forEach(t => {
-      const val = t.year || t.anoSerie || '';
-      if (val) unique.add(val);
-    });
-    return unique.size > 0 ? Array.from(unique) : FAiXAS_ETARIAS;
+    if (turmas.length === 0) return [];
+    return FAiXAS_ETARIAS.filter(ano => 
+      turmas.some(t => isTurmaInAnoSerie(t, ano))
+    );
   }, [turmas]);
 
   // Filter turmas matching the selected Ano/Série
   const availableTurmas = useMemo(() => {
-    return turmas.filter(t => {
-      const tYear = (t.year || '').toLowerCase().trim();
-      const tAnoSerie = (t.anoSerie || '').toLowerCase().trim();
-      const target = selectedGrupo.toLowerCase().trim();
-      return tYear === target || tAnoSerie === target;
-    });
+    if (!selectedGrupo) return [];
+    return turmas.filter(t => isTurmaInAnoSerie(t, selectedGrupo));
   }, [turmas, selectedGrupo]);
 
   const currentSchoolId = selectedEscolaId || (escolasInfantil.length > 0 ? escolasInfantil[0].id : '');
@@ -151,8 +182,12 @@ export const ParecerDescritivoInfantil: React.FC<ParecerDescritivoInfantilProps>
 
   // Auto-select first Ano/Série when turmas list changes (school change)
   useEffect(() => {
-    if (availableAnosSeries.length > 0 && !availableAnosSeries.includes(selectedGrupo)) {
-      setSelectedGrupo(availableAnosSeries[0]);
+    if (availableAnosSeries.length > 0) {
+      if (!availableAnosSeries.includes(selectedGrupo)) {
+        setSelectedGrupo(availableAnosSeries[0]);
+      }
+    } else {
+      setSelectedGrupo('');
     }
   }, [availableAnosSeries, selectedGrupo]);
 
@@ -656,8 +691,14 @@ export const ParecerDescritivoInfantil: React.FC<ParecerDescritivoInfantilProps>
                 required
                 className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
               >
-                <option value="">Selecione o Grupo/Faixa Etária</option>
-                {availableAnosSeries.map(a => <option key={a} value={a}>{a}</option>)}
+                {availableAnosSeries.length === 0 ? (
+                  <option value="">Nenhum grupo cadastrado</option>
+                ) : (
+                  <>
+                    <option value="">Selecione o Grupo/Faixa Etária</option>
+                    {availableAnosSeries.map(a => <option key={a} value={a}>{a}</option>)}
+                  </>
+                )}
               </select>
             </div>
 

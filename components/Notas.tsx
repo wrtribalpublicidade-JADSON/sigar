@@ -65,6 +65,21 @@ const BIMESTRES = [
   '4º Bimestre'
 ];
 
+// Helper to parse any grade value (string or number or empty) into a float or NaN
+const parseGradeToFloat = (val: any): number => {
+  if (val === undefined || val === null || val === '') return NaN;
+  if (typeof val === 'number') return val;
+  const parsed = parseFloat(String(val).replace(',', '.'));
+  return parsed;
+};
+
+// Helper to format a float value (or empty string/null) to Brazilian format "X,XX"
+const formatGradeValue = (val: any): string => {
+  const num = parseGradeToFloat(val);
+  if (isNaN(num)) return '';
+  return num.toFixed(2).replace('.', ',');
+};
+
 export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, userEmail, currentUser, subHeader }) => {
   const { showNotification } = showNotificationContext();
   const [sheets, setSheets] = useState<GradeSheet[]>([]);
@@ -72,7 +87,13 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
   const [students, setStudents] = useState<any[]>([]);
   
   // Spreadsheet States
-  const [gradesMap, setGradesMap] = useState<Record<string | number, Omit<StudentGrade, 'id' | 'name'>>>({});
+  const [gradesMap, setGradesMap] = useState<Record<string | number, {
+    av1: string;
+    av2: string;
+    qualitativa: string;
+    recuperacao: string;
+    mediaFinal: number;
+  }>>({});
 
   const editTurmaIdRef = useRef<string | null>(null);
   const [selectedSheetForPrint, setSelectedSheetForPrint] = useState<GradeSheet | null>(null);
@@ -245,13 +266,19 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
         const sheetStudents = savedSheet.students.map(s => ({ id: s.id, name: s.name }));
         setStudents(sheetStudents);
         
-        const map: Record<string | number, Omit<StudentGrade, 'id' | 'name'>> = {};
+        const map: Record<string | number, {
+          av1: string;
+          av2: string;
+          qualitativa: string;
+          recuperacao: string;
+          mediaFinal: number;
+        }> = {};
         savedSheet.students.forEach(s => {
           map[s.id] = {
-            av1: s.av1,
-            av2: s.av2,
-            qualitativa: s.qualitativa,
-            recuperacao: s.recuperacao,
+            av1: formatGradeValue(s.av1),
+            av2: formatGradeValue(s.av2),
+            qualitativa: formatGradeValue(s.qualitativa),
+            recuperacao: formatGradeValue(s.recuperacao),
             mediaFinal: s.mediaFinal
           };
         });
@@ -276,7 +303,13 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
         ];
         setStudents(demoStudents);
         
-        const map: Record<string | number, Omit<StudentGrade, 'id' | 'name'>> = {};
+        const map: Record<string | number, {
+          av1: string;
+          av2: string;
+          qualitativa: string;
+          recuperacao: string;
+          mediaFinal: number;
+        }> = {};
         demoStudents.forEach(s => {
           map[s.id] = { av1: '', av2: '', qualitativa: '', recuperacao: '', mediaFinal: 0 };
         });
@@ -295,7 +328,13 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
         if (error) throw error;
         setStudents(data || []);
 
-        const map: Record<string | number, Omit<StudentGrade, 'id' | 'name'>> = {};
+        const map: Record<string | number, {
+          av1: string;
+          av2: string;
+          qualitativa: string;
+          recuperacao: string;
+          mediaFinal: number;
+        }> = {};
         (data || []).forEach((s: any) => {
           map[s.id] = { av1: '', av2: '', qualitativa: '', recuperacao: '', mediaFinal: 0 };
         });
@@ -312,43 +351,92 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
   }, [selectedTurmaId, selectedEscolaId, componente, bimestre, sheets, isDemoMode]);
 
   // Calculate final average based on: (AV1 + AV2 + Qualitativa) / 3, and if recovery is higher, replace it
-  const calculateFinalMedia = (av1: number | '', av2: number | '', qual: number | '', rec: number | ''): number => {
-    const valAv1 = av1 === '' ? 0 : av1;
-    const valAv2 = av2 === '' ? 0 : av2;
-    const valQual = qual === '' ? 0 : qual;
+  const calculateFinalMedia = (av1: string, av2: string, qual: string, rec: string): number => {
+    const valAv1 = parseGradeToFloat(av1);
+    const valAv2 = parseGradeToFloat(av2);
+    const valQual = parseGradeToFloat(qual);
+    const valRec = parseGradeToFloat(rec);
     
-    // Calculate simple average of the three evaluations
-    const baseMedia = Number(((valAv1 + valAv2 + valQual) / 3).toFixed(1));
+    const numAv1 = isNaN(valAv1) ? 0 : valAv1;
+    const numAv2 = isNaN(valAv2) ? 0 : valAv2;
+    const numQual = isNaN(valQual) ? 0 : valQual;
     
-    if (rec !== '' && rec > baseMedia) {
-      return Number(Math.max(baseMedia, rec).toFixed(1));
+    // Calculate simple average of the three evaluations with 2 decimal places
+    const baseMedia = Number(((numAv1 + numAv2 + numQual) / 3).toFixed(2));
+    
+    if (!isNaN(valRec) && valRec > baseMedia) {
+      return Number(Math.max(baseMedia, valRec).toFixed(2));
     }
     
     return baseMedia;
   };
 
   const handleGradeChange = (studentId: string | number, field: 'av1' | 'av2' | 'qualitativa' | 'recuperacao', value: string) => {
-    let numVal: number | '';
-    if (value === '') {
-      numVal = '';
-    } else {
-      const parsed = parseFloat(value.replace(',', '.'));
-      if (isNaN(parsed) || parsed < 0 || parsed > 10) return;
-      numVal = parsed;
+    let normalized = value.replace('.', ',');
+    
+    if (normalized === '') {
+      updateGradeState(studentId, field, '');
+      return;
     }
+    
+    if (normalized === ',') {
+      normalized = '0,';
+    }
+    
+    // Allow digits and at most one comma, with up to 2 decimal places
+    if (!/^\d*,?\d{0,2}$/.test(normalized)) {
+      return;
+    }
+    
+    const parsed = parseFloat(normalized.replace(',', '.'));
+    if (!isNaN(parsed) && parsed > 10) {
+      return;
+    }
+    
+    updateGradeState(studentId, field, normalized);
+  };
 
+  const updateGradeState = (studentId: string | number, field: 'av1' | 'av2' | 'qualitativa' | 'recuperacao', valStr: string) => {
     setGradesMap(prev => {
       const current = prev[studentId] || { av1: '', av2: '', qualitativa: '', recuperacao: '', mediaFinal: 0 };
       const updatedField = {
         ...current,
-        [field]: numVal
+        [field]: valStr
       };
       
       const newMedia = calculateFinalMedia(
-        updatedField.av1,
-        updatedField.av2,
-        updatedField.qualitativa,
-        updatedField.recuperacao
+        String(updatedField.av1),
+        String(updatedField.av2),
+        String(updatedField.qualitativa),
+        String(updatedField.recuperacao)
+      );
+
+      return {
+        ...prev,
+        [studentId]: {
+          ...updatedField,
+          mediaFinal: newMedia
+        }
+      };
+    });
+  };
+
+  const handleGradeBlur = (studentId: string | number, field: 'av1' | 'av2' | 'qualitativa' | 'recuperacao') => {
+    setGradesMap(prev => {
+      const current = prev[studentId];
+      if (!current) return prev;
+      
+      const formatted = formatGradeValue(current[field]);
+      const updatedField = {
+        ...current,
+        [field]: formatted
+      };
+      
+      const newMedia = calculateFinalMedia(
+        String(updatedField.av1),
+        String(updatedField.av2),
+        String(updatedField.qualitativa),
+        String(updatedField.recuperacao)
       );
 
       return {
@@ -377,7 +465,7 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
       }
     });
 
-    const mediaTurma = Number((sum / total).toFixed(1));
+    const mediaTurma = Number((sum / total).toFixed(2));
     const taxaAprovacao = Math.round((approved / total) * 100);
     const recuperacaoCount = total - approved;
 
@@ -396,14 +484,19 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
 
     const sheetStudents: StudentGrade[] = students.map(s => {
       const grade = gradesMap[s.id] || { av1: '', av2: '', qualitativa: '', recuperacao: '', mediaFinal: 0 };
+      const av1Val = parseGradeToFloat(grade.av1);
+      const av2Val = parseGradeToFloat(grade.av2);
+      const qualVal = parseGradeToFloat(grade.qualitativa);
+      const recVal = parseGradeToFloat(grade.recuperacao);
+      
       return {
         id: s.id,
         name: s.name,
-        av1: grade.av1,
-        av2: grade.av2,
-        qualitativa: grade.qualitativa,
-        recuperacao: grade.recuperacao,
-        mediaFinal: grade.mediaFinal
+        av1: isNaN(av1Val) ? '' : av1Val,
+        av2: isNaN(av2Val) ? '' : av2Val,
+        qualitativa: isNaN(qualVal) ? '' : qualVal,
+        recuperacao: isNaN(recVal) ? '' : recVal,
+        mediaFinal: Number(grade.mediaFinal)
       };
     });
 
@@ -634,7 +727,9 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
           <Card className="bg-white border-slate-100 p-4 rounded-2xl flex items-center justify-between shadow-sm">
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Média da Turma</p>
-              <h3 className={`text-2xl font-black mt-1 ${stats.mediaTurma >= 6.0 ? 'text-emerald-600' : 'text-amber-600'}`}>{stats.mediaTurma}</h3>
+              <h3 className={`text-2xl font-black mt-1 ${stats.mediaTurma >= 6.0 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                {stats.mediaTurma.toFixed(2).replace('.', ',')}
+              </h3>
             </div>
             <div className="w-10 h-10 rounded-xl bg-slate-150 flex items-center justify-center text-slate-500 bg-slate-100">
               <TrendingUp className="w-5 h-5" />
@@ -729,48 +824,52 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
                             type="text"
                             value={gradeObj.av1}
                             onChange={e => handleGradeChange(student.id, 'av1', e.target.value)}
-                            placeholder="0.0"
+                            onBlur={() => handleGradeBlur(student.id, 'av1')}
+                            placeholder="0,00"
                             className="w-16 px-2 py-1.5 border border-slate-200 rounded-lg text-center font-bold text-slate-700 focus:border-brand-orange outline-none"
                           />
                         </td>
-
+ 
                         <td className="px-3 py-2 text-center">
                           <input 
                             type="text"
                             value={gradeObj.av2}
                             onChange={e => handleGradeChange(student.id, 'av2', e.target.value)}
-                            placeholder="0.0"
+                            onBlur={() => handleGradeBlur(student.id, 'av2')}
+                            placeholder="0,00"
                             className="w-16 px-2 py-1.5 border border-slate-200 rounded-lg text-center font-bold text-slate-700 focus:border-brand-orange outline-none"
                           />
                         </td>
-
+ 
                         <td className="px-3 py-2 text-center">
                           <input 
                             type="text"
                             value={gradeObj.qualitativa}
                             onChange={e => handleGradeChange(student.id, 'qualitativa', e.target.value)}
-                            placeholder="0.0"
+                            onBlur={() => handleGradeBlur(student.id, 'qualitativa')}
+                            placeholder="0,00"
                             className="w-16 px-2 py-1.5 border border-slate-200 rounded-lg text-center font-bold text-slate-700 focus:border-brand-orange outline-none"
                           />
                         </td>
-
+ 
                         <td className="px-3 py-2 text-center">
                           <input 
                             type="text"
                             value={gradeObj.recuperacao}
                             onChange={e => handleGradeChange(student.id, 'recuperacao', e.target.value)}
-                            placeholder="0.0"
+                            onBlur={() => handleGradeBlur(student.id, 'recuperacao')}
+                            placeholder="0,00"
                             className="w-16 px-2 py-1.5 border border-slate-200 rounded-lg text-center font-bold text-slate-700 focus:border-brand-orange outline-none bg-orange-50/30"
                           />
                         </td>
-
+ 
                         <td className="px-6 py-2 text-center">
                           <span className={`inline-block font-black text-sm px-2.5 py-0.5 rounded-lg
                             ${isApproved 
                               ? 'bg-emerald-100 text-emerald-700' 
                               : 'bg-red-100 text-red-600'}`}
                           >
-                            {gradeObj.mediaFinal.toFixed(1)}
+                            {gradeObj.mediaFinal.toFixed(2).replace('.', ',')}
                           </span>
                         </td>
                       </tr>
@@ -829,7 +928,7 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
                         <span className={`inline-block font-black text-xs px-2.5 py-0.5 rounded-full
                           ${sheet.mediaTurma >= 6.0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-500'}`}
                         >
-                          {sheet.mediaTurma}
+                          {Number(sheet.mediaTurma).toFixed(2).replace('.', ',')}
                         </span>
                       </td>
                       <td className="px-6 py-3 text-center">

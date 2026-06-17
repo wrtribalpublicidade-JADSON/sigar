@@ -99,42 +99,138 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
     return escolas.filter(e => e.segmentos.includes(Segmento.INFANTIL));
   }, [escolas]);
 
-  const currentSchoolId = selectedEscolaId || (escolasInfantil.length > 0 ? escolasInfantil[0].id : '');
+  // Sync selectedEscolaId on mount
+  useEffect(() => {
+    if (escolasInfantil.length > 0 && !selectedEscolaId) {
+      setSelectedEscolaId(escolasInfantil[0].id);
+    }
+  }, [escolasInfantil, selectedEscolaId]);
 
   // Load ECE turmas based on active school
   useEffect(() => {
     const fetchTurmas = async () => {
-      if (!currentSchoolId) return;
+      if (!selectedEscolaId) {
+        setTurmas([]);
+        return;
+      }
+
+      if (isDemoMode) {
+        setTurmas([
+          { id: 'demo-t1', name: 'Maternal A', year: 'Maternal A', anoSerie: 'Creche II', shift: 'MANHÃ', stage: 'Educação Infantil' },
+          { id: 'demo-t2', name: 'Creche III B', year: 'Creche III B', anoSerie: 'Creche III', shift: 'TARDE', stage: 'Educação Infantil' },
+          { id: 'demo-t3', name: 'Pré I A', year: 'Pré I A', anoSerie: 'Pré I', shift: 'MANHÃ', stage: 'Educação Infantil' },
+          { id: 'demo-t4', name: 'Pré II B', year: 'Pré II B', anoSerie: 'Pré II', shift: 'TARDE', stage: 'Educação Infantil' },
+        ]);
+        return;
+      }
+
       try {
         const { data, error } = await supabase
           .from('turmas')
           .select('*')
-          .eq('school_id', currentSchoolId)
-          .eq('stage', 'Educação Infantil');
+          .eq('school_id', selectedEscolaId)
+          .eq('stage', 'Educação Infantil')
+          .order('name');
 
         if (error) throw error;
         setTurmas(data || []);
-        if (data && data.length > 0) {
-          setSelectedTurmaId(data[0].id);
-          setAnoSerie(data[0].anoSerie || 'Creche III');
-        } else {
-          setSelectedTurmaId('');
-        }
       } catch (err) {
         console.error('Erro ao buscar turmas ECE:', err);
       }
     };
 
     fetchTurmas();
-  }, [currentSchoolId]);
+  }, [selectedEscolaId, isDemoMode]);
 
-  // Sync grade when selected class changes
+  // Helpers for filtering and matching
+  const isTurmaInAnoSerie = (t: any, anoSerieVal: string): boolean => {
+    if (!t || !anoSerieVal) return false;
+    
+    const normalize = (val: string) => {
+      return val.toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[-\s]/g, '');
+    };
+
+    const targetNorm = normalize(anoSerieVal);
+    
+    const getCleanGroup = (v: string) => {
+      if (v === 'preescolai' || v === 'prei') return 'prei';
+      if (v === 'preescolaii' || v === 'preii') return 'preii';
+      if (v === 'crechei') return 'crechei';
+      if (v === 'crecheii') return 'crecheii';
+      if (v === 'crecheiii') return 'crecheiii';
+      return v;
+    };
+
+    const targetClean = getCleanGroup(targetNorm);
+
+    const valuesToCheck = [
+      t.anoSerie || '',
+      t.year || '',
+      t.name || ''
+    ].map(v => getCleanGroup(normalize(v)));
+
+    return valuesToCheck.some(val => {
+      if (!val) return false;
+      if (val === targetClean) return true;
+      if ((val === 'prei' && targetClean === 'preii') || (val === 'preii' && targetClean === 'prei')) return false;
+      if (val.includes(targetClean) || targetClean.includes(val)) return true;
+      return false;
+    });
+  };
+
+  const FAIXAS_ETARIAS = ['Creche I', 'Creche II', 'Creche III', 'Pré I', 'Pré II'];
+
+  // Compute available Faixas Etárias for the selected school
+  const availableAnosSeries = useMemo(() => {
+    if (turmas.length === 0) return [];
+    return FAIXAS_ETARIAS.filter(ano => 
+      turmas.some(t => isTurmaInAnoSerie(t, ano))
+    );
+  }, [turmas]);
+
+  // Compute available Turmas for the selected school and Faixa Etária
+  const availableTurmas = useMemo(() => {
+    if (!anoSerie) return [];
+    return turmas.filter(t => isTurmaInAnoSerie(t, anoSerie));
+  }, [turmas, anoSerie]);
+
+  // Sync anoSerie selection when availableAnosSeries changes
   useEffect(() => {
-    const t = turmas.find(x => x.id === selectedTurmaId);
-    if (t) {
-      setAnoSerie(t.anoSerie || 'Creche III');
+    const turmasMatchSchool = turmas.length === 0 || 
+      turmas[0].school_id === selectedEscolaId || 
+      (isDemoMode && turmas[0].id?.startsWith('demo'));
+
+    if (turmasMatchSchool) {
+      if (availableAnosSeries.length > 0) {
+        if (!availableAnosSeries.includes(anoSerie)) {
+          setAnoSerie(availableAnosSeries[0]);
+        }
+      } else {
+        setAnoSerie('');
+      }
     }
-  }, [selectedTurmaId, turmas]);
+  }, [availableAnosSeries, anoSerie, selectedEscolaId, turmas, isDemoMode]);
+
+  // Sync selectedTurmaId selection when availableTurmas changes
+  useEffect(() => {
+    const turmasMatchSchool = turmas.length === 0 || 
+      turmas[0].school_id === selectedEscolaId || 
+      (isDemoMode && turmas[0].id?.startsWith('demo'));
+
+    if (turmasMatchSchool) {
+      if (availableTurmas.length > 0) {
+        const exists = availableTurmas.some(t => t.id === selectedTurmaId);
+        if (!exists) {
+          setSelectedTurmaId(availableTurmas[0].id);
+        }
+      } else {
+        setSelectedTurmaId('');
+      }
+    }
+  }, [availableTurmas, selectedTurmaId, selectedEscolaId, turmas, isDemoMode]);
 
   // Fetch students for selected class
   useEffect(() => {
@@ -553,7 +649,7 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
         </div>
 
         <form onSubmit={handleSave} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50/50 p-4 rounded-xl border border-slate-100">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-slate-50/50 p-4 rounded-xl border border-slate-100">
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Data *</label>
               <input 
@@ -579,15 +675,38 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Turma ECE *</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Grupo/Faixa Etária *</label>
+              <select 
+                value={anoSerie}
+                onChange={e => setAnoSerie(e.target.value)}
+                required
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+              >
+                {availableAnosSeries.length === 0 ? (
+                  <option value="">Nenhum grupo cadastrado</option>
+                ) : (
+                  availableAnosSeries.map(a => (
+                    <option key={a} value={a}>{a}</option>
+                  ))
+                )}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Turma *</label>
               <select 
                 value={selectedTurmaId}
                 onChange={e => setSelectedTurmaId(e.target.value)}
                 required
                 className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
               >
-                <option value="">Selecione a Turma</option>
-                {turmas.map(t => <option key={t.id} value={t.id}>{t.name || t.anoSerie} • {t.turno}</option>)}
+                {availableTurmas.length === 0 ? (
+                  <option value="">Nenhuma turma cadastrada</option>
+                ) : (
+                  availableTurmas.map(t => (
+                    <option key={t.id} value={t.id}>{`${t.name || t.anoSerie || t.year} • ${t.shift || t.turno || ''}`}</option>
+                  ))
+                )}
               </select>
             </div>
 

@@ -38,7 +38,7 @@ export const PrintableBoletim: React.FC<PrintableBoletimProps> = ({ sheet }) => 
 
   const formatValue = (val: number | '') => {
     if (val === '') return '-';
-    return Number(val).toFixed(1);
+    return Number(val).toFixed(2).replace('.', ',');
   };
 
   return createPortal(
@@ -149,7 +149,7 @@ export const PrintableBoletim: React.FC<PrintableBoletimProps> = ({ sheet }) => 
                     {formatValue(student.recuperacao)}
                   </td>
                   <td style={{ padding: '5pt 8pt', fontSize: '9pt', fontWeight: 900, color: isApproved ? '#059669' : '#e11d48', textAlign: 'center' }}>
-                    {Number(student.mediaFinal).toFixed(1)}
+                    {Number(student.mediaFinal).toFixed(2).replace('.', ',')}
                   </td>
                 </tr>
               );
@@ -165,7 +165,7 @@ export const PrintableBoletim: React.FC<PrintableBoletimProps> = ({ sheet }) => 
             Média Geral da Turma
           </span>
           <span style={{ fontSize: '13pt', fontWeight: 900, color: sheet.mediaTurma >= 6.0 ? '#059669' : '#b45309' }}>
-            {Number(sheet.mediaTurma).toFixed(1)}
+            {Number(sheet.mediaTurma).toFixed(2).replace('.', ',')}
           </span>
         </div>
         <div style={{ padding: '8pt 12pt', background: '#f8fafc', border: '0.5pt solid #e2e8f0', borderRadius: '4pt', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

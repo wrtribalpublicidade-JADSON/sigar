@@ -6,7 +6,7 @@ import { Button } from './ui/Button';
 import { 
   FileText, Plus, Search, Edit2, Trash2, Printer, 
   X, Calendar, School as SchoolIcon, Bookmark, Save,
-  Check, Info
+  Check, Info, ClipboardList, Layers
 } from 'lucide-react';
 import { Escola, Coordenador, Segmento } from '../types';
 import { supabase } from '../services/supabase';
@@ -37,6 +37,7 @@ interface ClassLogInfantil {
   anoSerie: string;
   periodo: string;
   selectedHabilidadeIds: string[]; // ECE BNCC Objective codes
+  selectedObjetoIds?: string[]; // Linked Saberes e Conhecimentos IDs
   criadoEm: string;
 }
 
@@ -67,20 +68,23 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
   const [dataAula, setDataAula] = useState(new Date().toISOString().split('T')[0]);
   const [selectedEscolaId, setSelectedEscolaId] = useState('');
   const [selectedTurmaId, setSelectedTurmaId] = useState('');
-  const [campoExperiencia, setCampoExperiencia] = useState('O eu, o outro e o nós');
+  const [campoExperiencia, setCampoExperiencia] = useState(CAMPOS_EXPERIENCIA[0]);
   const [rotina, setRotina] = useState('');
   const [conteudo, setConteudo] = useState('');
   const [atividades, setAtividades] = useState('');
   const [observacoes, setObservacoes] = useState('');
   const [anoSerie, setAnoSerie] = useState('Creche III');
-  const [periodo, setPeriodo] = useState('1º Bimestre');
+  const [periodo, setPeriodo] = useState(PERIODOS[0]);
+
+  // ECE Course Plans integration
+  const [coursePlans, setCoursePlans] = useState<any[]>([]);
+  const [selectedObjetoIds, setSelectedObjetoIds] = useState<string[]>([]);
   const [selectedHabilidadeIds, setSelectedHabilidadeIds] = useState<string[]>([]);
 
   // Search & Filter State
   const [searchTerm, setSearchTerm] = useState('');
   const [schoolFilter, setSchoolFilter] = useState('ALL');
   const [classFilter, setClassFilter] = useState('ALL');
-  const [isFormOpen, setIsFormOpen] = useState(false);
 
   // Printing State
   const [printLog, setPrintLog] = useState<ClassLogInfantil | null>(null);
@@ -92,45 +96,478 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
     );
   }, [escolas]);
 
-  // Get active school context
-  const currentSchoolId = selectedEscolaId || (escolasInfantil.length > 0 ? escolasInfantil[0].id : '');
+  // Fetch real logs
+  const fetchRealLogs = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('aulas_ministradas_infantil')
+        .select('*')
+        .eq('ativo', true)
+        .order('data', { ascending: false });
 
-  // Load ECE turmas based on active school
+      if (error) throw error;
+
+      // Also get turmas to map names
+      const { data: allTurmas, error: turmasError } = await supabase
+        .from('turmas')
+        .select('id, name, year, shift, anoSerie');
+      
+      const turmaMap = new Map<string, string>();
+      if (!turmasError && allTurmas) {
+        allTurmas.forEach((t: any) => {
+          turmaMap.set(t.id, `${t.name || t.anoSerie || t.year} • ${t.shift || t.turno || ''}`);
+        });
+      }
+
+      const formatted: ClassLogInfantil[] = (data || []).map(d => {
+        const escolaObj = escolas.find(esc => esc.id === d.escola_id);
+        const escolaNome = escolaObj ? escolaObj.nome : 'Unidade';
+        const turmaNome = turmaMap.get(d.turma_id) || d.ano_serie || 'Turma';
+
+        return {
+          id: d.id,
+          data: d.data,
+          escolaId: d.escola_id,
+          escolaNome,
+          turmaId: d.turma_id,
+          turmaNome,
+          campoExperiencia: d.campo_experiencia,
+          rotina: d.rotina,
+          conteudo: d.conteudo,
+          atividades: d.atividades || '',
+          observacoes: d.observacoes || '',
+          anoSerie: d.ano_serie,
+          periodo: d.periodo,
+          selectedHabilidadeIds: d.selected_habilidade_ids || [],
+          selectedObjetoIds: d.selected_objeto_ids || [],
+          criadoEm: d.created_at
+        };
+      });
+      setLogs(formatted);
+    } catch (err) {
+      console.error('Erro ao buscar registros de aula:', err);
+      showNotification('error', 'Erro ao carregar dados do Supabase. Utilizando dados locais.');
+    }
+  };
+
+  // Fetch real course plans
+  const fetchRealCoursePlans = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('planos_curso_infantil')
+        .select('*')
+        .eq('ativo', true);
+
+      if (error) throw error;
+
+      const formatted: any[] = (data || []).map((p: any) => ({
+        id: p.id,
+        anoReferencia: p.ano_referencia,
+        componente: p.campo_experiencia,
+        bimestre: p.bimestre,
+        anoSerie: p.ano_serie,
+        itens: p.itens || [],
+        criadoEm: p.created_at
+      }));
+
+      setCoursePlans(formatted);
+    } catch (err) {
+      console.error('Erro ao buscar planos de curso do Supabase para aulas:', err);
+    }
+  };
+
+  // Load logs on mount
+  useEffect(() => {
+    if (isDemoMode) {
+      const saved = localStorage.getItem('sigar_aulas_ministradas_infantil');
+      if (saved) {
+        try {
+          setLogs(JSON.parse(saved));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    } else {
+      if (escolas.length > 0) {
+        fetchRealLogs();
+      }
+    }
+
+    if (escolasInfantil.length > 0) {
+      setSelectedEscolaId(escolasInfantil[0].id);
+    }
+  }, [escolas, isDemoMode, escolasInfantil]);
+
+  // Load course plans on mount
+  useEffect(() => {
+    if (isDemoMode) {
+      const saved = localStorage.getItem('sigar_planos_curso_infantil');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          const formatted = parsed.map((p: any) => ({
+            id: p.id,
+            anoReferencia: p.anoReferencia || p.ano_referencia,
+            componente: p.campoExperiencia || p.campo_experiencia || p.componente,
+            bimestre: p.bimestre,
+            anoSerie: p.anoSerie || p.ano_serie,
+            itens: p.itens || [],
+            criadoEm: p.criadoEm || p.created_at
+          }));
+          setCoursePlans(formatted);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    } else {
+      fetchRealCoursePlans();
+    }
+  }, [isDemoMode]);
+
+  // Load turmas when selected school changes
   useEffect(() => {
     const fetchTurmas = async () => {
-      if (!currentSchoolId) return;
+      if (!selectedEscolaId) {
+        setTurmas([]);
+        return;
+      }
+
+      if (isDemoMode) {
+        setTurmas([
+          { id: 'demo-t1', name: 'Maternal A', year: 'Maternal A', anoSerie: 'Creche II', shift: 'MANHÃ', stage: 'Educação Infantil' },
+          { id: 'demo-t2', name: 'Creche III B', year: 'Creche III B', anoSerie: 'Creche III', shift: 'TARDE', stage: 'Educação Infantil' },
+          { id: 'demo-t3', name: 'Pré I A', year: 'Pré I A', anoSerie: 'Pré I', shift: 'MANHÃ', stage: 'Educação Infantil' },
+          { id: 'demo-t4', name: 'Pré II B', year: 'Pré II B', anoSerie: 'Pré II', shift: 'TARDE', stage: 'Educação Infantil' },
+        ]);
+        return;
+      }
+
       try {
         const { data, error } = await supabase
           .from('turmas')
           .select('*')
-          .eq('school_id', currentSchoolId)
-          .eq('stage', 'Educação Infantil'); // Only ECE classes
+          .eq('school_id', selectedEscolaId)
+          .eq('stage', 'Educação Infantil') // Only ECE classes
+          .order('name');
 
         if (error) throw error;
         setTurmas(data || []);
-        if (data && data.length > 0) {
-          setSelectedTurmaId(data[0].id);
-          setAnoSerie(data[0].anoSerie || 'Creche III');
-        } else {
-          setSelectedTurmaId('');
-        }
       } catch (err) {
-        console.error('Erro ao buscar turmas:', err);
+        console.error('Erro ao carregar turmas:', err);
       }
     };
 
     fetchTurmas();
-  }, [currentSchoolId]);
+  }, [selectedEscolaId, isDemoMode]);
 
-  // Sync grade (Faixa Etária) when selected class changes
+  // Helpers for filtering and matching
+  const isTurmaInAnoSerie = (t: any, anoSerieVal: string): boolean => {
+    if (!t || !anoSerieVal) return false;
+    
+    const normalize = (val: string) => {
+      return val.toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[-\s]/g, '');
+    };
+
+    const targetNorm = normalize(anoSerieVal);
+    
+    const getCleanGroup = (v: string) => {
+      if (v === 'preescolai' || v === 'prei') return 'prei';
+      if (v === 'preescolaii' || v === 'preii') return 'preii';
+      if (v === 'crechei') return 'crechei';
+      if (v === 'crecheii') return 'crecheii';
+      if (v === 'crecheiii') return 'crecheiii';
+      return v;
+    };
+
+    const targetClean = getCleanGroup(targetNorm);
+
+    const valuesToCheck = [
+      t.anoSerie || '',
+      t.year || '',
+      t.name || ''
+    ].map(v => getCleanGroup(normalize(v)));
+
+    return valuesToCheck.some(val => {
+      if (!val) return false;
+      if (val === targetClean) return true;
+      if ((val === 'prei' && targetClean === 'preii') || (val === 'preii' && targetClean === 'prei')) return false;
+      if (val.includes(targetClean) || targetClean.includes(val)) return true;
+      return false;
+    });
+  };
+
+  const FAiXAS_ETARIAS = ['Creche II', 'Creche III', 'Pré I', 'Pré II'];
+
+  // Compute available Faixas Etárias for the selected school
+  const availableAnosSeries = useMemo(() => {
+    if (turmas.length === 0) return [];
+    return FAiXAS_ETARIAS.filter(ano => 
+      turmas.some(t => isTurmaInAnoSerie(t, ano))
+    );
+  }, [turmas]);
+
+  // Compute available Turmas for the selected school and Faixa Etária
+  const availableTurmas = useMemo(() => {
+    return turmas.filter(t => isTurmaInAnoSerie(t, anoSerie));
+  }, [turmas, anoSerie]);
+
+  // Sync anoSerie selection when availableAnosSeries changes
   useEffect(() => {
-    const t = turmas.find(x => x.id === selectedTurmaId);
-    if (t) {
-      setAnoSerie(t.anoSerie || 'Creche III');
-    }
-  }, [selectedTurmaId, turmas]);
+    const turmasMatchSchool = turmas.length === 0 || 
+      turmas[0].school_id === selectedEscolaId || 
+      (isDemoMode && turmas[0].id?.startsWith('demo'));
 
-  // Fetch available ECE BNCC objectives for the form
+    if (turmasMatchSchool) {
+      if (availableAnosSeries.length > 0) {
+        if (!availableAnosSeries.includes(anoSerie)) {
+          setAnoSerie(availableAnosSeries[0]);
+        }
+      } else {
+        setAnoSerie('');
+      }
+    }
+  }, [availableAnosSeries, anoSerie, selectedEscolaId, turmas, isDemoMode]);
+
+  // Sync selectedTurmaId selection when availableTurmas changes
+  useEffect(() => {
+    const turmasMatchSchool = turmas.length === 0 || 
+      turmas[0].school_id === selectedEscolaId || 
+      (isDemoMode && turmas[0].id?.startsWith('demo'));
+
+    if (turmasMatchSchool) {
+      if (availableTurmas.length > 0) {
+        const exists = availableTurmas.some(t => t.id === selectedTurmaId);
+        if (!exists) {
+          setSelectedTurmaId(availableTurmas[0].id);
+        }
+      } else {
+        setSelectedTurmaId('');
+      }
+    }
+  }, [availableTurmas, selectedTurmaId, selectedEscolaId, turmas, isDemoMode]);
+
+  // Get active Course Plan unificado matching selections
+  const activeCoursePlan = useMemo(() => {
+    return coursePlans.find((p: any) => 
+      p.componente === campoExperiencia && 
+      p.anoSerie === anoSerie && 
+      p.bimestre === periodo
+    );
+  }, [coursePlans, campoExperiencia, anoSerie, periodo]);
+
+  // Aggregate objects and skills from active Course Plan items
+  const planData = useMemo(() => {
+    if (!activeCoursePlan || !activeCoursePlan.itens) {
+      return { objetos: [], habilidades: [], links: [] };
+    }
+    
+    const objetosMap = new Map<string, any>();
+    const habilidadesMap = new Map<string, any>();
+    const links: { objetoId: string; habilidadeId: string }[] = [];
+    
+    activeCoursePlan.itens.forEach((item: any) => {
+      if (item.objetos) {
+        item.objetos.forEach((obj: any) => {
+          objetosMap.set(obj.id, obj);
+        });
+      }
+      if (item.habilidades) {
+        item.habilidades.forEach((hab: any) => {
+          habilidadesMap.set(hab.id, hab);
+        });
+      }
+      if (item.links) {
+        item.links.forEach((link: any) => {
+          links.push(link);
+        });
+      }
+    });
+    
+    return {
+      objetos: Array.from(objetosMap.values()),
+      habilidades: Array.from(habilidadesMap.values()),
+      links
+    };
+  }, [activeCoursePlan]);
+
+  // Reset selection when parameters change
+  useEffect(() => {
+    if (!editingId) {
+      setSelectedObjetoIds([]);
+      setSelectedHabilidadeIds([]);
+    }
+  }, [campoExperiencia, anoSerie, periodo, selectedTurmaId, editingId]);
+
+  // Auto-fill form values from interactive selections
+  const updateTextFromSelections = (objIds: string[], habIds: string[]) => {
+    const selectedObjs = planData.objetos
+      .filter((o: any) => objIds.includes(o.id))
+      .map((o: any) => o.descricao);
+    
+    const selectedHabs = planData.habilidades
+      .filter((h: any) => habIds.includes(h.id))
+      .map((h: any) => h.codigo);
+      
+    let newContent = '';
+    if (selectedObjs.length > 0) {
+      newContent += `Saberes e Conhecimentos:\n- ${selectedObjs.join('\n- ')}\n\n`;
+    }
+    if (selectedHabs.length > 0) {
+      newContent += `Objetivos de Aprendizagem:\n- ${selectedHabs.join(', ')}`;
+    }
+    
+    setConteudo(newContent);
+  };
+
+  // Interactive selection handlers
+  const toggleObjetoSelection = (objId: string) => {
+    const isSelected = selectedObjetoIds.includes(objId);
+    let newObjetoIds: string[];
+    let newHabilidadeIds = [...selectedHabilidadeIds];
+    
+    if (!isSelected) {
+      newObjetoIds = [...selectedObjetoIds, objId];
+      const linkedHabs = planData.links
+        .filter(l => l.objetoId === objId)
+        .map(l => l.habilidadeId);
+      
+      linkedHabs.forEach(habId => {
+        if (!newHabilidadeIds.includes(habId)) {
+          newHabilidadeIds.push(habId);
+        }
+      });
+    } else {
+      newObjetoIds = selectedObjetoIds.filter(id => id !== objId);
+      const linkedHabs = planData.links
+        .filter(l => l.objetoId === objId)
+        .map(l => l.habilidadeId);
+      
+      linkedHabs.forEach(habId => {
+        const linkedToOtherSelectedObj = planData.links.some(l => 
+          l.habilidadeId === habId && 
+          l.objetoId !== objId && 
+          newObjetoIds.includes(l.objetoId)
+        );
+        if (!linkedToOtherSelectedObj) {
+          newHabilidadeIds = newHabilidadeIds.filter(id => id !== habId);
+        }
+      });
+    }
+    
+    setSelectedObjetoIds(newObjetoIds);
+    setSelectedHabilidadeIds(newHabilidadeIds);
+    updateTextFromSelections(newObjetoIds, newHabilidadeIds);
+  };
+
+  const toggleHabilidadeSelection = (habId: string) => {
+    const isSelected = selectedHabilidadeIds.includes(habId);
+    let newHabilidadeIds: string[];
+    let newObjetoIds = [...selectedObjetoIds];
+    
+    if (!isSelected) {
+      newHabilidadeIds = [...selectedHabilidadeIds, habId];
+      const linkedObjs = planData.links
+        .filter(l => l.habilidadeId === habId)
+        .map(l => l.objetoId);
+      
+      linkedObjs.forEach(objId => {
+        if (!newObjetoIds.includes(objId)) {
+          newObjetoIds.push(objId);
+        }
+      });
+    } else {
+      newHabilidadeIds = selectedHabilidadeIds.filter(id => id !== habId);
+      const linkedObjs = planData.links
+        .filter(l => l.habilidadeId === habId)
+        .map(l => l.objetoId);
+      
+      linkedObjs.forEach(objId => {
+        const linkedToOtherSelectedHab = planData.links.some(l => 
+          l.objetoId === objId && 
+          l.habilidadeId !== habId && 
+          newHabilidadeIds.includes(l.habilidadeId)
+        );
+        if (!linkedToOtherSelectedHab) {
+          newObjetoIds = newObjetoIds.filter(id => id !== objId);
+        }
+      });
+    }
+    
+    setSelectedHabilidadeIds(newHabilidadeIds);
+    setSelectedObjetoIds(newObjetoIds);
+    updateTextFromSelections(newObjetoIds, newHabilidadeIds);
+  };
+
+  // Compute previously used objects and skills in this class, component, and period
+  const previouslyUsedData = useMemo(() => {
+    const usedObjetos = new Set<string>();
+    const usedHabilidades = new Set<string>();
+    
+    logs.forEach(log => {
+      if (
+        log.id !== editingId &&
+        log.turmaId === selectedTurmaId &&
+        log.campoExperiencia === campoExperiencia &&
+        log.anoSerie === anoSerie &&
+        log.periodo === periodo
+      ) {
+        if (log.selectedObjetoIds) {
+          log.selectedObjetoIds.forEach(id => usedObjetos.add(id));
+        }
+        if (log.selectedHabilidadeIds) {
+          log.selectedHabilidadeIds.forEach(id => usedHabilidades.add(id));
+        }
+      }
+    });
+    
+    return { usedObjetos, usedHabilidades };
+  }, [logs, selectedTurmaId, campoExperiencia, anoSerie, periodo, editingId]);
+
+  // Compute objectives statistics
+  const skillStats = useMemo(() => {
+    const total = planData.habilidades.length;
+    if (total === 0) return { total: 0, worked: 0, percentage: 0, missing: 0 };
+    
+    const uniqueWorkedHabilidadeIds = new Set<string>();
+    
+    logs.forEach(log => {
+      if (
+        log.turmaId === selectedTurmaId &&
+        log.campoExperiencia === campoExperiencia &&
+        log.anoSerie === anoSerie &&
+        log.periodo === periodo
+      ) {
+        if (log.selectedHabilidadeIds) {
+          log.selectedHabilidadeIds.forEach(id => {
+            if (planData.habilidades.some(h => h.id === id || h.codigo === id)) {
+              const match = planData.habilidades.find(h => h.id === id || h.codigo === id);
+              if (match) {
+                uniqueWorkedHabilidadeIds.add(match.id);
+              }
+            }
+          });
+        }
+      }
+    });
+
+    selectedHabilidadeIds.forEach(id => {
+      const match = planData.habilidades.find(h => h.id === id || h.codigo === id);
+      if (match) {
+        uniqueWorkedHabilidadeIds.add(match.id);
+      }
+    });
+    
+    const worked = uniqueWorkedHabilidadeIds.size;
+    const percentage = Math.round((worked / total) * 100);
+    const missing = total - worked;
+    
+    return { total, worked, percentage, missing };
+  }, [planData.habilidades, logs, selectedTurmaId, campoExperiencia, anoSerie, periodo, selectedHabilidadeIds]);
+
+  // Fetch available ECE BNCC objectives for the form (fallback)
   const availableObjectives = useMemo(() => {
     const ageGroup = ['Creche II', 'Creche III'].includes(anoSerie)
       ? 'Crianças bem pequenas'
@@ -143,51 +580,6 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
     return (fieldData as any)[ageGroup] || [];
   }, [campoExperiencia, anoSerie]);
 
-  // Load logs on mount
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        if (!isDemoMode) {
-          const { data, error } = await supabase
-            .from('aulas_ministradas_infantil')
-            .select('*')
-            .eq('ativo', true)
-            .order('data', { ascending: false });
-
-          if (error) throw error;
-
-          const formatted: ClassLogInfantil[] = (data || []).map(d => ({
-            id: d.id,
-            data: d.data,
-            escolaId: d.escola_id,
-            escolaNome: escolas.find(e => e.id === d.escola_id)?.nome || 'Unidade',
-            turmaId: d.turma_id,
-            turmaNome: d.ano_serie, // Placeholder or fetch
-            campoExperiencia: d.campo_experiencia,
-            rotina: d.rotina,
-            conteudo: d.conteudo,
-            atividades: d.atividades,
-            observacoes: d.observacoes,
-            anoSerie: d.ano_serie,
-            periodo: d.periodo,
-            selectedHabilidadeIds: d.selected_habilidade_ids || [],
-            criadoEm: d.created_at
-          }));
-          setLogs(formatted);
-        } else {
-          const saved = localStorage.getItem('sigar_aulas_ministradas_infantil');
-          if (saved) {
-            setLogs(JSON.parse(saved));
-          }
-        }
-      } catch (err) {
-        console.error('Erro ao buscar registros de aula:', err);
-      }
-    };
-
-    loadData();
-  }, [isDemoMode, escolas]);
-
   // Handle Save
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -199,7 +591,7 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
 
     const escolaNome = escolas.find(e => e.id === selectedEscolaId)?.nome || 'Unidade';
     const turmaObj = turmas.find(t => t.id === selectedTurmaId);
-    const turmaNome = turmaObj ? `${turmaObj.name || turmaObj.anoSerie} • ${turmaObj.turno || ''}` : 'Turma';
+    const turmaNome = turmaObj ? `${turmaObj.name || turmaObj.anoSerie || turmaObj.year} • ${turmaObj.shift || turmaObj.turno || ''}` : 'Turma';
 
     const payload: ClassLogInfantil = {
       id: editingId || crypto.randomUUID(),
@@ -210,12 +602,13 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
       turmaNome,
       campoExperiencia,
       rotina,
-      conteudo,
+      conteudo: conteudo.trim(),
       atividades,
       observacoes,
       anoSerie,
       periodo,
       selectedHabilidadeIds,
+      selectedObjetoIds,
       criadoEm: new Date().toISOString()
     };
 
@@ -234,6 +627,7 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
           ano_serie: payload.anoSerie,
           periodo: payload.periodo,
           selected_habilidade_ids: payload.selectedHabilidadeIds,
+          selected_objeto_ids: payload.selectedObjetoIds || [],
           updated_at: new Date().toISOString(),
           updated_by: userEmail || currentUser?.contato || 'user'
         };
@@ -259,14 +653,7 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
         localStorage.setItem('sigar_aulas_ministradas_infantil', JSON.stringify(updatedLogs));
       }
 
-      // Reset Form
-      setEditingId(null);
-      setRotina('');
-      setConteudo('');
-      setAtividades('');
-      setObservacoes('');
-      setSelectedHabilidadeIds([]);
-      setIsFormOpen(false);
+      resetForm();
     } catch (err) {
       console.error('Erro ao salvar registro de aula:', err);
       showNotification('error', 'Falha ao gravar os dados.');
@@ -277,16 +664,19 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
     setEditingId(log.id);
     setDataAula(log.data);
     setSelectedEscolaId(log.escolaId);
-    setSelectedTurmaId(log.turmaId);
+    setTimeout(() => {
+      setSelectedTurmaId(log.turmaId);
+    }, 150);
     setCampoExperiencia(log.campoExperiencia);
     setRotina(log.rotina);
     setConteudo(log.conteudo);
     setAtividades(log.atividades);
     setObservacoes(log.observacoes);
-    setAnoSerie(log.anoSerie);
-    setPeriodo(log.periodo);
+    setAnoSerie(log.anoSerie || 'Creche III');
+    setPeriodo(log.periodo || '1º Bimestre');
     setSelectedHabilidadeIds(log.selectedHabilidadeIds || []);
-    setIsFormOpen(true);
+    setSelectedObjetoIds(log.selectedObjetoIds || []);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDelete = async (id: string) => {
@@ -314,6 +704,16 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
     }
   };
 
+  const resetForm = () => {
+    setEditingId(null);
+    setRotina('');
+    setConteudo('');
+    setAtividades('');
+    setObservacoes('');
+    setSelectedHabilidadeIds([]);
+    setSelectedObjetoIds([]);
+  };
+
   const handlePrint = (log: ClassLogInfantil) => {
     setPrintLog(log);
     setTimeout(() => {
@@ -333,6 +733,20 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
     });
   }, [logs, searchTerm, schoolFilter, classFilter]);
 
+  // Helper to retrieve ECE BNCC objective descriptions
+  const getObjectiveDescription = (code: string) => {
+    let foundDesc = '';
+    Object.values(BNCC_INFANTIL).forEach((ageGroups: any) => {
+      Object.values(ageGroups).forEach((objectives: any) => {
+        const match = objectives.find((o: any) => o.code === code);
+        if (match) {
+          foundDesc = match.desc;
+        }
+      });
+    });
+    return foundDesc;
+  };
+
   return (
     <div className="space-y-6 pb-12 animate-fade-in relative text-left">
       <PageHeader 
@@ -340,323 +754,510 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
         subtitle="Registro de vivências diárias, rotina pedagógica e desenvolvimento infantil"
         icon={FileText}
         badgeText="DIÁRIO DE CLASSE"
-        actions={[
-          {
-            label: 'Registrar Aula',
-            icon: Plus,
-            onClick: () => {
-              setEditingId(null);
-              setRotina('');
-              setConteudo('');
-              setAtividades('');
-              setObservacoes('');
-              setSelectedHabilidadeIds([]);
-              setIsFormOpen(true);
-            },
-            variant: 'primary'
-          }
-        ]}
+        actions={[]}
       />
 
       {subHeader}
 
-      {/* SEARCH AND FILTERS */}
+      {/* Form Card (always visible) */}
       <Card className="bg-white border-slate-200 shadow-sm p-6 rounded-2xl">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-3.5 text-slate-400 w-4 h-4" />
-            <input 
-              type="text"
-              placeholder="Pesquisar vivências ou campos..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-sm font-medium text-slate-700 placeholder-slate-400 outline-none focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/10 shadow-sm"
-            />
-          </div>
-          <div>
-            <select
-              value={schoolFilter}
-              onChange={e => setSchoolFilter(e.target.value)}
-              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/10 appearance-none shadow-sm"
-            >
-              <option value="ALL">Todas as Escolas</option>
-              {escolasInfantil.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
-            </select>
-          </div>
-          <div>
-            <select
-              value={classFilter}
-              onChange={e => setClassFilter(e.target.value)}
-              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/10 appearance-none shadow-sm"
-            >
-              <option value="ALL">Todas as Turmas ECE</option>
-              {turmas.map(t => <option key={t.id} value={t.id}>{t.name || t.anoSerie} • {t.turno}</option>)}
-            </select>
-          </div>
+        <div className="flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
+          <FileText className="text-brand-orange w-5 h-5" />
+          <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight">
+            {editingId ? 'Editar Registro de Aula ECE' : 'Novo Registro de Aula ECE'}
+          </h2>
         </div>
-      </Card>
 
-      {/* LOGS LIST */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredLogs.length > 0 ? (
-          filteredLogs.map(log => (
-            <Card key={log.id} className="bg-white border-slate-200 hover:border-orange-200 hover:shadow-md transition-all p-6 rounded-2xl flex flex-col justify-between text-left">
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="bg-orange-50 text-brand-orange text-[10px] font-black px-2 py-0.5 rounded uppercase">
-                    {log.periodo}
-                  </span>
-                  <span className="text-xs text-slate-400 flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5" />
-                    {new Date(log.data).toLocaleDateString('pt-BR')}
-                  </span>
-                </div>
-
-                <div className="space-y-1">
-                  <p className="text-xs text-slate-500 font-bold uppercase">{log.campoExperiencia}</p>
-                  <p className="text-xs text-slate-400 font-medium"><strong>Rotina:</strong> {log.rotina}</p>
-                </div>
-                
-                <div className="mt-3">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">Vivências:</span>
-                  <p className="text-xs text-slate-600 line-clamp-3 leading-relaxed mt-0.5">{log.conteudo}</p>
-                </div>
-
-                {log.selectedHabilidadeIds && log.selectedHabilidadeIds.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-1">
-                    {log.selectedHabilidadeIds.map(code => (
-                      <span key={code} className="bg-slate-100 text-slate-600 text-[9px] font-bold px-1.5 py-0.5 rounded">
-                        {code}
-                      </span>
-                    ))}
-                  </div>
-                )}
+        <form onSubmit={handleSave} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Data *</label>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <input 
+                  type="date" 
+                  value={dataAula}
+                  onChange={e => setDataAula(e.target.value)}
+                  required
+                  className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
+                />
               </div>
-
-              <div className="border-t border-slate-100 pt-4 mt-6 flex items-center justify-between">
-                <span className="text-[10px] font-bold text-slate-400 truncate max-w-[120px]">
-                  {log.escolaNome}
-                </span>
-
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => handlePrint(log)}
-                    className="p-2 hover:bg-slate-50 rounded-lg text-slate-500 hover:text-brand-orange transition-colors"
-                    title="Imprimir Registro"
-                  >
-                    <Printer className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleEdit(log)}
-                    className="p-2 hover:bg-slate-50 rounded-lg text-slate-500 hover:text-slate-800 transition-colors"
-                    title="Editar Registro"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(log.id)}
-                    className="p-2 hover:bg-slate-50 rounded-lg text-slate-500 hover:text-red-500 transition-colors"
-                    title="Excluir Registro"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </Card>
-          ))
-        ) : (
-          <div className="col-span-full py-16 text-center text-slate-400 italic text-xs">
-            Nenhuma aula ou vivência registrada para a Educação Infantil.
-          </div>
-        )}
-      </div>
-
-      {/* FORM MODAL */}
-      {isFormOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <form onSubmit={handleSave} className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl animate-scale-in text-left">
-            
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">
-                  {editingId ? 'Editar Registro de Aula ECE' : 'Registrar Aula / Vivência ECE'}
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">Educação Infantil</p>
-              </div>
-              <button 
-                type="button"
-                onClick={() => setIsFormOpen(false)}
-                className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Escola *</label>
+              <div className="relative">
+                <SchoolIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <select 
+                  value={selectedEscolaId}
+                  onChange={e => setSelectedEscolaId(e.target.value)}
+                  required
+                  className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all appearance-none"
+                >
+                  {escolasInfantil.map(e => (
+                    <option key={e.id} value={e.id}>{e.nome}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Grupo/Faixa Etária *</label>
+              <select 
+                value={anoSerie}
+                onChange={e => setAnoSerie(e.target.value)}
+                required
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+              >
+                {availableAnosSeries.length === 0 ? (
+                  <option value="">Nenhum grupo cadastrado</option>
+                ) : (
+                  availableAnosSeries.map(a => (
+                    <option key={a} value={a}>{a}</option>
+                  ))
+                )}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Turma *</label>
+              <select 
+                value={selectedTurmaId}
+                onChange={e => setSelectedTurmaId(e.target.value)}
+                required
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+              >
+                {availableTurmas.length === 0 ? (
+                  <option value="">Nenhuma turma cadastrada</option>
+                ) : (
+                  availableTurmas.map(t => (
+                    <option key={t.id} value={t.id}>{`${t.name || t.anoSerie || t.year} • ${t.shift || t.turno || ''}`}</option>
+                  ))
+                )}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Campo de Experiência *</label>
+              <select 
+                value={campoExperiencia}
+                onChange={e => setCampoExperiencia(e.target.value)}
+                required
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+              >
+                {CAMPOS_EXPERIENCIA.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Período *</label>
+              <select 
+                value={periodo}
+                onChange={e => setPeriodo(e.target.value)}
+                required
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+              >
+                {PERIODOS.map(p => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Rotina Diária *</label>
+              <input 
+                type="text" 
+                value={rotina}
+                onChange={e => setRotina(e.target.value)}
+                required
+                placeholder="Ex: Acolhida, Roda..."
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
+              />
+            </div>
+          </div>
+
+          {/* Progresso Curricular dos Objetivos */}
+          {skillStats.total > 0 && (
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2.5 animate-fade-in shadow-sm">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <ClipboardList className="text-brand-orange w-4 h-4" />
+                    Progresso Curricular dos Objetivos no Período
+                  </h4>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">
+                    {skillStats.worked} de {skillStats.total} Objetivos de Aprendizagem trabalhados nesta turma ({skillStats.percentage}%)
+                  </p>
+                </div>
+                
+                <div className="w-full md:w-auto text-right">
+                  <span className={`inline-block text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                    skillStats.missing === 0 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-brand-orange/10 text-brand-orange'
+                  }`}>
+                    {skillStats.missing === 0 ? '✓ 100% Concluído' : `Faltam trabalhar ${skillStats.missing} objetivos`}
+                  </span>
+                </div>
+              </div>
               
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Unidade Escolar *</label>
-                  <select
-                    value={selectedEscolaId}
-                    onChange={e => setSelectedEscolaId(e.target.value)}
-                    required
-                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/10 appearance-none shadow-sm"
-                  >
-                    <option value="">Selecione a Unidade Escolar</option>
-                    {escolasInfantil.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
-                  </select>
-                </div>
+              <div className="w-full bg-slate-200/60 rounded-full h-2.5 overflow-hidden border border-slate-100">
+                <div 
+                  className="bg-brand-orange h-full rounded-full transition-all duration-500 ease-out" 
+                  style={{ width: `${skillStats.percentage}%` }}
+                />
+              </div>
+            </div>
+          )}
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Turma ECE *</label>
-                  <select
-                    value={selectedTurmaId}
-                    onChange={e => setSelectedTurmaId(e.target.value)}
-                    required
-                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/10 appearance-none shadow-sm"
-                  >
-                    <option value="">Selecione a Turma</option>
-                    {turmas.map(t => <option key={t.id} value={t.id}>{t.name || t.anoSerie} • {t.turno}</option>)}
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Data *</label>
-                    <input 
-                      type="date"
-                      value={dataAula}
-                      onChange={e => setDataAula(e.target.value)}
-                      required
-                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 outline-none focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/10 shadow-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Período Letivo *</label>
-                    <select
-                      value={periodo}
-                      onChange={e => setPeriodo(e.target.value)}
-                      required
-                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/10 appearance-none shadow-sm"
-                    >
-                      {PERIODOS.map(p => <option key={p} value={p}>{p}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Campo de Experiência *</label>
-                  <select
-                    value={campoExperiencia}
-                    onChange={e => setCampoExperiencia(e.target.value)}
-                    required
-                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/10 appearance-none shadow-sm"
-                  >
-                    {CAMPOS_EXPERIENCIA.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-
-                {/* ECE Objectives selection */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Objetivos BNCC Trabalhados</label>
-                  <div className="max-h-[160px] overflow-y-auto space-y-1 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                    {availableObjectives.map((obj: any) => {
-                      const isSelected = selectedHabilidadeIds.includes(obj.code);
+          {/* Painel de Seleção Rápida (Plano de Curso ECE) */}
+          {planData.objetos.length > 0 && (
+            <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl space-y-3 animate-fade-in shadow-sm">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <Layers className="text-brand-orange w-4 h-4" />
+                  Vincular Conteúdo do Plano de Curso Unificado (ECE)
+                </h3>
+                <span className="text-[10px] text-slate-500 font-bold bg-slate-200 px-2 py-0.5 rounded-full uppercase tracking-tight">
+                  {periodo} • {anoSerie} • {campoExperiencia}
+                </span>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Saberes e Conhecimentos Column */}
+                <div className="bg-white p-3 rounded-xl border border-slate-200 flex flex-col space-y-2">
+                  <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-wider border-b pb-1.5 flex justify-between items-center">
+                    <span>Saberes e Conhecimentos ({planData.objetos.length})</span>
+                    {selectedObjetoIds.length > 0 && (
+                      <span className="text-[9px] bg-brand-orange/15 text-brand-orange font-bold px-1.5 py-0.2 rounded-full">
+                        {selectedObjetoIds.length} selecionado(s)
+                      </span>
+                    )}
+                  </h4>
+                  <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                    {planData.objetos.map((obj: any) => {
+                      const isSelected = selectedObjetoIds.includes(obj.id);
+                      const isAlreadyUsed = previouslyUsedData.usedObjetos.has(obj.id);
                       return (
-                        <div 
-                          key={obj.code}
-                          onClick={() => {
-                            if (isSelected) {
-                              setSelectedHabilidadeIds(selectedHabilidadeIds.filter(c => c !== obj.code));
-                            } else {
-                              setSelectedHabilidadeIds([...selectedHabilidadeIds, obj.code]);
-                            }
-                          }}
-                          className={`p-2 rounded-lg border text-left cursor-pointer transition-all flex items-start gap-2 ${
+                        <button
+                          type="button"
+                          key={obj.id}
+                          onClick={() => toggleObjetoSelection(obj.id)}
+                          className={`w-full text-left p-2.5 rounded-xl border transition-all text-xs flex gap-2.5 items-start ${
                             isSelected 
-                              ? 'bg-orange-50/50 border-orange-200' 
-                              : 'bg-white border-slate-100 hover:bg-slate-50'
+                              ? 'border-brand-orange bg-brand-orange/5 text-slate-800 shadow-sm font-semibold' 
+                              : 'border-slate-100 hover:border-slate-300 hover:bg-slate-50/50 text-slate-600'
                           }`}
                         >
-                          <span className={`text-[8px] font-black px-1 py-0.5 rounded leading-none mt-0.5 ${
-                            isSelected ? 'bg-brand-orange text-white' : 'bg-slate-100 text-slate-500'
+                          <div className={`mt-0.5 w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 transition-all ${
+                            isSelected 
+                              ? 'border-brand-orange bg-brand-orange text-white' 
+                              : 'border-slate-300 bg-white'
                           }`}>
-                            {obj.code}
-                          </span>
-                          <div>
-                            <p className="text-xs font-bold text-slate-700">{obj.short}</p>
-                            <p className="text-[10px] text-slate-400 mt-0.5">{obj.desc}</p>
+                            {isSelected && <Check className="w-2.5 h-2.5 stroke-[3px]" />}
                           </div>
-                        </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="font-semibold leading-normal break-words block text-slate-700">{obj.descricao}</span>
+                            {isAlreadyUsed && (
+                              <span className="inline-flex items-center gap-1 text-[8px] font-bold text-amber-600 bg-amber-50 border border-amber-100 rounded px-1.5 py-0.5 mt-1">
+                                ⚠️ Já trabalhado nesta turma
+                              </span>
+                            )}
+                          </div>
+                        </button>
                       );
                     })}
                   </div>
                 </div>
+
+                {/* Objetivos de Aprendizagem Column */}
+                <div className="bg-white p-3 rounded-xl border border-slate-200 flex flex-col space-y-2">
+                  <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-wider border-b pb-1.5 flex justify-between items-center">
+                    <span>Objetivos de Aprendizagem ({planData.habilidades.length})</span>
+                    {selectedHabilidadeIds.length > 0 && (
+                      <span className="text-[9px] bg-brand-orange/15 text-brand-orange font-bold px-1.5 py-0.2 rounded-full">
+                        {selectedHabilidadeIds.length} selecionado(s)
+                      </span>
+                    )}
+                  </h4>
+                  <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                    {planData.habilidades.length === 0 ? (
+                      <p className="text-slate-400 text-xs italic text-center py-6">Nenhum objetivo neste plano.</p>
+                    ) : (
+                      planData.habilidades.map((hab: any) => {
+                        const isSelected = selectedHabilidadeIds.includes(hab.id || hab.codigo);
+                        const isAlreadyUsed = previouslyUsedData.usedHabilidades.has(hab.id || hab.codigo);
+                        return (
+                          <button
+                            type="button"
+                            key={hab.id || hab.codigo}
+                            onClick={() => toggleHabilidadeSelection(hab.id || hab.codigo)}
+                            className={`w-full text-left p-2.5 rounded-xl border transition-all text-xs flex gap-2.5 items-start ${
+                              isSelected 
+                                ? 'border-brand-orange bg-brand-orange/5 text-slate-800 shadow-sm font-semibold' 
+                                : 'border-slate-100 hover:border-slate-300 hover:bg-slate-50/50 text-slate-600'
+                            }`}
+                          >
+                            <div className={`mt-0.5 w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 transition-all ${
+                              isSelected 
+                                ? 'border-brand-orange bg-brand-orange text-white' 
+                                : 'border-slate-300 bg-white'
+                            }`}>
+                              {isSelected && <Check className="w-2.5 h-2.5 stroke-[3px]" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 mb-0.5">
+                                <span className="bg-brand-orange/10 text-brand-orange text-[9px] font-black px-1.5 py-0.5 rounded font-mono">
+                                  {hab.codigo}
+                                </span>
+                                {isAlreadyUsed && (
+                                  <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-amber-600 bg-amber-50 border border-amber-100 rounded px-1.5 py-0.5">
+                                    ⚠️ Já trabalhado
+                                  </span>
+                                )}
+                              </div>
+                              <p className="font-semibold leading-normal text-slate-600 text-[11px] break-words">{hab.descricao}</p>
+                            </div>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
               </div>
+            </div>
+          )}
 
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Rotina Diária *</label>
-                  <input 
-                    type="text"
-                    value={rotina}
-                    onChange={e => setRotina(e.target.value)}
-                    required
-                    placeholder="Ex: Acolhida, Roda de Conversa, Higiene, Ativ. Direcionada..."
-                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 outline-none focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/10 shadow-sm"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Vivências Desenvolvidas *</label>
-                  <textarea
-                    rows={4}
-                    value={conteudo}
-                    onChange={e => setConteudo(e.target.value)}
-                    required
-                    placeholder="Quais brincadeiras, interações e experiências foram desenvolvidas com o grupo..."
-                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-medium text-slate-700 outline-none focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/10 shadow-sm"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Atividades / Materiais Utilizados</label>
-                  <textarea
-                    rows={3}
-                    value={atividades}
-                    onChange={e => setAtividades(e.target.value)}
-                    placeholder="Ex: Brinquedos de montar, tintas guache, blocos lógicos..."
-                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-medium text-slate-700 outline-none focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/10 shadow-sm"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Observações Coletivas</label>
-                  <textarea
-                    rows={3}
-                    value={observacoes}
-                    onChange={e => setObservacoes(e.target.value)}
-                    placeholder="Observações sobre o comportamento e envolvimento coletivo..."
-                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-medium text-slate-700 outline-none focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/10 shadow-sm"
-                  />
-                </div>
+          {/* Fallback Objectives checklist from BNCC_INFANTIL if no course plan objects exist */}
+          {planData.objetos.length === 0 && (
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Objetivos BNCC Trabalhados (Fallback)</label>
+              <div className="max-h-[160px] overflow-y-auto space-y-1 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                {availableObjectives.map((obj: any) => {
+                  const isSelected = selectedHabilidadeIds.includes(obj.code);
+                  return (
+                    <div 
+                      key={obj.code}
+                      onClick={() => {
+                        if (isSelected) {
+                          setSelectedHabilidadeIds(selectedHabilidadeIds.filter(c => c !== obj.code));
+                        } else {
+                          setSelectedHabilidadeIds([...selectedHabilidadeIds, obj.code]);
+                        }
+                      }}
+                      className={`p-2 rounded-lg border text-left cursor-pointer transition-all flex items-start gap-2 ${
+                        isSelected 
+                          ? 'bg-orange-50/50 border-orange-200' 
+                          : 'bg-white border-slate-100 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span className={`text-[8px] font-black px-1 py-0.5 rounded leading-none mt-0.5 ${
+                        isSelected ? 'bg-brand-orange text-white' : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        {obj.code}
+                      </span>
+                      <div>
+                        <p className="text-xs font-bold text-slate-700">{obj.short}</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">{obj.desc}</p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
+            </div>
+          )}
 
+          {/* Text fields are always visible for ECE to allow describing interactions and plays */}
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Vivências Desenvolvidas (Conteúdo) *</label>
+              <textarea
+                rows={3}
+                value={conteudo}
+                onChange={e => setConteudo(e.target.value)}
+                required
+                placeholder="Quais brincadeiras, interações e experiências foram desenvolvidas com o grupo..."
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
+              />
             </div>
 
-            <div className="p-6 border-t border-slate-100 flex items-center justify-end gap-3">
-              <Button type="button" variant="secondary" onClick={() => setIsFormOpen(false)}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Atividades / Materiais Utilizados</label>
+                <textarea
+                  rows={2}
+                  value={atividades}
+                  onChange={e => setAtividades(e.target.value)}
+                  placeholder="Ex: Brinquedos de montar, tintas guache, blocos lógicos..."
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Observações Coletivas</label>
+                <textarea
+                  rows={2}
+                  value={observacoes}
+                  onChange={e => setObservacoes(e.target.value)}
+                  placeholder="Observações sobre o comportamento e envolvimento coletivo..."
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            {editingId && (
+              <Button type="button" variant="secondary" onClick={resetForm} className="rounded-xl text-xs font-bold py-2">
                 Cancelar
               </Button>
-              <Button type="submit" variant="primary" className="flex items-center gap-2">
-                <Bookmark className="w-4 h-4" /> Salvar Registro
-              </Button>
+            )}
+            <Button type="submit" variant="primary" className="rounded-xl text-xs font-black py-2 bg-brand-orange hover:bg-orange-600 shadow-md flex items-center gap-1.5">
+              <Save className="w-4 h-4" />
+              {editingId ? 'Salvar Edição' : 'Salvar Registro'}
+            </Button>
+          </div>
+        </form>
+      </Card>
+
+      {/* Saved logs list */}
+      <div className="space-y-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h3 className="text-md font-black text-slate-800 uppercase tracking-wider">Histórico de Aulas e Vivências</h3>
+            <p className="text-xs text-slate-500 mt-0.5">Veja todas as vivências registradas no diário de classe da Educação Infantil</p>
+          </div>
+
+          <div className="flex flex-wrap gap-2 w-full md:w-auto">
+            <div className="relative flex-1 md:flex-none">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+              <input 
+                type="text" 
+                placeholder="Buscar por conteúdo..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-white outline-none focus:border-brand-orange transition-all text-xs font-semibold"
+              />
             </div>
 
-          </form>
+            <select 
+              value={schoolFilter}
+              onChange={e => setSchoolFilter(e.target.value)}
+              className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 outline-none focus:border-brand-orange"
+            >
+              <option value="ALL">Todas Unidades</option>
+              {escolasInfantil.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
+            </select>
+
+            <select 
+              value={classFilter}
+              onChange={e => setClassFilter(e.target.value)}
+              className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 outline-none focus:border-brand-orange"
+            >
+              <option value="ALL">Todas as Turmas ECE</option>
+              {turmas.map(t => <option key={t.id} value={t.id}>{t.name || t.anoSerie} • {t.turno || t.shift || ''}</option>)}
+            </select>
+          </div>
         </div>
-      )}
+
+        <Card className="p-0 overflow-hidden border-slate-200 shadow-sm bg-white rounded-2xl">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead className="bg-slate-50 border-b border-slate-100 uppercase text-[10px] font-black text-slate-500 tracking-wider">
+                <tr>
+                  <th className="px-6 py-4">Data / Escola</th>
+                  <th className="px-6 py-4">Turma / Campo de Experiência</th>
+                  <th className="px-6 py-4">Grupo / Período</th>
+                  <th className="px-6 py-4">Vivências Desenvolvidas</th>
+                  <th className="px-6 py-4">Rotina Diária</th>
+                  <th className="px-6 py-4 text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredLogs.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-12 text-center text-slate-400 font-semibold">
+                      Nenhuma aula ou vivência registrada para a Educação Infantil.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredLogs.map(log => (
+                    <tr key={log.id} className="hover:bg-slate-50/50 transition-colors group">
+                      <td className="px-6 py-3">
+                        <div className="font-bold text-slate-800">
+                          {new Date(log.data + 'T12:00:00').toLocaleDateString('pt-BR')}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-bold uppercase mt-0.5 tracking-tight truncate max-w-[200px]">
+                          {log.escolaNome}
+                        </div>
+                      </td>
+                      <td className="px-6 py-3">
+                        <div className="font-bold text-slate-700">{log.turmaNome}</div>
+                        <div className="text-[10px] text-brand-orange font-bold uppercase mt-0.5 truncate max-w-[250px]" title={log.campoExperiencia}>
+                          {log.campoExperiencia}
+                        </div>
+                      </td>
+                      <td className="px-6 py-3">
+                        <div className="font-bold text-slate-700">{log.anoSerie}</div>
+                        <div className="text-[10px] text-slate-500 font-bold uppercase mt-0.5">
+                          {log.periodo}
+                        </div>
+                      </td>
+                      <td className="px-6 py-3">
+                        <div className="font-semibold text-slate-800 line-clamp-1">{log.conteudo}</div>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {log.selectedHabilidadeIds && log.selectedHabilidadeIds.map(code => (
+                            <span key={code} className="bg-slate-100 text-slate-600 text-[8px] font-bold px-1 py-0.2 rounded font-mono">
+                              {code}
+                            </span>
+                          ))}
+                        </div>
+                        {log.observacoes && (
+                          <div className="text-[10px] text-slate-400 line-clamp-1 mt-1">
+                            Obs: {log.observacoes}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-3">
+                        <div className="font-semibold text-slate-700 max-w-[150px] truncate" title={log.rotina}>
+                          {log.rotina}
+                        </div>
+                      </td>
+                      <td className="px-6 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
+                          <button 
+                            onClick={() => handlePrint(log)} 
+                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" 
+                            title="Imprimir Relatório"
+                          >
+                            <Printer size={15} />
+                          </button>
+                          <button 
+                            onClick={() => handleEdit(log)} 
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" 
+                            title="Editar"
+                          >
+                            <Edit2 size={15} />
+                          </button>
+                          <button 
+                            onClick={() => handleDelete(log.id)} 
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" 
+                            title="Excluir"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </div>
 
       {/* PRINTABLE COMPONENT AREA */}
       {printLog && createPortal(
