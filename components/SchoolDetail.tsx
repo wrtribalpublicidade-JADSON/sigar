@@ -5,6 +5,7 @@ import { PrintableVisitReport } from './PrintableVisitReport';
 import { PrintableRhReport } from './PrintableRhReport';
 import { PrintableChecklistReport } from './PrintableChecklistReport';
 import { PrintableCartaApresentacao } from './PrintableCartaApresentacao';
+import { hasTabAccess, hasFullTabAccess } from '../utils/permissions';
 import {
   BarChart,
   Bar,
@@ -21,7 +22,7 @@ import { Button } from './ui/Button';
 import { Escola, Visita, DadosEducacionais, ItemAcompanhamento, RecursoHumano, MetaAcao, StatusMeta, Coordenador, Segmento } from '../types';
 import { igPlanoAcaoService } from '../services/gestaoConselhoService';
 import { supabase } from '../services/supabase';
-
+ 
 interface SchoolDetailProps {
   escola: Escola;
   coordenadores: Coordenador[];
@@ -30,6 +31,7 @@ interface SchoolDetailProps {
   onUpdate: (escola: Escola) => void;
   onUpdateVisitStatus: (visitId: string, newStatus: Visita['status']) => void;
   isDemoMode: boolean;
+  userRole?: string;
 }
 
 const COLORS = {
@@ -63,11 +65,34 @@ const ETAPAS_COHORTS = [
   }
 ];
 
-export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadores = [], historicoVisitas, onBack, onUpdate, onUpdateVisitStatus, isDemoMode }) => {
+export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadores = [], historicoVisitas, onBack, onUpdate, onUpdateVisitStatus, isDemoMode, userRole }) => {
   const [activeTab, setActiveTab] = useState<'plano' | 'visitas' | 'turmas' | 'rh' | 'acompanhamento' | 'detalhamento_turmas'>('acompanhamento');
   const [selectedVisitForPrint, setSelectedVisitForPrint] = useState<Visita | null>(null);
   const [selectedServidorForCarta, setSelectedServidorForCarta] = useState<RecursoHumano | null>(null);
   const [formData, setFormData] = useState<DadosEducacionais>(escola.dadosEducacionais);
+
+  const visibleTabs = useMemo(() => {
+    const allTabs = [
+      { id: 'acompanhamento', icon: ClipboardCheck, label: 'Monitoramento' },
+      { id: 'turmas', icon: CheckSquare, label: 'Turmas' },
+      { id: 'detalhamento_turmas', icon: GraduationCap, label: 'Detalhamento de Turmas' },
+      { id: 'rh', icon: Briefcase, label: 'Recursos Humanos' },
+      { id: 'plano', icon: Target, label: 'Plano de Ação' },
+      { id: 'visitas', icon: History, label: 'Histórico' }
+    ];
+    return allTabs.filter(tab => hasTabAccess('escolas', tab.id, userRole));
+  }, [userRole]);
+
+  useEffect(() => {
+    if (visibleTabs.length > 0 && !visibleTabs.some(t => t.id === activeTab)) {
+      setActiveTab(visibleTabs[0].id as any);
+    }
+  }, [visibleTabs, activeTab]);
+
+  const canEditTab = useMemo(() => {
+    if (!userRole) return true;
+    return userRole === 'Administrador' || hasFullTabAccess('escolas', activeTab, userRole);
+  }, [activeTab, userRole]);
 
   const regionalCoordinator = useMemo(() => {
     return coordenadores.find(c => c.escolasIds.includes(escola.id) && c.funcao === 'Coordenador Regional')
@@ -84,12 +109,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
 
   // helper: check if servidor is eligible for a letter
   const servidorElegivelCarta = (funcao: string) => {
-    const f = funcao.toLowerCase();
-    return (
-      f.includes('professor') ||
-      f.includes('gestor') ||
-      f.includes('coordenador')
-    );
+    return true;
   };
 
   const handlePrintCarta = (rh: RecursoHumano) => {
@@ -490,18 +510,18 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
     const totalTurmas = (data.turmas.integral || 0) + (data.turmas.manha || 0) + (data.turmas.tarde || 0);
     const totalAlunos = (data.alunos.integral || 0) + (data.alunos.manha || 0) + (data.alunos.tarde || 0);
 
-    const inputClass = "w-full text-center bg-white border border-slate-200 rounded-lg focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all text-sm font-semibold text-slate-700 py-2.5 appearance-none outline-none hover:border-slate-300";
+    const inputClass = `w-full text-center border rounded-lg focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all text-sm font-semibold py-2.5 appearance-none outline-none ${!canEditTab ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'}`;
 
     return (
       <tr key={rowKey} className="border-b border-slate-100 hover:bg-orange-50/30 transition-colors group text-sm">
         <td className="px-5 py-3.5 font-bold text-slate-700 bg-slate-50/50 border-r border-slate-200 whitespace-nowrap">{label}</td>
-        <td className="p-1.5"><input type="number" className={inputClass} value={data.turmas.integral} onChange={(e) => handleTurmaChange(segmento, rowKey, 'turmas', 'integral', e.target.value)} /></td>
-        <td className="p-1.5"><input type="number" className={inputClass} value={data.turmas.manha} onChange={(e) => handleTurmaChange(segmento, rowKey, 'turmas', 'manha', e.target.value)} /></td>
-        <td className="p-1.5"><input type="number" className={inputClass} value={data.turmas.tarde} onChange={(e) => handleTurmaChange(segmento, rowKey, 'turmas', 'tarde', e.target.value)} /></td>
+        <td className="p-1.5"><input type="number" disabled={!canEditTab} className={inputClass} value={data.turmas.integral} onChange={(e) => handleTurmaChange(segmento, rowKey, 'turmas', 'integral', e.target.value)} /></td>
+        <td className="p-1.5"><input type="number" disabled={!canEditTab} className={inputClass} value={data.turmas.manha} onChange={(e) => handleTurmaChange(segmento, rowKey, 'turmas', 'manha', e.target.value)} /></td>
+        <td className="p-1.5"><input type="number" disabled={!canEditTab} className={inputClass} value={data.turmas.tarde} onChange={(e) => handleTurmaChange(segmento, rowKey, 'turmas', 'tarde', e.target.value)} /></td>
         <td className="px-3 py-3.5 bg-slate-100/80 text-slate-800 text-center font-bold border-x border-slate-200">{totalTurmas}</td>
-        <td className="p-1.5"><input type="number" className={inputClass} value={data.alunos.integral} onChange={(e) => handleTurmaChange(segmento, rowKey, 'alunos', 'integral', e.target.value)} /></td>
-        <td className="p-1.5"><input type="number" className={inputClass} value={data.alunos.manha} onChange={(e) => handleTurmaChange(segmento, rowKey, 'alunos', 'manha', e.target.value)} /></td>
-        <td className="p-1.5"><input type="number" className={inputClass} value={data.alunos.tarde} onChange={(e) => handleTurmaChange(segmento, rowKey, 'alunos', 'tarde', e.target.value)} /></td>
+        <td className="p-1.5"><input type="number" disabled={!canEditTab} className={inputClass} value={data.alunos.integral} onChange={(e) => handleTurmaChange(segmento, rowKey, 'alunos', 'integral', e.target.value)} /></td>
+        <td className="p-1.5"><input type="number" disabled={!canEditTab} className={inputClass} value={data.alunos.manha} onChange={(e) => handleTurmaChange(segmento, rowKey, 'alunos', 'manha', e.target.value)} /></td>
+        <td className="p-1.5"><input type="number" disabled={!canEditTab} className={inputClass} value={data.alunos.tarde} onChange={(e) => handleTurmaChange(segmento, rowKey, 'alunos', 'tarde', e.target.value)} /></td>
         <td className="px-3 py-3.5 text-orange-600 text-center font-bold">{totalAlunos}</td>
       </tr>
     );
@@ -575,14 +595,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
       </div>
 
       <div className="flex flex-wrap gap-2 p-1 bg-slate-100 rounded-xl mb-6">
-        {[
-          { id: 'acompanhamento', icon: ClipboardCheck, label: 'Monitoramento' },
-          { id: 'turmas', icon: CheckSquare, label: 'Turmas' },
-          { id: 'detalhamento_turmas', icon: GraduationCap, label: 'Detalhamento de Turmas' },
-          { id: 'rh', icon: Briefcase, label: 'Recursos Humanos' },
-          { id: 'plano', icon: Target, label: 'Plano de Ação' },
-          { id: 'visitas', icon: History, label: 'Histórico' }
-        ].map(tab => (
+        {visibleTabs.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
@@ -620,15 +633,19 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                       </p>
                     </div>
                     <div className="flex gap-3">
-                      <button onClick={handleClearAcompanhamento} className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-4 py-2.5 rounded-xl font-semibold transition-all flex items-center gap-2">
-                        <Trash2 size={18} /> Apagar Registros
-                      </button>
+                      {canEditTab && (
+                        <button onClick={handleClearAcompanhamento} className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-4 py-2.5 rounded-xl font-semibold transition-all flex items-center gap-2">
+                          <Trash2 size={18} /> Apagar Registros
+                        </button>
+                      )}
                       <button onClick={handlePrintChecklist} className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 px-4 py-2.5 rounded-xl font-semibold transition-all flex items-center gap-2">
                         <Printer size={18} /> Imprimir Relatório
                       </button>
-                      <button onClick={handleSaveAcompanhamento} className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2">
-                        <Save size={18} /> Salvar Registros
-                      </button>
+                      {canEditTab && (
+                        <button onClick={handleSaveAcompanhamento} className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2">
+                          <Save size={18} /> Salvar Registros
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div className="grid gap-5">
@@ -645,11 +662,25 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                               <div key={item.id} className="p-6 flex flex-col md:flex-row gap-6 items-start hover:bg-slate-50/50 transition-colors">
                                 <div className="flex-1">
                                   <p className="text-sm font-medium text-slate-800 leading-relaxed mb-3">{item.pergunta}</p>
-                                  <input type="text" placeholder="Adicionar observação..." value={item.observacao} onChange={e => handleAcompanhamentoChange(item.id, 'observacao', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all" />
+                                  <input 
+                                    type="text" 
+                                    placeholder={canEditTab ? "Adicionar observação..." : "Sem observação"} 
+                                    disabled={!canEditTab}
+                                    value={item.observacao} 
+                                    onChange={e => handleAcompanhamentoChange(item.id, 'observacao', e.target.value)} 
+                                    className={`w-full border rounded-lg px-4 py-2 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 ${!canEditTab ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed' : 'bg-slate-50 border-slate-200 text-slate-800'}`} 
+                                  />
                                 </div>
                                 <div className="flex gap-2 shrink-0">
                                   {['Sim', 'Não', 'Parcialmente'].map(res => (
-                                    <button key={res} onClick={() => handleAcompanhamentoChange(item.id, 'resposta', res)} className={`px-4 py-2 text-xs font-bold rounded-lg border transition-all ${item.resposta === res ? 'bg-orange-500 border-orange-600 text-white shadow-md shadow-orange-500/20' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{res}</button>
+                                    <button 
+                                      key={res} 
+                                      disabled={!canEditTab}
+                                      onClick={() => handleAcompanhamentoChange(item.id, 'resposta', res)} 
+                                      className={`px-4 py-2 text-xs font-bold rounded-lg border transition-all ${!canEditTab ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'} ${item.resposta === res ? 'bg-orange-500 border-orange-600 text-white shadow-md shadow-orange-500/20' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                                    >
+                                      {res}
+                                    </button>
                                   ))}
                                 </div>
                               </div>
@@ -672,7 +703,11 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                     <h3 className="text-2xl font-bold text-slate-800">Alunos por Turmas</h3>
                     <p className="text-slate-500 text-sm mt-1">Detalhamento de turmas e alunos por nível e turno.</p>
                   </div>
-                  <button onClick={handleSaveIndicators} className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2"><Save size={18} /> Salvar Dados</button>
+                  {canEditTab && (
+                    <button onClick={handleSaveIndicators} className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2">
+                      <Save size={18} /> Salvar Dados
+                    </button>
+                  )}
                 </div>
                 <div className="space-y-8">
                   {['infantil', 'fundamental'].filter(seg => {
@@ -905,9 +940,11 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                       <button onClick={handlePrintRh} className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl font-semibold shadow-sm transition-all flex items-center gap-2">
                         <Printer size={18} /> Imprimir Relatório
                       </button>
-                      <button onClick={() => setIsAddingRh(true)} className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2">
-                        <UserPlus size={18} /> Adicionar Servidor
-                      </button>
+                      {canEditTab && (
+                        <button onClick={() => setIsAddingRh(true)} className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2">
+                          <UserPlus size={18} /> Adicionar Servidor
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1188,8 +1225,12 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                                     <Printer size={16} />
                                   </button>
                                 )}
-                                <button onClick={() => handleEditRh(rh)} className="text-slate-300 hover:text-orange-500 transition-colors p-1.5 hover:bg-orange-50 rounded-lg"><Edit size={16} /></button>
-                                <button onClick={() => handleDeleteRh(rh.id)} className="text-slate-300 hover:text-red-500 transition-colors p-1.5 hover:bg-red-50 rounded-lg"><Trash2 size={16} /></button>
+                                {canEditTab && (
+                                  <>
+                                    <button onClick={() => handleEditRh(rh)} className="text-slate-300 hover:text-orange-500 transition-colors p-1.5 hover:bg-orange-50 rounded-lg" title="Editar"><Edit size={16} /></button>
+                                    <button onClick={() => handleDeleteRh(rh.id)} className="text-slate-300 hover:text-red-500 transition-colors p-1.5 hover:bg-red-50 rounded-lg" title="Excluir"><Trash2 size={16} /></button>
+                                  </>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -1215,7 +1256,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                     <h3 className="text-2xl font-bold text-slate-800">Plano de Ação</h3>
                     <p className="text-sm text-slate-500 mt-1">Gestão de metas e prazos para melhoria dos indicadores.</p>
                   </div>
-                  {!isEditingMeta && <button onClick={() => { setMetaForm({ id: '', descricao: '', prazo: '', status: StatusMeta.NAO_INICIADO, responsavel: '' }); setIsEditingMeta(true); }} className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2"><Target size={18} /> Nova Meta</button>}
+                  {!isEditingMeta && canEditTab && <button onClick={() => { setMetaForm({ id: '', descricao: '', prazo: '', status: StatusMeta.NAO_INICIADO, responsavel: '' }); setIsEditingMeta(true); }} className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2"><Target size={18} /> Nova Meta</button>}
                 </div>
 
                 {isEditingMeta && (
@@ -1268,10 +1309,12 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                         <h4 className="text-lg font-bold text-slate-900 leading-tight">{meta.descricao}</h4>
                         <p className="text-xs font-medium text-orange-600 mt-2 uppercase tracking-wide">Responsável: {meta.responsavel}</p>
                       </div>
-                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => handleEditMeta(meta)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-orange-50 hover:text-orange-600 transition-all"><Edit size={16} /></button>
-                        <button onClick={() => handleDeleteMeta(meta.id)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-600 transition-all"><Trash2 size={16} /></button>
-                      </div>
+                      {canEditTab && (
+                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => handleEditMeta(meta)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-orange-50 hover:text-orange-600 transition-all"><Edit size={16} /></button>
+                          <button onClick={() => handleDeleteMeta(meta.id)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-600 transition-all"><Trash2 size={16} /></button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

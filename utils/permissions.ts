@@ -62,7 +62,19 @@ const SIDEBAR_LABEL_TO_MODULE: Record<string, string> = {
 
 export const ALL_MODULES = [
     { id: 'dashboard', name: 'Visão Geral (Dashboard)', group: 'Menu' },
-    { id: 'escolas', name: 'Escolas', group: 'Menu' },
+    {
+        id: 'escolas',
+        name: 'Escolas',
+        group: 'Menu',
+        tabs: [
+            { id: 'acompanhamento', name: 'Monitoramento' },
+            { id: 'turmas', name: 'Turmas' },
+            { id: 'detalhamento_turmas', name: 'Detalhamento de Turmas' },
+            { id: 'rh', name: 'Recursos Humanos' },
+            { id: 'plano', name: 'Plano de Ação' },
+            { id: 'visitas', name: 'Histórico' }
+        ]
+    },
     { id: 'equipe', name: 'Equipe / Gestão de Usuários', group: 'Gestão' },
     { id: 'relatorios', name: 'Relatórios', group: 'Gestão' },
     { id: 'indicadores', name: 'Indicadores', group: 'Gestão' },
@@ -158,4 +170,42 @@ export function hasAccess(viewState: string, userRole?: string): boolean {
  */
 export function hasFullAccess(viewState: string, userRole?: string): boolean {
     return getAccessForView(viewState, userRole) === 'full';
+}
+
+/**
+ * Get the access level for a specific tab under a parent module.
+ * If parent module is none, tab is none.
+ * If tab has specific permission, use it. Otherwise, inherit parent permission.
+ */
+export function getAccessForTab(parentModuleId: string, tabId: string, userRole?: string): AccessLevel {
+    if (!userRole) return 'none';
+    if (userRole === 'Administrador') return 'full';
+
+    const permissions = loadPermissions();
+    const rolePerms = permissions[userRole] || DEFAULT_PERMISSIONS[userRole] || {};
+
+    const parentAccess = rolePerms[parentModuleId] || 'none';
+    if (parentAccess === 'none') return 'none';
+
+    const tabKey = `${parentModuleId}:${tabId}`;
+    const tabAccess = rolePerms[tabKey];
+
+    if (tabAccess === undefined) {
+        return parentAccess;
+    }
+    return tabAccess;
+}
+
+/**
+ * Check if a user has access to a tab.
+ */
+export function hasTabAccess(parentModuleId: string, tabId: string, userRole?: string): boolean {
+    return getAccessForTab(parentModuleId, tabId, userRole) !== 'none';
+}
+
+/**
+ * Check if a user has full (write) access to a tab.
+ */
+export function hasFullTabAccess(parentModuleId: string, tabId: string, userRole?: string): boolean {
+    return getAccessForTab(parentModuleId, tabId, userRole) === 'full';
 }

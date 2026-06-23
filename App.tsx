@@ -952,6 +952,7 @@ export default function App() {
             onSave={handleSaveSchool}
             onUpdate={handleUpdateEscola}
             onDelete={handleDeleteSchool}
+            userRole={effectiveUser?.funcao}
           />
         );
       case 'DETALHE_ESCOLA':
@@ -966,6 +967,7 @@ export default function App() {
             onUpdate={handleUpdateEscola}
             onUpdateVisitStatus={handleUpdateVisitStatus}
             isDemoMode={isDemoMode}
+            userRole={effectiveUser?.funcao}
           />
         );
       case 'NOVA_VISITA':

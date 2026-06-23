@@ -75,6 +75,23 @@ export const PermissoesManager: React.FC = () => {
         setSaved(false);
     };
 
+    const handleToggleTabAccess = (moduleId: string, tabId: string, parentAccess: AccessLevel) => {
+        const tabKey = `${moduleId}:${tabId}`;
+        const current = permissions[selectedRole]?.[tabKey] !== undefined
+            ? permissions[selectedRole][tabKey]
+            : parentAccess;
+        const next = cycleAccess(current);
+        setPermissions(prev => ({
+            ...prev,
+            [selectedRole]: {
+                ...(prev[selectedRole] || {}),
+                [tabKey]: next,
+            },
+        }));
+        setHasChanges(true);
+        setSaved(false);
+    };
+
     const handleSave = async () => {
         setSaving(true);
         try {
@@ -90,9 +107,12 @@ export const PermissoesManager: React.FC = () => {
     };
 
     const handleSetAll = (access: AccessLevel) => {
+        const clearedRolePerms = Object.fromEntries(
+            ALL_MODULES.map(m => [m.id, access])
+        );
         setPermissions(prev => ({
             ...prev,
-            [selectedRole]: Object.fromEntries(ALL_MODULES.map(m => [m.id, access])),
+            [selectedRole]: clearedRolePerms,
         }));
         setHasChanges(true);
         setSaved(false);
@@ -260,22 +280,52 @@ export const PermissoesManager: React.FC = () => {
                                         {groupModules.map(mod => {
                                             const access = rolePermissions[mod.id] || 'none';
                                             return (
-                                                <div
-                                                    key={mod.id}
-                                                    className="flex items-center justify-between px-6 py-3 hover:bg-slate-50/50 transition-colors group"
-                                                >
-                                                    <div className="flex items-center gap-3">
-                                                        <div className={`w-2 h-2 rounded-full ${access === 'full' ? 'bg-emerald-500' : access === 'readonly' ? 'bg-amber-500' : 'bg-red-400'}`} />
-                                                        <span className="text-sm font-semibold text-slate-700">{mod.name}</span>
-                                                    </div>
-                                                    <button
-                                                        onClick={() => handleToggleAccess(mod.id)}
-                                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all hover:scale-105 active:scale-95 select-none cursor-pointer ${getAccessColor(access)}`}
+                                                <React.Fragment key={mod.id}>
+                                                    <div
+                                                        className="flex items-center justify-between px-6 py-3 hover:bg-slate-50/50 transition-colors group"
                                                     >
-                                                        {getAccessIcon(access)}
-                                                        {getAccessLabel(access)}
-                                                    </button>
-                                                </div>
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`w-2 h-2 rounded-full ${access === 'full' ? 'bg-emerald-500' : access === 'readonly' ? 'bg-amber-500' : 'bg-red-400'}`} />
+                                                            <span className="text-sm font-semibold text-slate-700">{mod.name}</span>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => handleToggleAccess(mod.id)}
+                                                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all hover:scale-105 active:scale-95 select-none cursor-pointer ${getAccessColor(access)}`}
+                                                        >
+                                                            {getAccessIcon(access)}
+                                                            {getAccessLabel(access)}
+                                                        </button>
+                                                    </div>
+                                                    {/* Tabs (Sub-modules) */}
+                                                    {mod.tabs && access !== 'none' && mod.tabs.map(tab => {
+                                                        const tabKey = `${mod.id}:${tab.id}`;
+                                                        const tabAccess = rolePermissions[tabKey] !== undefined
+                                                            ? rolePermissions[tabKey]
+                                                            : access;
+                                                        const isInherited = rolePermissions[tabKey] === undefined;
+
+                                                        return (
+                                                            <div
+                                                                key={tabKey}
+                                                                className="flex items-center justify-between pl-12 pr-6 py-2 bg-slate-50/30 hover:bg-slate-50 transition-colors group"
+                                                            >
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className={`w-1.5 h-1.5 rounded-full ${tabAccess === 'full' ? 'bg-emerald-500' : tabAccess === 'readonly' ? 'bg-amber-500' : 'bg-red-400'}`} />
+                                                                    <span className="text-xs font-semibold text-slate-600">
+                                                                        ↳ {tab.name} {isInherited && <span className="text-[9px] text-slate-400 font-normal italic">(Herdado)</span>}
+                                                                    </span>
+                                                                </div>
+                                                                <button
+                                                                    onClick={() => handleToggleTabAccess(mod.id, tab.id, access)}
+                                                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[10px] font-bold transition-all hover:scale-105 active:scale-95 select-none cursor-pointer ${getAccessColor(tabAccess)}`}
+                                                                >
+                                                                    {getAccessIcon(tabAccess)}
+                                                                    {getAccessLabel(tabAccess)}
+                                                                </button>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </React.Fragment>
                                             );
                                         })}
                                     </div>
@@ -305,22 +355,45 @@ export const PermissoesManager: React.FC = () => {
                         </thead>
                         <tbody className="divide-y divide-slate-50">
                             {ALL_MODULES.map(mod => (
-                                <tr key={mod.id} className="hover:bg-slate-50/50 transition-colors">
-                                    <td className="p-3 pl-6 text-xs font-semibold text-slate-600 sticky left-0 bg-white z-10 border-r border-slate-100">
-                                        {mod.name}
-                                    </td>
-                                    {ALL_ROLES.map(role => {
-                                        const access = (permissions[role] || {})[mod.id] || 'none';
-                                        return (
-                                            <td key={role} className="p-2 text-center">
-                                                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold border ${getAccessColor(access)}`}>
-                                                    {getAccessIcon(access)}
-                                                    {access === 'full' ? 'L' : access === 'readonly' ? 'R' : 'B'}
-                                                </span>
+                                <React.Fragment key={mod.id}>
+                                    <tr className="hover:bg-slate-50/50 transition-colors">
+                                        <td className="p-3 pl-6 text-xs font-semibold text-slate-600 sticky left-0 bg-white z-10 border-r border-slate-100">
+                                            {mod.name}
+                                        </td>
+                                        {ALL_ROLES.map(role => {
+                                            const access = (permissions[role] || {})[mod.id] || 'none';
+                                            return (
+                                                <td key={role} className="p-2 text-center">
+                                                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold border ${getAccessColor(access)}`}>
+                                                        {getAccessIcon(access)}
+                                                        {access === 'full' ? 'L' : access === 'readonly' ? 'R' : 'B'}
+                                                    </span>
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+                                    {mod.tabs && mod.tabs.map(tab => (
+                                        <tr key={`${mod.id}:${tab.id}`} className="hover:bg-slate-50/30 transition-colors bg-slate-50/10">
+                                            <td className="p-2 pl-12 text-xs text-slate-500 sticky left-0 bg-slate-50/10 z-10 border-r border-slate-100">
+                                                ↳ {tab.name}
                                             </td>
-                                        );
-                                    })}
-                                </tr>
+                                            {ALL_ROLES.map(role => {
+                                                const rolePerms = permissions[role] || {};
+                                                const parentAccess = rolePerms[mod.id] || 'none';
+                                                const access = rolePerms[`${mod.id}:${tab.id}`] !== undefined
+                                                    ? rolePerms[`${mod.id}:${tab.id}`]
+                                                    : parentAccess;
+                                                return (
+                                                    <td key={role} className="p-1.5 text-center">
+                                                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold border ${getAccessColor(access)}`}>
+                                                            {access === 'full' ? 'L' : access === 'readonly' ? 'R' : 'B'}
+                                                        </span>
+                                                    </td>
+                                                );
+                                            })}
+                                        </tr>
+                                    ))}
+                                </React.Fragment>
                             ))}
                         </tbody>
                     </table>

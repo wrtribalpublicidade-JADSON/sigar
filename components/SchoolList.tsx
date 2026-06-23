@@ -6,6 +6,7 @@ import { exportToCSV, generateUUID } from '../utils';
 import { generateAcompanhamentoMensal } from '../constants';
 import { ConfirmModal } from './ui/ConfirmModal';
 import { Button, ActionButton } from './ui/Button';
+import { hasFullAccess } from '../utils/permissions';
 
 interface SchoolListProps {
   escolas: Escola[];
@@ -13,6 +14,7 @@ interface SchoolListProps {
   onSave: (escola: Escola) => void;
   onUpdate: (escola: Escola) => void;
   onDelete: (escolaId: string) => void;
+  userRole?: string;
 }
 
 const createEmptyNivel = (): DadosNivel => ({
@@ -77,7 +79,8 @@ const calcTotalAlunos = (escola: Escola): number => {
   return total;
 };
 
-export const SchoolList: React.FC<SchoolListProps> = ({ escolas, onSelectEscola, onSave, onUpdate, onDelete }) => {
+export const SchoolList: React.FC<SchoolListProps> = ({ escolas, onSelectEscola, onSave, onUpdate, onDelete, userRole }) => {
+  const canEdit = !userRole || userRole === 'Administrador' || hasFullAccess('LISTA_ESCOLAS', userRole);
   const [isRegistering, setIsRegistering] = useState(false);
   const [editingSchoolId, setEditingSchoolId] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -324,8 +327,8 @@ export const SchoolList: React.FC<SchoolListProps> = ({ escolas, onSelectEscola,
         icon={SchoolIcon}
         badgeText={`${escolas.length} Unidades Ativas`}
         actions={[
-          { label: 'Exportar', icon: Download, onClick: handleExport, variant: 'secondary' },
-          { label: 'Nova Escola', icon: Plus, onClick: () => setIsRegistering(true), variant: 'primary' }
+          { label: 'Exportar', icon: Download, onClick: handleExport, variant: 'secondary' as const },
+          ...(canEdit ? [{ label: 'Nova Escola', icon: Plus, onClick: () => setIsRegistering(true), variant: 'primary' as const }] : [])
         ]}
       />
 
@@ -422,10 +425,12 @@ export const SchoolList: React.FC<SchoolListProps> = ({ escolas, onSelectEscola,
               )}
               <div className="flex items-center justify-between mt-2 pt-2">
                 <span className="text-xs font-medium text-slate-500">{calcTotalAlunos(escola)} alunos</span>
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity transform translate-y-2 group-hover:translate-y-0 duration-200">
-                  <button onClick={e => handleEditClick(e, escola)} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition"><Edit2 size={16} /></button>
-                  <button onClick={e => handleDeleteClick(e, escola.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"><Trash2 size={16} /></button>
-                </div>
+                {canEdit && (
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity transform translate-y-2 group-hover:translate-y-0 duration-200">
+                    <button onClick={e => handleEditClick(e, escola)} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition" title="Editar"><Edit2 size={16} /></button>
+                    <button onClick={e => handleDeleteClick(e, escola.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="Excluir"><Trash2 size={16} /></button>
+                  </div>
+                )}
               </div>
             </div>
             <div className="h-1 bg-gradient-to-r from-orange-500 to-orange-600 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300" />
