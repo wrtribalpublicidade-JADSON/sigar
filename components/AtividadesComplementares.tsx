@@ -256,6 +256,14 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
             alert('Este estudante já está vinculado a esta turma.');
             return;
         }
+
+        // Check maximum capacity for linked activities
+        const fullActivities = linkedActivities.filter(atv => atv.inscritos >= atv.vagas);
+        if (fullActivities.length > 0) {
+            alert('A capacidade máxima da turma já foi atingida, e é necessário abrir uma nova turma para cadastrar os demais alunos.');
+            return;
+        }
+
         try {
             await turmaCompService.addStudentToTurma(selectedTurmaId, student.id);
             await handleSelectTurma(selectedTurmaId);

@@ -11,9 +11,10 @@ interface CoordinatorReportTabProps {
   visitas: Visita[];
   coordenadores: Coordenador[];
   onPrint?: (data: any[], filtroCoord: string, filtroRegional: string) => void;
+  canEdit?: boolean;
 }
 
-export const CoordinatorReportTab: React.FC<CoordinatorReportTabProps> = ({ escolas, visitas, coordenadores, onPrint }) => {
+export const CoordinatorReportTab: React.FC<CoordinatorReportTabProps> = ({ escolas, visitas, coordenadores, onPrint, canEdit = true }) => {
   const { showNotification } = useNotification();
   const [turmasCount, setTurmasCount] = useState<Record<string, number>>({});
   const [alunosCount, setAlunosCount] = useState<Record<string, number>>({});
@@ -354,7 +355,9 @@ export const CoordinatorReportTab: React.FC<CoordinatorReportTabProps> = ({ esco
         </div>
 
         <div className="flex items-end gap-2 text-sm">
-           <button onClick={handleExportCSV} className="flex-1 bg-white border border-slate-200 hover:border-orange-500 hover:text-orange-600 text-slate-600 py-2 px-4 rounded-xl flex items-center justify-center gap-2 font-bold transition-all"><Download className="w-4 h-4"/> CSV</button>
+           {canEdit && (
+              <button onClick={handleExportCSV} className="flex-1 bg-white border border-slate-200 hover:border-orange-500 hover:text-orange-600 text-slate-600 py-2 px-4 rounded-xl flex items-center justify-center gap-2 font-bold transition-all"><Download className="w-4 h-4"/> CSV</button>
+           )}
            <button onClick={handlePrint} className="flex-1 bg-white border border-slate-200 hover:border-orange-500 hover:text-orange-600 text-slate-600 py-2 px-4 rounded-xl flex items-center justify-center gap-2 font-bold transition-all"><Printer className="w-4 h-4"/> Imprimir</button>
         </div>
       </div>

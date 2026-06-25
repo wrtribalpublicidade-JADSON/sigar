@@ -160,6 +160,10 @@ export const DiarioAtividadeModal: React.FC<{
             alert('Este aluno já está vinculado a esta atividade.');
             return;
         }
+        if (atividade && students.length >= (atividade.vagas || 0)) {
+            alert('A capacidade máxima da turma já foi atingida, e é necessário abrir uma nova turma para cadastrar os demais alunos.');
+            return;
+        }
         if (!atividade?.id) return; // Added optional chaining check
         try {
             await activitiesService.enrollStudent(atividade?.id, student.id);

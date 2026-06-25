@@ -4,6 +4,7 @@ import { ChevronDown, ChevronRight, FileText, Calendar, Printer, CheckSquare, Al
 import { Visita, Escola, Coordenador, RecursoHumano } from '../types';
 import { exportToCSV } from '../utils';
 import { useNotification } from '../context/NotificationContext';
+import { hasTabAccess, hasFullTabAccess } from '../utils/permissions';
 import { PrintableGerencialReport, TipoRelatorio, FiltroVinculo, SubtipoGestor } from './PrintableGerencialReport';
 import { PrintableMatriculaReport } from './PrintableMatriculaReport';
 import { PrintableMatriculaDetalhadaReport } from './PrintableMatriculaDetalhadaReport';
@@ -17,6 +18,7 @@ interface ReportsModuleProps {
    visitas: Visita[];
    escolas: Escola[];
    coordenadores: Coordenador[];
+   userRole?: string;
 }
 
 type ReportTab = 'visita' | 'gerenciais' | 'matriculas' | 'servidores' | 'atividades' | 'coordenador';
@@ -27,9 +29,32 @@ interface ServidorCompleto extends RecursoHumano {
    escolaLocalizacao: string;
 }
 
-export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, coordenadores }) => {
+export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, coordenadores, userRole }) => {
    const { showNotification } = useNotification();
    const [activeTab, setActiveTab] = useState<ReportTab>('visita');
+
+   const visibleTabs = useMemo(() => {
+      const allTabs = [
+         { id: 'coordenador' as ReportTab, icon: ClipboardCheck, label: 'Atividades do Coordenador' },
+         { id: 'visita' as ReportTab, icon: FileText, label: 'Relatório de Visita' },
+         { id: 'gerenciais' as ReportTab, icon: BarChart3, label: 'Relatórios Gerenciais' },
+         { id: 'matriculas' as ReportTab, icon: GraduationCap, label: 'Controle de Matrículas' },
+         { id: 'servidores' as ReportTab, icon: Briefcase, label: 'Controle de Servidores' },
+         { id: 'atividades' as ReportTab, icon: BookOpen, label: 'Ativ. Complementares' },
+      ];
+      return allTabs.filter(tab => hasTabAccess('relatorios', tab.id, userRole));
+   }, [userRole]);
+
+   useEffect(() => {
+      if (visibleTabs.length > 0 && !visibleTabs.some(t => t.id === activeTab)) {
+         setActiveTab(visibleTabs[0].id);
+      }
+   }, [visibleTabs, activeTab]);
+
+   const canEditTab = useMemo(() => {
+      if (!userRole) return true;
+      return userRole === 'Administrador' || hasFullTabAccess('relatorios', activeTab, userRole);
+   }, [activeTab, userRole]);
 
    // === Visita Tab State ===
    const [selectedCoordId, setSelectedCoordId] = useState<string>('');
@@ -465,22 +490,21 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
             subtitle="Exportação e Auditoria de Visitas"
             icon={FileSpreadsheet}
             badgeText="Auditoria Técnica"
-            actions={activeTab === 'visita' ? [
-               { label: 'Exportar CSV', icon: Download, onClick: handleExport, variant: 'primary' },
-               { label: 'Imprimir', icon: Printer, onClick: handlePrint, variant: 'secondary' }
-            ] : []}
+            actions={activeTab === 'visita' ? (
+               canEditTab
+                  ? [
+                     { label: 'Exportar CSV', icon: Download, onClick: handleExport, variant: 'primary' as const },
+                     { label: 'Imprimir', icon: Printer, onClick: handlePrint, variant: 'secondary' as const }
+                  ]
+                  : [
+                     { label: 'Imprimir', icon: Printer, onClick: handlePrint, variant: 'secondary' as const }
+                  ]
+            ) : []}
          />
 
          {/* ====== TABS ====== */}
          <div className="flex gap-2 p-1 bg-slate-100 rounded-xl print:hidden">
-            {[
-               { id: 'coordenador' as ReportTab, icon: ClipboardCheck, label: 'Atividades do Coordenador' },
-               { id: 'visita' as ReportTab, icon: FileText, label: 'Relatório de Visita' },
-               { id: 'gerenciais' as ReportTab, icon: BarChart3, label: 'Relatórios Gerenciais' },
-               { id: 'matriculas' as ReportTab, icon: GraduationCap, label: 'Controle de Matrículas' },
-               { id: 'servidores' as ReportTab, icon: Briefcase, label: 'Controle de Servidores' },
-               { id: 'atividades' as ReportTab, icon: BookOpen, label: 'Ativ. Complementares' },
-            ].map(tab => (
+            {visibleTabs.map(tab => (
                <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
@@ -1225,12 +1249,14 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
 
                   {/* Action buttons */}
                   <div className="flex gap-3 justify-end">
-                     <button
-                        onClick={handleExportServidoresCSV}
-                        className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-6 py-3 rounded-xl font-bold shadow-sm transition-all flex items-center gap-2"
-                     >
-                        <Download className="w-5 h-5" /> Exportar CSV
-                     </button>
+                     {canEditTab && (
+                        <button
+                           onClick={handleExportServidoresCSV}
+                           className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-6 py-3 rounded-xl font-bold shadow-sm transition-all flex items-center gap-2"
+                        >
+                           <Download className="w-5 h-5" /> Exportar CSV
+                        </button>
+                     )}
                      <button
                         onClick={handlePrintServidores}
                         className="bg-cyan-600 hover:bg-cyan-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-cyan-500/20 transition-all flex items-center gap-2 whitespace-nowrap"
@@ -1435,12 +1461,14 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
                      >
                         <FileSpreadsheet className="w-5 h-5" /> {isLoadingAtividades ? 'Carregando...' : 'Atualizar Dados'}
                      </button>
-                     <button
-                        onClick={handleExportAtividadesCSV}
-                        className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-6 py-3 rounded-xl font-bold shadow-sm transition-all flex items-center gap-2"
-                     >
-                        <Download className="w-5 h-5" /> Exportar CSV
-                     </button>
+                     {canEditTab && (
+                        <button
+                           onClick={handleExportAtividadesCSV}
+                           className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-6 py-3 rounded-xl font-bold shadow-sm transition-all flex items-center gap-2"
+                        >
+                           <Download className="w-5 h-5" /> Exportar CSV
+                        </button>
+                     )}
                      <button
                         onClick={handlePrintAtividades}
                         className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-purple-500/20 transition-all flex items-center gap-2 whitespace-nowrap"
@@ -1619,6 +1647,7 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
                visitas={visitas}
                coordenadores={coordenadores}
                onPrint={handlePrintCoordinator}
+               canEdit={canEditTab}
             />
          )}
 

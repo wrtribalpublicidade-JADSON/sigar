@@ -1100,6 +1100,7 @@ export default function App() {
             visitas={visitas}
             escolas={escolas}
             coordenadores={coordenadores}
+            userRole={effectiveUser?.funcao}
           />
         );
       case 'INDICADORES':

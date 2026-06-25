@@ -76,7 +76,19 @@ export const ALL_MODULES = [
         ]
     },
     { id: 'equipe', name: 'Equipe / Gestão de Usuários', group: 'Gestão' },
-    { id: 'relatorios', name: 'Relatórios', group: 'Gestão' },
+    {
+        id: 'relatorios',
+        name: 'Relatórios',
+        group: 'Gestão',
+        tabs: [
+            { id: 'coordenador', name: 'Atividades do Coordenador' },
+            { id: 'visita', name: 'Relatório de Visita' },
+            { id: 'gerenciais', name: 'Relatórios Gerenciais' },
+            { id: 'matriculas', name: 'Controle de Matrículas' },
+            { id: 'servidores', name: 'Controle de Servidores' },
+            { id: 'atividades', name: 'Atividades Complementares' }
+        ]
+    },
     { id: 'indicadores', name: 'Indicadores', group: 'Gestão' },
     { id: 'instrumentais', name: 'Instrumentais de Gestão', group: 'Gestão' },
     { id: 'conselho', name: 'Conselho de Classe', group: 'Gestão' },
