@@ -274,3 +274,12 @@ export function hasTabAccess(parentModuleId: string, tabId: string, userRole?: s
 export function hasFullTabAccess(parentModuleId: string, tabId: string, userRole?: string): boolean {
     return getAccessForTab(parentModuleId, tabId, userRole) === 'full';
 }
+
+/**
+ * Normalize role string to match the casing in ALL_ROLES.
+ */
+export function normalizeRole(role?: string): any {
+    if (!role) return role;
+    const match = ALL_ROLES.find(r => r.toLowerCase() === role.toLowerCase());
+    return match || role;
+}

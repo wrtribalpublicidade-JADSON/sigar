@@ -9,6 +9,7 @@ import { exportToCSV, checkSchoolPendencies } from '../utils';
 import { ConfirmModal } from './ui/ConfirmModal';
 import { supabase } from '../services/supabase';
 import { useNotification } from '../context/NotificationContext';
+import { normalizeRole } from '../utils/permissions';
 
 interface CoordinatorsManagerProps {
   coordenadores: Coordenador[];
@@ -181,7 +182,7 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
   };
 
   const handleEdit = (coord: Coordenador) => {
-    setFormData({ ...coord, funcao: coord.funcao || 'Coordenador Regional' });
+    setFormData({ ...coord, funcao: normalizeRole(coord.funcao) || 'Coordenador Regional' });
     setViewSummaryCoord(null);
     setIsEditing(true);
   };

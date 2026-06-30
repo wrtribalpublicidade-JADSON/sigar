@@ -7,6 +7,7 @@ import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 import { ConfirmModal } from './ui/ConfirmModal';
 import { useNotification } from '../context/NotificationContext';
+import { normalizeRole } from '../utils/permissions';
 
 interface UserManagementProps {
     userEmail: string | null;
@@ -44,7 +45,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
         try {
             if (isDemoMode) {
                 setEscolas(appEscolas);
-                let mappedUsers = [...coordenadores];
+                let mappedUsers = coordenadores.map(u => ({ ...u, funcao: normalizeRole(u.funcao) }));
                 if (!isAdmin && currentUserRole === 'Coordenador Regional') {
                     const myProfile = mappedUsers.find(u => u.contato === userEmail);
                     if (myProfile) {
@@ -74,7 +75,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
                 nome: c.nome,
                 contato: c.contato,
                 regiao: c.regiao,
-                funcao: c.funcao,
+                funcao: normalizeRole(c.funcao),
                 status: c.status || 'Ativo',
                 escolasIds: c.coordenador_escolas?.map((ce: any) => ce.escola_id) || []
             })) || [];

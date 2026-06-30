@@ -40,7 +40,7 @@ import { ViewState, Escola, Visita, Coordenador, Segmento } from './types';
 import { supabase } from './services/supabase';
 import { useNotification } from './context/NotificationContext';
 import { generateUUID, checkSchoolPendencies } from './utils';
-import { hasAccess, hasFullAccess } from './utils/permissions';
+import { hasAccess, hasFullAccess, normalizeRole } from './utils/permissions';
 import { loadPermissions as preloadPermissions } from './services/permissoesService';
 import { ESCOLAS_MOCK, VISITAS_MOCK, COORDENADORES_MOCK } from './constants';
 import { igPlanoAcaoService } from './services/gestaoConselhoService';
@@ -99,7 +99,7 @@ export default function App() {
         nome: c.nome,
         contato: c.contato,
         regiao: c.regiao,
-        funcao: c.funcao, // Map function from DB
+        funcao: normalizeRole(c.funcao), // Map function from DB
         escolasIds: c.coordenador_escolas?.map((ce: any) => ce.escola_id) || [],
         created_at: c.created_at
       })) || [];
