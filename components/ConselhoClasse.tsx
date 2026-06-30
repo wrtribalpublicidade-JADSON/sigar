@@ -11,6 +11,7 @@ import { PrintableEncaminhamento } from './PrintableEncaminhamento';
 import { PrintableAcompanhamentoDocente } from './PrintableAcompanhamentoDocente';
 import { Escola, Segmento, Coordenador } from '../types';
 import { supabase } from '../services/supabase';
+import { hasTabAccess } from '../utils/permissions';
 
 
 export const BNCC_INFANTIL = {
@@ -131,7 +132,32 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     externalSelectedEscolaId,
     onEscolaChange
 }) => {
-    const [activeTab, setActiveTab] = useState<Tab>('estudantil');
+    const parentModuleId = forcedEtapa === 'infantil' ? 'conselho_infantil' : 'conselho_fundamental';
+    
+    const tabs = useMemo(() => [
+        { id: 'estudantil', label: 'Reunião Estudantil', icon: Users },
+        { id: 'avaliacao', label: 'Avaliação Docente', icon: BookOpen },
+        { id: 'acompanhamento', label: 'Acompanhamento Docente', icon: UserCheck },
+        { id: 'encaminhamentos', label: 'Encaminhamentos e Intervenções', icon: AlertTriangle }
+    ], []);
+
+    const filteredTabs = useMemo(() => {
+        return tabs.filter(t => 
+            isAdmin || hasTabAccess(parentModuleId, t.id, currentUser?.funcao)
+        );
+    }, [tabs, isAdmin, parentModuleId, currentUser]);
+
+    const [activeTab, setActiveTab] = useState<Tab>(() => {
+        const found = filteredTabs.find(t => t.id === 'estudantil');
+        return (found ? 'estudantil' : (filteredTabs[0]?.id || 'estudantil')) as Tab;
+    });
+
+    useEffect(() => {
+        if (filteredTabs.length > 0 && !filteredTabs.some(t => t.id === activeTab)) {
+            setActiveTab(filteredTabs[0].id as Tab);
+        }
+    }, [filteredTabs, activeTab]);
+
     const [isLoading, setIsLoading] = useState(true);
     const [selectedEscolaId, setSelectedEscolaId] = useState<string>(externalSelectedEscolaId || escolas[0]?.id || '');
     const [isPrintingReport, setIsPrintingReport] = useState(false);
@@ -1751,12 +1777,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         }
     };
 
-    const tabs = [
-        { id: 'estudantil', label: 'Reunião Estudantil', icon: Users },
-        { id: 'avaliacao', label: 'Avaliação Docente', icon: BookOpen },
-        { id: 'acompanhamento', label: 'Acompanhamento Docente', icon: UserCheck },
-        { id: 'encaminhamentos', label: 'Encaminhamentos e Intervenções', icon: AlertTriangle }
-    ];
+    
 
     React.useEffect(() => {
         const loadDocs = async () => {
@@ -1846,6 +1867,13 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     }, [selectedEscolaId, currentEscolaId, escolas, isAdmin]);
 
     const renderTabContent = () => {
+        if (filteredTabs.length === 0) {
+            return (
+                <div className="p-8 text-center text-slate-500 font-medium bg-white rounded-2xl border border-slate-200">
+                    Você não tem permissão para acessar nenhuma das abas deste Conselho de Classe.
+                </div>
+            );
+        }
         const isBemPequena = ['Creche II', 'Creche III'].includes(activeTurma?.anoSerie || '');
         const currentAgeGroup = isBemPequena ? 'Crianças bem pequenas' : 'Crianças pequenas';
         const currentObjectives = BNCC_INFANTIL[avaliacaoInfantilCampo.toUpperCase() as keyof typeof BNCC_INFANTIL]?.[currentAgeGroup as 'Crianças bem pequenas' | 'Crianças pequenas'] || [];
@@ -3993,7 +4021,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             />
 
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-6 flex flex-wrap gap-2">
-                {tabs.map(t => (
+                {filteredTabs.map(t => (
                     <button
                         key={t.id}
                         onClick={() => setActiveTab(t.id as Tab)}

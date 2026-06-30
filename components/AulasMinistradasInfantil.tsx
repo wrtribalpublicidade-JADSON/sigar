@@ -37,7 +37,7 @@ interface ClassLogInfantil {
   anoSerie: string;
   periodo: string;
   selectedHabilidadeIds: string[]; // ECE BNCC Objective codes
-  selectedObjetoIds?: string[]; // Linked Saberes e Conhecimentos IDs
+  selectedObjetoIds?: string[]; // Linked Campo de Experiência IDs
   criadoEm: string;
 }
 
@@ -425,7 +425,7 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
       
     let newContent = '';
     if (selectedObjs.length > 0) {
-      newContent += `Saberes e Conhecimentos:\n- ${selectedObjs.join('\n- ')}\n\n`;
+      newContent += `Campo de Experiência:\n- ${selectedObjs.join('\n- ')}\n\n`;
     }
     if (selectedHabs.length > 0) {
       newContent += `Objetivos de Aprendizagem:\n- ${selectedHabs.join(', ')}`;
@@ -938,10 +938,10 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Saberes e Conhecimentos Column */}
+                {/* Campo de Experiência Column */}
                 <div className="bg-white p-3 rounded-xl border border-slate-200 flex flex-col space-y-2">
                   <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-wider border-b pb-1.5 flex justify-between items-center">
-                    <span>Saberes e Conhecimentos ({planData.objetos.length})</span>
+                    <span>Campo de Experiência ({planData.objetos.length})</span>
                     {selectedObjetoIds.length > 0 && (
                       <span className="text-[9px] bg-brand-orange/15 text-brand-orange font-bold px-1.5 py-0.2 rounded-full">
                         {selectedObjetoIds.length} selecionado(s)

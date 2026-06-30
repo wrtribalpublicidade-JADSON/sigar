@@ -158,7 +158,7 @@ export const PlanoCursoInfantil: React.FC<PlanoCursoInfantilProps> = ({
       'Campo de experiência',
       'Bimestre / Período',
       'Direito de Aprendizagem',
-      'Saberes e Conhecimentos',
+      'Campo de Experiência',
       'Objetivos de Aprendizagem (Códigos separados por ;)',
       'Objetivos de Aprendizagem (Descrições separadas por ;)',
       'Sugestões Pedagógicas (Separadas por ;)'
@@ -171,7 +171,7 @@ export const PlanoCursoInfantil: React.FC<PlanoCursoInfantilProps> = ({
         'Campo de experiência': 'O eu, o outro e o nós',
         'Bimestre / Período': '1º Bimestre',
         'Direito de Aprendizagem': 'Brincar',
-        'Saberes e Conhecimentos': 'Demonstrar atitudes de cuidado e solidariedade na interação com crianças e adultos.',
+        'Campo de Experiência': 'Demonstrar atitudes de cuidado e solidariedade na interação com crianças e adultos.',
         'Objetivos de Aprendizagem (Códigos separados por ;)': 'EI02EO01; EI02EO02',
         'Objetivos de Aprendizagem (Descrições separadas por ;)': 'Demonstrar atitudes de cuidado e solidariedade na interação com crianças e adultos.; Demonstrar imagem positiva de si e confiança em sua capacidade para enfrentar dificuldades e desafios.',
         'Sugestões Pedagógicas (Separadas por ;)': 'Promover momentos de interação e acolhida.; Estimular a autonomia das crianças em pequenas ações diárias.'
@@ -187,7 +187,7 @@ export const PlanoCursoInfantil: React.FC<PlanoCursoInfantilProps> = ({
       { wch: 25 }, // Campo de experiência
       { wch: 20 }, // Bimestre / Periodo
       { wch: 25 }, // Direito de Aprendizagem
-      { wch: 30 }, // Saberes e Conhecimentos
+      { wch: 30 }, // Campo de Experiência
       { wch: 45 }, // Objetivos Codigos
       { wch: 60 }, // Objetivos Descricoes
       { wch: 60 }  // Sugestoes Pedagogicas
@@ -227,7 +227,12 @@ export const PlanoCursoInfantil: React.FC<PlanoCursoInfantilProps> = ({
         }> = {};
 
         rawRows.forEach((row: any) => {
-          const getValue = (keys: string[]) => {
+          const getValue = (keys: string[], exactKeys?: string[]) => {
+            if (exactKeys) {
+              for (const ek of exactKeys) {
+                if (row[ek] !== undefined) return row[ek];
+              }
+            }
             const foundKey = Object.keys(row).find(k => 
               keys.some(key => k.toLowerCase().replace(/[\s\-\_\/]/g, '').includes(key.toLowerCase().replace(/[\s\-\_\/]/g, '')))
             );
@@ -238,8 +243,8 @@ export const PlanoCursoInfantil: React.FC<PlanoCursoInfantilProps> = ({
           const anoSerieVal = String(getValue(['série', 'serie', 'ano/série', 'ano/serie']) || '').trim();
           const bimestreVal = String(getValue(['bimestre', 'período', 'periodo']) || '').trim();
           const direitoVal = String(getValue(['direito', 'eixo', 'temático', 'tematico']) || '').trim();
-          const campoVal = String(getValue(['saber', 'saberes', 'conhecimento', 'conhecimentos', 'campo', 'experiência', 'experiencia', 'objeto', 'conhecimento', 'objetos']) || '').trim();
-          const componenteVal = String(getValue(['componente', 'campoexperiência', 'campo_experiencia', 'campoexperiencia', 'experiência']) || 'O eu, o outro e o nós').trim();
+          const campoVal = String(getValue(['saber', 'saberes', 'conhecimento', 'conhecimentos', 'objeto', 'objetos'], ['Campo de Experiência', 'Saberes e Conhecimentos']) || '').trim();
+          const componenteVal = String(getValue(['componente', 'campoexperiência', 'campo_experiencia', 'campoexperiencia'], ['Campo de experiência']) || 'O eu, o outro e o nós').trim();
           const habsVal = String(
             getValue(['código', 'codigo', 'códigos', 'codigos', 'objetivo', 'objetivos']) || 
             ''
@@ -1463,14 +1468,14 @@ export const PlanoCursoInfantil: React.FC<PlanoCursoInfantilProps> = ({
                   {/* Campos de Experiência Panel */}
                   <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
                     <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider border-b pb-2 flex justify-between items-center">
-                      <span>Saberes e Conhecimentos ({item.objetos.length})</span>
+                      <span>Campo de Experiência ({item.objetos.length})</span>
                     </h4>
                     
                     <div className="flex gap-2">
                       <input
                         type="text"
                         id={`new-objeto-${item.id}`}
-                        placeholder="Novo saber ou conhecimento..."
+                        placeholder="Novo campo de experiência..."
                         onKeyDown={e => {
                           if (e.key === 'Enter') {
                             e.preventDefault();
@@ -1498,7 +1503,7 @@ export const PlanoCursoInfantil: React.FC<PlanoCursoInfantilProps> = ({
 
                     <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
                       {item.objetos.length === 0 ? (
-                        <p className="text-slate-400 text-xs italic text-center py-4">Nenhum saber adicionado.</p>
+                        <p className="text-slate-400 text-xs italic text-center py-4">Nenhum campo de experiência adicionado.</p>
                       ) : (
                         item.objetos.map((obj: ObjetoConhecimento) => (
                           <div key={obj.id} className="flex justify-between items-center bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 group">
@@ -1573,11 +1578,11 @@ export const PlanoCursoInfantil: React.FC<PlanoCursoInfantilProps> = ({
                     <div className="flex items-center gap-1.5 border-b pb-2 border-slate-100">
                       <Link2 className="w-4 h-4 text-brand-orange" />
                       <h4 className="text-xs font-black text-slate-700 uppercase tracking-tight">
-                        Associação de Saberes e Conhecimentos com Objetivos (Mapeamento N:N)
+                        Associação de Campo de Experiência com Objetivos (Mapeamento N:N)
                       </h4>
                     </div>
                     <p className="text-[10px] text-slate-400 italic">
-                      Vincule os objetivos correspondentes a cada saber ou conhecimento clicando sobre eles:
+                      Vincule os objetivos correspondentes a cada campo de experiência clicando sobre eles:
                     </p>
 
                     <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
@@ -1935,11 +1940,11 @@ export const PlanoCursoInfantil: React.FC<PlanoCursoInfantilProps> = ({
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                          Novo Saber ou Conhecimento
+                          Novo Campo de Experiência
                         </label>
                         <input
                           type="text"
-                          placeholder="Cadastrar novo saber/conhecimento e vincular a este objetivo..."
+                          placeholder="Cadastrar novo campo de experiência e vincular a este objetivo..."
                           value={newHabObjetoDesc}
                           onChange={e => setNewHabObjetoDesc(e.target.value)}
                           className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
@@ -2060,7 +2065,7 @@ export const PlanoCursoInfantil: React.FC<PlanoCursoInfantilProps> = ({
                             <div key={item.id || index} className="text-slate-800 flex flex-col gap-0.5">
                               <span className="font-bold text-slate-700">• {item.eixoTematico || 'Direito Geral'}</span>
                               <span className="text-[10px] text-slate-400 font-semibold pl-2.5">
-                                ({item.objetos?.length || 0} saberes, {item.habilidades?.length || 0} objetivos, {item.links?.length || 0} vínc.)
+                                ({item.objetos?.length || 0} campos de experiência, {item.habilidades?.length || 0} objetivos, {item.links?.length || 0} vínc.)
                               </span>
                             </div>
                           ))}

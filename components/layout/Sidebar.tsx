@@ -99,7 +99,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
         { icon: Library, label: 'Conselho - Fundamental', view: 'CONSELHO_CLASSE_FUNDAMENTAL' as ViewState },
         { icon: Baby, label: 'Conselho - Infantil', view: 'CONSELHO_CLASSE_INFANTIL' as ViewState },
         { icon: Bell, label: 'Notificações', view: 'NOTIFICACOES' as ViewState, isHighlighted: true, hasNotification: notificationCount > 0 },
-        { icon: Library, label: 'Atividades Complementares', view: 'ATIVIDADES_COMPLEMENTARES' as ViewState },
         { icon: Shield, label: 'Auditoria', view: 'AUDIT_LOGS' as ViewState },
         { icon: KeyRound, label: 'Permissões', view: 'PERMISSOES' as ViewState },
         { icon: Utensils, label: 'Merenda Escolar', view: 'MERENDA_ESCOLAR' as ViewState },
@@ -108,6 +107,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
     const diarioClasseNavItems = [
         { icon: ClipboardList, label: 'Ensino Fundamental', view: 'DIARIO_FUNDAMENTAL' as ViewState },
         { icon: Baby, label: 'Educação Infantil', view: 'DIARIO_INFANTIL' as ViewState },
+        { icon: Library, label: 'Atividades Complementares', view: 'ATIVIDADES_COMPLEMENTARES' as ViewState },
     ];
 
     // Filter items based on user role permissions (admins bypass)

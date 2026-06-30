@@ -13,9 +13,9 @@ const VIEW_TO_MODULE: Record<string, string> = {
     'RELATORIOS': 'relatorios',
     'INDICADORES': 'indicadores',
     'INSTRUMENTAIS_GESTAO': 'instrumentais',
-    'CONSELHO_CLASSE': 'conselho',
-    'CONSELHO_CLASSE_FUNDAMENTAL': 'conselho',
-    'CONSELHO_CLASSE_INFANTIL': 'conselho',
+    'CONSELHO_CLASSE': 'conselho_fundamental',
+    'CONSELHO_CLASSE_FUNDAMENTAL': 'conselho_fundamental',
+    'CONSELHO_CLASSE_INFANTIL': 'conselho_infantil',
     'NOTIFICACOES': 'notificacoes',
     'AUDIT_LOGS': 'auditoria',
     'NOVA_VISITA': 'registrar_visita',
@@ -24,13 +24,13 @@ const VIEW_TO_MODULE: Record<string, string> = {
     'ATIVIDADES_COMPLEMENTARES': 'atividades_comp',
     'GESTAO_ESTUDANTES': 'estudantes',
     'MERENDA_ESCOLAR': 'merenda',
-    'PLANO_CURSO': 'diario_classe',
-    'PLANO_AULA': 'diario_classe',
-    'AULAS_MINISTRADAS': 'diario_classe',
-    'FREQUENCIA': 'diario_classe',
-    'NOTAS': 'diario_classe',
-    'DIARIO_FUNDAMENTAL': 'diario_classe',
-    'DIARIO_INFANTIL': 'diario_classe',
+    'PLANO_CURSO': 'diario_fundamental',
+    'PLANO_AULA': 'diario_fundamental',
+    'AULAS_MINISTRADAS': 'diario_fundamental',
+    'FREQUENCIA': 'diario_fundamental',
+    'NOTAS': 'diario_fundamental',
+    'DIARIO_FUNDAMENTAL': 'diario_fundamental',
+    'DIARIO_INFANTIL': 'diario_infantil',
 };
 
 // Sidebar label → moduleId mapping
@@ -41,9 +41,9 @@ const SIDEBAR_LABEL_TO_MODULE: Record<string, string> = {
     'Relatórios': 'relatorios',
     'Indicadores': 'indicadores',
     'Instrumentais de Gestão': 'instrumentais',
-    'Conselho de Classe': 'conselho',
-    'Conselho - Fundamental': 'conselho',
-    'Conselho - Infantil': 'conselho',
+    'Conselho de Classe': 'conselho_fundamental',
+    'Conselho - Fundamental': 'conselho_fundamental',
+    'Conselho - Infantil': 'conselho_infantil',
     'Notificações': 'notificacoes',
     'Auditoria': 'auditoria',
     'Registrar Visita': 'registrar_visita',
@@ -51,13 +51,13 @@ const SIDEBAR_LABEL_TO_MODULE: Record<string, string> = {
     'Atividades Complementares': 'atividades_comp',
     'Estudantes': 'estudantes',
     'Merenda Escolar': 'merenda',
-    'Plano de Curso': 'diario_classe',
-    'Guia de Aprendizagem': 'diario_classe',
-    'Aulas ministradas': 'diario_classe',
-    'Frequencia': 'diario_classe',
-    'Notas': 'diario_classe',
-    'Ensino Fundamental': 'diario_classe',
-    'Educação Infantil': 'diario_classe',
+    'Plano de Curso': 'diario_fundamental',
+    'Guia de Aprendizagem': 'diario_fundamental',
+    'Aulas ministradas': 'diario_fundamental',
+    'Frequencia': 'diario_fundamental',
+    'Notas': 'diario_fundamental',
+    'Ensino Fundamental': 'diario_fundamental',
+    'Educação Infantil': 'diario_infantil',
 };
 
 export const ALL_MODULES = [
@@ -72,7 +72,8 @@ export const ALL_MODULES = [
             { id: 'detalhamento_turmas', name: 'Detalhamento de Turmas' },
             { id: 'rh', name: 'Recursos Humanos' },
             { id: 'plano', name: 'Plano de Ação' },
-            { id: 'visitas', name: 'Histórico' }
+            { id: 'visitas', name: 'Histórico' },
+            { id: 'documentos', name: 'Documentos' }
         ]
     },
     { id: 'equipe', name: 'Equipe / Gestão de Usuários', group: 'Gestão' },
@@ -91,14 +92,61 @@ export const ALL_MODULES = [
     },
     { id: 'indicadores', name: 'Indicadores', group: 'Gestão' },
     { id: 'instrumentais', name: 'Instrumentais de Gestão', group: 'Gestão' },
-    { id: 'conselho', name: 'Conselho de Classe', group: 'Gestão' },
+    {
+        id: 'conselho_fundamental',
+        name: 'Conselho de Classe - Ensino Fundamental',
+        group: 'Gestão',
+        tabs: [
+            { id: 'estudantil', name: 'Reunião Estudantil' },
+            { id: 'avaliacao', name: 'Avaliação Docente' },
+            { id: 'acompanhamento', name: 'Acompanhamento Docente' },
+            { id: 'encaminhamentos', name: 'Encaminhamentos e Intervenções' }
+        ]
+    },
+    {
+        id: 'conselho_infantil',
+        name: 'Conselho de Classe - Educação Infantil',
+        group: 'Gestão',
+        tabs: [
+            { id: 'estudantil', name: 'Reunião Estudantil' },
+            { id: 'avaliacao', name: 'Avaliação Docente' },
+            { id: 'acompanhamento', name: 'Acompanhamento Docente' },
+            { id: 'encaminhamentos', name: 'Encaminhamentos e Intervenções' }
+        ]
+    },
     { id: 'notificacoes', name: 'Notificações', group: 'Sistema' },
     { id: 'auditoria', name: 'Auditoria', group: 'Sistema' },
     { id: 'registrar_visita', name: 'Registrar Visita', group: 'Sistema' },
     { id: 'atividades_comp', name: 'Atividades Complementares', group: 'Gestão' },
     { id: 'estudantes', name: 'Gestão de Estudantes', group: 'Menu' },
     { id: 'merenda', name: 'Merenda Escolar', group: 'Gestão' },
-    { id: 'diario_classe', name: 'Diário de Classe', group: 'Gestão' },
+    {
+        id: 'diario_fundamental',
+        name: 'Diário de Classe - Ensino Fundamental',
+        group: 'Gestão',
+        tabs: [
+            { id: 'plano_curso', name: 'Plano de Curso' },
+            { id: 'plano_aula', name: 'Guia de Aprendizagem' },
+            { id: 'aulas_ministradas', name: 'Aulas Ministradas' },
+            { id: 'frequencia', name: 'Frequência' },
+            { id: 'notas', name: 'Notas' }
+        ]
+    },
+    {
+        id: 'diario_infantil',
+        name: 'Diário de Classe - Educação Infantil',
+        group: 'Gestão',
+        tabs: [
+            { id: 'plano_curso', name: 'Plano de Curso' },
+            { id: 'plano_aula', name: 'Guia de Aprendizagem' },
+            { id: 'aulas_ministradas', name: 'Aulas Ministradas' },
+            { id: 'portfolio_visual', name: 'Portfólio Visual' },
+            { id: 'parecer_descritivo', name: 'Parecer Descritivo' },
+            { id: 'frequencia', name: 'Frequência' },
+            { id: 'avaliacao_docente', name: 'Avaliação Docente' },
+            { id: 'painel_resultados', name: 'Painel de Resultados' }
+        ]
+    },
 ];
 
 export const ALL_ROLES = [
@@ -110,6 +158,7 @@ export const ALL_ROLES = [
     'Gestor Geral',
     'Gestor Pedagógico',
     'Auxiliar Administrativo',
+    'Monitor de Atividade Complementar',
 ];
 
 export const DEFAULT_PERMISSIONS: Record<string, Record<string, AccessLevel>> = {
@@ -118,12 +167,16 @@ export const DEFAULT_PERMISSIONS: Record<string, Record<string, AccessLevel>> = 
     'Técnico Pedagógico': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['equipe', 'auditoria'].includes(m.id) ? 'none' : 'full'])),
     'Professor': Object.fromEntries(ALL_MODULES.map(m => [
         m.id,
-        m.id === 'diario_classe' ? 'full' : ['dashboard', 'conselho', 'notificacoes', 'atividades_comp', 'estudantes'].includes(m.id) ? 'readonly' : 'none'
+        ['diario_fundamental', 'diario_infantil'].includes(m.id) ? 'full' : ['dashboard', 'conselho_fundamental', 'conselho_infantil', 'notificacoes', 'atividades_comp', 'estudantes'].includes(m.id) ? 'readonly' : 'none'
     ])),
     'Coordenador Pedagógico': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['auditoria', 'equipe'].includes(m.id) ? 'none' : 'full'])),
     'Gestor Geral': Object.fromEntries(ALL_MODULES.map(m => [m.id, m.id === 'auditoria' ? 'readonly' : 'full'])),
     'Gestor Pedagógico': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['auditoria', 'equipe'].includes(m.id) ? 'readonly' : 'full'])),
     'Auxiliar Administrativo': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['auditoria', 'equipe', 'indicadores'].includes(m.id) ? 'none' : 'full'])),
+    'Monitor de Atividade Complementar': Object.fromEntries(ALL_MODULES.map(m => [
+        m.id,
+        m.id === 'atividades_comp' ? 'full' : ['dashboard', 'estudantes'].includes(m.id) ? 'readonly' : 'none'
+    ])),
 };
 
 function loadPermissions(): Record<string, Record<string, AccessLevel>> {

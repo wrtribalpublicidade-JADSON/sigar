@@ -314,6 +314,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
                         <option value="Coordenador Pedagógico">Coordenador Pedagógico</option>
                         <option value="Técnico Pedagógico">Técnico Pedagógico</option>
                         <option value="Auxiliar Administrativo">Auxiliar Administrativo</option>
+                        <option value="Monitor de Atividade Complementar">Monitor de Atividade Complementar</option>
                     </select>
 
                     <select
@@ -500,7 +501,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
                                         value={editRole}
                                         onChange={(e) => setEditRole(e.target.value)}
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/20 text-slate-700"
-                                        disabled={!isAdmin && selectedUser.funcao === 'Administrador'} // Coordinators can't edit Admins
+                                        disabled={!isAdmin && (selectedUser.funcao === 'Administrador' || selectedUser.funcao === 'Coordenador Regional')} // Coordinators can't edit Admins or other Regional Coordinators
                                     >
                                         <option value="">Selecione um perfil</option>
                                         {isAdmin && <option value="Administrador">Administrador</option>}
@@ -509,6 +510,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
                                         <option value="Coordenador Pedagógico">Coordenador(a) Pedagógico (Local)</option>
                                         <option value="Técnico Pedagógico">Técnico Pedagógico</option>
                                         <option value="Auxiliar Administrativo">Auxiliar Administrativo</option>
+                                        <option value="Monitor de Atividade Complementar">Monitor de Atividade Complementar</option>
                                     </select>
                                 </div>
 

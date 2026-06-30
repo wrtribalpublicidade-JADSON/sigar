@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ArrowLeft, Target, TrendingUp, History, FileText, Save, Users, Calculator, Briefcase, Plus, Trash2, Edit, ClipboardCheck, AlertCircle, AlertTriangle, CheckCircle2, School as SchoolIcon, LayoutDashboard, GraduationCap, Clock, Activity, Award, BookOpen, UserPlus, X, MapPin, ChevronRight, CheckSquare, Printer } from 'lucide-react';
+import { ArrowLeft, Target, TrendingUp, History, FileText, Save, Users, Calculator, Briefcase, Plus, Trash2, Edit, ClipboardCheck, AlertCircle, AlertTriangle, CheckCircle2, School as SchoolIcon, LayoutDashboard, GraduationCap, Clock, Activity, Award, BookOpen, UserPlus, X, MapPin, ChevronRight, CheckSquare, Printer, Loader2 } from 'lucide-react';
 import { PageHeader } from './ui/PageHeader';
 import { PrintableVisitReport } from './PrintableVisitReport';
 import { PrintableRhReport } from './PrintableRhReport';
 import { PrintableChecklistReport } from './PrintableChecklistReport';
 import { PrintableCartaApresentacao } from './PrintableCartaApresentacao';
+import { PrintableSchoolDocument } from './PrintableSchoolDocument';
 import { hasTabAccess, hasFullTabAccess } from '../utils/permissions';
 import {
   BarChart,
@@ -19,7 +20,7 @@ import {
 import { generateUUID } from '../utils';
 import { generateAcompanhamentoMensal } from '../constants';
 import { Button } from './ui/Button';
-import { Escola, Visita, DadosEducacionais, ItemAcompanhamento, RecursoHumano, MetaAcao, StatusMeta, Coordenador, Segmento } from '../types';
+import { Escola, Visita, DadosEducacionais, ItemAcompanhamento, RecursoHumano, MetaAcao, StatusMeta, Coordenador, Segmento, Aluno } from '../types';
 import { igPlanoAcaoService } from '../services/gestaoConselhoService';
 import { supabase } from '../services/supabase';
  
@@ -66,10 +67,93 @@ const ETAPAS_COHORTS = [
 ];
 
 export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadores = [], historicoVisitas, onBack, onUpdate, onUpdateVisitStatus, isDemoMode, userRole }) => {
-  const [activeTab, setActiveTab] = useState<'plano' | 'visitas' | 'turmas' | 'rh' | 'acompanhamento' | 'detalhamento_turmas'>('acompanhamento');
+  const [activeTab, setActiveTab] = useState<'plano' | 'visitas' | 'turmas' | 'rh' | 'acompanhamento' | 'detalhamento_turmas' | 'documentos'>('acompanhamento');
   const [selectedVisitForPrint, setSelectedVisitForPrint] = useState<Visita | null>(null);
   const [selectedServidorForCarta, setSelectedServidorForCarta] = useState<RecursoHumano | null>(null);
   const [formData, setFormData] = useState<DadosEducacionais>(escola.dadosEducacionais);
+
+  // State for document generation
+  const [selectedDocType, setSelectedDocType] = useState<'notificacao_frequencia' | 'autorizacao_imagem'>('notificacao_frequencia');
+  const [docStudentId, setDocStudentId] = useState<string | number>('');
+  const [docResponsavelNome, setDocResponsavelNome] = useState('');
+  const [docResponsavelCpf, setDocResponsavelCpf] = useState('');
+  const [docResponsavelEndereco, setDocResponsavelEndereco] = useState('');
+  const [docResponsavelTelefone, setDocResponsavelTelefone] = useState('');
+  const [docFrequenciaAtual, setDocFrequenciaAtual] = useState<number>(70);
+  const [docTotalFaltas, setDocTotalFaltas] = useState<number>(15);
+  const [docDataAtendimento, setDocDataAtendimento] = useState<string>(
+    new Date(Date.now() + 86400000).toISOString().split('T')[0] // Tomorrow
+  );
+  const [docHorarioAtendimento, setDocHorarioAtendimento] = useState('09:00');
+  
+  // Printing states
+  const [students, setStudents] = useState<Aluno[]>([]);
+  const [loadingStudents, setLoadingStudents] = useState(false);
+  const [selectedStudentForPrint, setSelectedStudentForPrint] = useState<Aluno | null>(null);
+  const [printDocData, setPrintDocData] = useState<any>(null);
+  const [isPrintingDocument, setIsPrintingDocument] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'documentos') {
+      const fetchStudents = async () => {
+        setLoadingStudents(true);
+        try {
+          if (isDemoMode) {
+            // Generate 10 realistic mock students for this school
+            const mockStudents: Aluno[] = [
+              { id: 1, name: 'Arthur Silva Santos', stage: 'Creche II', status: 'Ativo', escola_id: escola.id },
+              { id: 2, name: 'Beatriz Ramos Lima', stage: '1º Ano', status: 'Ativo', escola_id: escola.id },
+              { id: 3, name: 'Carlos Eduardo Souza', stage: '5º Ano', status: 'Ativo', escola_id: escola.id },
+              { id: 4, name: 'Daniela Ferreira Costa', stage: '9º Ano', status: 'Ativo', escola_id: escola.id },
+              { id: 5, name: 'Gabriel Nascimento Rocha', stage: 'Creche III', status: 'Ativo', escola_id: escola.id },
+              { id: 6, name: 'Helena Mendes Abreu', stage: '2º Ano', status: 'Ativo', escola_id: escola.id },
+              { id: 7, name: 'Igor Miranda Alves', stage: '6º Ano', status: 'Ativo', escola_id: escola.id },
+              { id: 8, name: 'Julia Martins Oliveira', stage: 'Pré I', status: 'Ativo', escola_id: escola.id },
+              { id: 9, name: 'Lucas Pinheiro Castro', stage: '3º Ano', status: 'Ativo', escola_id: escola.id },
+              { id: 10, name: 'Mariana Santos Pereira', stage: 'Pré II', status: 'Ativo', escola_id: escola.id },
+            ];
+            setStudents(mockStudents);
+            return;
+          }
+
+          const { data, error } = await supabase
+            .from('alunos')
+            .select('*')
+            .eq('escola_id', escola.id)
+            .order('name', { ascending: true });
+
+          if (error) throw error;
+          setStudents(data || []);
+        } catch (err) {
+          console.error('Error fetching students:', err);
+        } finally {
+          setLoadingStudents(false);
+        }
+      };
+      fetchStudents();
+    }
+  }, [activeTab, escola.id, isDemoMode]);
+
+  const selectedStudentObj = useMemo(() => {
+    return students.find(s => String(s.id) === String(docStudentId)) || null;
+  }, [students, docStudentId]);
+
+  const handleGenerateDocument = () => {
+    if (!selectedStudentObj) return;
+    
+    setSelectedStudentForPrint(selectedStudentObj);
+    setPrintDocData({
+      responsavelNome: docResponsavelNome,
+      responsavelCpf: docResponsavelCpf,
+      responsavelEndereco: docResponsavelEndereco,
+      responsavelTelefone: docResponsavelTelefone,
+      frequenciaAtual: docFrequenciaAtual,
+      totalFaltas: docTotalFaltas,
+      dataAtendimento: docDataAtendimento,
+      horarioAtendimento: docHorarioAtendimento
+    });
+    setIsPrintingDocument(true);
+  };
 
   const visibleTabs = useMemo(() => {
     const allTabs = [
@@ -78,7 +162,8 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
       { id: 'detalhamento_turmas', icon: GraduationCap, label: 'Detalhamento de Turmas' },
       { id: 'rh', icon: Briefcase, label: 'Recursos Humanos' },
       { id: 'plano', icon: Target, label: 'Plano de Ação' },
-      { id: 'visitas', icon: History, label: 'Histórico' }
+      { id: 'visitas', icon: History, label: 'Histórico' },
+      { id: 'documentos', icon: FileText, label: 'Documentos' }
     ];
     return allTabs.filter(tab => hasTabAccess('escolas', tab.id, userRole));
   }, [userRole]);
@@ -1387,6 +1472,241 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
               </div>
             )
           }
+
+          {
+            activeTab === 'documentos' && (
+              <div className="space-y-6 animate-fade-in">
+                <div className="border-b border-slate-100 pb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-800 uppercase tracking-tight">Emissão de Documentos</h3>
+                    <p className="text-sm text-slate-500 mt-1">Gere notificações de frequência e autorizações oficiais</p>
+                  </div>
+                  <div className="flex bg-slate-100 p-1 rounded-xl w-fit border border-slate-200">
+                    <button
+                      onClick={() => setSelectedDocType('notificacao_frequencia')}
+                      className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
+                        selectedDocType === 'notificacao_frequencia'
+                          ? 'bg-white text-orange-600 shadow-sm'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      Notificação de Frequência
+                    </button>
+                    <button
+                      onClick={() => setSelectedDocType('autorizacao_imagem')}
+                      className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
+                        selectedDocType === 'autorizacao_imagem'
+                          ? 'bg-white text-orange-600 shadow-sm'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      Autorização de Imagem e Som
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Form Card */}
+                  <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
+                    <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b pb-3">
+                      {selectedDocType === 'notificacao_frequencia' 
+                        ? 'Dados da Notificação por Baixa Frequência' 
+                        : 'Dados do Termo de Autorização de Imagem/Som'}
+                    </h4>
+
+                    {loadingStudents ? (
+                      <div className="flex justify-center items-center py-12">
+                        <Loader2 className="w-8 h-8 text-brand-orange animate-spin" />
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {/* Student Selector */}
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                            Selecionar Estudante *
+                          </label>
+                          <select
+                            value={docStudentId}
+                            onChange={(e) => setDocStudentId(e.target.value)}
+                            className="w-full px-3 py-2.5 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+                          >
+                            <option value="">Selecione um estudante...</option>
+                            {students.map(student => (
+                              <option key={student.id} value={student.id}>
+                                {student.name} ({student.stage})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Common Fields */}
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                            Nome do Pai, Mãe ou Responsável Legal *
+                          </label>
+                          <input
+                            type="text"
+                            value={docResponsavelNome}
+                            onChange={(e) => setDocResponsavelNome(e.target.value)}
+                            placeholder="Nome completo do responsável"
+                            className="w-full px-3 py-2.5 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+                          />
+                        </div>
+
+                        {/* Attendance specific fields */}
+                        {selectedDocType === 'notificacao_frequencia' && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                Frequência Atual do Aluno (%) *
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={docFrequenciaAtual}
+                                onChange={(e) => setDocFrequenciaAtual(Number(e.target.value))}
+                                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                Total de Faltas Acumuladas *
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                value={docTotalFaltas}
+                                onChange={(e) => setDocTotalFaltas(Number(e.target.value))}
+                                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                Data de Comparecimento na Escola *
+                              </label>
+                              <input
+                                type="date"
+                                value={docDataAtendimento}
+                                onChange={(e) => setDocDataAtendimento(e.target.value)}
+                                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                Horário do Comparecimento *
+                              </label>
+                              <input
+                                type="time"
+                                value={docHorarioAtendimento}
+                                onChange={(e) => setDocHorarioAtendimento(e.target.value)}
+                                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Image authorization specific fields */}
+                        {selectedDocType === 'autorizacao_imagem' && (
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                  CPF do Responsável *
+                                </label>
+                                <input
+                                  type="text"
+                                  value={docResponsavelCpf}
+                                  onChange={(e) => setDocResponsavelCpf(e.target.value)}
+                                  placeholder="000.000.000-00"
+                                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                  Telefone de Contato *
+                                </label>
+                                <input
+                                  type="text"
+                                  value={docResponsavelTelefone}
+                                  onChange={(e) => setDocResponsavelTelefone(e.target.value)}
+                                  placeholder="(98) 99999-9999"
+                                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                Endereço Residencial Completo *
+                              </label>
+                              <input
+                                type="text"
+                                value={docResponsavelEndereco}
+                                onChange={(e) => setDocResponsavelEndereco(e.target.value)}
+                                placeholder="Rua, Número, Bairro, Cidade - MA"
+                                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="pt-4 flex justify-end">
+                          <button
+                            type="button"
+                            onClick={handleGenerateDocument}
+                            disabled={!docStudentId || !docResponsavelNome}
+                            className={`px-6 py-3 bg-brand-orange text-white rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-orange-600 shadow-sm transition-all ${
+                              (!docStudentId || !docResponsavelNome) ? 'opacity-50 cursor-not-allowed' : ''
+                            }`}
+                          >
+                            <Printer size={16} /> Emitir e Imprimir Documento
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Information / Preview panel */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 flex flex-col justify-between">
+                    <div>
+                      <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider border-b pb-3 mb-4">
+                        Orientações de Emissão
+                      </h4>
+                      {selectedDocType === 'notificacao_frequencia' ? (
+                        <div className="space-y-3 text-xs text-slate-600 leading-relaxed">
+                          <p>
+                            A <strong>Notificação por Baixa Frequência</strong> deve ser emitida para estudantes cuja frequência escolar acumulada esteja abaixo do mínimo constitucional exigido (75%).
+                          </p>
+                          <p>
+                            Este documento serve como a <strong>primeira notificação formal</strong> à família e integra o histórico do aluno de acordo com o estatuto da criança e do adolescente (ECA).
+                          </p>
+                          <p className="font-bold text-orange-600 bg-orange-50 p-2.5 rounded-lg border border-orange-100">
+                            Atenção: Caso o responsável não compareça ou não haja melhoria na frequência após a notificação, a escola deverá encaminhar a ficha FICAI ao Conselho Tutelar.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3 text-xs text-slate-600 leading-relaxed">
+                          <p>
+                            O <strong>Termo de Autorização de Imagem e Som</strong> é indispensável para todos os estudantes menores de idade.
+                          </p>
+                          <p>
+                            A escola só poderá veicular fotos, vídeos ou áudios dos estudantes em murais públicos, redes sociais ou materiais didáticos caso possua este termo devidamente assinado e arquivado na secretaria escolar.
+                          </p>
+                          <p className="font-bold text-slate-700 bg-white p-2.5 rounded-lg border border-slate-200">
+                            Recomendação: Colete esta autorização durante o ato de matrícula no início do ano letivo.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-8 border-t border-slate-200 pt-4 text-center">
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">SEMED - Humberto de Campos</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          }
         </div>
       </div>
 
@@ -1409,6 +1729,20 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
           escola={escola}
           servidor={selectedServidorForCarta}
           coordenadorRegional={regionalCoordinator}
+        />
+      )}
+
+      {isPrintingDocument && (
+        <PrintableSchoolDocument
+          documentType={selectedDocType}
+          student={selectedStudentForPrint}
+          escolaNome={escola.nome}
+          data={printDocData}
+          onClose={() => {
+            setIsPrintingDocument(false);
+            setSelectedStudentForPrint(null);
+            setPrintDocData(null);
+          }}
         />
       )}
     </div>

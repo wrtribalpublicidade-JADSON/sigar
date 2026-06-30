@@ -164,7 +164,7 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
   };
 
   // Roles available for Coordenador Regional to assign
-  const coordRoles = ['Gestor Geral', 'Gestor Pedagógico', 'Coordenador Pedagógico', 'Professor', 'Auxiliar Administrativo'];
+  const coordRoles = ['Gestor Geral', 'Gestor Pedagógico', 'Coordenador Pedagógico', 'Professor', 'Auxiliar Administrativo', 'Monitor de Atividade Complementar'];
 
   const handleCreate = () => {
     const defaultFuncao = isAdmin ? 'Coordenador Regional' : 'Gestor Geral';
@@ -359,7 +359,12 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
             </div>
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Função</label>
-              <select className="w-full rounded-xl border-slate-200 shadow-sm focus:border-orange-500 focus:ring-orange-500 border px-4 py-2.5" value={formData.funcao} onChange={e => setFormData({ ...formData, funcao: e.target.value as any })}>
+              <select
+                className="w-full rounded-xl border-slate-200 shadow-sm focus:border-orange-500 focus:ring-orange-500 border px-4 py-2.5"
+                value={formData.funcao}
+                onChange={e => setFormData({ ...formData, funcao: e.target.value as any })}
+                disabled={!isAdmin && (formData.funcao === 'Administrador' || formData.funcao === 'Coordenador Regional')}
+              >
                 {isAdmin ? (
                   <>
                     <option value="Coordenador Regional">Coordenador Regional</option>
@@ -370,6 +375,7 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
                     <option value="Gestor Geral">Gestor Geral</option>
                     <option value="Gestor Pedagógico">Gestor Pedagógico</option>
                     <option value="Auxiliar Administrativo">Auxiliar Administrativo</option>
+                    <option value="Monitor de Atividade Complementar">Monitor de Atividade Complementar</option>
                   </>
                 ) : (
                   <>
@@ -481,6 +487,7 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
           <option value="Professor">Professor</option>
           <option value="Técnico Pedagógico">Técnico Pedagógico</option>
           <option value="Auxiliar Administrativo">Auxiliar Administrativo</option>
+          <option value="Monitor de Atividade Complementar">Monitor de Atividade Complementar</option>
         </select>
 
         <select

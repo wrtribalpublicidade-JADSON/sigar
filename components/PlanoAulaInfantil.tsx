@@ -719,7 +719,7 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
             </div>
 
             <div>
-              <h3 className="font-bold border-b pb-1 mb-1 text-xs">Vivências / Saberes e Conhecimentos</h3>
+              <h3 className="font-bold border-b pb-1 mb-1 text-xs">Vivências / Campo de Experiência</h3>
               <p className="whitespace-pre-wrap">{printPlan.objetivos}</p>
             </div>
 
@@ -1128,7 +1128,7 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
                       <td className="px-6 py-3">
                         <div className="font-semibold text-slate-800 line-clamp-1">{plan.titulo}</div>
                         <div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">
-                          Saberes: {plan.objetivos}
+                          Campo de Experiência: {plan.objetivos}
                         </div>
                       </td>
                       <td className="px-6 py-3 text-right">
