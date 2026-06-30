@@ -364,7 +364,7 @@ export interface Coordenador {
   cpf?: string;
   contato: string; // Utilizado como E-mail principal/Autenticação
   regiao: string; // Ex: "Regional Sede", "Regional Litoral"
-  funcao?: 'Administrador' | 'Coordenador Regional' | 'Gestor' | 'Coordenador Pedagógico' | 'Técnico' | 'Gestor Geral' | 'Gestor Pedagógico' | 'Professor'; // Papel no sistema
+  funcao?: 'Administrador' | 'Coordenador Regional' | 'Gestor' | 'Coordenador Pedagógico' | 'Técnico' | 'Técnico Pedagógico' | 'Gestor Geral' | 'Gestor Pedagógico' | 'Professor' | 'Auxiliar Administrativo' | 'Monitor de Atividade Complementar'; // Papel no sistema
   status?: 'Ativo' | 'Inativo'; // Controle de acesso
   escolasIds: string[]; // Vínculo com escolas
   created_at?: string;

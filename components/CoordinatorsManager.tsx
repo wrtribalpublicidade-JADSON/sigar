@@ -96,6 +96,12 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
     : coordenadores.filter(c => {
       // Show users that share at least one school with the logged-in coordinator
       if (c.id === loggedInCoordId) return true; // always show self
+      
+      // Also show all Técnico Pedagógico users to Coordenador Regional
+      if (loggedInCoord?.funcao === 'Coordenador Regional' && c.funcao === 'Técnico Pedagógico') {
+        return true;
+      }
+      
       return c.escolasIds.some(eid => mySchoolIds.includes(eid));
     });
 

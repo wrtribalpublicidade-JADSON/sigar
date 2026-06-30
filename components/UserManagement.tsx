@@ -50,6 +50,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
                     if (myProfile) {
                         mappedUsers = mappedUsers.filter(u =>
                             u.id === myProfile.id ||
+                            u.funcao === 'Técnico Pedagógico' ||
                             u.escolasIds.some(eid => myProfile.escolasIds.includes(eid))
                         );
                     } else {
@@ -84,6 +85,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
                 if (myProfile) {
                     mappedUsers = mappedUsers.filter(u =>
                         u.id === myProfile.id ||
+                        u.funcao === 'Técnico Pedagógico' ||
                         u.escolasIds.some(eid => myProfile.escolasIds.includes(eid))
                     );
                 } else {
