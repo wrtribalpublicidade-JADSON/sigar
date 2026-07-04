@@ -70,6 +70,7 @@ export const ALL_MODULES = [
             { id: 'acompanhamento', name: 'Monitoramento' },
             { id: 'turmas', name: 'Turmas' },
             { id: 'detalhamento_turmas', name: 'Detalhamento de Turmas' },
+            { id: 'matriculas', name: 'Matrículas' },
             { id: 'rh', name: 'Recursos Humanos' },
             { id: 'plano', name: 'Plano de Ação' },
             { id: 'visitas', name: 'Histórico' },

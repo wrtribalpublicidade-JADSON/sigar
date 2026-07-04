@@ -168,6 +168,7 @@ export interface RecursoHumano {
    status: 'Ativo' | 'Inativo' | 'Transferido' | 'Desistente';
    observations?: string;
    professor_responsavel?: string;
+   ano_matricula?: number;
    created_at?: string;
  }
  

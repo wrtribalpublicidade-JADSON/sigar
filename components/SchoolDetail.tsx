@@ -1,8 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ArrowLeft, Target, TrendingUp, History, FileText, Save, Users, Calculator, Briefcase, Plus, Trash2, Edit, ClipboardCheck, AlertCircle, AlertTriangle, CheckCircle2, School as SchoolIcon, LayoutDashboard, GraduationCap, Clock, Activity, Award, BookOpen, UserPlus, X, MapPin, ChevronRight, CheckSquare, Printer, Loader2 } from 'lucide-react';
+import { ArrowLeft, Target, TrendingUp, History, FileText, Save, Users, Calculator, Briefcase, Plus, Trash2, Edit, ClipboardCheck, AlertCircle, AlertTriangle, CheckCircle2, School as SchoolIcon, LayoutDashboard, GraduationCap, Clock, Activity, Award, BookOpen, UserPlus, X, MapPin, ChevronRight, CheckSquare, Printer, Loader2, Search, RefreshCw } from 'lucide-react';
 import { PageHeader } from './ui/PageHeader';
 import { PrintableVisitReport } from './PrintableVisitReport';
 import { PrintableRhReport } from './PrintableRhReport';
+import { CadastroEstudanteModal } from './modals/CadastroEstudanteModal';
+import { CadastroTurmaModal } from './modals/CadastroTurmaModal';
 import { PrintableChecklistReport } from './PrintableChecklistReport';
 import { PrintableCartaApresentacao } from './PrintableCartaApresentacao';
 import { PrintableSchoolDocument } from './PrintableSchoolDocument';
@@ -67,10 +69,20 @@ const ETAPAS_COHORTS = [
 ];
 
 export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadores = [], historicoVisitas, onBack, onUpdate, onUpdateVisitStatus, isDemoMode, userRole }) => {
-  const [activeTab, setActiveTab] = useState<'plano' | 'visitas' | 'turmas' | 'rh' | 'acompanhamento' | 'detalhamento_turmas' | 'documentos'>('acompanhamento');
+  const [activeTab, setActiveTab] = useState<'plano' | 'visitas' | 'turmas' | 'rh' | 'acompanhamento' | 'detalhamento_turmas' | 'documentos' | 'matriculas'>('acompanhamento');
   const [selectedVisitForPrint, setSelectedVisitForPrint] = useState<Visita | null>(null);
   const [selectedServidorForCarta, setSelectedServidorForCarta] = useState<RecursoHumano | null>(null);
   const [formData, setFormData] = useState<DadosEducacionais>(escola.dadosEducacionais);
+
+  // State for Matriculas tab
+  const [searchTermMatriculas, setSearchTermMatriculas] = useState('');
+  const [stageFilterMatriculas, setStageFilterMatriculas] = useState('ALL');
+  const [statusFilterMatriculas, setStatusFilterMatriculas] = useState('ALL');
+  const [currentPageMatriculas, setCurrentPageMatriculas] = useState(1);
+  const [pageSizeMatriculas] = useState(10);
+  const [isCadastroModalOpen, setIsCadastroModalOpen] = useState(false);
+  const [isTurmaModalOpen, setIsTurmaModalOpen] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<Aluno | null>(null);
 
   // State for document generation
   const [selectedDocType, setSelectedDocType] = useState<'notificacao_frequencia' | 'autorizacao_imagem'>('notificacao_frequencia');
@@ -93,46 +105,52 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
   const [printDocData, setPrintDocData] = useState<any>(null);
   const [isPrintingDocument, setIsPrintingDocument] = useState(false);
 
+  const loadStudentsList = async () => {
+    if (!escola.id) return;
+    setLoadingStudents(true);
+    try {
+      if (isDemoMode) {
+        // Generate 10 realistic mock students for this school
+        const mockStudents: Aluno[] = [
+          { id: 1, name: 'Arthur Silva Santos', stage: 'Creche II', status: 'Ativo', escola_id: escola.id },
+          { id: 2, name: 'Beatriz Ramos Lima', stage: '1º Ano', status: 'Ativo', escola_id: escola.id },
+          { id: 3, name: 'Carlos Eduardo Souza', stage: '5º Ano', status: 'Ativo', escola_id: escola.id },
+          { id: 4, name: 'Daniela Ferreira Costa', stage: '9º Ano', status: 'Ativo', escola_id: escola.id },
+          { id: 5, name: 'Gabriel Nascimento Rocha', stage: 'Creche III', status: 'Ativo', escola_id: escola.id },
+          { id: 6, name: 'Helena Mendes Abreu', stage: '2º Ano', status: 'Ativo', escola_id: escola.id },
+          { id: 7, name: 'Igor Miranda Alves', stage: '6º Ano', status: 'Ativo', escola_id: escola.id },
+          { id: 8, name: 'Julia Martins Oliveira', stage: 'Pré I', status: 'Ativo', escola_id: escola.id },
+          { id: 9, name: 'Lucas Pinheiro Castro', stage: '3º Ano', status: 'Ativo', escola_id: escola.id },
+          { id: 10, name: 'Mariana Santos Pereira', stage: 'Pré II', status: 'Ativo', escola_id: escola.id },
+        ];
+        setStudents(mockStudents);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('alunos')
+        .select('*')
+        .eq('escola_id', escola.id)
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+      setStudents(data || []);
+    } catch (err) {
+      console.error('Error fetching students:', err);
+    } finally {
+      setLoadingStudents(false);
+    }
+  };
+
   useEffect(() => {
-    if (activeTab === 'documentos') {
-      const fetchStudents = async () => {
-        setLoadingStudents(true);
-        try {
-          if (isDemoMode) {
-            // Generate 10 realistic mock students for this school
-            const mockStudents: Aluno[] = [
-              { id: 1, name: 'Arthur Silva Santos', stage: 'Creche II', status: 'Ativo', escola_id: escola.id },
-              { id: 2, name: 'Beatriz Ramos Lima', stage: '1º Ano', status: 'Ativo', escola_id: escola.id },
-              { id: 3, name: 'Carlos Eduardo Souza', stage: '5º Ano', status: 'Ativo', escola_id: escola.id },
-              { id: 4, name: 'Daniela Ferreira Costa', stage: '9º Ano', status: 'Ativo', escola_id: escola.id },
-              { id: 5, name: 'Gabriel Nascimento Rocha', stage: 'Creche III', status: 'Ativo', escola_id: escola.id },
-              { id: 6, name: 'Helena Mendes Abreu', stage: '2º Ano', status: 'Ativo', escola_id: escola.id },
-              { id: 7, name: 'Igor Miranda Alves', stage: '6º Ano', status: 'Ativo', escola_id: escola.id },
-              { id: 8, name: 'Julia Martins Oliveira', stage: 'Pré I', status: 'Ativo', escola_id: escola.id },
-              { id: 9, name: 'Lucas Pinheiro Castro', stage: '3º Ano', status: 'Ativo', escola_id: escola.id },
-              { id: 10, name: 'Mariana Santos Pereira', stage: 'Pré II', status: 'Ativo', escola_id: escola.id },
-            ];
-            setStudents(mockStudents);
-            return;
-          }
-
-          const { data, error } = await supabase
-            .from('alunos')
-            .select('*')
-            .eq('escola_id', escola.id)
-            .order('name', { ascending: true });
-
-          if (error) throw error;
-          setStudents(data || []);
-        } catch (err) {
-          console.error('Error fetching students:', err);
-        } finally {
-          setLoadingStudents(false);
-        }
-      };
-      fetchStudents();
+    if (activeTab === 'documentos' || activeTab === 'matriculas') {
+      loadStudentsList();
     }
   }, [activeTab, escola.id, isDemoMode]);
+
+  useEffect(() => {
+    setCurrentPageMatriculas(1);
+  }, [searchTermMatriculas, stageFilterMatriculas, statusFilterMatriculas]);
 
   const selectedStudentObj = useMemo(() => {
     return students.find(s => String(s.id) === String(docStudentId)) || null;
@@ -160,6 +178,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
       { id: 'acompanhamento', icon: ClipboardCheck, label: 'Monitoramento' },
       { id: 'turmas', icon: CheckSquare, label: 'Turmas' },
       { id: 'detalhamento_turmas', icon: GraduationCap, label: 'Detalhamento de Turmas' },
+      { id: 'matriculas', icon: Users, label: 'Matrículas' },
       { id: 'rh', icon: Briefcase, label: 'Recursos Humanos' },
       { id: 'plano', icon: Target, label: 'Plano de Ação' },
       { id: 'visitas', icon: History, label: 'Histórico' },
@@ -255,44 +274,160 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
   const [schoolTurmas, setSchoolTurmas] = useState<any[]>([]);
   const [isLoadingTurmas, setIsLoadingTurmas] = useState(false);
 
-  useEffect(() => {
-    const fetchTurmas = async () => {
-      if (!escola.id || activeTab !== 'detalhamento_turmas') return;
-      setIsLoadingTurmas(true);
-      try {
-        if (isDemoMode) {
-          // Generate demo turmas for the school
-          const demoTurmas = [
-            { id: 'dt-1', stage: 'Educação Infantil', year: 'Creche II', name: 'Turma A', shift: 'MANHÃ', modality: 'REGULAR' },
-            { id: 'dt-2', stage: 'Educação Infantil', year: 'Pré-Escola I', name: 'Turma A', shift: 'MANHÃ', modality: 'REGULAR' },
-            { id: 'dt-3', stage: 'Educação Infantil', year: 'Pré-Escola I', name: 'Turma B', shift: 'TARDE', modality: 'REGULAR' },
-            { id: 'dt-4', stage: 'Anos Iniciais', year: '1º ANO', name: 'Turma A', shift: 'MANHÃ', modality: 'REGULAR' },
-            { id: 'dt-5', stage: 'Anos Iniciais', year: '2º ANO', name: 'Turma A', shift: 'MANHÃ', modality: 'REGULAR' },
-            { id: 'dt-6', stage: 'Anos Iniciais', year: '5º ANO', name: 'Turma B', shift: 'TARDE', modality: 'REGULAR' },
-            { id: 'dt-7', stage: 'Anos Finais', year: '6º ANO', name: 'Turma A', shift: 'MANHÃ', modality: 'REGULAR' },
-            { id: 'dt-8', stage: 'Anos Finais', year: '9º ANO', name: 'Turma A', shift: 'INTEGRAL', modality: 'REGULAR' },
-            { id: 'dt-9', stage: 'EJA', year: 'I ETAPA', name: 'Turma A', shift: 'NOITE', modality: 'REGULAR' }
-          ];
-          setSchoolTurmas(demoTurmas);
-        } else {
-          const { data, error } = await supabase
-            .from('turmas')
-            .select('*')
-            .eq('school_id', escola.id)
-            .order('name');
-          
-          if (error) throw error;
-          setSchoolTurmas(data || []);
-        }
-      } catch (err) {
-        console.error('Erro ao buscar turmas:', err);
-      } finally {
-        setIsLoadingTurmas(false);
+  const loadSchoolTurmas = async () => {
+    if (!escola.id) return;
+    setIsLoadingTurmas(true);
+    try {
+      if (isDemoMode) {
+        // Generate demo turmas for the school
+        const demoTurmas = [
+          { id: 'dt-1', stage: 'Educação Infantil', year: 'Creche II', name: 'Turma A', shift: 'MANHÃ', modality: 'REGULAR' },
+          { id: 'dt-2', stage: 'Educação Infantil', year: 'Pré-Escola I', name: 'Turma A', shift: 'MANHÃ', modality: 'REGULAR' },
+          { id: 'dt-3', stage: 'Educação Infantil', year: 'Pré-Escola I', name: 'Turma B', shift: 'TARDE', modality: 'REGULAR' },
+          { id: 'dt-4', stage: 'Anos Iniciais', year: '1º ANO', name: 'Turma A', shift: 'MANHÃ', modality: 'REGULAR' },
+          { id: 'dt-5', stage: 'Anos Iniciais', year: '2º ANO', name: 'Turma A', shift: 'MANHÃ', modality: 'REGULAR' },
+          { id: 'dt-6', stage: 'Anos Iniciais', year: '5º ANO', name: 'Turma B', shift: 'TARDE', modality: 'REGULAR' },
+          { id: 'dt-7', stage: 'Anos Finais', year: '6º ANO', name: 'Turma A', shift: 'MANHÃ', modality: 'REGULAR' },
+          { id: 'dt-8', stage: 'Anos Finais', year: '9º ANO', name: 'Turma A', shift: 'INTEGRAL', modality: 'REGULAR' },
+          { id: 'dt-9', stage: 'EJA', year: 'I ETAPA', name: 'Turma A', shift: 'NOITE', modality: 'REGULAR' }
+        ];
+        setSchoolTurmas(demoTurmas);
+      } else {
+        const { data, error } = await supabase
+          .from('turmas')
+          .select('*')
+          .eq('school_id', escola.id)
+          .order('name');
+        
+        if (error) throw error;
+        setSchoolTurmas(data || []);
       }
-    };
+    } catch (err) {
+      console.error('Erro ao buscar turmas:', err);
+    } finally {
+      setIsLoadingTurmas(false);
+    }
+  };
 
-    fetchTurmas();
+  useEffect(() => {
+    if (activeTab === 'detalhamento_turmas' || activeTab === 'matriculas') {
+      loadSchoolTurmas();
+    }
   }, [escola.id, activeTab, isDemoMode]);
+
+  const handleSaveTurma = async (turmaData: any) => {
+    try {
+      if (isDemoMode) {
+        alert('Turma salva (Simulado).');
+        setIsTurmaModalOpen(false);
+        return;
+      }
+
+      const payload = {
+        name: turmaData.identificacao,
+        stage: turmaData.etapa,
+        year: turmaData.anoSerie,
+        shift: turmaData.turno,
+        modality: turmaData.tipo,
+        school_id: escola.id
+      };
+
+      if (turmaData.id) {
+        const { error } = await supabase.from('turmas').update(payload).eq('id', turmaData.id);
+        if (error) throw error;
+        alert('Turma atualizada com sucesso!');
+      } else {
+        const { error } = await supabase.from('turmas').insert([payload]);
+        if (error) throw error;
+        alert('Nova turma cadastrada com sucesso!');
+      }
+
+      setIsTurmaModalOpen(false);
+      loadSchoolTurmas();
+    } catch (error) {
+      console.error(error);
+      alert('Erro ao salvar turma.');
+    }
+  };
+
+  const handleDeleteTurma = async (id: string) => {
+    if (!confirm('Deseja realmente remover esta turma?')) return;
+    try {
+      const { error } = await supabase.from('turmas').delete().eq('id', id);
+      if (error) throw error;
+      alert('Turma removida.');
+      loadSchoolTurmas();
+    } catch (error) {
+      console.error(error);
+      alert('Erro ao excluir turma.');
+    }
+  };
+
+  const handleDeleteStudent = async (id: number) => {
+    if (!confirm('Deseja realmente remover este registro?')) return;
+    try {
+      if (isDemoMode) {
+        alert('Remoção simulada.');
+        setStudents(prev => prev.filter(s => s.id !== id));
+        return;
+      }
+      const { error } = await supabase.from('alunos').delete().eq('id', id);
+      if (error) throw error;
+      alert('Estudante removido com sucesso.');
+      loadStudentsList();
+    } catch (error) {
+      console.error(error);
+      alert('Erro ao excluir registro.');
+    }
+  };
+
+  const stagesMatriculas = useMemo(() => {
+    const uniqueTurmas = new Set<string>();
+    schoolTurmas.forEach(t => {
+      const year = t.year || t.anoSerie;
+      const name = t.name || t.identificacao;
+      if (year && name) {
+        uniqueTurmas.add(`${year} - ${name}`);
+      }
+    });
+    return Array.from(uniqueTurmas).sort();
+  }, [schoolTurmas]);
+
+  const filteredStudentsMatriculas = useMemo(() => {
+    return students.filter(s => {
+      const nameMatch = s.name?.toLowerCase().includes(searchTermMatriculas.toLowerCase());
+      const cpfMatch = s.cpf?.includes(searchTermMatriculas);
+      const matchSearch = searchTermMatriculas === '' || nameMatch || cpfMatch;
+      
+      let matchStage = stageFilterMatriculas === 'ALL' || s.stage === stageFilterMatriculas;
+      if (stageFilterMatriculas !== 'ALL' && !matchStage && s.class_id) {
+        const turma = schoolTurmas.find(t => String(t.id) === String(s.class_id));
+        if (turma) {
+          const turmaInfo = `${turma.year || turma.anoSerie || ''} - ${turma.name || turma.identificacao || ''}`;
+          if ((turma.year || turma.anoSerie) === stageFilterMatriculas || turmaInfo === stageFilterMatriculas) {
+            matchStage = true;
+          }
+        }
+      }
+
+      const matchStatus = statusFilterMatriculas === 'ALL' || s.status === statusFilterMatriculas;
+      return matchSearch && matchStage && matchStatus;
+    });
+  }, [students, searchTermMatriculas, stageFilterMatriculas, statusFilterMatriculas, schoolTurmas]);
+
+  const paginatedStudentsMatriculas = useMemo(() => {
+    const startIndex = (currentPageMatriculas - 1) * pageSizeMatriculas;
+    return filteredStudentsMatriculas.slice(startIndex, startIndex + pageSizeMatriculas);
+  }, [filteredStudentsMatriculas, currentPageMatriculas, pageSizeMatriculas]);
+
+  const totalPagesMatriculas = Math.ceil(filteredStudentsMatriculas.length / pageSizeMatriculas) || 1;
+
+  const getStudentTurmaInfo = (classId?: string) => {
+    if (!classId) return '---';
+    const turma = schoolTurmas.find(t => String(t.id) === String(classId));
+    if (!turma) return '---';
+    return `${turma.year || turma.anoSerie || ''} - ${turma.name || turma.identificacao || ''}`;
+  };
 
   const visibleEtapas = useMemo(() => {
     return ETAPAS_COHORTS.filter(etapa => {
@@ -1707,6 +1842,200 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
               </div>
             )
           }
+
+          {
+            activeTab === 'matriculas' && (
+              <div className="space-y-6 animate-fade-in">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-5">
+                  <div>
+                    <h3 className="text-2xl font-bold text-slate-800">Controle de Matrículas</h3>
+                    <p className="text-slate-500 text-sm mt-1">
+                      Gerenciamento de alunos matriculados nesta unidade de ensino.
+                    </p>
+                  </div>
+                  {canEditTab && (
+                    <button
+                      onClick={() => { setSelectedStudent(null); setIsCadastroModalOpen(true); }}
+                      className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2"
+                    >
+                      <UserPlus size={18} /> Cadastrar Aluno
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex flex-col md:flex-row gap-4 items-center bg-white p-3 rounded-2xl border border-slate-200 shadow-sm transition-all duration-300">
+                  <div className="relative flex-1 w-full">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 transition-colors group-focus-within:text-orange-500" />
+                    <input 
+                      type="text" 
+                      placeholder="Buscar por nome ou CPF..."
+                      value={searchTermMatriculas}
+                      onChange={e => setSearchTermMatriculas(e.target.value)}
+                      className="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-100 bg-slate-50/50 focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all font-medium text-slate-700 text-sm"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 px-4 py-2.5 bg-orange-50 border border-orange-100 rounded-xl shrink-0">
+                    <Users className="w-4 h-4 text-orange-500" />
+                    <span className="text-xs font-black text-orange-600 uppercase tracking-wider whitespace-nowrap">
+                      {filteredStudentsMatriculas.length} {filteredStudentsMatriculas.length === 1 ? 'estudante' : 'estudantes'}
+                    </span>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                    <select 
+                      value={stageFilterMatriculas}
+                      onChange={e => setStageFilterMatriculas(e.target.value)}
+                      className="px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-600 outline-none focus:border-orange-500 focus:bg-white transition-all"
+                    >
+                      <option value="ALL">Todos os Anos / Séries</option>
+                      {stagesMatriculas.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+
+                    <select 
+                      value={statusFilterMatriculas}
+                      onChange={e => setStatusFilterMatriculas(e.target.value)}
+                      className="px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-600 outline-none focus:border-orange-500 focus:bg-white transition-all"
+                    >
+                      <option value="ALL">Todos os Status</option>
+                      <option value="Ativo">Ativo</option>
+                      <option value="Inativo">Inativo</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="overflow-hidden border border-slate-200 shadow-sm bg-white rounded-2xl">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead className="bg-slate-50 border-b border-slate-200 uppercase text-[10px] font-black text-slate-500 tracking-wider">
+                        <tr>
+                          <th className="px-6 py-4">Matrícula / Nome</th>
+                          <th className="px-6 py-4">CPF</th>
+                          <th className="px-6 py-4">Ano / Série</th>
+                          <th className="px-6 py-4 text-center">Etapa</th>
+                          <th className="px-6 py-4 text-center">Status</th>
+                          {canEditTab && <th className="px-6 py-4 text-right">Ações</th>}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {loadingStudents ? (
+                          <tr>
+                            <td colSpan={canEditTab ? 6 : 5} className="py-20 text-center text-slate-400">
+                              <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 opacity-20 text-orange-500" />
+                              <p className="font-bold text-sm tracking-wide">Sincronizando base de dados de alunos...</p>
+                            </td>
+                          </tr>
+                        ) : filteredStudentsMatriculas.length === 0 ? (
+                          <tr>
+                            <td colSpan={canEditTab ? 6 : 5} className="py-20 text-center text-slate-400">
+                              <Users className="w-12 h-12 mx-auto mb-4 opacity-10" />
+                              <p className="font-semibold text-sm">Nenhum aluno matriculado encontrado para os filtros atuais.</p>
+                            </td>
+                          </tr>
+                        ) : (
+                          paginatedStudentsMatriculas.map(student => (
+                            <tr key={student.id} className="hover:bg-slate-50/50 transition-colors group">
+                              <td className="px-6 py-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-400 text-xs uppercase">
+                                    {student.name?.charAt(0)}
+                                  </div>
+                                  <div>
+                                    <div className="font-bold text-slate-800 text-sm uppercase">{student.name}</div>
+                                    <div className="text-[10px] text-slate-400 font-bold uppercase mt-0.5 tracking-tighter">
+                                      MAT: {student.registration_number || '---'}
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="text-xs font-bold text-slate-500">{student.cpf || '---'}</div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="text-xs font-bold text-slate-600 uppercase">
+                                  {getStudentTurmaInfo(student.class_id)}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 text-center">
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black bg-indigo-50 text-indigo-600 border border-indigo-100 uppercase">
+                                  {student.stage}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-center">
+                                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase
+                                  ${(student.status as string === 'Ativo' || student.status as string === 'active') ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                  <span className={`w-1.5 h-1.5 rounded-full ${(student.status as string === 'Ativo' || student.status as string === 'active') ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                                  {(student.status as string === 'Ativo' || student.status as string === 'active') ? 'Ativo' : student.status}
+                                </span>
+                              </td>
+                              {canEditTab && (
+                                <td className="px-6 py-4 text-right">
+                                  <div className="flex items-center justify-end gap-1 opacity-20 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                      onClick={() => { setSelectedStudent(student); setIsCadastroModalOpen(true); }}
+                                      className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                                      title="Editar Aluno"
+                                    >
+                                      <Edit size={16} />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteStudent(student.id)}
+                                      className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                      title="Excluir Aluno"
+                                    >
+                                      <Trash2 size={16} />
+                                    </button>
+                                  </div>
+                                </td>
+                              )}
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Pagination */}
+                  {!loadingStudents && filteredStudentsMatriculas.length > 0 && (
+                    <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+                      <div className="text-xs font-bold text-slate-400 uppercase">
+                        Mostrando {paginatedStudentsMatriculas.length} de {filteredStudentsMatriculas.length} registros
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={currentPageMatriculas === 1}
+                          onClick={() => setCurrentPageMatriculas(p => Math.max(1, p - 1))}
+                          className={`px-4 py-2 rounded-xl text-xs font-black border border-slate-200 transition-all ${
+                            currentPageMatriculas === 1
+                              ? 'bg-slate-50 text-slate-300 cursor-not-allowed'
+                              : 'bg-white text-slate-600 shadow-sm hover:border-orange-500 hover:text-orange-500 active:scale-95'
+                          }`}
+                        >
+                          Anterior
+                        </button>
+                        <span className="text-xs font-bold text-slate-500 px-2 whitespace-nowrap">
+                          Página {currentPageMatriculas} de {totalPagesMatriculas}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={currentPageMatriculas >= totalPagesMatriculas}
+                          onClick={() => setCurrentPageMatriculas(p => Math.min(totalPagesMatriculas, p + 1))}
+                          className={`px-4 py-2 rounded-xl text-xs font-black border border-slate-200 transition-all ${
+                            currentPageMatriculas >= totalPagesMatriculas
+                              ? 'bg-slate-50 text-slate-300 cursor-not-allowed'
+                              : 'bg-white text-slate-600 shadow-sm hover:border-orange-500 hover:text-orange-500 active:scale-95'
+                          }`}
+                        >
+                          Próximo
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          }
         </div>
       </div>
 
@@ -1743,6 +2072,44 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
             setSelectedStudentForPrint(null);
             setPrintDocData(null);
           }}
+        />
+      )}
+
+      {isCadastroModalOpen && (
+        <CadastroEstudanteModal 
+          isOpen={isCadastroModalOpen}
+          onClose={() => setIsCadastroModalOpen(false)}
+          onSuccess={loadStudentsList}
+          escolas={[escola]}
+          initialStudent={selectedStudent}
+          onOpenTurmaModal={() => setIsTurmaModalOpen(true)}
+          context={{
+            schoolId: escola.id,
+            schoolName: escola.nome,
+            classId: '',
+            groupName: '',
+            responsibleName: '',
+            contextName: 'Controle de Matrículas'
+          }}
+        />
+      )}
+
+      {isTurmaModalOpen && (
+        <CadastroTurmaModal 
+          isOpen={isTurmaModalOpen}
+          onClose={() => setIsTurmaModalOpen(false)}
+          onSave={handleSaveTurma}
+          onDelete={handleDeleteTurma}
+          turmasExistentes={schoolTurmas.map(t => ({
+            id: t.id,
+            etapa: t.stage || (t.level === 'Infantil' ? 'Educação Infantil' : 'Anos Iniciais'),
+            anoSerie: t.year || t.name,
+            identificacao: t.name,
+            turno: t.shift || 'MANHÃ',
+            tipo: t.modality || 'REGULAR',
+            escolaId: t.school_id
+          }))}
+          escolas={[escola]}
         />
       )}
     </div>

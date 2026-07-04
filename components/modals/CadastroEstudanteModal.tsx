@@ -38,6 +38,7 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
     const [gender, setGender] = useState('');
     const [status, setStatus] = useState('Ativo');
     const [observations, setObservations] = useState('');
+    const [anoMatricula, setAnoMatricula] = useState<number>(2025);
     
     // Interactive context state
     const [selectedSchoolId, setSelectedSchoolId] = useState(context.schoolId);
@@ -170,7 +171,8 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
             stage: currentTurma.stage || currentTurma.year, 
             class_id: selectedTurmaId,
             escola_id: selectedSchoolId,
-            professor_responsavel: selectedResponsible
+            professor_responsavel: selectedResponsible,
+            ano_matricula: Number(anoMatricula)
         };
 
         try {
@@ -198,6 +200,7 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
         setGender(student.gender || '');
         setStatus(student.status || 'Ativo');
         setObservations(student.observations || '');
+        setAnoMatricula(student.ano_matricula || 2025);
         if (student.escola_id) setSelectedSchoolId(student.escola_id);
         if (student.class_id) setSelectedTurmaId(student.class_id);
         if (student.professor_responsavel) setSelectedResponsible(student.professor_responsavel);
@@ -224,6 +227,7 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
         setGender('');
         setStatus('Ativo');
         setObservations('');
+        setAnoMatricula(2025);
         setError(null);
     };
 
@@ -280,95 +284,6 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar bg-slate-50/30">
-                    {/* Interactive Context Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="cursor-pointer group relative">
-                            <ContextCard 
-                                icon={<div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-[10px] text-blue-600 font-bold">UE</div>} 
-                                label="Unidade Escolar" 
-                                value={escolas.find(e => e.id === selectedSchoolId)?.nome || context.schoolName} 
-                                isInteractive={true}
-                            />
-                            <select 
-                                value={selectedSchoolId}
-                                onChange={(e) => setSelectedSchoolId(e.target.value)}
-                                className="absolute inset-0 opacity-0 cursor-pointer w-full"
-                            >
-                                {escolas.map(e => (
-                                    <option key={e.id} value={e.id}>{e.nome}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className="cursor-pointer group relative">
-                            <ContextCard 
-                                icon={<div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center text-[10px] text-emerald-600 font-bold"><Users className="w-4 h-4" /></div>} 
-                                label="Professor Responsável" 
-                                value={selectedResponsible} 
-                                isInteractive={true}
-                            />
-                            <select 
-                                value={selectedResponsible}
-                                onChange={(e) => setSelectedResponsible(e.target.value)}
-                                className="absolute inset-0 opacity-0 cursor-pointer w-full"
-                                disabled={isLoadingTeachers}
-                            >
-                                <option value="">Selecione um professor...</option>
-                                {teachers.map((t, idx) => (
-                                    <option key={idx} value={t.nome}>{t.nome}</option>
-                                ))}
-                            </select>
-                            {isLoadingTeachers && (
-                                <div className="absolute right-12 top-1/2 -translate-y-1/2">
-                                    <div className="w-4 h-4 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="cursor-pointer group relative">
-                            <ContextCard 
-                                icon={<div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center text-[10px] text-orange-600 font-bold">TR</div>} 
-                                label="Turma/Grupo" 
-                                value={(() => {
-                                    const t = turmas.find(curr => curr.id === selectedTurmaId);
-                                    if (!t) return context.groupName;
-                                    return `${t.year || t.stage || ''} - ${t.name || ''}`.replace(/^ - | - $/, '');
-                                })()}
-                                isInteractive={true}
-                            />
-                            <select 
-                                value={selectedTurmaId}
-                                onChange={(e) => setSelectedTurmaId(e.target.value)}
-                                className="absolute inset-0 opacity-0 cursor-pointer w-full"
-                                disabled={isLoadingTurmas || (!!context.classId && !initialStudent)}
-                            >
-                                <option value="">Selecione uma turma...</option>
-                                {turmas.map(t => (
-                                    <option key={t.id} value={t.id}>
-                                        {t.year || t.stage || ''} - {t.name}
-                                    </option>
-                                ))}
-                            </select>
-                            {isLoadingTurmas && (
-                                <div className="absolute right-12 top-1/2 -translate-y-1/2">
-                                    <div className="w-4 h-4 border-2 border-orange-500/20 border-t-orange-500 rounded-full animate-spin"></div>
-                                </div>
-                            )}
-                            {/* Nova Turma Button */}
-                            <button 
-                                type="button"
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    onOpenTurmaModal();
-                                }}
-                                className="absolute -right-3 -top-3 w-10 h-10 bg-emerald-600 text-white rounded-2xl flex items-center justify-center shadow-xl hover:scale-110 active:scale-95 transition-all z-[20] border-4 border-white group/btn"
-                                title="Nova Turma"
-                            >
-                                <Plus className="w-5 h-5 group-hover/btn:rotate-90 transition-transform duration-300" />
-                            </button>
-                        </div>
-                    </div>
 
                     {/* Form Section - Full Width and Top */}
                     <div className="bg-white border border-slate-100 rounded-[2rem] p-8 shadow-sm relative overflow-hidden group/form">
@@ -386,7 +301,7 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
                                 </div>
                             )}
 
-                            <div>
+                             <div>
                                 <label className="block text-[11px] font-black tracking-widest text-slate-400 uppercase mb-3 ml-1">Nome Completo *</label>
                                 <input
                                     required
@@ -396,6 +311,82 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
                                     placeholder="Nome completo do estudante..."
                                     className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-base font-bold text-slate-700 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-300"
                                 />
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div>
+                                    <label className="block text-[11px] font-black tracking-widest text-slate-400 uppercase mb-3 ml-1">Unidade Escolar *</label>
+                                    <select
+                                        value={selectedSchoolId}
+                                        onChange={(e) => setSelectedSchoolId(e.target.value)}
+                                        className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-base font-bold text-slate-700 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all appearance-none"
+                                        disabled={!!context.schoolId && !id}
+                                    >
+                                        <option value="">Selecione...</option>
+                                        {escolas.map(e => (
+                                            <option key={e.id} value={e.id}>{e.nome}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-[11px] font-black tracking-widest text-slate-400 uppercase mb-3 ml-1">Professor Responsável</label>
+                                    <select
+                                        value={selectedResponsible}
+                                        onChange={(e) => setSelectedResponsible(e.target.value)}
+                                        className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-base font-bold text-slate-700 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all appearance-none"
+                                        disabled={isLoadingTeachers}
+                                    >
+                                        <option value="">Selecione...</option>
+                                        {teachers.map((t, idx) => (
+                                            <option key={idx} value={t.nome}>{t.nome}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                <div className="md:col-span-2">
+                                    <label className="block text-[11px] font-black tracking-widest text-slate-400 uppercase mb-3 ml-1">Turma / Grupo *</label>
+                                    <div className="flex gap-3">
+                                        <select
+                                            value={selectedTurmaId}
+                                            onChange={(e) => setSelectedTurmaId(e.target.value)}
+                                            className="flex-1 bg-white border border-slate-200 rounded-2xl px-6 py-4 text-base font-bold text-slate-700 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all appearance-none"
+                                            disabled={isLoadingTurmas || (!!context.classId && !id)}
+                                        >
+                                            <option value="">Selecione...</option>
+                                            {turmas.map(t => (
+                                                <option key={t.id} value={t.id}>
+                                                    {t.year || t.stage || ''} - {t.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <button 
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                onOpenTurmaModal();
+                                            }}
+                                            className="w-14 h-14 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl flex items-center justify-center shadow-lg transition-all shrink-0 active:scale-95"
+                                            title="Nova Turma"
+                                        >
+                                            <Plus className="w-6 h-6" />
+                                        </button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-[11px] font-black tracking-widest text-slate-400 uppercase mb-3 ml-1">Ano de Matrícula *</label>
+                                    <select
+                                        value={anoMatricula}
+                                        onChange={(e) => setAnoMatricula(Number(e.target.value))}
+                                        className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-base font-bold text-slate-700 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all appearance-none"
+                                    >
+                                        <option value={2024}>2024</option>
+                                        <option value={2025}>2025</option>
+                                        <option value={2026}>2026</option>
+                                        <option value={2027}>2027</option>
+                                    </select>
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -504,6 +495,7 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
                                         <tr className="bg-slate-50/50 border-b border-slate-100">
                                             <th className="px-8 py-6 text-[11px] font-black text-slate-400 uppercase tracking-widest">Estudante</th>
                                             <th className="px-8 py-6 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Nascimento</th>
+                                            <th className="px-8 py-6 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Ano Matrícula</th>
                                             <th className="px-8 py-6 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
                                             <th className="px-8 py-6 text-[11px] font-black text-slate-400 uppercase tracking-widest text-right">Ações</th>
                                         </tr>
@@ -511,14 +503,14 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
                                     <tbody className="divide-y divide-slate-100">
                                         {isLoading ? (
                                             <tr>
-                                                <td colSpan={4} className="px-8 py-24 text-center">
+                                                <td colSpan={5} className="px-8 py-24 text-center">
                                                     <div className="w-12 h-12 border-4 border-slate-100 border-t-emerald-600 rounded-full animate-spin mx-auto mb-6"></div>
                                                     <p className="text-sm font-bold text-slate-400 tracking-widest uppercase">Carregando estudantes...</p>
                                                 </td>
                                             </tr>
                                         ) : filteredStudents.length === 0 ? (
                                             <tr>
-                                                <td colSpan={4} className="px-8 py-24 text-center text-slate-400">
+                                                <td colSpan={5} className="px-8 py-24 text-center text-slate-400">
                                                     <Users className="w-16 h-16 mx-auto mb-6 opacity-5" />
                                                     <p className="text-sm font-black uppercase tracking-widest">Nenhum estudante encontrado</p>
                                                 </td>
@@ -547,6 +539,9 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
                                                     </td>
                                                     <td className="px-8 py-5 text-center text-xs font-bold text-slate-500">
                                                         {student.birth_date ? new Date(student.birth_date).toLocaleDateString() : '-'}
+                                                    </td>
+                                                    <td className="px-8 py-5 text-center text-xs font-bold text-slate-600">
+                                                        {student.ano_matricula || 2025}
                                                     </td>
                                                     <td className="px-8 py-5 text-center">
                                                         <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest shadow-sm ${student.status === 'Ativo' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
@@ -591,22 +586,4 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
     );
 };
 
-const ContextCard = ({ icon, label, value, isInteractive }: { icon: React.ReactNode, label: string, value: string, isInteractive?: boolean }) => (
-    <div className={`bg-white border border-slate-100 rounded-[2rem] p-6 flex items-center gap-5 transition-all duration-300 shadow-sm border-b-4 border-b-slate-50 relative group ${isInteractive ? 'hover:shadow-xl hover:-translate-y-1 hover:border-emerald-500/30' : ''}`}>
-        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-colors ${isInteractive ? 'bg-emerald-50 border border-emerald-100 group-hover:bg-emerald-500 group-hover:text-white' : 'bg-slate-50 border border-slate-100'}`}>
-            {icon}
-        </div>
-        <div className="overflow-hidden flex-1">
-            <span className="block text-[10px] font-black tracking-widest text-slate-400 uppercase mb-1.5 group-hover:text-emerald-600 transition-colors">{label}</span>
-            <span className="block text-base font-black text-slate-800 uppercase truncate group-hover:text-slate-900 transition-colors">{value || '-'}</span>
-        </div>
-        {isInteractive && (
-            <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100">
-                <Edit className="w-4 h-4 text-emerald-600" />
-            </div>
-        )}
-        <div className="absolute right-6 top-6 opacity-10 group-hover:opacity-20 transition-opacity">
-            <Lock className="w-4 h-4 text-slate-400" />
-        </div>
-    </div>
-);
+
