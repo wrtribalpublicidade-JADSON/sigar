@@ -11,6 +11,7 @@ import { activitiesService, Atividade } from '../services/activitiesService';
 import { supabase } from '../services/supabase';
 import { turmaCompService, TurmaComp } from '../services/turmaCompService';
 import { PrintableTurmaCompReport } from './PrintableTurmaCompReport';
+import { Coordenador } from '../types';
 
 interface Student {
     id: number;
@@ -46,9 +47,10 @@ const CATEGORIAS = [
 interface AtividadesComplementaresProps {
     userEscolaIds?: string[];
     escolaName?: string;
+    currentUser?: Coordenador | null;
 }
 
-export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> = ({ userEscolaIds, escolaName }) => {
+export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> = ({ userEscolaIds, escolaName, currentUser }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCat, setSelectedCat] = useState('todas');
     const [atividades, setAtividades] = useState<Atividade[]>([]);
@@ -118,10 +120,19 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
 
             if (alunosRes.error) throw alunosRes.error;
 
-            const turmasMap = new Map((turmasRes.data || []).map(t => [t.id, t]));
+            let filteredTurmas = turmasRes.data || [];
+            let filteredAlunos = alunosRes.data || [];
+
+            if (currentUser && currentUser.funcao === 'Professor') {
+                const assignedIds = currentUser.turmasIds || [];
+                filteredTurmas = filteredTurmas.filter(t => assignedIds.includes(t.id));
+                filteredAlunos = filteredAlunos.filter(a => a.class_id && assignedIds.includes(a.class_id));
+            }
+
+            const turmasMap = new Map(filteredTurmas.map(t => [t.id, t]));
             const escolasMap = new Map((escolasRes.data || []).map(e => [e.id, e]));
 
-            const mapped: Student[] = (alunosRes.data || []).map((a: any) => {
+            const mapped: Student[] = filteredAlunos.map((a: any) => {
                 const t = turmasMap.get(a.class_id);
                 const e = escolasMap.get(a.escola_id);
 

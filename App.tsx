@@ -91,7 +91,7 @@ export default function App() {
     setIsAdmin(isUserAdmin);
 
     try {
-      const { data: coordData, error: coordError } = await supabase.from('coordenadores').select('*, coordenador_escolas(escola_id)');
+      const { data: coordData, error: coordError } = await supabase.from('coordenadores').select('*, coordenador_escolas(escola_id), coordenador_turmas(turma_id)');
       if (coordError) throw coordError;
 
       const mappedCoords: Coordenador[] = coordData?.map((c: any) => ({
@@ -101,6 +101,7 @@ export default function App() {
         regiao: c.regiao,
         funcao: normalizeRole(c.funcao), // Map function from DB
         escolasIds: c.coordenador_escolas?.map((ce: any) => ce.escola_id) || [],
+        turmasIds: c.coordenador_turmas?.map((ct: any) => ct.turma_id) || [],
         created_at: c.created_at
       })) || [];
 
@@ -925,6 +926,36 @@ export default function App() {
     }
   };
 
+  const handleUpdateCoordenadorTurmas = async (coordenadorId: string, turmasIds: string[]) => {
+    if (isDemoMode) {
+      setCoordenadores(coordenadores.map(c => c.id === coordenadorId ? { ...c, turmasIds } : c));
+      showNotification('success', 'Vínculos de turmas atualizados (Demo).');
+      return;
+    }
+
+    try {
+      // Delete existing assignments for this coordinator
+      await supabase.from('coordenador_turmas').delete().eq('coordenador_id', coordenadorId);
+      
+      // Insert new ones
+      if (turmasIds.length > 0) {
+        const { error } = await supabase.from('coordenador_turmas').insert(
+          turmasIds.map(tid => ({ coordenador_id: coordenadorId, turma_id: tid }))
+        );
+        if (error) throw error;
+      }
+
+      await logAudit('UPDATE', 'COORDENADOR_TURMAS', coordenadorId, { turmasIds });
+
+      // Update local state
+      setCoordenadores(coordenadores.map(c => c.id === coordenadorId ? { ...c, turmasIds } : c));
+      showNotification('success', 'Vínculos de turmas atualizados com sucesso!');
+    } catch (error: any) {
+      console.error("Erro ao atualizar turmas do coordenador:", error);
+      showNotification('error', `Erro ao atualizar turmas: ${error.message || 'Desconhecido'}`);
+    }
+  };
+
   const renderContent = () => {
     // Enforce permissions — admins bypass
     const effectiveRole = isAdmin ? undefined : effectiveUser?.funcao;
@@ -968,6 +999,7 @@ export default function App() {
             onUpdateVisitStatus={handleUpdateVisitStatus}
             isDemoMode={isDemoMode}
             userRole={effectiveUser?.funcao}
+            onUpdateCoordenadorTurmas={handleUpdateCoordenadorTurmas}
           />
         );
       case 'NOVA_VISITA':
@@ -1187,6 +1219,7 @@ export default function App() {
             escolaName={effectiveUser?.escolasIds.length === 1 
               ? escolas.find(e => e.id === effectiveUser.escolasIds[0])?.nome 
               : undefined}
+            currentUser={effectiveUser || null}
           />
         );
       case 'GESTAO_ESTUDANTES':
@@ -1195,6 +1228,7 @@ export default function App() {
             escolas={escolas}
             isDemoMode={isDemoMode}
             isAdmin={isAdmin}
+            currentUser={effectiveUser || null}
           />
         );
       case 'MERENDA_ESCOLAR':

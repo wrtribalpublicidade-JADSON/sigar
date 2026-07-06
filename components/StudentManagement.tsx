@@ -7,7 +7,7 @@ import {
 import { CadastroEstudanteModal } from './modals/CadastroEstudanteModal';
 import { CadastroTurmaModal, TurmaData } from './modals/CadastroTurmaModal';
 import { ImportEstudantesModal } from './modals/ImportEstudantesModal';
-import { Aluno, Escola } from '../types';
+import { Aluno, Escola, Coordenador } from '../types';
 import { supabase } from '../services/supabase';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
@@ -17,9 +17,10 @@ interface StudentManagementProps {
   escolas: Escola[];
   isDemoMode: boolean;
   isAdmin: boolean;
+  currentUser?: Coordenador | null;
 }
 
-export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, isDemoMode, isAdmin }) => {
+export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, isDemoMode, isAdmin, currentUser }) => {
   const { showNotification } = useNotification();
   const [students, setStudents] = useState<Aluno[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -51,10 +52,15 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
     setIsLoading(true);
     try {
       if (isDemoMode) {
-        setStudents([
-          { id: 1, name: 'Estudante Exemplo A', stage: '1º Ano', status: 'Ativo', escola_id: escolas[0]?.id || '1' },
-          { id: 2, name: 'Estudante Exemplo B', stage: '5º Ano', status: 'Ativo', escola_id: escolas[1]?.id || '2' }
-        ] as Aluno[]);
+        let mockStudents = [
+          { id: 1, name: 'Estudante Exemplo A', stage: '1º Ano', status: 'Ativo', escola_id: escolas[0]?.id || '1', class_id: 'demo-t1' },
+          { id: 2, name: 'Estudante Exemplo B', stage: '5º Ano', status: 'Ativo', escola_id: escolas[1]?.id || '2', class_id: 'demo-t3' }
+        ] as Aluno[];
+        if (currentUser && currentUser.funcao === 'Professor') {
+          const assignedIds = currentUser.turmasIds || [];
+          mockStudents = mockStudents.filter(s => s.class_id && assignedIds.includes(s.class_id));
+        }
+        setStudents(mockStudents);
         return;
       }
 
@@ -95,7 +101,12 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
         }
       }
 
-      setStudents(allStudents);
+      let filteredStudents = allStudents;
+      if (currentUser && currentUser.funcao === 'Professor') {
+        const assignedIds = currentUser.turmasIds || [];
+        filteredStudents = allStudents.filter(s => s.class_id && assignedIds.includes(s.class_id));
+      }
+      setStudents(filteredStudents);
     } catch (error) {
       console.error(error);
       showNotification('error', 'Erro ao carregar estudantes.');
@@ -111,6 +122,20 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
 
   const loadTurmas = async () => {
     try {
+      if (isDemoMode) {
+        let demoTurmas: TurmaData[] = [
+          { id: 'demo-t1', etapa: 'Anos Iniciais', anoSerie: '1º Ano', identificacao: 'Turma A', turno: 'MANHÃ', tipo: 'REGULAR', escolaId: escolas[0]?.id || '1' },
+          { id: 'demo-t2', etapa: 'Anos Iniciais', anoSerie: '2º Ano', identificacao: 'Turma B', turno: 'TARDE', tipo: 'REGULAR', escolaId: escolas[0]?.id || '1' },
+          { id: 'demo-t3', etapa: 'Anos Iniciais', anoSerie: '5º Ano', identificacao: 'Turma A', turno: 'MANHÃ', tipo: 'REGULAR', escolaId: escolas[0]?.id || '1' },
+        ];
+        if (currentUser && currentUser.funcao === 'Professor') {
+          const assignedIds = currentUser.turmasIds || [];
+          demoTurmas = demoTurmas.filter(t => t.id && assignedIds.includes(t.id));
+        }
+        setTurmas(demoTurmas);
+        return;
+      }
+
       let query = supabase
         .from('turmas')
         .select('*')
@@ -128,7 +153,13 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
       const { data, error } = await query;
       if (error) throw error;
       
-      const formattedTurmas: TurmaData[] = (data || []).map(t => ({
+      let filteredData = data || [];
+      if (currentUser && currentUser.funcao === 'Professor') {
+        const assignedIds = currentUser.turmasIds || [];
+        filteredData = filteredData.filter((t: any) => assignedIds.includes(t.id));
+      }
+
+      const formattedTurmas: TurmaData[] = filteredData.map((t: any) => ({
         id: t.id,
         etapa: t.stage || (t.level === 'Infantil' ? 'Educação Infantil' : 'Anos Iniciais'),
         anoSerie: t.year || t.name,

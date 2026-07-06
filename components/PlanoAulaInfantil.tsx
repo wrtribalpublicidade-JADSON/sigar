@@ -180,19 +180,30 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
           .eq('stage', 'Educação Infantil'); // Only ECE classes
 
         if (error) throw error;
-        setTurmas(data || []);
+        
+        let filteredTurmas = data || [];
+        if (currentUser && currentUser.funcao === 'Professor') {
+          const assignedIds = currentUser.turmasIds || [];
+          filteredTurmas = filteredTurmas.filter((t: any) => assignedIds.includes(t.id));
+        }
+        setTurmas(filteredTurmas);
       } catch (err) {
         console.error('Erro ao buscar turmas:', err);
       }
     };
 
     if (isDemoMode) {
-      setTurmas([
+      let mockTurmas = [
         { id: 'demo-t1', name: 'Creche II A', year: 'Creche II', anoSerie: 'Creche II', shift: 'Matutino', stage: 'Educação Infantil' },
         { id: 'demo-t2', name: 'Creche III B', year: 'Creche III', anoSerie: 'Creche III', shift: 'Vespertino', stage: 'Educação Infantil' },
         { id: 'demo-t3', name: 'Pré I A', year: 'Pré-Escola I', anoSerie: 'Pré I', shift: 'Matutino', stage: 'Educação Infantil' },
         { id: 'demo-t4', name: 'Pré II B', year: 'Pré-Escola II', anoSerie: 'Pré II', shift: 'Vespertino', stage: 'Educação Infantil' },
-      ]);
+      ];
+      if (currentUser && currentUser.funcao === 'Professor') {
+        const assignedIds = currentUser.turmasIds || [];
+        mockTurmas = mockTurmas.filter(t => assignedIds.includes(t.id));
+      }
+      setTurmas(mockTurmas);
     } else {
       fetchTurmas();
     }
@@ -457,7 +468,13 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
 
           if (error) throw error;
 
-          const formatted: LessonPlanInfantil[] = (data || []).map(d => ({
+          let filteredPlansData = data || [];
+          if (currentUser && currentUser.funcao === 'Professor') {
+            const assignedIds = currentUser.turmasIds || [];
+            filteredPlansData = filteredPlansData.filter((d: any) => assignedIds.includes(d.turma_id));
+          }
+
+          const formatted: LessonPlanInfantil[] = filteredPlansData.map(d => ({
             id: d.id,
             data: d.data,
             escolaId: d.escola_id,

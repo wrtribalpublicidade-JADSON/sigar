@@ -115,12 +115,17 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
       }
 
       if (isDemoMode) {
-        setTurmas([
+        let mockTurmas = [
           { id: 'demo-t1', name: 'Maternal A', year: 'Maternal A', anoSerie: 'Creche II', shift: 'MANHÃ', stage: 'Educação Infantil' },
           { id: 'demo-t2', name: 'Creche III B', year: 'Creche III B', anoSerie: 'Creche III', shift: 'TARDE', stage: 'Educação Infantil' },
           { id: 'demo-t3', name: 'Pré I A', year: 'Pré I A', anoSerie: 'Pré I', shift: 'MANHÃ', stage: 'Educação Infantil' },
           { id: 'demo-t4', name: 'Pré II B', year: 'Pré II B', anoSerie: 'Pré II', shift: 'TARDE', stage: 'Educação Infantil' },
-        ]);
+        ];
+        if (currentUser && currentUser.funcao === 'Professor') {
+          const assignedIds = currentUser.turmasIds || [];
+          mockTurmas = mockTurmas.filter(t => assignedIds.includes(t.id));
+        }
+        setTurmas(mockTurmas);
         return;
       }
 
@@ -133,7 +138,13 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
           .order('name');
 
         if (error) throw error;
-        setTurmas(data || []);
+        
+        let filteredTurmas = data || [];
+        if (currentUser && currentUser.funcao === 'Professor') {
+          const assignedIds = currentUser.turmasIds || [];
+          filteredTurmas = filteredTurmas.filter((t: any) => assignedIds.includes(t.id));
+        }
+        setTurmas(filteredTurmas);
       } catch (err) {
         console.error('Erro ao buscar turmas ECE:', err);
       }
@@ -283,7 +294,13 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
 
         if (error) throw error;
 
-        const formatted: PortfolioEntry[] = (data || []).map(d => {
+        let filteredData = data || [];
+        if (currentUser && currentUser.funcao === 'Professor') {
+          const assignedIds = currentUser.turmasIds || [];
+          filteredData = filteredData.filter((d: any) => assignedIds.includes(d.turma_id));
+        }
+
+        const formatted: PortfolioEntry[] = filteredData.map(d => {
           const classObj = turmas.find(t => t.id === d.turma_id);
           const studentObj = students.find(s => s.id === d.aluno_id);
           return {

@@ -338,7 +338,13 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
         });
       }
 
-      const formattedPlans: LessonPlan[] = (data || []).map((p: any) => {
+      let filteredPlansData = data || [];
+      if (currentUser && currentUser.funcao === 'Professor') {
+        const assignedIds = currentUser.turmasIds || [];
+        filteredPlansData = filteredPlansData.filter((p: any) => assignedIds.includes(p.turma_id));
+      }
+
+      const formattedPlans: LessonPlan[] = filteredPlansData.map((p: any) => {
         const escolaObj = escolas.find(esc => esc.id === p.escola_id);
         const escolaNome = escolaObj ? escolaObj.nome : 'Unidade';
         const turmaNome = turmaMap.get(p.turma_id) || 'Turma';
@@ -401,11 +407,16 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       }
 
       if (isDemoMode) {
-        setTurmas([
+        let mockTurmas = [
           { id: 'demo-t1', name: '1º ANO A', year: '1º Ano', shift: 'MANHÃ' },
           { id: 'demo-t2', name: '2º ANO B', year: '2º Ano', shift: 'TARDE' },
           { id: 'demo-t3', name: '5º ANO A', year: '5º Ano', shift: 'MANHÃ' },
-        ]);
+        ];
+        if (currentUser && currentUser.funcao === 'Professor') {
+          const assignedIds = currentUser.turmasIds || [];
+          mockTurmas = mockTurmas.filter(t => assignedIds.includes(t.id));
+        }
+        setTurmas(mockTurmas);
         return;
       }
 
@@ -417,7 +428,13 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
           .order('name');
 
         if (error) throw error;
-        setTurmas(data || []);
+        
+        let filteredTurmas = data || [];
+        if (currentUser && currentUser.funcao === 'Professor') {
+          const assignedIds = currentUser.turmasIds || [];
+          filteredTurmas = filteredTurmas.filter((t: any) => assignedIds.includes(t.id));
+        }
+        setTurmas(filteredTurmas);
       } catch (err) {
         console.error('Erro ao carregar turmas:', err);
       }

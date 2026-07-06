@@ -74,7 +74,8 @@ export const ALL_MODULES = [
             { id: 'rh', name: 'Recursos Humanos' },
             { id: 'plano', name: 'Plano de Ação' },
             { id: 'visitas', name: 'Histórico' },
-            { id: 'documentos', name: 'Documentos' }
+            { id: 'documentos', name: 'Documentos' },
+            { id: 'professores', name: 'Professores' }
         ]
     },
     { id: 'equipe', name: 'Equipe / Gestão de Usuários', group: 'Gestão' },

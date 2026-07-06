@@ -92,12 +92,17 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
       }
 
       if (isDemoMode) {
-        setTurmas([
+        let mockTurmas = [
           { id: 'demo-t1', name: 'Maternal A', year: 'Maternal A', anoSerie: 'Creche II', school_id: selectedEscolaId, shift: 'MANHÃ', stage: 'Educação Infantil' },
           { id: 'demo-t2', name: 'Creche III B', year: 'Creche III B', anoSerie: 'Creche III', school_id: selectedEscolaId, shift: 'TARDE', stage: 'Educação Infantil' },
           { id: 'demo-t3', name: 'Pré I A', year: 'Pré I A', anoSerie: 'Pré I', school_id: selectedEscolaId, shift: 'MANHÃ', stage: 'Educação Infantil' },
           { id: 'demo-t4', name: 'Pré II B', year: 'Pré II B', anoSerie: 'Pré II', school_id: selectedEscolaId, shift: 'TARDE', stage: 'Educação Infantil' },
-        ]);
+        ];
+        if (currentUser && currentUser.funcao === 'Professor') {
+          const assignedIds = currentUser.turmasIds || [];
+          mockTurmas = mockTurmas.filter(t => assignedIds.includes(t.id));
+        }
+        setTurmas(mockTurmas);
         return;
       }
 
@@ -110,7 +115,13 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
           .order('name');
 
         if (error) throw error;
-        setTurmas(data || []);
+        
+        let filteredTurmas = data || [];
+        if (currentUser && currentUser.funcao === 'Professor') {
+          const assignedIds = currentUser.turmasIds || [];
+          filteredTurmas = filteredTurmas.filter((t: any) => assignedIds.includes(t.id));
+        }
+        setTurmas(filteredTurmas);
       } catch (err) {
         console.error('Erro ao buscar turmas ECE:', err);
       }
@@ -234,7 +245,13 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
 
           if (error) throw error;
 
-          const formatted: AttendanceSheetInfantil[] = (data || []).map(d => ({
+          let filteredSheetsData = data || [];
+          if (currentUser && currentUser.funcao === 'Professor') {
+            const assignedIds = currentUser.turmasIds || [];
+            filteredSheetsData = filteredSheetsData.filter((d: any) => assignedIds.includes(d.turma_id));
+          }
+
+          const formatted: AttendanceSheetInfantil[] = filteredSheetsData.map(d => ({
             id: d.id,
             data: d.data,
             escolaId: d.escola_id,

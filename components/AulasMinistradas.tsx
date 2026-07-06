@@ -132,7 +132,13 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
         });
       }
 
-      const formatted: ClassLog[] = (data || []).map((p: any) => {
+      let filteredLogs = data || [];
+      if (currentUser && currentUser.funcao === 'Professor') {
+        const assignedIds = currentUser.turmasIds || [];
+        filteredLogs = filteredLogs.filter((p: any) => assignedIds.includes(p.turma_id));
+      }
+
+      const formatted: ClassLog[] = filteredLogs.map((p: any) => {
         const escolaObj = escolas.find(esc => esc.id === p.escola_id);
         const escolaNome = escolaObj ? escolaObj.nome : 'Unidade';
         const turmaNome = turmaMap.get(p.turma_id) || 'Turma';
@@ -491,11 +497,16 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
       }
 
       if (isDemoMode) {
-        setTurmas([
+        let mockTurmas = [
           { id: 'demo-t1', name: '1º ANO A', year: '1º Ano', shift: 'MANHÃ' },
           { id: 'demo-t2', name: '2º ANO B', year: '2º Ano', shift: 'TARDE' },
           { id: 'demo-t3', name: '5º ANO A', year: '5º Ano', shift: 'MANHÃ' },
-        ]);
+        ];
+        if (currentUser && currentUser.funcao === 'Professor') {
+          const assignedIds = currentUser.turmasIds || [];
+          mockTurmas = mockTurmas.filter(t => assignedIds.includes(t.id));
+        }
+        setTurmas(mockTurmas);
         return;
       }
 
@@ -507,7 +518,13 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
           .order('name');
 
         if (error) throw error;
-        setTurmas(data || []);
+        
+        let filteredTurmas = data || [];
+        if (currentUser && currentUser.funcao === 'Professor') {
+          const assignedIds = currentUser.turmasIds || [];
+          filteredTurmas = filteredTurmas.filter((t: any) => assignedIds.includes(t.id));
+        }
+        setTurmas(filteredTurmas);
       } catch (err) {
         console.error('Erro ao carregar turmas:', err);
       }

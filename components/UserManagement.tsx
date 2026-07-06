@@ -65,7 +65,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
             // Fetch users from coordenadores table
             const { data: coordData, error: coordError } = await supabase
                 .from('coordenadores')
-                .select('*, coordenador_escolas(escola_id)');
+                .select('*, coordenador_escolas(escola_id), coordenador_turmas(turma_id)');
 
             if (coordError) throw coordError;
 
@@ -77,7 +77,8 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
                 regiao: c.regiao,
                 funcao: normalizeRole(c.funcao),
                 status: c.status || 'Ativo',
-                escolasIds: c.coordenador_escolas?.map((ce: any) => ce.escola_id) || []
+                escolasIds: c.coordenador_escolas?.map((ce: any) => ce.escola_id) || [],
+                turmasIds: c.coordenador_turmas?.map((ct: any) => ct.turma_id) || []
             })) || [];
 
             // Apply RBAC Logic: If not Admin, Coordinator can only see users linked to their schools (or themselves)

@@ -35,6 +35,7 @@ interface SchoolDetailProps {
   onUpdateVisitStatus: (visitId: string, newStatus: Visita['status']) => void;
   isDemoMode: boolean;
   userRole?: string;
+  onUpdateCoordenadorTurmas?: (coordenadorId: string, turmasIds: string[]) => Promise<void> | void;
 }
 
 const COLORS = {
@@ -68,11 +69,16 @@ const ETAPAS_COHORTS = [
   }
 ];
 
-export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadores = [], historicoVisitas, onBack, onUpdate, onUpdateVisitStatus, isDemoMode, userRole }) => {
-  const [activeTab, setActiveTab] = useState<'plano' | 'visitas' | 'turmas' | 'rh' | 'acompanhamento' | 'detalhamento_turmas' | 'documentos' | 'matriculas'>('acompanhamento');
+export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadores = [], historicoVisitas, onBack, onUpdate, onUpdateVisitStatus, isDemoMode, userRole, onUpdateCoordenadorTurmas }) => {
+  const [activeTab, setActiveTab] = useState<'plano' | 'visitas' | 'turmas' | 'rh' | 'acompanhamento' | 'detalhamento_turmas' | 'documentos' | 'matriculas' | 'professores'>('acompanhamento');
   const [selectedVisitForPrint, setSelectedVisitForPrint] = useState<Visita | null>(null);
   const [selectedServidorForCarta, setSelectedServidorForCarta] = useState<RecursoHumano | null>(null);
   const [formData, setFormData] = useState<DadosEducacionais>(escola.dadosEducacionais);
+  
+  // State for teachers tab
+  const [selectedTeacherForTurmas, setSelectedTeacherForTurmas] = useState<Coordenador | null>(null);
+  const [tempSelectedTurmas, setTempSelectedTurmas] = useState<string[]>([]);
+  const [isSavingTurmas, setIsSavingTurmas] = useState(false);
 
   // State for Matriculas tab
   const [searchTermMatriculas, setSearchTermMatriculas] = useState('');
@@ -182,7 +188,8 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
       { id: 'rh', icon: Briefcase, label: 'Recursos Humanos' },
       { id: 'plano', icon: Target, label: 'Plano de Ação' },
       { id: 'visitas', icon: History, label: 'Histórico' },
-      { id: 'documentos', icon: FileText, label: 'Documentos' }
+      { id: 'documentos', icon: FileText, label: 'Documentos' },
+      { id: 'professores', icon: Users, label: 'Professores' }
     ];
     return allTabs.filter(tab => hasTabAccess('escolas', tab.id, userRole));
   }, [userRole]);
@@ -201,6 +208,10 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
   const regionalCoordinator = useMemo(() => {
     return coordenadores.find(c => c.escolasIds.includes(escola.id) && c.funcao === 'Coordenador Regional')
       || coordenadores.find(c => c.escolasIds.includes(escola.id));
+  }, [coordenadores, escola.id]);
+
+  const schoolTeachers = useMemo(() => {
+    return coordenadores.filter(c => c.funcao === 'Professor' && c.escolasIds.includes(escola.id));
   }, [coordenadores, escola.id]);
 
   const handlePrint = (visita: Visita) => {
@@ -274,6 +285,55 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
   const [schoolTurmas, setSchoolTurmas] = useState<any[]>([]);
   const [isLoadingTurmas, setIsLoadingTurmas] = useState(false);
 
+  const sortTurmas = (turmasList: any[]): any[] => {
+    const getStageScore = (stage: string = ''): number => {
+      const s = stage.toLowerCase();
+      if (s.includes('infantil') || s.includes('creche') || s.includes('pré') || s.includes('pre')) return 1000;
+      if (s.includes('iniciais') || s.includes('fundamental i') || s.includes('fundamental 1')) return 2000;
+      if (s.includes('finais') || s.includes('fundamental ii') || s.includes('fundamental 2')) return 3000;
+      if (s.includes('eja')) return 4000;
+      return 5000;
+    };
+
+    const getYearScore = (year: string = ''): number => {
+      const y = year.toLowerCase().replace(/[^a-z0-9]/g, ' ').trim();
+      if (y.includes('creche i') && !y.includes('creche ii') && !y.includes('creche iii')) return 1;
+      if (y.includes('creche ii')) return 2;
+      if (y.includes('creche iii')) return 3;
+      if (y.includes('pré i') || y.includes('pre i') || y.includes('pré escola i') || y.includes('preescola i') || y.includes('pré-escola i')) return 4;
+      if (y.includes('pré ii') || y.includes('pre ii') || y.includes('pré escola ii') || y.includes('preescola ii') || y.includes('pré-escola ii')) return 5;
+      
+      if (y.startsWith('1') || y.includes('1 ano') || y.includes('1º') || y.includes('1o')) return 1;
+      if (y.startsWith('2') || y.includes('2 ano') || y.includes('2º') || y.includes('2o')) return 2;
+      if (y.startsWith('3') || y.includes('3 ano') || y.includes('3º') || y.includes('3o')) return 3;
+      if (y.startsWith('4') || y.includes('4 ano') || y.includes('4º') || y.includes('4o')) return 4;
+      if (y.startsWith('5') || y.includes('5 ano') || y.includes('5º') || y.includes('5o')) return 5;
+      
+      if (y.startsWith('6') || y.includes('6 ano') || y.includes('6º') || y.includes('6o')) return 6;
+      if (y.startsWith('7') || y.includes('7 ano') || y.includes('7º') || y.includes('7o')) return 7;
+      if (y.startsWith('8') || y.includes('8 ano') || y.includes('8º') || y.includes('8o')) return 8;
+      if (y.startsWith('9') || y.includes('9 ano') || y.includes('9º') || y.includes('9o')) return 9;
+      
+      if (y.includes('i etapa')) return 1;
+      if (y.includes('ii etapa')) return 2;
+      if (y.includes('iii etapa')) return 3;
+      if (y.includes('iv etapa')) return 4;
+      return 100;
+    };
+
+    return [...turmasList].sort((a, b) => {
+      const stageA = getStageScore(a.stage);
+      const stageB = getStageScore(b.stage);
+      if (stageA !== stageB) return stageA - stageB;
+
+      const yearA = getYearScore(a.year || a.anoSerie);
+      const yearB = getYearScore(b.year || b.anoSerie);
+      if (yearA !== yearB) return yearA - yearB;
+
+      return (a.name || '').localeCompare(b.name || '');
+    });
+  };
+
   const loadSchoolTurmas = async () => {
     if (!escola.id) return;
     setIsLoadingTurmas(true);
@@ -291,7 +351,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
           { id: 'dt-8', stage: 'Anos Finais', year: '9º ANO', name: 'Turma A', shift: 'INTEGRAL', modality: 'REGULAR' },
           { id: 'dt-9', stage: 'EJA', year: 'I ETAPA', name: 'Turma A', shift: 'NOITE', modality: 'REGULAR' }
         ];
-        setSchoolTurmas(demoTurmas);
+        setSchoolTurmas(sortTurmas(demoTurmas));
       } else {
         const { data, error } = await supabase
           .from('turmas')
@@ -300,7 +360,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
           .order('name');
         
         if (error) throw error;
-        setSchoolTurmas(data || []);
+        setSchoolTurmas(sortTurmas(data || []));
       }
     } catch (err) {
       console.error('Erro ao buscar turmas:', err);
@@ -310,7 +370,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
   };
 
   useEffect(() => {
-    if (activeTab === 'detalhamento_turmas' || activeTab === 'matriculas') {
+    if (activeTab === 'detalhamento_turmas' || activeTab === 'matriculas' || activeTab === 'professores' || activeTab === 'turmas') {
       loadSchoolTurmas();
     }
   }, [escola.id, activeTab, isDemoMode]);
@@ -2033,6 +2093,183 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                     </div>
                   )}
                 </div>
+              </div>
+            )
+          }
+
+          {
+            activeTab === 'professores' && (
+              <div className="space-y-6 animate-fade-in">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-5">
+                  <div>
+                    <h3 className="text-2xl font-bold text-slate-800">Professores e Vínculos</h3>
+                    <p className="text-slate-500 text-sm mt-1">
+                      Gerenciamento dos professores vinculados a esta unidade escolar e suas turmas.
+                    </p>
+                  </div>
+                </div>
+
+                {schoolTeachers.length === 0 ? (
+                  <div className="bg-slate-50 rounded-2xl border border-slate-200 border-dashed p-12 text-center">
+                    <Users className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                    <h4 className="text-lg font-bold text-slate-700">Nenhum professor vinculado</h4>
+                    <p className="text-slate-500 text-sm max-w-md mx-auto mt-2">
+                      Não há coordenadores com a função "Professor" vinculados a esta escola. Para vincular um professor a esta escola, vá em Equipe/Gestão de Usuários.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {schoolTeachers.map((teacher) => {
+                      const teacherTurmas = schoolTurmas.filter(t => (teacher.turmasIds || []).includes(t.id));
+                      return (
+                        <div key={teacher.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
+                          <div className="space-y-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-12 h-12 bg-orange-50 rounded-xl flex items-center justify-center text-orange-500 font-bold text-lg">
+                                {teacher.nome.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-slate-800 text-lg leading-tight">{teacher.nome}</h4>
+                                <p className="text-slate-400 text-xs mt-0.5">{teacher.contato}</p>
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Turmas Vinculadas ({teacherTurmas.length})</span>
+                              {teacherTurmas.length === 0 ? (
+                                <p className="text-slate-400 text-xs italic">Nenhuma turma vinculada a este professor nesta escola.</p>
+                              ) : (
+                                <div className="flex flex-wrap gap-2">
+                                  {teacherTurmas.map((t) => (
+                                    <span key={t.id} className="bg-slate-100 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200/60 shadow-sm flex items-center gap-1.5">
+                                      <GraduationCap className="w-3.5 h-3.5 text-orange-500" />
+                                      {(t.year || t.anoSerie) ? `${t.year || t.anoSerie} - ` : ''}{t.name || ''} • {t.shift || ''}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {canEditTab && (
+                            <div className="mt-6 border-t border-slate-100 pt-4 flex justify-end">
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => {
+                                  setSelectedTeacherForTurmas(teacher);
+                                  setTempSelectedTurmas(teacher.turmasIds || []);
+                                }}
+                                className="flex items-center gap-2"
+                              >
+                                <Edit className="w-4 h-4" />
+                                Vincular Turmas
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Modal for Vincular Turmas */}
+                {selectedTeacherForTurmas && (
+                  <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden animate-scale-up">
+                      <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                        <div>
+                          <h4 className="text-xl font-bold text-slate-800">Vincular Turmas</h4>
+                          <p className="text-xs text-slate-500 mt-1">{selectedTeacherForTurmas.nome}</p>
+                        </div>
+                        <button
+                          onClick={() => setSelectedTeacherForTurmas(null)}
+                          className="w-8 h-8 rounded-full bg-white hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 border border-slate-200/60 shadow-sm transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <div className="p-6 overflow-y-auto space-y-4 flex-1">
+                        <p className="text-slate-500 text-sm leading-relaxed">
+                          Selecione as turmas da unidade <strong>{escola.nome}</strong> que este professor lecionará:
+                        </p>
+                        
+                        {schoolTurmas.length === 0 ? (
+                          <div className="text-center py-6">
+                            <GraduationCap className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                            <p className="text-slate-400 text-xs italic">Nenhuma turma cadastrada nesta escola.</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {schoolTurmas.map((t) => {
+                              const isChecked = tempSelectedTurmas.includes(t.id);
+                              return (
+                                <label key={t.id} className={`flex items-center gap-3 p-3.5 rounded-2xl border transition-all cursor-pointer select-none ${isChecked ? 'bg-orange-50/50 border-orange-200 shadow-sm' : 'bg-white border-slate-200 hover:border-slate-300'}`}>
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setTempSelectedTurmas([...tempSelectedTurmas, t.id]);
+                                      } else {
+                                        setTempSelectedTurmas(tempSelectedTurmas.filter(id => id !== t.id));
+                                      }
+                                    }}
+                                    className="w-4 h-4 rounded text-orange-500 border-slate-300 focus:ring-orange-500"
+                                  />
+                                  <div className="flex-1">
+                                    <span className="font-bold text-slate-800 text-sm block">{(t.year || t.anoSerie) ? `${t.year || t.anoSerie} - ` : ''}{t.name || ''}</span>
+                                    <span className="text-[10px] text-slate-400 font-medium block uppercase mt-0.5">{t.stage || 'Regular'} • {t.shift || 'MANHÃ'}</span>
+                                  </div>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+                        <Button
+                          variant="ghost"
+                          onClick={() => setSelectedTeacherForTurmas(null)}
+                          disabled={isSavingTurmas}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          variant="primary"
+                          onClick={async () => {
+                            if (!onUpdateCoordenadorTurmas) return;
+                            setIsSavingTurmas(true);
+                            try {
+                              await onUpdateCoordenadorTurmas(selectedTeacherForTurmas.id, tempSelectedTurmas);
+                              setSelectedTeacherForTurmas(null);
+                            } catch (err) {
+                              console.error(err);
+                            } finally {
+                              setIsSavingTurmas(false);
+                            }
+                          }}
+                          disabled={isSavingTurmas}
+                          className="flex items-center gap-2"
+                        >
+                          {isSavingTurmas ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Salvando...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="w-4 h-4" />
+                              Salvar Vínculos
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )
           }

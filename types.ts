@@ -368,6 +368,7 @@ export interface Coordenador {
   funcao?: 'Administrador' | 'Coordenador Regional' | 'Gestor' | 'Coordenador Pedagógico' | 'Técnico' | 'Técnico Pedagógico' | 'Gestor Geral' | 'Gestor Pedagógico' | 'Professor' | 'Auxiliar Administrativo' | 'Monitor de Atividade Complementar'; // Papel no sistema
   status?: 'Ativo' | 'Inativo'; // Controle de acesso
   escolasIds: string[]; // Vínculo com escolas
+  turmasIds?: string[]; // Vínculo com turmas
   created_at?: string;
 }
 

@@ -174,19 +174,30 @@ export const ParecerDescritivoInfantil: React.FC<ParecerDescritivoInfantilProps>
           .eq('stage', 'Educação Infantil');
 
         if (error) throw error;
-        setTurmas(data || []);
+        
+        let filteredTurmas = data || [];
+        if (currentUser && currentUser.funcao === 'Professor') {
+          const assignedIds = currentUser.turmasIds || [];
+          filteredTurmas = filteredTurmas.filter((t: any) => assignedIds.includes(t.id));
+        }
+        setTurmas(filteredTurmas);
       } catch (err) {
         console.error('Erro ao buscar turmas ECE:', err);
       }
     };
 
     if (isDemoMode) {
-      setTurmas([
+      let mockTurmas = [
         { id: 'demo-t1', name: 'Creche II A', year: 'Creche II', anoSerie: 'Creche II', shift: 'Matutino', stage: 'Educação Infantil' },
         { id: 'demo-t2', name: 'Creche III B', year: 'Creche III', anoSerie: 'Creche III', shift: 'Vespertino', stage: 'Educação Infantil' },
         { id: 'demo-t3', name: 'Pré I A', year: 'Pré-Escola I', anoSerie: 'Pré I', shift: 'Matutino', stage: 'Educação Infantil' },
         { id: 'demo-t4', name: 'Pré II B', year: 'Pré-Escola II', anoSerie: 'Pré II', shift: 'Vespertino', stage: 'Educação Infantil' },
-      ]);
+      ];
+      if (currentUser && currentUser.funcao === 'Professor') {
+        const assignedIds = currentUser.turmasIds || [];
+        mockTurmas = mockTurmas.filter(t => assignedIds.includes(t.id));
+      }
+      setTurmas(mockTurmas);
     } else {
       fetchTurmas();
     }
@@ -266,7 +277,13 @@ export const ParecerDescritivoInfantil: React.FC<ParecerDescritivoInfantilProps>
 
         if (error) throw error;
 
-        const formatted: ParecerEntry[] = (data || []).map(d => {
+        let filteredData = data || [];
+        if (currentUser && currentUser.funcao === 'Professor') {
+          const assignedIds = currentUser.turmasIds || [];
+          filteredData = filteredData.filter((d: any) => assignedIds.includes(d.turma_id));
+        }
+
+        const formatted: ParecerEntry[] = filteredData.map(d => {
           const classObj = turmas.find(t => t.id === d.turma_id);
           const studentObj = students.find(s => s.id === d.aluno_id);
           return {

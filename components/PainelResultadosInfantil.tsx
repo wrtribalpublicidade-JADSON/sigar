@@ -197,19 +197,30 @@ export const PainelResultadosInfantil: React.FC<PainelResultadosInfantilProps> =
           .eq('stage', 'Educação Infantil');
 
         if (error) throw error;
-        setTurmas(data || []);
+        
+        let filteredTurmas = data || [];
+        if (currentUser && currentUser.funcao === 'Professor') {
+          const assignedIds = currentUser.turmasIds || [];
+          filteredTurmas = filteredTurmas.filter((t: any) => assignedIds.includes(t.id));
+        }
+        setTurmas(filteredTurmas);
       } catch (err) {
         console.error('Erro ao buscar turmas ECE:', err);
       }
     };
 
     if (isDemoMode) {
-      setTurmas([
+      let mockTurmas = [
         { id: 't1', name: 'Creche II A', year: 'Creche II', anoSerie: 'Creche II', shift: 'Matutino', stage: 'Educação Infantil', schoolId: '2' },
         { id: 't2', name: 'Creche III B', year: 'Creche III', anoSerie: 'Creche III', shift: 'Vespertino', stage: 'Educação Infantil', schoolId: '2' },
         { id: 't3', name: 'Pré I A', year: 'Pré I', anoSerie: 'Pré I', shift: 'Matutino', stage: 'Educação Infantil', schoolId: '2' },
         { id: 't4', name: 'Pré II B', year: 'Pré II', anoSerie: 'Pré II', shift: 'Vespertino', stage: 'Educação Infantil', schoolId: '2' },
-      ]);
+      ];
+      if (currentUser && currentUser.funcao === 'Professor') {
+        const assignedIds = currentUser.turmasIds || [];
+        mockTurmas = mockTurmas.filter(t => assignedIds.includes(t.id));
+      }
+      setTurmas(mockTurmas);
     } else {
       fetchTurmas();
     }

@@ -105,7 +105,13 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
         });
       }
 
-      const formatted: AttendanceSheet[] = (data || []).map((p: any) => {
+      let filteredSheets = data || [];
+      if (currentUser && currentUser.funcao === 'Professor') {
+        const assignedIds = currentUser.turmasIds || [];
+        filteredSheets = filteredSheets.filter((p: any) => assignedIds.includes(p.turma_id));
+      }
+
+      const formatted: AttendanceSheet[] = filteredSheets.map((p: any) => {
         const escolaObj = escolas.find(esc => esc.id === p.escola_id);
         const escolaNome = escolaObj ? escolaObj.nome : 'Unidade';
         const turmaNome = turmaMap.get(p.turma_id) || 'Turma';
@@ -164,11 +170,16 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
       }
 
       if (isDemoMode) {
-        setTurmas([
+        let mockTurmas = [
           { id: 'demo-t1', name: '1º ANO A', year: '1º ANO', shift: 'MANHÃ' },
           { id: 'demo-t2', name: '2º ANO B', year: '2º ANO', shift: 'TARDE' },
           { id: 'demo-t3', name: '5º ANO A', year: '5º ANO', shift: 'MANHÃ' },
-        ]);
+        ];
+        if (currentUser && currentUser.funcao === 'Professor') {
+          const assignedIds = currentUser.turmasIds || [];
+          mockTurmas = mockTurmas.filter(t => assignedIds.includes(t.id));
+        }
+        setTurmas(mockTurmas);
         return;
       }
 
@@ -180,7 +191,13 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
           .order('name');
 
         if (error) throw error;
-        setTurmas(data || []);
+        
+        let filteredTurmas = data || [];
+        if (currentUser && currentUser.funcao === 'Professor') {
+          const assignedIds = currentUser.turmasIds || [];
+          filteredTurmas = filteredTurmas.filter((t: any) => assignedIds.includes(t.id));
+        }
+        setTurmas(filteredTurmas);
       } catch (err) {
         console.error('Erro ao carregar turmas:', err);
       }

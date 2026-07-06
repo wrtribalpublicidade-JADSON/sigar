@@ -119,7 +119,13 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
         });
       }
 
-      const formatted: ClassLogInfantil[] = (data || []).map(d => {
+      let filteredLogs = data || [];
+      if (currentUser && currentUser.funcao === 'Professor') {
+        const assignedIds = currentUser.turmasIds || [];
+        filteredLogs = filteredLogs.filter((d: any) => assignedIds.includes(d.turma_id));
+      }
+
+      const formatted: ClassLogInfantil[] = filteredLogs.map(d => {
         const escolaObj = escolas.find(esc => esc.id === d.escola_id);
         const escolaNome = escolaObj ? escolaObj.nome : 'Unidade';
         const turmaNome = turmaMap.get(d.turma_id) || d.ano_serie || 'Turma';
@@ -233,12 +239,17 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
       }
 
       if (isDemoMode) {
-        setTurmas([
+        let mockTurmas = [
           { id: 'demo-t1', name: 'Maternal A', year: 'Maternal A', anoSerie: 'Creche II', shift: 'MANHÃ', stage: 'Educação Infantil' },
           { id: 'demo-t2', name: 'Creche III B', year: 'Creche III B', anoSerie: 'Creche III', shift: 'TARDE', stage: 'Educação Infantil' },
           { id: 'demo-t3', name: 'Pré I A', year: 'Pré I A', anoSerie: 'Pré I', shift: 'MANHÃ', stage: 'Educação Infantil' },
           { id: 'demo-t4', name: 'Pré II B', year: 'Pré II B', anoSerie: 'Pré II', shift: 'TARDE', stage: 'Educação Infantil' },
-        ]);
+        ];
+        if (currentUser && currentUser.funcao === 'Professor') {
+          const assignedIds = currentUser.turmasIds || [];
+          mockTurmas = mockTurmas.filter(t => assignedIds.includes(t.id));
+        }
+        setTurmas(mockTurmas);
         return;
       }
 
@@ -251,7 +262,13 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
           .order('name');
 
         if (error) throw error;
-        setTurmas(data || []);
+        
+        let filteredTurmas = data || [];
+        if (currentUser && currentUser.funcao === 'Professor') {
+          const assignedIds = currentUser.turmasIds || [];
+          filteredTurmas = filteredTurmas.filter((t: any) => assignedIds.includes(t.id));
+        }
+        setTurmas(filteredTurmas);
       } catch (err) {
         console.error('Erro ao carregar turmas:', err);
       }
