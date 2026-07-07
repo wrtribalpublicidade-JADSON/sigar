@@ -842,64 +842,65 @@ export default function App() {
   };
 
   const handleSaveCoordenador = async (coord: Coordenador) => {
+    const coordUpper = { ...coord, nome: coord.nome.trim().toUpperCase() };
     if (isDemoMode) {
-      if (coord.id) {
-        setCoordenadores(coordenadores.map(c => c.id === coord.id ? coord : c));
+      if (coordUpper.id) {
+        setCoordenadores(coordenadores.map(c => c.id === coordUpper.id ? coordUpper : c));
       } else {
         const newId = generateUUID();
-        setCoordenadores([...coordenadores, { ...coord, id: newId }]);
+        setCoordenadores([...coordenadores, { ...coordUpper, id: newId }]);
       }
       showNotification('success', 'Coordenador atualizado (Demo).');
       return;
     }
 
     try {
-      if (coord.id) {
-        const funcaoToSave = (coord.funcao as any) === '' ? null : coord.funcao;
+      if (coordUpper.id) {
+        const funcaoToSave = (coordUpper.funcao as any) === '' ? null : coordUpper.funcao;
         const { error } = await supabase.from('coordenadores').update({
-          nome: coord.nome,
-          contato: coord.contato,
-          regiao: coord.regiao,
+          nome: coordUpper.nome,
+          contato: coordUpper.contato,
+          regiao: coordUpper.regiao,
           funcao: funcaoToSave,
-          status: coord.status || 'Ativo'
-        }).eq('id', coord.id);
+          status: coordUpper.status || 'Ativo'
+        }).eq('id', coordUpper.id);
 
-        await logAudit('UPDATE', 'COORDENADOR', coord.id, coord);
+        await logAudit('UPDATE', 'COORDENADOR', coordUpper.id, coordUpper);
 
         if (error) throw error;
 
-        await supabase.from('coordenador_escolas').delete().eq('coordenador_id', coord.id);
-        if (coord.escolasIds.length > 0) {
+        await supabase.from('coordenador_escolas').delete().eq('coordenador_id', coordUpper.id);
+        if (coordUpper.escolasIds.length > 0) {
           await supabase.from('coordenador_escolas').insert(
-            coord.escolasIds.map(eid => ({ coordenador_id: coord.id, escola_id: eid }))
+            coordUpper.escolasIds.map(eid => ({ coordenador_id: coordUpper.id, escola_id: eid }))
           );
         }
 
-        setCoordenadores(coordenadores.map(c => c.id === coord.id ? coord : c));
+        setCoordenadores(coordenadores.map(c => c.id === coordUpper.id ? coordUpper : c));
         showNotification('success', 'Coordenador atualizado!');
       } else {
         const newId = generateUUID();
-        const funcaoToSave = (coord.funcao as any) === '' ? null : coord.funcao;
+        const funcaoToSave = (coordUpper.funcao as any) === '' ? null : coordUpper.funcao;
         const { error } = await supabase.from('coordenadores').insert({
           id: newId,
-          nome: coord.nome,
-          contato: coord.contato,
-          regiao: coord.regiao,
+          nome: coordUpper.nome,
+          contato: coordUpper.contato,
+          regiao: coordUpper.regiao,
           funcao: funcaoToSave,
-          status: coord.status || 'Ativo'
+          status: coordUpper.status || 'Ativo'
         });
 
-        await logAudit('CREATE', 'COORDENADOR', newId, coord);
+        await logAudit('CREATE', 'COORDENADOR', newId, coordUpper);
 
         if (error) throw error;
 
-        if (coord.escolasIds.length > 0) {
+        if (coordUpper.escolasIds.length > 0) {
           await supabase.from('coordenador_escolas').insert(
-            coord.escolasIds.map(eid => ({ coordenador_id: newId, escola_id: eid }))
+            coordUpper.escolasIds.map(eid => ({ coordenador_id: newId, escola_id: eid }))
           );
         }
 
-        setCoordenadores([...coordenadores, { ...coord, id: newId, created_at: new Date().toISOString() }]);
+        setCoordenadores([...coordenadores, { ...coordUpper, id: newId, created_at: new Date().toISOString() }]);
         showNotification('success', 'Coordenador cadastrado!');
       }
     } catch (error: any) {

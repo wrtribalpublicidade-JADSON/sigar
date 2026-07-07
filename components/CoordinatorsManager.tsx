@@ -63,7 +63,7 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
       
       if (data.error) throw new Error(data.error);
       
-      showNotification('success', `A senha de ${selectedUserForPassword.nome} foi definida com sucesso.`);
+      showNotification('success', `A senha de ${selectedUserForPassword.nome?.toUpperCase()} foi definida com sucesso.`);
     } catch (error: any) {
       console.error('Password reset error:', error);
       showNotification('error', `Erro: ${error?.message || 'Falha ao redefinir a senha.'}`);
@@ -201,7 +201,7 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
       const totalPendencias = escolasDoCoord.reduce((sum, escola) => sum + checkSchoolPendencies(escola).length, 0);
 
       return {
-        NOME: c.nome, EMAIL: c.contato, FUNCAO: c.funcao || 'Coordenador Regional', REGIAO: c.regiao,
+        NOME: c.nome?.toUpperCase(), EMAIL: c.contato, FUNCAO: c.funcao || 'Coordenador Regional', REGIAO: c.regiao,
         QTD_ESCOLAS: c.escolasIds.length,
         PENDENCIAS: totalPendencias,
         ESCOLAS_VINCULADAS: escolasDoCoord.map(e => e.nome).join(', ')
@@ -228,7 +228,7 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
                 Monitoramento
               </span>
               <h2 className="text-2xl font-black text-white mt-2">Região: {viewSummaryCoord.regiao}</h2>
-              <p className="text-slate-400 text-sm">Coordenador: <span className="font-semibold text-orange-400">{viewSummaryCoord.nome}</span></p>
+              <p className="text-slate-400 text-sm">Coordenador: <span className="font-semibold text-orange-400">{viewSummaryCoord.nome?.toUpperCase()}</span></p>
             </div>
           </div>
         </div>
@@ -358,7 +358,7 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Nome Completo</label>
-              <input type="text" required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-orange-500 focus:ring-orange-500 border px-4 py-2.5" value={formData.nome} onChange={e => setFormData({ ...formData, nome: e.target.value })} />
+              <input type="text" required className="w-full rounded-xl border-slate-200 shadow-sm focus:border-orange-500 focus:ring-orange-500 border px-4 py-2.5 uppercase" value={formData.nome} onChange={e => setFormData({ ...formData, nome: e.target.value.toUpperCase() })} />
             </div>
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">E-mail</label>
@@ -557,9 +557,9 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center text-orange-400 font-bold shrink-0">
-                          {coord.nome.charAt(0)}
+                          {coord.nome.charAt(0).toUpperCase()}
                         </div>
-                        <span className="font-bold text-slate-800">{coord.nome}</span>
+                        <span className="font-bold text-slate-800">{coord.nome?.toUpperCase()}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 font-medium text-slate-500">

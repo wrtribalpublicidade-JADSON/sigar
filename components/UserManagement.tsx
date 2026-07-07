@@ -409,7 +409,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
                                                     {user.nome.charAt(0).toUpperCase()}
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <p className="font-bold text-slate-800 truncate">{user.nome}</p>
+                                                    <p className="font-bold text-slate-800 truncate">{user.nome?.toUpperCase()}</p>
                                                     <p className="text-xs text-slate-500 truncate flex items-center gap-1 mt-0.5">
                                                         {user.contato}
                                                     </p>
@@ -486,7 +486,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
                                     {selectedUser.nome.charAt(0).toUpperCase()}
                                 </div>
                                 <div>
-                                    <h3 className="text-xl font-bold text-slate-800">{selectedUser.nome}</h3>
+                                    <h3 className="text-xl font-bold text-slate-800">{selectedUser.nome?.toUpperCase()}</h3>
                                     <p className="text-slate-500 text-sm">{selectedUser.contato}</p>
                                 </div>
                             </div>
