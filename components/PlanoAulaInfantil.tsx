@@ -11,6 +11,7 @@ import {
 import { Escola, Coordenador, Segmento } from '../types';
 import { supabase } from '../services/supabase';
 import { useNotification } from '../context/NotificationContext';
+import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
 import { BNCC_INFANTIL } from './ConselhoClasse';
 
 interface PlanoAulaInfantilProps {
@@ -796,20 +797,13 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
 
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Unidade Escolar *</label>
-              <div className="relative">
-                <SchoolIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                <select 
-                  value={selectedEscolaId}
-                  onChange={e => setSelectedEscolaId(e.target.value)}
-                  required
-                  className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all appearance-none"
-                >
-                  <option value="">Selecione a Unidade Escolar</option>
-                  {escolasInfantil.map(e => (
-                    <option key={e.id} value={e.id}>{e.nome}</option>
-                  ))}
-                </select>
-              </div>
+              <SearchableSchoolSelect
+                escolas={escolasInfantil}
+                selectedId={selectedEscolaId}
+                onChange={setSelectedEscolaId}
+                placeholder="Selecione a Unidade Escolar"
+                inputClassName="pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
+              />
             </div>
 
             <div>
@@ -1089,14 +1083,15 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
               />
             </div>
 
-            <select 
-              value={schoolFilter}
-              onChange={e => setSchoolFilter(e.target.value)}
-              className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 outline-none focus:border-brand-orange"
-            >
-              <option value="ALL">Todas Unidades</option>
-              {escolasInfantil.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
-            </select>
+            <SearchableSchoolSelect
+              escolas={escolasInfantil}
+              selectedId={schoolFilter}
+              onChange={setSchoolFilter}
+              showAllOption={true}
+              allOptionLabel="Todas Unidades"
+              className="max-w-[240px]"
+              inputClassName="pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
+            />
           </div>
         </div>
 

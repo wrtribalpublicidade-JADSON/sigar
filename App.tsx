@@ -76,7 +76,7 @@ export default function App() {
   // Function to load all data
   const fetchData = async (isDemo: boolean = false, email: string | null = null) => {
     if (isDemo) {
-      setEscolas(ESCOLAS_MOCK);
+      setEscolas([...ESCOLAS_MOCK].sort((a, b) => a.nome.localeCompare(b.nome)));
       setVisitas(VISITAS_MOCK);
       setCoordenadores(COORDENADORES_MOCK);
       setIsAdmin(true);
@@ -91,19 +91,58 @@ export default function App() {
     setIsAdmin(isUserAdmin);
 
     try {
-      const { data: coordData, error: coordError } = await supabase.from('coordenadores').select('*, coordenador_escolas(escola_id), coordenador_turmas(turma_id)');
-      if (coordError) throw coordError;
+      const [coordData, schoolAssoc, classAssoc] = await Promise.all([
+        (async () => {
+          let list: any[] = [];
+          let hasMore = true;
+          let from = 0;
+          while (hasMore) {
+            const { data, error } = await supabase.from('coordenadores').select('*').range(from, from + 999);
+            if (error) throw error;
+            list = list.concat(data || []);
+            hasMore = (data || []).length === 1000;
+            from += 1000;
+          }
+          return list;
+        })(),
+        (async () => {
+          let list: any[] = [];
+          let hasMore = true;
+          let from = 0;
+          while (hasMore) {
+            const { data, error } = await supabase.from('coordenador_escolas').select('coordenador_id, escola_id').range(from, from + 999);
+            if (error) throw error;
+            list = list.concat(data || []);
+            hasMore = (data || []).length === 1000;
+            from += 1000;
+          }
+          return list;
+        })(),
+        (async () => {
+          let list: any[] = [];
+          let hasMore = true;
+          let from = 0;
+          while (hasMore) {
+            const { data, error } = await supabase.from('coordenador_turmas').select('coordenador_id, turma_id').range(from, from + 999);
+            if (error) throw error;
+            list = list.concat(data || []);
+            hasMore = (data || []).length === 1000;
+            from += 1000;
+          }
+          return list;
+        })()
+      ]);
 
-      const mappedCoords: Coordenador[] = coordData?.map((c: any) => ({
+      const mappedCoords: Coordenador[] = coordData.map((c: any) => ({
         id: c.id,
         nome: c.nome,
         contato: c.contato,
         regiao: c.regiao,
         funcao: normalizeRole(c.funcao), // Map function from DB
-        escolasIds: c.coordenador_escolas?.map((ce: any) => ce.escola_id) || [],
-        turmasIds: c.coordenador_turmas?.map((ct: any) => ct.turma_id) || [],
+        escolasIds: schoolAssoc.filter(sa => sa.coordenador_id === c.id).map(sa => sa.escola_id),
+        turmasIds: classAssoc.filter(ca => ca.coordenador_id === c.id).map(ca => ca.turma_id),
         created_at: c.created_at
-      })) || [];
+      }));
 
       let linkedSchoolIds: string[] = [];
       let currentUserCoord: Coordenador | undefined;
@@ -287,7 +326,7 @@ export default function App() {
         status: v.status
       })) || [];
 
-      setEscolas(mappedEscolas);
+      setEscolas([...mappedEscolas].sort((a, b) => a.nome.localeCompare(b.nome)));
       
       // Initialize Class Council selections if not set
       if (mappedEscolas.length > 0) {

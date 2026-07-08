@@ -10,3 +10,5 @@ export { FormInput, FormSelect, FormTextarea, FormCheckbox } from './FormInput';
 export { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell, TableEmpty } from './Table';
 export { EmptyState } from './EmptyState';
 export { SchoolIcon } from './icons';
+export { SearchableSchoolSelect } from './SearchableSchoolSelect';
+

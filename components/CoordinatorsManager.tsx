@@ -10,6 +10,7 @@ import { ConfirmModal } from './ui/ConfirmModal';
 import { supabase } from '../services/supabase';
 import { useNotification } from '../context/NotificationContext';
 import { normalizeRole } from '../utils/permissions';
+import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
 
 interface CoordinatorsManagerProps {
   coordenadores: Coordenador[];
@@ -507,15 +508,15 @@ export const CoordinatorsManager: React.FC<CoordinatorsManagerProps> = ({
           {regions.map(r => <option key={r} value={r}>{r}</option>)}
         </select>
 
-        <select
-          value={schoolFilter}
-          onChange={(e) => setSchoolFilter(e.target.value)}
-          className="flex-shrink-0 px-4 py-2.5 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/20 cursor-pointer max-w-[200px] truncate"
-          title="Filtrar por Escola"
-        >
-          <option value="ALL">Todas as Escolas</option>
-          {escolas.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
-        </select>
+        <SearchableSchoolSelect
+          escolas={escolas}
+          selectedId={schoolFilter}
+          onChange={setSchoolFilter}
+          showAllOption={true}
+          allOptionLabel="Todas as Escolas"
+          className="max-w-[200px]"
+          inputClassName="px-4 py-2.5 text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/20 cursor-pointer text-xs"
+        />
       </div>
 
       {/* Table */}

@@ -11,6 +11,7 @@ import {
 import { Escola, Coordenador, Segmento, Aluno } from '../types';
 import { supabase } from '../services/supabase';
 import { useNotification } from '../context/NotificationContext';
+import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
 
 interface PortfolioVisualInfantilProps {
   escolas: Escola[];
@@ -692,15 +693,13 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
 
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Unidade Escolar *</label>
-              <select 
-                value={selectedEscolaId}
-                onChange={e => setSelectedEscolaId(e.target.value)}
-                required
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
-              >
-                <option value="">Selecione a Unidade</option>
-                {escolasInfantil.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
-              </select>
+              <SearchableSchoolSelect
+                escolas={escolasInfantil}
+                selectedId={selectedEscolaId}
+                onChange={setSelectedEscolaId}
+                placeholder="Selecione a Unidade"
+                inputClassName="pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
+              />
             </div>
 
             <div>
@@ -880,14 +879,15 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
               />
             </div>
 
-            <select 
-              value={schoolFilter}
-              onChange={e => setSchoolFilter(e.target.value)}
-              className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 outline-none focus:border-brand-orange"
-            >
-              <option value="ALL">Todas Unidades</option>
-              {escolasInfantil.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
-            </select>
+            <SearchableSchoolSelect
+              escolas={escolasInfantil}
+              selectedId={schoolFilter}
+              onChange={setSchoolFilter}
+              showAllOption={true}
+              allOptionLabel="Todas Unidades"
+              className="max-w-[240px]"
+              inputClassName="pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
+            />
 
             <select 
               value={studentFilter}

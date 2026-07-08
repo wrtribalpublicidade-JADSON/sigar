@@ -17,6 +17,7 @@ import * as XLSX from 'xlsx';
 import { Escola, Coordenador, Segmento, Aluno } from '../types';
 import { supabase } from '../services/supabase';
 import { useNotification } from '../context/NotificationContext';
+import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
 import { BNCC_INFANTIL } from './ConselhoClasse';
 import { ccAvaliacaoInfantilService, ccEstudanteService } from '../services/gestaoConselhoService';
 
@@ -682,13 +683,13 @@ export const PainelResultadosInfantil: React.FC<PainelResultadosInfantilProps> =
           <div className={`grid grid-cols-1 ${activeTab === 'bimestre' ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-4`}>
             <div>
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Unidade Escolar *</label>
-              <select 
-                value={selectedEscolaId}
-                onChange={e => setSelectedEscolaId(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
-              >
-                {escolasInfantil.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
-              </select>
+              <SearchableSchoolSelect
+                escolas={escolasInfantil}
+                selectedId={selectedEscolaId}
+                onChange={setSelectedEscolaId}
+                placeholder="Selecione a Unidade"
+                inputClassName="pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
+              />
             </div>
 
             <div>

@@ -8,6 +8,7 @@ import { Card } from './ui/Card';
 import { ConfirmModal } from './ui/ConfirmModal';
 import { useNotification } from '../context/NotificationContext';
 import { normalizeRole } from '../utils/permissions';
+import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
 
 interface UserManagementProps {
     userEmail: string | null;
@@ -62,24 +63,60 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
                 return;
             }
 
-            // Fetch users from coordenadores table
-            const { data: coordData, error: coordError } = await supabase
-                .from('coordenadores')
-                .select('*, coordenador_escolas(escola_id), coordenador_turmas(turma_id)');
-
-            if (coordError) throw coordError;
+            // Fetch coordinators, schools and classes in parallel
+            const [coordData, schoolAssoc, classAssoc] = await Promise.all([
+                (async () => {
+                    let list: any[] = [];
+                    let hasMore = true;
+                    let from = 0;
+                    while (hasMore) {
+                        const { data, error } = await supabase.from('coordenadores').select('*').range(from, from + 999);
+                        if (error) throw error;
+                        list = list.concat(data || []);
+                        hasMore = (data || []).length === 1000;
+                        from += 1000;
+                    }
+                    return list;
+                })(),
+                (async () => {
+                    let list: any[] = [];
+                    let hasMore = true;
+                    let from = 0;
+                    while (hasMore) {
+                        const { data, error } = await supabase.from('coordenador_escolas').select('coordenador_id, escola_id').range(from, from + 999);
+                        if (error) throw error;
+                        list = list.concat(data || []);
+                        hasMore = (data || []).length === 1000;
+                        from += 1000;
+                    }
+                    return list;
+                })(),
+                (async () => {
+                    let list: any[] = [];
+                    let hasMore = true;
+                    let from = 0;
+                    while (hasMore) {
+                        const { data, error } = await supabase.from('coordenador_turmas').select('coordenador_id, turma_id').range(from, from + 999);
+                        if (error) throw error;
+                        list = list.concat(data || []);
+                        hasMore = (data || []).length === 1000;
+                        from += 1000;
+                    }
+                    return list;
+                })()
+            ]);
 
             // Map the data
-            let mappedUsers: Coordenador[] = coordData?.map((c: any) => ({
+            let mappedUsers: Coordenador[] = coordData.map((c: any) => ({
                 id: c.id,
                 nome: c.nome,
                 contato: c.contato,
                 regiao: c.regiao,
                 funcao: normalizeRole(c.funcao),
                 status: c.status || 'Ativo',
-                escolasIds: c.coordenador_escolas?.map((ce: any) => ce.escola_id) || [],
-                turmasIds: c.coordenador_turmas?.map((ct: any) => ct.turma_id) || []
-            })) || [];
+                escolasIds: schoolAssoc.filter(sa => sa.coordenador_id === c.id).map(sa => sa.escola_id),
+                turmasIds: classAssoc.filter(ca => ca.coordenador_id === c.id).map(ca => ca.turma_id)
+            }));
 
             // Apply RBAC Logic: If not Admin, Coordinator can only see users linked to their schools (or themselves)
             if (!isAdmin && currentUserRole === 'Coordenador Regional') {
@@ -98,7 +135,8 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
 
             const { data: schoolData, error: schoolError } = await supabase.from('escolas').select('id, nome');
             if (schoolError) throw schoolError;
-            setEscolas((schoolData as any) || []);
+            const sortedSchools = ((schoolData as any) || []).sort((a: any, b: any) => a.nome.localeCompare(b.nome));
+            setEscolas(sortedSchools);
 
         } catch (error: any) {
             console.error(error);
@@ -331,15 +369,15 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
                         {regions.map(r => <option key={r} value={r}>{r}</option>)}
                     </select>
 
-                    <select
-                        value={schoolFilter}
-                        onChange={(e) => setSchoolFilter(e.target.value)}
-                        className="px-4 py-2.5 text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/20 cursor-pointer max-w-[200px] truncate"
-                        title="Filtrar por Escola"
-                    >
-                        <option value="ALL">Todas as Escolas</option>
-                        {escolas.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
-                    </select>
+                    <SearchableSchoolSelect
+                        escolas={escolas}
+                        selectedId={schoolFilter}
+                        onChange={setSchoolFilter}
+                        showAllOption={true}
+                        allOptionLabel="Todas as Escolas"
+                        className="max-w-[200px]"
+                        inputClassName="px-4 py-2.5 text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/20 cursor-pointer text-xs"
+                    />
 
                     <select
                         value={statusFilter}

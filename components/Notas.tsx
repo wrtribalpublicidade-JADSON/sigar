@@ -10,6 +10,7 @@ import {
 import { Escola, Coordenador } from '../types';
 import { supabase } from '../services/supabase';
 import { useNotification } from '../context/NotificationContext';
+import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
 import { PrintableBoletim } from './PrintableBoletim';
 
 interface NotasProps {
@@ -710,19 +711,12 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
         <div className="grid grid-cols-1 sm:grid-cols-6 gap-4">
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Escola *</label>
-            <div className="relative">
-              <SchoolIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <select 
-                value={selectedEscolaId}
-                onChange={e => setSelectedEscolaId(e.target.value)}
-                required
-                className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all appearance-none"
-              >
-                {escolas.map(e => (
-                  <option key={e.id} value={e.id}>{e.nome}</option>
-                ))}
-              </select>
-            </div>
+            <SearchableSchoolSelect
+              escolas={escolas}
+              selectedId={selectedEscolaId}
+              onChange={setSelectedEscolaId}
+              inputClassName="pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
+            />
           </div>
 
           <div>
