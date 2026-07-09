@@ -272,7 +272,17 @@ export const ParecerDescritivoInfantil: React.FC<ParecerDescritivoInfantilProps>
       if (!isDemoMode) {
         const { data, error } = await supabase
           .from('parecer_descritivo_infantil')
-          .select('*')
+          .select(`
+            *,
+            alunos (
+              name
+            ),
+            turmas (
+              name,
+              year,
+              shift
+            )
+          `)
           .eq('ativo', true)
           .order('created_at', { ascending: false });
 
@@ -284,17 +294,32 @@ export const ParecerDescritivoInfantil: React.FC<ParecerDescritivoInfantilProps>
           filteredData = filteredData.filter((d: any) => assignedIds.includes(d.turma_id));
         }
 
-        const formatted: ParecerEntry[] = filteredData.map(d => {
+        const formatted: ParecerEntry[] = filteredData.map((d: any) => {
           const classObj = turmas.find(t => t.id === d.turma_id);
           const studentObj = students.find(s => s.id === d.aluno_id);
+          
+          const studentName = (Array.isArray(d.alunos) ? d.alunos[0]?.name : d.alunos?.name)
+            || studentObj?.name
+            || `Estudante #${d.aluno_id}`;
+
+          const turmaRelation = Array.isArray(d.turmas) ? d.turmas[0] : d.turmas;
+          let resolvedTurmaNome = 'Turma';
+          if (turmaRelation) {
+            const tName = turmaRelation.name || turmaRelation.year || '';
+            const tShift = turmaRelation.shift || '';
+            resolvedTurmaNome = tName && tShift ? `${tName} • ${tShift}` : (tName || tShift || 'Turma');
+          } else if (classObj) {
+            resolvedTurmaNome = `${classObj.name || classObj.anoSerie} • ${classObj.turno || ''}`;
+          }
+
           return {
             id: d.id,
             escolaId: d.escola_id,
             escolaNome: escolas.find(e => e.id === d.escola_id)?.nome || 'Unidade',
             turmaId: d.turma_id,
-            turmaNome: classObj ? `${classObj.name || classObj.anoSerie} • ${classObj.turno || ''}` : 'Turma',
+            turmaNome: resolvedTurmaNome,
             alunoId: d.aluno_id,
-            alunoNome: studentObj ? studentObj.name : `Estudante #${d.aluno_id}`,
+            alunoNome: studentName,
             periodo: d.periodo,
             parecer: d.parecer,
             aspectos: d.aspectos || {},

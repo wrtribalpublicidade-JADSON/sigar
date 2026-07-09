@@ -289,7 +289,17 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
       if (!isDemoMode) {
         const { data, error } = await supabase
           .from('portfolio_visual_infantil')
-          .select('*')
+          .select(`
+            *,
+            alunos (
+              name
+            ),
+            turmas (
+              name,
+              year,
+              shift
+            )
+          `)
           .eq('ativo', true)
           .order('data', { ascending: false });
 
@@ -301,18 +311,35 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
           filteredData = filteredData.filter((d: any) => assignedIds.includes(d.turma_id));
         }
 
-        const formatted: PortfolioEntry[] = filteredData.map(d => {
+        const formatted: PortfolioEntry[] = filteredData.map((d: any) => {
           const classObj = turmas.find(t => t.id === d.turma_id);
           const studentObj = students.find(s => s.id === d.aluno_id);
+          
+          const studentName = d.aluno_id
+            ? ((Array.isArray(d.alunos) ? d.alunos[0]?.name : d.alunos?.name)
+              || studentObj?.name
+              || `Estudante #${d.aluno_id}`)
+            : 'Toda a Turma';
+
+          const turmaRelation = Array.isArray(d.turmas) ? d.turmas[0] : d.turmas;
+          let resolvedTurmaNome = 'Turma';
+          if (turmaRelation) {
+            const tName = turmaRelation.name || turmaRelation.year || '';
+            const tShift = turmaRelation.shift || '';
+            resolvedTurmaNome = tName && tShift ? `${tName} • ${tShift}` : (tName || tShift || 'Turma');
+          } else if (classObj) {
+            resolvedTurmaNome = `${classObj.name || classObj.anoSerie} • ${classObj.turno || ''}`;
+          }
+
           return {
             id: d.id,
             data: d.data,
             escolaId: d.escola_id,
             escolaNome: escolas.find(e => e.id === d.escola_id)?.nome || 'Unidade',
             turmaId: d.turma_id,
-            turmaNome: classObj ? `${classObj.name || classObj.anoSerie} • ${classObj.turno || ''}` : 'Turma',
+            turmaNome: resolvedTurmaNome,
             alunoId: d.aluno_id,
-            alunoNome: d.aluno_id ? (studentObj ? studentObj.name : `Estudante #${d.aluno_id}`) : 'Toda a Turma',
+            alunoNome: studentName,
             campoExperiencia: d.campo_experiencia,
             titulo: d.titulo,
             descricao: d.descricao,
