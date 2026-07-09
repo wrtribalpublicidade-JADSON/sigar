@@ -81,6 +81,8 @@ export const ParecerDescritivoInfantil: React.FC<ParecerDescritivoInfantilProps>
   const [searchTerm, setSearchTerm] = useState('');
   const [schoolFilter, setSchoolFilter] = useState('ALL');
   const [periodFilter, setPeriodFilter] = useState('ALL');
+  const [grupoFilter, setGrupoFilter] = useState('ALL');
+  const [turmaFilter, setTurmaFilter] = useState('ALL');
 
   // Print Portal
   const [printEntry, setPrintEntry] = useState<ParecerEntry | null>(null);
@@ -145,6 +147,24 @@ export const ParecerDescritivoInfantil: React.FC<ParecerDescritivoInfantilProps>
       if (val.includes(targetClean) || targetClean.includes(val)) return true;
       return false;
     });
+  };
+
+  const getAnoSerieFromTurma = (t: any): string => {
+    if (!t) return 'Creche III';
+    if (t.anoSerie) return t.anoSerie;
+    
+    const val = (t.year || t.name || '').toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[-\s]/g, '');
+
+    if (val.includes('preescolaii') || val.includes('preii')) return 'Pré II';
+    if (val.includes('preescolai') || val.includes('prei')) return 'Pré I';
+    if (val.includes('crecheiii')) return 'Creche III';
+    if (val.includes('crecheii')) return 'Creche II';
+    if (val.includes('crechei')) return 'Creche I';
+    
+    return t.year || 'Creche III';
   };
 
   // Derive unique Ano/Série values directly from loaded turmas
@@ -231,7 +251,7 @@ export const ParecerDescritivoInfantil: React.FC<ParecerDescritivoInfantilProps>
   useEffect(() => {
     const t = turmas.find(x => x.id === selectedTurmaId);
     if (t) {
-      setAnoSerie(t.anoSerie || 'Creche III');
+      setAnoSerie(getAnoSerieFromTurma(t));
     }
   }, [selectedTurmaId, turmas]);
 
@@ -312,6 +332,10 @@ export const ParecerDescritivoInfantil: React.FC<ParecerDescritivoInfantilProps>
             resolvedTurmaNome = `${classObj.name || classObj.anoSerie} • ${classObj.turno || ''}`;
           }
 
+          const resolvedAnoSerie = turmaRelation 
+            ? getAnoSerieFromTurma(turmaRelation) 
+            : (classObj ? getAnoSerieFromTurma(classObj) : (d.ano_serie || 'Creche III'));
+
           return {
             id: d.id,
             escolaId: d.escola_id,
@@ -323,7 +347,7 @@ export const ParecerDescritivoInfantil: React.FC<ParecerDescritivoInfantilProps>
             periodo: d.periodo,
             parecer: d.parecer,
             aspectos: d.aspectos || {},
-            anoSerie: d.ano_serie,
+            anoSerie: resolvedAnoSerie,
             criadoEm: d.created_at
           };
         });
@@ -588,6 +612,42 @@ export const ParecerDescritivoInfantil: React.FC<ParecerDescritivoInfantilProps>
     }
   };
 
+  // Derive unique Turmas from all entries to populate the turma filter dropdown dynamically
+  const historyTurmas = useMemo(() => {
+    const list: { id: string, name: string, escolaId: string, anoSerie: string }[] = [];
+    const seen = new Set<string>();
+    
+    entries.forEach(e => {
+      if (e.turmaId && !seen.has(e.turmaId)) {
+        seen.add(e.turmaId);
+        list.push({
+          id: e.turmaId,
+          name: e.turmaNome.split(' • ')[0],
+          escolaId: e.escolaId,
+          anoSerie: e.anoSerie
+        });
+      }
+    });
+    
+    return list;
+  }, [entries]);
+
+  // Filter history turmas based on school and group filters
+  const filteredHistoryTurmas = useMemo(() => {
+    return historyTurmas.filter(t => {
+      const matchSchool = schoolFilter === 'ALL' || t.escolaId === schoolFilter;
+      const matchGrupo = grupoFilter === 'ALL' || t.anoSerie === grupoFilter;
+      return matchSchool && matchGrupo;
+    });
+  }, [historyTurmas, schoolFilter, grupoFilter]);
+
+  // Reset turma filter if it is no longer valid
+  useEffect(() => {
+    if (turmaFilter !== 'ALL' && !filteredHistoryTurmas.some(t => t.id === turmaFilter)) {
+      setTurmaFilter('ALL');
+    }
+  }, [filteredHistoryTurmas, turmaFilter]);
+
   // Filter entries
   const filteredEntries = useMemo(() => {
     return entries.filter(e => {
@@ -595,9 +655,11 @@ export const ParecerDescritivoInfantil: React.FC<ParecerDescritivoInfantilProps>
                           e.parecer.toLowerCase().includes(searchTerm.toLowerCase());
       const matchSchool = schoolFilter === 'ALL' || e.escolaId === schoolFilter;
       const matchPeriod = periodFilter === 'ALL' || e.periodo === periodFilter;
-      return matchSearch && matchSchool && matchPeriod;
+      const matchGrupo = grupoFilter === 'ALL' || e.anoSerie === grupoFilter;
+      const matchTurma = turmaFilter === 'ALL' || e.turmaId === turmaFilter;
+      return matchSearch && matchSchool && matchPeriod && matchGrupo && matchTurma;
     });
-  }, [entries, searchTerm, schoolFilter, periodFilter]);
+  }, [entries, searchTerm, schoolFilter, periodFilter, grupoFilter, turmaFilter]);
 
   return (
     <div className="space-y-6 text-left">
@@ -1027,38 +1089,60 @@ export const ParecerDescritivoInfantil: React.FC<ParecerDescritivoInfantilProps>
 
       {/* History table list */}
       <div className="space-y-4">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h3 className="text-md font-black text-slate-800 uppercase tracking-wider">Histórico de Pareceres ECE</h3>
-            <p className="text-xs text-slate-500 mt-0.5">Pesquise e consulte os pareceres individuais emitidos na Educação Infantil</p>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h3 className="text-md font-black text-slate-800 uppercase tracking-wider">Histórico de Pareceres ECE</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Pesquise e consulte os pareceres individuais emitidos na Educação Infantil</p>
+            </div>
           </div>
 
-          <div className="flex flex-wrap gap-2 w-full md:w-auto">
-            <div className="relative flex-1 md:flex-none">
+          <div className="flex flex-wrap gap-2 w-full items-center">
+            <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
               <input 
                 type="text" 
                 placeholder="Buscar por estudante..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                className="pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-white outline-none focus:border-brand-orange transition-all text-xs font-semibold"
+                className="pl-9 pr-3 py-2 w-full rounded-xl border border-slate-200 bg-white outline-none focus:border-brand-orange transition-all text-xs font-semibold"
               />
             </div>
 
-            <SearchableSchoolSelect
-              escolas={escolasInfantil}
-              selectedId={schoolFilter}
-              onChange={setSchoolFilter}
-              showAllOption={true}
-              allOptionLabel="Todas Unidades"
-              className="max-w-[240px]"
-              inputClassName="pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
-            />
+            <div className="min-w-[180px] flex-1 md:flex-none">
+              <SearchableSchoolSelect
+                escolas={escolasInfantil}
+                selectedId={schoolFilter}
+                onChange={setSchoolFilter}
+                showAllOption={true}
+                allOptionLabel="Todas Unidades"
+                className="w-full"
+                inputClassName="pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all w-full"
+              />
+            </div>
+
+            <select 
+              value={grupoFilter}
+              onChange={e => setGrupoFilter(e.target.value)}
+              className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 outline-none focus:border-brand-orange min-w-[120px] flex-1 md:flex-none"
+            >
+              <option value="ALL">Todos Grupos</option>
+              {FAiXAS_ETARIAS.map(g => <option key={g} value={g}>{g}</option>)}
+            </select>
+
+            <select 
+              value={turmaFilter}
+              onChange={e => setTurmaFilter(e.target.value)}
+              className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 outline-none focus:border-brand-orange min-w-[120px] flex-1 md:flex-none"
+            >
+              <option value="ALL">Todas Turmas</option>
+              {filteredHistoryTurmas.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
 
             <select 
               value={periodFilter}
               onChange={e => setPeriodFilter(e.target.value)}
-              className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 outline-none focus:border-brand-orange"
+              className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 outline-none focus:border-brand-orange min-w-[120px] flex-1 md:flex-none"
             >
               <option value="ALL">Todos Períodos</option>
               {PERIODOS.map(p => <option key={p} value={p}>{p}</option>)}

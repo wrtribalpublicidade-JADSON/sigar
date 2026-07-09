@@ -205,6 +205,24 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
     });
   };
 
+  const getAnoSerieFromTurma = (t: any): string => {
+    if (!t) return 'Creche III';
+    if (t.anoSerie) return t.anoSerie;
+    
+    const val = (t.year || t.name || '').toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[-\s]/g, '');
+
+    if (val.includes('preescolaii') || val.includes('preii')) return 'Pré II';
+    if (val.includes('preescolai') || val.includes('prei')) return 'Pré I';
+    if (val.includes('crecheiii')) return 'Creche III';
+    if (val.includes('crecheii')) return 'Creche II';
+    if (val.includes('crechei')) return 'Creche I';
+    
+    return t.year || 'Creche III';
+  };
+
   const FAIXAS_ETARIAS = ['Creche I', 'Creche II', 'Creche III', 'Pré I', 'Pré II'];
 
   // Compute available Faixas Etárias for the selected school
@@ -331,6 +349,10 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
             resolvedTurmaNome = `${classObj.name || classObj.anoSerie} • ${classObj.turno || ''}`;
           }
 
+          const resolvedAnoSerie = turmaRelation 
+            ? getAnoSerieFromTurma(turmaRelation) 
+            : (classObj ? getAnoSerieFromTurma(classObj) : (d.ano_serie || 'Creche III'));
+
           return {
             id: d.id,
             data: d.data,
@@ -344,7 +366,7 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
             titulo: d.titulo,
             descricao: d.descricao,
             imagens: d.imagens || [],
-            anoSerie: d.ano_serie,
+            anoSerie: resolvedAnoSerie,
             criadoEm: d.created_at
           };
         });
