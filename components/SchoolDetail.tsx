@@ -35,7 +35,7 @@ interface SchoolDetailProps {
   onUpdateVisitStatus: (visitId: string, newStatus: Visita['status']) => void;
   isDemoMode: boolean;
   userRole?: string;
-  onUpdateCoordenadorTurmas?: (coordenadorId: string, turmasIds: string[]) => Promise<void> | void;
+  onUpdateCoordenadorTurmas?: (coordenadorId: string, turmasIds: string[], turmaComponentes?: Record<string, string[]>) => Promise<void> | void;
 }
 
 const COLORS = {
@@ -45,6 +45,26 @@ const COLORS = {
   acid: '#D6FF00',
   signal: '#FF1F00'
 };
+
+const COMPONENTES_CURRICULARES = [
+  'Língua Portuguesa',
+  'Matemática',
+  'Ciências',
+  'Geografia',
+  'História',
+  'Educação Física',
+  'Arte',
+  'Ensino Religioso',
+  'Língua Inglesa'
+];
+
+const CAMPOS_EXPERIENCIA = [
+  'O eu, o outro e o nós',
+  'Corpo, gestos e movimentos',
+  'Traços, sons, cores e formas',
+  'Escuta, fala, pensamento e imaginação',
+  'Espaços, tempos, quantidades, relações e transformações'
+];
 
 const ETAPAS_COHORTS = [
   {
@@ -78,6 +98,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
   // State for teachers tab
   const [selectedTeacherForTurmas, setSelectedTeacherForTurmas] = useState<Coordenador | null>(null);
   const [tempSelectedTurmas, setTempSelectedTurmas] = useState<string[]>([]);
+  const [tempTurmaComponentes, setTempTurmaComponentes] = useState<Record<string, string[]>>({});
   const [isSavingTurmas, setIsSavingTurmas] = useState(false);
 
   // State for Matriculas tab
@@ -2134,123 +2155,193 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                               </div>
                             </div>
 
-                            <div className="space-y-2">
-                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Turmas Vinculadas ({teacherTurmas.length})</span>
-                              {teacherTurmas.length === 0 ? (
-                                <p className="text-slate-400 text-xs italic">Nenhuma turma vinculada a este professor nesta escola.</p>
-                              ) : (
-                                <div className="flex flex-wrap gap-2">
-                                  {teacherTurmas.map((t) => (
-                                    <span key={t.id} className="bg-slate-100 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200/60 shadow-sm flex items-center gap-1.5">
-                                      <GraduationCap className="w-3.5 h-3.5 text-orange-500" />
-                                      {(t.year || t.anoSerie) ? `${t.year || t.anoSerie} - ` : ''}{t.name || ''} • {t.shift || ''}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          </div>
+                             <div className="space-y-2">
+                               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Turmas Vinculadas ({teacherTurmas.length})</span>
+                               {teacherTurmas.length === 0 ? (
+                                 <p className="text-slate-400 text-xs italic">Nenhuma turma vinculada a este professor nesta escola.</p>
+                               ) : (
+                                 <div className="flex flex-col gap-2">
+                                   {teacherTurmas.map((t) => {
+                                     const comps = teacher.turmaComponentes?.[t.id] || [];
+                                     return (
+                                       <div key={t.id} className="bg-slate-50 text-slate-700 text-xs font-semibold p-3 rounded-xl border border-slate-200/60 shadow-sm space-y-1.5">
+                                         <div className="flex items-center gap-1.5 font-bold text-slate-800">
+                                           <GraduationCap className="w-4 h-4 text-orange-500" />
+                                           {(t.year || t.anoSerie) ? `${t.year || t.anoSerie} - ` : ''}{t.name || ''} • {t.shift || ''}
+                                         </div>
+                                         {comps.length > 0 ? (
+                                           <div className="flex flex-wrap gap-1">
+                                             {comps.map(comp => (
+                                               <span key={comp} className="bg-orange-50 text-orange-700 text-[10px] font-bold px-2 py-0.5 rounded border border-orange-100 uppercase tracking-tight">
+                                                 {comp}
+                                               </span>
+                                             ))}
+                                           </div>
+                                         ) : (
+                                           <span className="text-[10px] text-slate-400 italic block">Nenhum componente curricular ou campo de experiência vinculado</span>
+                                        )}
+                                       </div>
+                                     );
+                                   })}
+                                 </div>
+                               )}
+                             </div>
+                           </div>
+ 
+                           {canEditTab && (
+                             <div className="mt-6 border-t border-slate-100 pt-4 flex justify-end">
+                               <Button
+                                 size="sm"
+                                 variant="secondary"
+                                 onClick={() => {
+                                   setSelectedTeacherForTurmas(teacher);
+                                   setTempSelectedTurmas(teacher.turmasIds || []);
+                                   setTempTurmaComponentes(teacher.turmaComponentes || {});
+                                 }}
+                                 className="flex items-center gap-2"
+                               >
+                                 <Edit className="w-4 h-4" />
+                                 Vincular Turmas
+                               </Button>
+                             </div>
+                           )}
+                         </div>
+                       );
+                     })}
+                   </div>
+                 )}
+ 
+                 {/* Modal for Vincular Turmas */}
+                 {selectedTeacherForTurmas && (
+                   <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                     <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden animate-scale-up">
+                       <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                         <div>
+                           <h4 className="text-xl font-bold text-slate-800">Vincular Turmas</h4>
+                           <p className="text-xs text-slate-500 mt-1">{selectedTeacherForTurmas.nome}</p>
+                         </div>
+                         <button
+                           onClick={() => setSelectedTeacherForTurmas(null)}
+                           className="w-8 h-8 rounded-full bg-white hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 border border-slate-200/60 shadow-sm transition-colors"
+                         >
+                           <X className="w-4 h-4" />
+                         </button>
+                       </div>
+ 
+                       <div className="p-6 overflow-y-auto space-y-4 flex-1">
+                         <p className="text-slate-500 text-sm leading-relaxed">
+                           Selecione as turmas da unidade <strong>{escola.nome}</strong> que este professor lecionará e vincule os componentes/campos correspondentes:
+                         </p>
+                         
+                         {schoolTurmas.length === 0 ? (
+                           <div className="text-center py-6">
+                             <GraduationCap className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                             <p className="text-slate-400 text-xs italic">Nenhuma turma cadastrada nesta escola.</p>
+                           </div>
+                         ) : (
+                           <div className="space-y-3">
+                             {schoolTurmas.map((t) => {
+                               const isChecked = tempSelectedTurmas.includes(t.id);
+                               const isInfantil = t.stage === 'Educação Infantil';
+                               const currentSelected = tempTurmaComponentes[t.id] || [];
+                               const listToUse = isInfantil ? CAMPOS_EXPERIENCIA : COMPONENTES_CURRICULARES;
 
-                          {canEditTab && (
-                            <div className="mt-6 border-t border-slate-100 pt-4 flex justify-end">
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={() => {
-                                  setSelectedTeacherForTurmas(teacher);
-                                  setTempSelectedTurmas(teacher.turmasIds || []);
-                                }}
-                                className="flex items-center gap-2"
-                              >
-                                <Edit className="w-4 h-4" />
-                                Vincular Turmas
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                               return (
+                                 <div key={t.id} className={`rounded-2xl border transition-all overflow-hidden ${isChecked ? 'bg-orange-50/20 border-orange-200 shadow-sm' : 'bg-white border-slate-200 hover:border-slate-300'}`}>
+                                   {/* Header Row */}
+                                   <div 
+                                     onClick={() => {
+                                       if (isChecked) {
+                                         setTempSelectedTurmas(tempSelectedTurmas.filter(id => id !== t.id));
+                                         const updated = { ...tempTurmaComponentes };
+                                         delete updated[t.id];
+                                         setTempTurmaComponentes(updated);
+                                       } else {
+                                         setTempSelectedTurmas([...tempSelectedTurmas, t.id]);
+                                         setTempTurmaComponentes({
+                                           ...tempTurmaComponentes,
+                                           [t.id]: []
+                                         });
+                                       }
+                                     }}
+                                     className="flex items-center gap-3 p-3.5 cursor-pointer select-none bg-white hover:bg-slate-50/50"
+                                   >
+                                     <input
+                                       type="checkbox"
+                                       checked={isChecked}
+                                       readOnly
+                                       className="w-4 h-4 rounded text-orange-500 border-slate-300 focus:ring-orange-500 pointer-events-none"
+                                     />
+                                     <div className="flex-1">
+                                       <span className="font-bold text-slate-800 text-sm block">{(t.year || t.anoSerie) ? `${t.year || t.anoSerie} - ` : ''}{t.name || ''}</span>
+                                       <span className="text-[10px] text-slate-400 font-medium block uppercase mt-0.5">{t.stage || 'Regular'} • {t.shift || 'MANHÃ'}</span>
+                                     </div>
+                                   </div>
 
-                {/* Modal for Vincular Turmas */}
-                {selectedTeacherForTurmas && (
-                  <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden animate-scale-up">
-                      <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                        <div>
-                          <h4 className="text-xl font-bold text-slate-800">Vincular Turmas</h4>
-                          <p className="text-xs text-slate-500 mt-1">{selectedTeacherForTurmas.nome}</p>
-                        </div>
-                        <button
-                          onClick={() => setSelectedTeacherForTurmas(null)}
-                          className="w-8 h-8 rounded-full bg-white hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 border border-slate-200/60 shadow-sm transition-colors"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      <div className="p-6 overflow-y-auto space-y-4 flex-1">
-                        <p className="text-slate-500 text-sm leading-relaxed">
-                          Selecione as turmas da unidade <strong>{escola.nome}</strong> que este professor lecionará:
-                        </p>
-                        
-                        {schoolTurmas.length === 0 ? (
-                          <div className="text-center py-6">
-                            <GraduationCap className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-                            <p className="text-slate-400 text-xs italic">Nenhuma turma cadastrada nesta escola.</p>
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            {schoolTurmas.map((t) => {
-                              const isChecked = tempSelectedTurmas.includes(t.id);
-                              return (
-                                <label key={t.id} className={`flex items-center gap-3 p-3.5 rounded-2xl border transition-all cursor-pointer select-none ${isChecked ? 'bg-orange-50/50 border-orange-200 shadow-sm' : 'bg-white border-slate-200 hover:border-slate-300'}`}>
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    onChange={(e) => {
-                                      if (e.target.checked) {
-                                        setTempSelectedTurmas([...tempSelectedTurmas, t.id]);
-                                      } else {
-                                        setTempSelectedTurmas(tempSelectedTurmas.filter(id => id !== t.id));
-                                      }
-                                    }}
-                                    className="w-4 h-4 rounded text-orange-500 border-slate-300 focus:ring-orange-500"
-                                  />
-                                  <div className="flex-1">
-                                    <span className="font-bold text-slate-800 text-sm block">{(t.year || t.anoSerie) ? `${t.year || t.anoSerie} - ` : ''}{t.name || ''}</span>
-                                    <span className="text-[10px] text-slate-400 font-medium block uppercase mt-0.5">{t.stage || 'Regular'} • {t.shift || 'MANHÃ'}</span>
-                                  </div>
-                                </label>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
-                        <Button
-                          variant="ghost"
-                          onClick={() => setSelectedTeacherForTurmas(null)}
-                          disabled={isSavingTurmas}
-                        >
-                          Cancelar
-                        </Button>
-                        <Button
-                          variant="primary"
-                          onClick={async () => {
-                            if (!onUpdateCoordenadorTurmas) return;
-                            setIsSavingTurmas(true);
-                            try {
-                              await onUpdateCoordenadorTurmas(selectedTeacherForTurmas.id, tempSelectedTurmas);
-                              setSelectedTeacherForTurmas(null);
-                            } catch (err) {
-                              console.error(err);
-                            } finally {
-                              setIsSavingTurmas(false);
-                            }
-                          }}
+                                   {/* Curricular Components / Fields of Experience Selection */}
+                                   {isChecked && (
+                                     <div className="p-4 bg-slate-50/50 border-t border-slate-100 space-y-2.5">
+                                       <span className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                                         {isInfantil ? 'Campos de Experiência' : 'Componentes Curriculares'}
+                                       </span>
+                                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                         {listToUse.map((comp) => {
+                                           const isCompChecked = currentSelected.includes(comp);
+                                           return (
+                                             <label 
+                                               key={comp} 
+                                               className="flex items-start gap-2.5 p-2 rounded-xl border bg-white border-slate-200 hover:bg-slate-50/80 cursor-pointer transition-colors text-xs font-semibold text-slate-700 leading-normal"
+                                             >
+                                               <input
+                                                 type="checkbox"
+                                                 checked={isCompChecked}
+                                                 onChange={(e) => {
+                                                   const newComponents = e.target.checked
+                                                     ? [...currentSelected, comp]
+                                                     : currentSelected.filter(item => item !== comp);
+                                                   setTempTurmaComponentes({
+                                                     ...tempTurmaComponentes,
+                                                     [t.id]: newComponents
+                                                   });
+                                                 }}
+                                                 className="w-3.5 h-3.5 rounded text-orange-500 border-slate-300 focus:ring-orange-500 mt-0.5"
+                                               />
+                                               <span>{comp}</span>
+                                             </label>
+                                           );
+                                         })}
+                                       </div>
+                                     </div>
+                                   )}
+                                 </div>
+                               );
+                             })}
+                           </div>
+                         )}
+                       </div>
+ 
+                       <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+                         <Button
+                           variant="ghost"
+                           onClick={() => setSelectedTeacherForTurmas(null)}
+                           disabled={isSavingTurmas}
+                         >
+                           Cancelar
+                         </Button>
+                         <Button
+                           variant="primary"
+                           onClick={async () => {
+                             if (!onUpdateCoordenadorTurmas) return;
+                             setIsSavingTurmas(true);
+                             try {
+                               await onUpdateCoordenadorTurmas(selectedTeacherForTurmas.id, tempSelectedTurmas, tempTurmaComponentes);
+                               setSelectedTeacherForTurmas(null);
+                             } catch (err) {
+                               console.error(err);
+                             } finally {
+                               setIsSavingTurmas(false);
+                             }
+                           }}
                           disabled={isSavingTurmas}
                           className="flex items-center gap-2"
                         >

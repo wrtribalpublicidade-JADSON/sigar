@@ -123,7 +123,7 @@ export default function App() {
           let hasMore = true;
           let from = 0;
           while (hasMore) {
-            const { data, error } = await supabase.from('coordenador_turmas').select('coordenador_id, turma_id').range(from, from + 999);
+            const { data, error } = await supabase.from('coordenador_turmas').select('coordenador_id, turma_id, componentes').range(from, from + 999);
             if (error) throw error;
             list = list.concat(data || []);
             hasMore = (data || []).length === 1000;
@@ -133,16 +133,24 @@ export default function App() {
         })()
       ]);
 
-      const mappedCoords: Coordenador[] = coordData.map((c: any) => ({
-        id: c.id,
-        nome: c.nome,
-        contato: c.contato,
-        regiao: c.regiao,
-        funcao: normalizeRole(c.funcao), // Map function from DB
-        escolasIds: schoolAssoc.filter(sa => sa.coordenador_id === c.id).map(sa => sa.escola_id),
-        turmasIds: classAssoc.filter(ca => ca.coordenador_id === c.id).map(ca => ca.turma_id),
-        created_at: c.created_at
-      }));
+      const mappedCoords: Coordenador[] = coordData.map((c: any) => {
+        const cTurmas = classAssoc.filter(ca => ca.coordenador_id === c.id);
+        const turmaComponentes: Record<string, string[]> = {};
+        cTurmas.forEach(ca => {
+          turmaComponentes[ca.turma_id] = ca.componentes || [];
+        });
+        return {
+          id: c.id,
+          nome: c.nome,
+          contato: c.contato,
+          regiao: c.regiao,
+          funcao: normalizeRole(c.funcao), // Map function from DB
+          escolasIds: schoolAssoc.filter(sa => sa.coordenador_id === c.id).map(sa => sa.escola_id),
+          turmasIds: cTurmas.map(ca => ca.turma_id),
+          turmaComponentes,
+          created_at: c.created_at
+        };
+      });
 
       let linkedSchoolIds: string[] = [];
       let currentUserCoord: Coordenador | undefined;
@@ -966,9 +974,13 @@ export default function App() {
     }
   };
 
-  const handleUpdateCoordenadorTurmas = async (coordenadorId: string, turmasIds: string[]) => {
+  const handleUpdateCoordenadorTurmas = async (
+    coordenadorId: string, 
+    turmasIds: string[], 
+    turmaComponentes?: Record<string, string[]>
+  ) => {
     if (isDemoMode) {
-      setCoordenadores(coordenadores.map(c => c.id === coordenadorId ? { ...c, turmasIds } : c));
+      setCoordenadores(coordenadores.map(c => c.id === coordenadorId ? { ...c, turmasIds, turmaComponentes } : c));
       showNotification('success', 'Vínculos de turmas atualizados (Demo).');
       return;
     }
@@ -980,15 +992,19 @@ export default function App() {
       // Insert new ones
       if (turmasIds.length > 0) {
         const { error } = await supabase.from('coordenador_turmas').insert(
-          turmasIds.map(tid => ({ coordenador_id: coordenadorId, turma_id: tid }))
+          turmasIds.map(tid => ({ 
+            coordenador_id: coordenadorId, 
+            turma_id: tid,
+            componentes: turmaComponentes?.[tid] || []
+          }))
         );
         if (error) throw error;
       }
 
-      await logAudit('UPDATE', 'COORDENADOR_TURMAS', coordenadorId, { turmasIds });
+      await logAudit('UPDATE', 'COORDENADOR_TURMAS', coordenadorId, { turmasIds, turmaComponentes });
 
       // Update local state
-      setCoordenadores(coordenadores.map(c => c.id === coordenadorId ? { ...c, turmasIds } : c));
+      setCoordenadores(coordenadores.map(c => c.id === coordenadorId ? { ...c, turmasIds, turmaComponentes } : c));
       showNotification('success', 'Vínculos de turmas atualizados com sucesso!');
     } catch (error: any) {
       console.error("Erro ao atualizar turmas do coordenador:", error);
