@@ -121,6 +121,7 @@ interface ConselhoClasseProps {
     forcedEtapa?: 'fundamental' | 'infantil';
     externalSelectedEscolaId?: string;
     onEscolaChange?: (id: string) => void;
+    isDemoMode?: boolean;
 }
 
 export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
@@ -130,7 +131,8 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     currentUser = null,
     forcedEtapa,
     externalSelectedEscolaId,
-    onEscolaChange
+    onEscolaChange,
+    isDemoMode = false
 }) => {
     const parentModuleId = forcedEtapa === 'infantil' ? 'conselho_infantil' : 'conselho_fundamental';
     
@@ -209,18 +211,18 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     const [avaliacaoEtapa, setAvaliacaoEtapa] = useState<'fundamental' | 'infantil'>(defaultAvaliacaoEtapa);
     const [avaliacaoInfantilCampo, setAvaliacaoInfantilCampo] = useState('O EU, O OUTRO E O NÓS');
     const [avaliacaoBimestre, setAvaliacaoBimestre] = useState('Resultado Consolidado');
-    const [selectedComponenteCurricular, setSelectedComponenteCurricular] = useState('Língua Portuguesa - BNCC');
+    const [selectedComponenteCurricular, setSelectedComponenteCurricular] = useState('Língua Portuguesa');
 
     const COMPONENTES_CURRICULARES = [
-        'Língua Portuguesa - BNCC',
-        'Matemática - BNCC',
-        'Ciências - BNCC',
-        'Geografia - BNCC',
-        'História - BNCC',
-        'Educação Física - BNCC',
-        'Arte - BNCC',
-        'Ensino Religioso - BNCC',
-        'Língua Inglesa - BNCC'
+        'Língua Portuguesa',
+        'Matemática',
+        'Ciências',
+        'Geografia',
+        'História',
+        'Educação Física',
+        'Arte',
+        'Ensino Religioso',
+        'Língua Inglesa'
     ];
     const [isTurmaModalOpen, setIsTurmaModalOpen] = useState(false);
     const [isStudentReportOpen, setIsStudentReportOpen] = useState(false);
@@ -463,6 +465,9 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     const [showSuccessToast, setShowSuccessToast] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isCadastroEstudanteOpen, setIsCadastroEstudanteOpen] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [importPreviewData, setImportPreviewData] = useState<any[]>([]);
+    const [isImportLoading, setIsImportLoading] = useState(false);
 
     // Sync active tabs based on selected class stage
     useEffect(() => {
@@ -695,6 +700,192 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             }
         } catch (error) {
             console.error('Erro ao persistir avaliação:', error);
+        } finally {
+            setTimeout(() => setIsSaving(false), 800);
+        }
+    };
+
+    const handleStartImport = async () => {
+        if (!activeTurma || avaliacaoBimestre === 'Resultado Consolidado' || avaliacaoEtapa !== 'fundamental') return;
+
+        setIsImportLoading(true);
+        try {
+            let fetchedSheet: any = null;
+            if (isDemoMode) {
+                const saved = localStorage.getItem('sigar_notas_sheets');
+                if (saved) {
+                    const sheets = JSON.parse(saved);
+                    fetchedSheet = sheets.find((s: any) =>
+                        s.escolaId === currentEscolaId &&
+                        s.turmaId === activeTurma.id &&
+                        s.componente === selectedComponenteCurricular &&
+                        s.bimestre === avaliacaoBimestre
+                    );
+                }
+                
+                if (!fetchedSheet) {
+                    // Generate demo data so user can test the import process in demo mode
+                    const demoStudents = studentsAvaliacao.map((s, idx) => {
+                        const av1 = parseFloat((7 + (idx % 3) + Math.random() * 0.5).toFixed(1));
+                        const av2 = parseFloat((7.5 + ((idx + 1) % 3) * 0.5 + Math.random() * 0.5).toFixed(1));
+                        const qual = parseFloat((8 + ((idx + 2) % 3) + Math.random() * 0.5).toFixed(1));
+                        const rec = idx % 4 === 0 ? parseFloat((6.5 + Math.random() * 1.5).toFixed(1)) : 0;
+                        let avg = (av1 + av2 + qual) / 3;
+                        if (rec > avg) avg = rec;
+                        return {
+                            id: s.id,
+                            name: s.name,
+                            av1: av1 > 10 ? 10 : av1,
+                            av2: av2 > 10 ? 10 : av2,
+                            qualitativa: qual > 10 ? 10 : qual,
+                            recuperacao: rec > 10 ? 10 : rec,
+                            mediaFinal: parseFloat(avg.toFixed(1))
+                        };
+                    });
+
+                    fetchedSheet = {
+                        escolaId: currentEscolaId,
+                        turmaId: activeTurma.id,
+                        componente: selectedComponenteCurricular,
+                        bimestre: avaliacaoBimestre,
+                        students: demoStudents
+                    };
+                }
+            } else {
+                const { data, error } = await supabase
+                    .from('notas_sheets')
+                    .select('*')
+                    .eq('escola_id', currentEscolaId)
+                    .eq('turma_id', activeTurma.id)
+                    .eq('componente', selectedComponenteCurricular)
+                    .eq('bimestre', avaliacaoBimestre)
+                    .eq('ativo', true)
+                    .maybeSingle();
+
+                if (error) throw error;
+                fetchedSheet = data;
+            }
+
+            if (!fetchedSheet || !fetchedSheet.students || fetchedSheet.students.length === 0) {
+                alert(`Nenhuma pauta de notas encontrada no Diário de Classe para:\nTurma: ${activeTurma.anoSerie} ${activeTurma.identificacao}\nComponente: ${selectedComponenteCurricular}\nBimestre: ${avaliacaoBimestre}`);
+                return;
+            }
+
+            // Map and compare with current grades
+            const preview = studentsAvaliacao.map(currentStudent => {
+                const importedStudent = fetchedSheet.students.find((s: any) => s.id.toString() === currentStudent.id.toString());
+                
+                return {
+                    id: currentStudent.id,
+                    name: currentStudent.name,
+                    dbId: currentStudent.dbId,
+                    current: {
+                        av1: currentStudent.notas?.av1 || 0,
+                        av2: currentStudent.notas?.av2 || 0,
+                        av3: currentStudent.notas?.av3 || 0,
+                        rec: currentStudent.notas?.rec || null,
+                        media: currentStudent.media || 0
+                    },
+                    imported: importedStudent ? {
+                        av1: parseFloat(importedStudent.av1) || 0,
+                        av2: parseFloat(importedStudent.av2) || 0,
+                        av3: parseFloat(importedStudent.qualitativa) || 0, // qualitativa maps to av3
+                        rec: importedStudent.recuperacao !== undefined && importedStudent.recuperacao !== null && importedStudent.recuperacao !== '' ? parseFloat(importedStudent.recuperacao) : null,
+                        media: parseFloat(importedStudent.mediaFinal) || 0
+                    } : null
+                };
+            });
+
+            setImportPreviewData(preview);
+            setIsImportModalOpen(true);
+        } catch (error) {
+            console.error('Erro ao buscar notas do diário para importação:', error);
+            alert('Ocorreu um erro ao carregar as notas do diário de classe.');
+        } finally {
+            setIsImportLoading(false);
+        }
+    };
+
+    const handleConfirmImport = async () => {
+        if (!activeTurma || avaliacaoBimestre === 'Resultado Consolidado' || isEtapaReadOnly) return;
+
+        setIsSaving(true);
+        try {
+            const updatedStudents = studentsAvaliacao.map(student => {
+                const previewItem = importPreviewData.find(p => p.id === student.id);
+                if (previewItem && previewItem.imported) {
+                    const newNotas = {
+                        av1: previewItem.imported.av1,
+                        av2: previewItem.imported.av2,
+                        av3: previewItem.imported.av3,
+                        rec: previewItem.imported.rec
+                    };
+                    const newMedia = previewItem.imported.media;
+                    
+                    // Create temp student object to calculate new parecer
+                    const tempStudent = {
+                        ...student,
+                        notas: newNotas,
+                        media: newMedia
+                    };
+                    const newParecer = calculateParecerEtapaRaw(tempStudent);
+
+                    return {
+                        ...tempStudent,
+                        notas: newNotas,
+                        media: newMedia,
+                        parecer: newParecer
+                    };
+                }
+                return student;
+            });
+
+            if (isDemoMode) {
+                // In demo mode, just update the state
+                setStudentsAvaliacao(updatedStudents);
+                alert('Notas importadas com sucesso no modo de demonstração!');
+                setIsImportModalOpen(false);
+            } else {
+                // In production mode, map to payloads and call saveMany
+                const payloads = updatedStudents.map(student => ({
+                    id: student.dbId || crypto.randomUUID(),
+                    escola_id: currentEscolaId,
+                    turma_id: activeTurma.id,
+                    estudante_id: student.id.toString(),
+                    nome_estudante: student.name,
+                    periodo_letivo: avaliacaoBimestre,
+                    componente_curricular: selectedComponenteCurricular,
+                    frequencia_conceito: student.fre,
+                    participacao_conceito: student.par,
+                    material_conceito: student.mat,
+                    atividades_conceito: student.atv,
+                    comunicacao_conceito: student.com,
+                    pesquisa_conceito: student.pes,
+                    conduta_conceito: student.con,
+                    notas_json: student.notas,
+                    media_final: student.media,
+                    parecer_etapa: student.parecer
+                }));
+
+                const savedData = await ccAvaliacaoDocenteService.saveMany(payloads, 'fundamental');
+                if (savedData) {
+                    setStudentsAvaliacao(prev => prev.map(s => {
+                        const savedItem = savedData.find((d: any) => d.estudante_id === s.id.toString());
+                        return savedItem ? { 
+                            ...s, 
+                            dbId: savedItem.id, 
+                            notas: savedItem.notas_json, 
+                            media: savedItem.media_final ? Number(savedItem.media_final) : 0, 
+                            parecer: savedItem.parecer_etapa 
+                        } : s;
+                    }));
+                }
+                alert('Notas importadas e persistidas com sucesso!');
+                setIsImportModalOpen(false);
+            }
+        } catch (error) {
+            console.error('Erro ao salvar notas importadas:', error);
+            alert('Ocorreu um erro ao salvar as notas importadas.');
         } finally {
             setTimeout(() => setIsSaving(false), 800);
         }
@@ -1998,6 +2189,18 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
 
                                 {avaliacaoBimestre !== 'Resultado Consolidado' && !isEtapaReadOnly && (
                                     <>
+                                        {avaliacaoEtapa === 'fundamental' && (
+                                            <button
+                                                onClick={handleStartImport}
+                                                disabled={isSaving || isImportLoading || isLoading}
+                                                className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl font-bold text-sm hover:bg-slate-50 hover:border-emerald-500 hover:text-emerald-600 flex items-center gap-2 transition-all"
+                                            >
+                                                {isImportLoading ? (
+                                                    <div className="w-4 h-4 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin"></div>
+                                                ) : <Download className="w-4 h-4 text-emerald-500" />}
+                                                Importar do Diário
+                                            </button>
+                                        )}
                                         <button
                                             onClick={handleSaveRascunho}
                                             disabled={isSaving}
@@ -4105,6 +4308,153 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                             </button>
                             <button onClick={handleSaveGrades} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-emerald-500/20 transition-colors flex items-center justify-center gap-2">
                                 <CheckCircle2 className="w-5 h-5" /> Salvar Média
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {isImportModalOpen && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm animate-fade-in p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden animate-scale-in flex flex-col max-h-[85vh]">
+                        <div className="bg-slate-900 p-6 text-white flex justify-between items-center shrink-0">
+                            <div>
+                                <h3 className="text-xl font-bold flex items-center gap-2">
+                                    <Download className="w-5 h-5 text-emerald-500" /> Conferir Importação de Notas
+                                </h3>
+                                <p className="text-slate-400 text-xs mt-1 font-sans">
+                                    Diário de Classe &rarr; Conselho de Classe • {selectedComponenteCurricular} • {avaliacaoBimestre}
+                                </p>
+                            </div>
+                            <button onClick={() => setIsImportModalOpen(false)} className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center transition-colors">
+                                &times;
+                            </button>
+                        </div>
+
+                        <div className="p-6 overflow-y-auto flex-1 space-y-4">
+                            <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex gap-3 text-amber-800 text-sm">
+                                <AlertCircle className="w-5 h-5 shrink-0 text-amber-600 mt-0.5" />
+                                <div>
+                                    <p className="font-bold">Confirmação de Importação</p>
+                                    <p className="text-amber-700 text-xs mt-0.5 font-sans">
+                                        Esta ação substituirá as notas atuais da avaliação docente pelas notas registradas no diário de classe. Verifique os valores abaixo antes de confirmar.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-200">
+                                            <th className="p-3">Estudante</th>
+                                            <th className="p-3 text-center">Avaliação 1</th>
+                                            <th className="p-3 text-center">Avaliação 2</th>
+                                            <th className="p-3 text-center">Qualitativa (AV3)</th>
+                                            <th className="p-3 text-center">Recuperação</th>
+                                            <th className="p-3 text-center">Média Final</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 text-slate-700 text-xs">
+                                        {importPreviewData.map(item => {
+                                            const hasChanges = !item.imported ? false : (
+                                                item.current.av1 !== item.imported.av1 ||
+                                                item.current.av2 !== item.imported.av2 ||
+                                                item.current.av3 !== item.imported.av3 ||
+                                                item.current.rec !== item.imported.rec ||
+                                                item.current.media !== item.imported.media
+                                            );
+
+                                            return (
+                                                <tr key={item.id} className={`hover:bg-slate-50/50 transition-colors ${hasChanges ? 'bg-emerald-50/10' : ''}`}>
+                                                    <td className="p-3 font-semibold border-r border-slate-100">
+                                                        <p className="text-slate-800 font-bold">{item.name}</p>
+                                                        {!item.imported && (
+                                                            <span className="inline-block mt-0.5 px-2 py-0.5 text-[9px] font-bold bg-amber-100 text-amber-800 rounded">
+                                                                Não encontrado no diário
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    
+                                                    {/* AV 1 */}
+                                                    <td className="p-3 text-center border-r border-slate-100">
+                                                        {item.imported ? (
+                                                            <div className="flex flex-col items-center justify-center">
+                                                                <span className="font-bold text-slate-800">{item.imported.av1.toFixed(1)}</span>
+                                                                {item.current.av1 !== item.imported.av1 && (
+                                                                    <span className="text-[10px] text-slate-400 line-through">({item.current.av1.toFixed(1)})</span>
+                                                                )}
+                                                            </div>
+                                                        ) : '—'}
+                                                    </td>
+
+                                                    {/* AV 2 */}
+                                                    <td className="p-3 text-center border-r border-slate-100">
+                                                        {item.imported ? (
+                                                            <div className="flex flex-col items-center justify-center">
+                                                                <span className="font-bold text-slate-800">{item.imported.av2.toFixed(1)}</span>
+                                                                {item.current.av2 !== item.imported.av2 && (
+                                                                    <span className="text-[10px] text-slate-400 line-through">({item.current.av2.toFixed(1)})</span>
+                                                                )}
+                                                            </div>
+                                                        ) : '—'}
+                                                    </td>
+
+                                                    {/* QUALITATIVA / AV 3 */}
+                                                    <td className="p-3 text-center border-r border-slate-100">
+                                                        {item.imported ? (
+                                                            <div className="flex flex-col items-center justify-center">
+                                                                <span className="font-bold text-slate-800">{item.imported.av3.toFixed(1)}</span>
+                                                                {item.current.av3 !== item.imported.av3 && (
+                                                                    <span className="text-[10px] text-slate-400 line-through">({item.current.av3.toFixed(1)})</span>
+                                                                )}
+                                                            </div>
+                                                        ) : '—'}
+                                                    </td>
+
+                                                    {/* REC */}
+                                                    <td className="p-3 text-center border-r border-slate-100">
+                                                        {item.imported ? (
+                                                            <div className="flex flex-col items-center justify-center">
+                                                                <span className={`font-bold ${item.imported.rec ? 'text-amber-600' : 'text-slate-800'}`}>
+                                                                    {item.imported.rec !== null ? item.imported.rec.toFixed(1) : '—'}
+                                                                </span>
+                                                                {item.current.rec !== item.imported.rec && item.current.rec !== null && (
+                                                                    <span className="text-[10px] text-slate-400 line-through">({item.current.rec.toFixed(1)})</span>
+                                                                )}
+                                                            </div>
+                                                        ) : '—'}
+                                                    </td>
+
+                                                    {/* MEDIA */}
+                                                    <td className="p-3 text-center font-bold">
+                                                        {item.imported ? (
+                                                            <div className="flex flex-col items-center justify-center">
+                                                                <span className={`px-2 py-1 rounded text-xs font-black ${item.imported.media >= 6 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                                                                    {item.imported.media.toFixed(1)}
+                                                                </span>
+                                                                {item.current.media !== item.imported.media && (
+                                                                    <span className="text-[10px] text-slate-400 line-through mt-0.5">({item.current.media.toFixed(1)})</span>
+                                                                )}
+                                                            </div>
+                                                        ) : '—'}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3 shrink-0">
+                            <button onClick={() => setIsImportModalOpen(false)} className="flex-1 bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold py-3 rounded-xl transition-colors">
+                                Cancelar
+                            </button>
+                            <button onClick={handleConfirmImport} disabled={isSaving} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-emerald-500/20 transition-colors flex items-center justify-center gap-2">
+                                {isSaving ? (
+                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                ) : <CheckCircle2 className="w-5 h-5" />}
+                                Confirmar Importação
                             </button>
                         </div>
                     </div>

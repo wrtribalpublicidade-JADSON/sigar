@@ -625,13 +625,13 @@ export const FORMACAO_IG_MOCK: any[] = [
 export const AVALIACOES_DOCENTE_MOCK: any[] = [
   {
     id: 'ev1', escola_id: '1', turma_id: 't1', estudante_id: 'a1', periodo_letivo: '1º Bimestre', 
-    componente_curricular: 'Língua Portuguesa - BNCC', frequencia_conceito: 'B', participacao_conceito: 'B',
+    componente_curricular: 'Língua Portuguesa', frequencia_conceito: 'B', participacao_conceito: 'B',
     material_conceito: 'B', atividades_conceito: 'B', comunicacao_conceito: 'B', pesquisa_conceito: 'B', 
     conduta_conceito: 'B', notas_json: { av1: 8.5, av2: 7.0, av3: 9.0, rec: null }, media_final: 8.2, parecer_etapa: 'BOM'
   },
   {
     id: 'ev2', escola_id: '1', turma_id: 't1', estudante_id: 'a2', periodo_letivo: '1º Bimestre',
-    componente_curricular: 'Língua Portuguesa - BNCC', frequencia_conceito: 'B', participacao_conceito: 'R',
+    componente_curricular: 'Língua Portuguesa', frequencia_conceito: 'B', participacao_conceito: 'R',
     material_conceito: 'B', atividades_conceito: 'R', comunicacao_conceito: 'B', pesquisa_conceito: 'R',
     conduta_conceito: 'B', notas_json: { av1: 5.5, av2: 6.0, av3: 5.0, rec: 7.5 }, media_final: 6.5, parecer_etapa: 'REGULAR'
   }

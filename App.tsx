@@ -1209,6 +1209,7 @@ export default function App() {
             userEmail={userEmail}
             isAdmin={isAdmin}
             currentUser={effectiveUser}
+            isDemoMode={isDemoMode}
           />
         );
       case 'CONSELHO_CLASSE_FUNDAMENTAL':
@@ -1225,6 +1226,7 @@ export default function App() {
             forcedEtapa="fundamental"
             externalSelectedEscolaId={ccFundamentalEscolaId}
             onEscolaChange={setCcFundamentalEscolaId}
+            isDemoMode={isDemoMode}
           />
         );
       case 'CONSELHO_CLASSE_INFANTIL':
@@ -1238,6 +1240,7 @@ export default function App() {
             forcedEtapa="infantil"
             externalSelectedEscolaId={ccInfantilEscolaId}
             onEscolaChange={setCcInfantilEscolaId}
+            isDemoMode={isDemoMode}
           />
         );
       case 'NOTIFICACOES':

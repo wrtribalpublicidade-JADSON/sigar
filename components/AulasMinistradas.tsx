@@ -50,8 +50,7 @@ const COMPONENTES = [
   'Arte',
   'Educação Física',
   'Língua Inglesa',
-  'Ensino Religioso',
-  'Campos de Experiência (EI)'
+  'Ensino Religioso'
 ];
 
 const BIMESTRES = [
