@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { 
     X, Users, Calendar, BookOpen, CheckCircle2, XCircle, 
-    Plus, Search, UserPlus, Filter, ClipboardList, TrendingUp
+    Plus, Search, UserPlus, Filter, ClipboardList, TrendingUp,
+    Pencil, Trash2, Printer
 } from 'lucide-react';
 import { activitiesService, Atividade, AtividadeLog, AtividadePresenca } from '../services/activitiesService';
 import { supabase } from '../services/supabase';
+import { PrintableAtividadePlanejamentoReport } from './PrintableAtividadePlanejamentoReport';
 
 interface Student {
     id: number;
@@ -33,6 +35,9 @@ export const DiarioAtividadeModal: React.FC<{
     const [isLoadingStudents, setIsLoadingStudents] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [newLog, setNewLog] = useState('');
+    const [editingLog, setEditingLog] = useState<AtividadeLog | null>(null);
+    const [isPrinting, setIsPrinting] = useState(false);
+    const [logsToPrint, setLogsToPrint] = useState<AtividadeLog[]>([]);
 
     const loadData = async () => {
         if (!atividade?.id) return;
@@ -193,19 +198,68 @@ export const DiarioAtividadeModal: React.FC<{
         if (!newLog.trim()) return;
         if (!atividade?.id) return; // Added optional chaining check
         try {
-            const logPaylod = {
-                atividade_id: atividade.id,
-                data: selectedDate,
-                conteudo: newLog,
-                instrutor: atividade.instrutor || 'Instrutor'
-            };
-            const saved = await activitiesService.saveLog(logPaylod);
-            setLogs([saved, ...logs]);
-            setNewLog('');
+            if (editingLog) {
+                const logPayload = {
+                    data: selectedDate,
+                    conteudo: newLog
+                };
+                const updated = await activitiesService.updateLog(editingLog.id, logPayload);
+                setLogs(logs.map(l => l.id === editingLog.id ? updated : l));
+                setEditingLog(null);
+                setNewLog('');
+                setSelectedDate(new Date().toISOString().split('T')[0]);
+            } else {
+                const logPayload = {
+                    atividade_id: atividade.id,
+                    data: selectedDate,
+                    conteudo: newLog,
+                    instrutor: atividade.instrutor || 'Instrutor'
+                };
+                const saved = await activitiesService.saveLog(logPayload);
+                setLogs([saved, ...logs]);
+                setNewLog('');
+            }
         } catch (err) {
             console.error('Error saving log:', err);
             alert('Erro ao salvar registro.');
         }
+    };
+
+    const handleStartEdit = (log: AtividadeLog) => {
+        setEditingLog(log);
+        setNewLog(log.conteudo);
+        setSelectedDate(log.data);
+    };
+
+    const handleCancelEdit = () => {
+        setEditingLog(null);
+        setNewLog('');
+        setSelectedDate(new Date().toISOString().split('T')[0]);
+    };
+
+    const handleDeleteLog = async (id: string) => {
+        if (confirm('Deseja realmente excluir este registro de conteúdo?')) {
+            try {
+                await activitiesService.deleteLog(id);
+                setLogs(logs.filter(l => l.id !== id));
+                if (editingLog?.id === id) {
+                    handleCancelEdit();
+                }
+            } catch (err) {
+                console.error('Error deleting log:', err);
+                alert('Erro ao excluir registro.');
+            }
+        }
+    };
+
+    const handlePrintAllLogs = () => {
+        setLogsToPrint(logs);
+        setIsPrinting(true);
+    };
+
+    const handlePrintSingleLog = (log: AtividadeLog) => {
+        setLogsToPrint([log]);
+        setIsPrinting(true);
     };
 
     // Students to show in picker: all from DB filtered by search
@@ -514,47 +568,105 @@ export const DiarioAtividadeModal: React.FC<{
                     {/* Tab: Conteúdo */}
                     {activeTab === 'conteudo' && (
                         <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-                            {/* New Log Input */}
+                            {/* New/Edit Log Input */}
                             <div className="bg-white rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/20 p-8 space-y-4">
-                                <div className="flex items-center gap-2 text-slate-800">
-                                    <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
-                                        <BookOpen size={18} />
+                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                    <div className="flex items-center gap-2 text-slate-800">
+                                        <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                                            <BookOpen size={18} />
+                                        </div>
+                                        <h4 className="font-black text-sm uppercase tracking-wider">
+                                            {editingLog ? 'Editar Registro de Conteúdo' : 'Novo Registro de Conteúdo'}
+                                        </h4>
                                     </div>
-                                    <h4 className="font-black text-sm uppercase tracking-wider">Novo Registro de Conteúdo</h4>
+                                    <div className="flex items-center gap-2 border border-slate-100 bg-slate-50 px-4 py-2 rounded-xl">
+                                        <Calendar size={16} className="text-indigo-600" />
+                                        <input 
+                                            type="date" 
+                                            value={selectedDate}
+                                            onChange={e => setSelectedDate(e.target.value)}
+                                            className="font-bold text-slate-700 bg-transparent border-none p-0 outline-none focus:ring-0 text-xs"
+                                        />
+                                    </div>
                                 </div>
                                 <textarea 
                                     rows={4}
                                     placeholder="Descreva o que foi desenvolvido na aula de hoje..."
                                     value={newLog}
                                     onChange={e => setNewLog(e.target.value)}
-                                    className="w-full bg-slate-50 border-none rounded-[1.5rem] px-6 py-4 text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 transition-all transition-all outline-none resize-none"
+                                    className="w-full bg-slate-50 border-none rounded-[1.5rem] px-6 py-4 text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 transition-all outline-none resize-none"
                                 />
-                                <div className="flex justify-end">
+                                <div className="flex justify-end gap-3">
+                                    {editingLog && (
+                                        <button 
+                                            onClick={handleCancelEdit}
+                                            className="bg-slate-100 text-slate-600 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-200 transition-all active:scale-95"
+                                        >
+                                            Cancelar
+                                        </button>
+                                    )}
                                     <button 
                                         onClick={handleAddLog}
                                         className="bg-indigo-600 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 active:scale-95"
                                     >
-                                        Postar Registro
+                                        {editingLog ? 'Salvar Alterações' : 'Postar Registro'}
                                     </button>
                                 </div>
                             </div>
 
                             {/* Logs History */}
                             <div className="space-y-6">
-                                <h5 className="font-black text-xs text-slate-400 uppercase tracking-widest ml-1">Histórico de Aulas</h5>
+                                <div className="flex justify-between items-center ml-1">
+                                    <h5 className="font-black text-xs text-slate-400 uppercase tracking-widest">Histórico de Aulas</h5>
+                                    {logs.length > 0 && (
+                                        <button 
+                                            onClick={handlePrintAllLogs}
+                                            className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest flex items-center gap-1.5 bg-white px-4 py-2 rounded-xl border border-slate-100 hover:border-slate-200 transition-all shadow-sm"
+                                        >
+                                            <Printer size={14} /> Imprimir Planejamento
+                                        </button>
+                                    )}
+                                </div>
                                 {logs.map(log => (
-                                    <div key={log.id} className="bg-white rounded-[2rem] border border-slate-100 p-8 shadow-sm hover:shadow-md transition-all relative overflow-hidden">
+                                    <div key={log.id} className="bg-white rounded-[2rem] border border-slate-100 p-8 shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
                                         <div className="absolute top-0 left-0 w-2 h-full bg-indigo-500" />
                                         <div className="flex justify-between items-start mb-4">
                                             <div className="flex items-center gap-3">
                                                 <div className="p-2 bg-slate-50 text-slate-500 rounded-lg">
                                                     <Calendar size={16} />
                                                 </div>
-                                                <span className="font-black text-slate-800 text-sm">{new Date(log.data).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
+                                                <span className="font-black text-slate-800 text-sm">
+                                                    {new Date(log.data + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                                                </span>
                                             </div>
-                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1.5 rounded-full">{log.instrutor}</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1.5 rounded-full">{log.instrutor}</span>
+                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button 
+                                                        onClick={() => handlePrintSingleLog(log)}
+                                                        title="Imprimir registro"
+                                                        className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 rounded-lg transition-colors"
+                                                    >
+                                                        <Printer size={16} />
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleStartEdit(log)}
+                                                        title="Editar registro"
+                                                        className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-slate-50 rounded-lg transition-colors"
+                                                    >
+                                                        <Pencil size={16} />
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleDeleteLog(log.id)}
+                                                        title="Excluir registro"
+                                                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-slate-50 rounded-lg transition-colors"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <p className="text-slate-600 font-medium leading-relaxed">{log.conteudo}</p>
+                                        <p className="text-slate-600 font-medium leading-relaxed whitespace-pre-line">{log.conteudo}</p>
                                     </div>
                                 ))}
                             </div>
@@ -573,6 +685,13 @@ export const DiarioAtividadeModal: React.FC<{
                     </button>
                 </div>
             </div>
+            {isPrinting && atividade && (
+                <PrintableAtividadePlanejamentoReport 
+                    atividade={atividade}
+                    logs={logsToPrint}
+                    onClose={() => setIsPrinting(false)}
+                />
+            )}
         </div>
     );
 };

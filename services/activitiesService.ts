@@ -235,6 +235,27 @@ export const activitiesService = {
         return data;
     },
 
+    async updateLog(id: string, log: Partial<Omit<AtividadeLog, 'id'>>): Promise<AtividadeLog> {
+        const { data, error } = await supabase
+            .from('atividade_logs')
+            .update(log)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
+    async deleteLog(id: string): Promise<void> {
+        const { error } = await supabase
+            .from('atividade_logs')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+    },
+
     async getLogs(atividadeId: string): Promise<AtividadeLog[]> {
         const { data, error } = await supabase
             .from('atividade_logs')

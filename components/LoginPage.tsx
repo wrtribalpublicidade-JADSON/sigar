@@ -282,7 +282,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onDemoLogin }) =>
             © {new Date().getFullYear()} Secretaria Municipal de Educação. Todos os direitos reservados.
           </div>
           <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">
-            SIGAR • Versão 1.0.3
+            SIGAR • Versão 1.0.4
           </div>
         </div>
       </div>
