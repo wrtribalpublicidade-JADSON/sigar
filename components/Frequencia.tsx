@@ -68,6 +68,22 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
   const [componente, setComponente] = useState(COMPONENTES[0]);
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
 
+  const allowedComponentes = useMemo(() => {
+    if (currentUser && currentUser.funcao === 'Professor') {
+      const assigned = currentUser.turmaComponentes?.[selectedTurmaId] || [];
+      if (assigned.length > 0) return assigned;
+    }
+    return COMPONENTES;
+  }, [currentUser, selectedTurmaId]);
+
+  useEffect(() => {
+    if (allowedComponentes.length > 0) {
+      if (!allowedComponentes.includes(componente)) {
+        setComponente(allowedComponentes[0]);
+      }
+    }
+  }, [allowedComponentes, componente]);
+
   // Extract unique available Year/Grade levels
   const availableAnosSeries = useMemo(() => {
     const years = turmas.map(t => t.year).filter(Boolean);
@@ -522,7 +538,7 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
               required
               className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
             >
-              {COMPONENTES.map(c => (
+              {allowedComponentes.map(c => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>

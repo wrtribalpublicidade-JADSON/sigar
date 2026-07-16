@@ -6,20 +6,28 @@ export const logAccess = async (
     action: 'LOGIN' | 'LOGOUT',
     status: 'SUCCESS' | 'FAILURE',
     userId?: string,
-    userEmail?: string
+    userEmail?: string,
+    userName?: string
 ) => {
     try {
         // Get basic user agent info
         const userAgent = navigator.userAgent;
 
         // Attempt to get IP (optional, might block on some clients/adblockers, so we keep it simple or skip)
-        // For client-side only, getting real IP is hard without an external service. 
-        // We will leave IP null for now or use a placeholder if needed.
         const ipAddress = null;
+
+        let uname = userName;
+        if (!uname) {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                uname = session.user.user_metadata?.full_name || session.user.email?.split('@')[0];
+            }
+        }
 
         await supabase.from('access_logs').insert({
             user_id: userId,
             user_email: userEmail,
+            user_name: uname,
             action,
             status,
             user_agent: userAgent,
@@ -36,24 +44,28 @@ export const logAudit = async (
     recordId: string | undefined,
     details: any,
     userId?: string,
-    userEmail?: string
+    userEmail?: string,
+    userName?: string
 ) => {
     try {
         // If user info not passed, try to get from current session
         let uid = userId;
         let uemail = userEmail;
+        let uname = userName;
 
-        if (!uid || !uemail) {
+        if (!uid || !uemail || !uname) {
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
                 uid = uid || session.user.id;
                 uemail = uemail || session.user.email;
+                uname = uname || session.user.user_metadata?.full_name || session.user.email?.split('@')[0];
             }
         }
 
         await supabase.from('audit_logs').insert({
             user_id: uid,
             user_email: uemail,
+            user_name: uname,
             action,
             module,
             record_id: recordId,

@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { Escola, Coordenador } from '../types';
 import { supabase } from '../services/supabase';
+import { logAudit } from '../services/logService';
 import { useNotification } from '../context/NotificationContext';
 import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
 import { PrintableBoletim } from './PrintableBoletim';
@@ -105,6 +106,22 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
   const [componente, setComponente] = useState(COMPONENTES[0]);
   const [bimestre, setBimestre] = useState(BIMESTRES[0]);
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
+
+  const allowedComponentes = useMemo(() => {
+    if (currentUser && currentUser.funcao === 'Professor') {
+      const assigned = currentUser.turmaComponentes?.[selectedTurmaId] || [];
+      if (assigned.length > 0) return assigned;
+    }
+    return COMPONENTES;
+  }, [currentUser, selectedTurmaId]);
+
+  useEffect(() => {
+    if (allowedComponentes.length > 0) {
+      if (!allowedComponentes.includes(componente)) {
+        setComponente(allowedComponentes[0]);
+      }
+    }
+  }, [allowedComponentes, componente]);
 
   // Extract unique available Year/Grade levels
   const availableAnosSeries = useMemo(() => {
@@ -613,9 +630,21 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
         updated[existingIndex] = payload;
         setSheets(updated);
         showNotification('success', 'Pauta de notas atualizada com sucesso no Supabase!');
+        await logAudit(
+          'UPDATE',
+          'NOTAS',
+          payload.id,
+          { school: payload.escolaNome, class: payload.turmaNome, component: payload.componente, period: payload.bimestre }
+        );
       } else {
         setSheets([payload, ...sheets]);
         showNotification('success', 'Notas salvas com sucesso no Supabase!');
+        await logAudit(
+          'CREATE',
+          'NOTAS',
+          payload.id,
+          { school: payload.escolaNome, class: payload.turmaNome, component: payload.componente, period: payload.bimestre }
+        );
       }
     } else {
       let updatedSheets: GradeSheet[];
@@ -661,6 +690,14 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
   const handleDeleteSheet = async (id: string) => {
     if (!confirm('Deseja realmente remover esta pauta de notas?')) return;
     
+    const sheet = sheets.find(s => s.id === id);
+    const sheetDetails = sheet ? {
+      school: sheet.escolaNome,
+      class: sheet.turmaNome,
+      component: sheet.componente,
+      period: sheet.bimestre
+    } : {};
+
     if (!isDemoMode) {
       const { error } = await supabase
         .from('notas_sheets')
@@ -673,6 +710,7 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
         return;
       }
       showNotification('success', 'Pauta de notas removida do Supabase.');
+      await logAudit('DELETE', 'NOTAS', id, sheetDetails);
     } else {
       showNotification('success', 'Pauta de notas removida.');
     }
@@ -760,7 +798,7 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
               required
               className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
             >
-              {COMPONENTES.map(c => (
+              {allowedComponentes.map(c => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>

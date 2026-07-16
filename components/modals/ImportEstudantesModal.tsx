@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { X, Upload, FileType, Check, AlertTriangle, Download, RefreshCw } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { supabase } from '../../services/supabase';
+import { logAudit } from '../../services/logService';
 
 interface ImportEstudantesModalProps {
     isOpen: boolean;
@@ -203,6 +204,17 @@ export const ImportEstudantesModal: React.FC<ImportEstudantesModalProps> = ({
                 .insert(studentsToSave);
 
             if (saveError) throw saveError;
+
+            try {
+                const schoolName = escolas.find(e => String(e.id) === String(selectedSchoolId))?.nome || 'Unidade';
+                await logAudit('CREATE', 'ESTUDANTE', selectedSchoolId, {
+                    bulk: true,
+                    count: studentsToSave.length,
+                    school: schoolName
+                });
+            } catch (auditErr) {
+                console.error('Error logging bulk import audit:', auditErr);
+            }
 
             onSuccess();
             onClose();

@@ -396,6 +396,7 @@ export interface AccessLog {
   id: string;
   user_id?: string;
   user_email?: string;
+  user_name?: string;
   action: 'LOGIN' | 'LOGOUT';
   status: 'SUCCESS' | 'FAILURE';
   ip_address?: string;
@@ -407,6 +408,7 @@ export interface AuditLog {
   id: string;
   user_id?: string;
   user_email?: string;
+  user_name?: string;
   action: 'CREATE' | 'UPDATE' | 'DELETE';
   module: string;
   record_id?: string;

@@ -9,6 +9,7 @@ import { CadastroTurmaModal, TurmaData } from './modals/CadastroTurmaModal';
 import { ImportEstudantesModal } from './modals/ImportEstudantesModal';
 import { Aluno, Escola, Coordenador } from '../types';
 import { supabase } from '../services/supabase';
+import { logAudit } from '../services/logService';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 import { useNotification } from '../context/NotificationContext';
@@ -241,10 +242,14 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
         const { error } = await supabase.from('turmas').update(payload).eq('id', turmaData.id);
         if (error) throw error;
         showNotification('success', 'Turma atualizada com sucesso!');
+        await logAudit('UPDATE', 'TURMA', turmaData.id, payload);
       } else {
-        const { error } = await supabase.from('turmas').insert([payload]);
+        const { data, error } = await supabase.from('turmas').insert([payload]).select();
         if (error) throw error;
         showNotification('success', 'Nova turma cadastrada com sucesso!');
+        if (data && data[0]) {
+          await logAudit('CREATE', 'TURMA', data[0].id, payload);
+        }
       }
 
       setIsTurmaModalOpen(false);
@@ -258,9 +263,16 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
   const handleDeleteTurma = async (id: string) => {
     if (!confirm('Deseja realmente remover esta turma?')) return;
     try {
+      let name = 'desconhecida';
+      try {
+        const { data } = await supabase.from('turmas').select('name').eq('id', id).maybeSingle();
+        if (data) name = data.name;
+      } catch (e) {}
+
       const { error } = await supabase.from('turmas').delete().eq('id', id);
       if (error) throw error;
       showNotification('success', 'Turma removida.');
+      await logAudit('DELETE', 'TURMA', id, { name });
       loadTurmas();
     } catch (error) {
       console.error(error);
@@ -276,9 +288,16 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
         showNotification('success', 'Remoção simulada.');
         return;
       }
+      let studentName = 'desconhecido';
+      try {
+        const { data } = await supabase.from('alunos').select('name').eq('id', id).maybeSingle();
+        if (data) studentName = data.name;
+      } catch (e) {}
+
       const { error } = await supabase.from('alunos').delete().eq('id', id);
       if (error) throw error;
       showNotification('success', 'Estudante removido com sucesso.');
+      await logAudit('DELETE', 'ESTUDANTE', String(id), { name: studentName });
       loadStudents();
     } catch (error) {
         console.error(error);

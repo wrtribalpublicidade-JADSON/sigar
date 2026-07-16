@@ -394,6 +394,7 @@ export default function App() {
         setIsAdmin(false);
         setEscolas([]);
         setVisitas([]);
+        sessionStorage.removeItem('logged_auth_token');
       } else if (session) {
         const email = session.user.email || '';
         const name = session.user.user_metadata?.full_name || email.split('@')[0];
@@ -403,7 +404,12 @@ export default function App() {
         setIsDemoMode(false);
         fetchData(false, email);
         if (event === 'SIGNED_IN') {
-          logAccess('LOGIN', 'SUCCESS', session.user.id, email);
+          // Evitar logs duplicados de login para o mesmo token/sessão na aba atual
+          const loggedToken = sessionStorage.getItem('logged_auth_token');
+          if (loggedToken !== session.access_token) {
+            logAccess('LOGIN', 'SUCCESS', session.user.id, email, name);
+            sessionStorage.setItem('logged_auth_token', session.access_token);
+          }
         }
       } else {
         setIsAuthenticated(false);
@@ -435,7 +441,7 @@ export default function App() {
       setIsAdmin(false);
     } else {
       try {
-        await logAccess('LOGOUT', 'SUCCESS', undefined, userEmail || undefined);
+        await logAccess('LOGOUT', 'SUCCESS', undefined, userEmail || undefined, userName || undefined);
         await supabase.auth.signOut();
       } catch (err) {
         console.error("Error signing out:", err);

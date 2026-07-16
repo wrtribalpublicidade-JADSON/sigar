@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { TURMAS_MOCK, ALUNOS_MOCK, REUNIOES_IG_MOCK, METAS_ACAO_IG_MOCK, FORMACAO_IG_MOCK, AVALIACOES_DOCENTE_MOCK, AVALIACOES_INFANTIL_MOCK, PPP_MOCK, ACOMP_SALA_MOCK, CALENDARIO_MOCK } from '../constants';
+import { logAudit } from './logService';
 
 const isMockId = (id: any): boolean => {
     if (!id) return false;
@@ -642,18 +643,28 @@ export const ccEstudanteService = {
     async add(student: any) {
         const { data, error } = await supabase.from('alunos').insert(student).select().single();
         if (error) throw error;
+        await logAudit('CREATE', 'ESTUDANTE', data.id, data);
         return data;
     },
 
     async update(id: string, updates: any) {
         const { data, error } = await supabase.from('alunos').update(updates).eq('id', id).select().single();
         if (error) throw error;
+        await logAudit('UPDATE', 'ESTUDANTE', id, data);
         return data;
     },
 
     async remove(id: string) {
+        let studentName = 'desconhecido';
+        try {
+            const { data } = await supabase.from('alunos').select('name').eq('id', id).maybeSingle();
+            if (data) studentName = data.name;
+        } catch (e) {}
+
         const { error } = await supabase.from('alunos').update({ status: 'inactive' }).eq('id', id);
         if (error) throw error;
+
+        await logAudit('DELETE', 'ESTUDANTE', id, { name: studentName });
         return true;
     }
 };

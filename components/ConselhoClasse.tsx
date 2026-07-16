@@ -1263,8 +1263,11 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         else if (concept === 'I') colors = 'bg-red-50 text-red-500 border-red-200';
         else colors = 'bg-slate-50 text-slate-500 border-slate-200';
 
+        const clickHandler = isEtapaReadOnly ? undefined : () => toggleConcept(studentId, field);
+        const cursorClass = isEtapaReadOnly ? 'cursor-default' : 'cursor-pointer hover:scale-110 transition-transform';
+
         return (
-            <div onClick={() => toggleConcept(studentId, field)} className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold mx-auto transition-transform hover:scale-110 cursor-pointer ${colors} select-none`}>
+            <div onClick={clickHandler} className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold mx-auto ${cursorClass} ${colors} select-none`}>
                 {concept}
             </div>
         );
@@ -1360,6 +1363,17 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     const [allPendingRequests, setAllPendingRequests] = useState<any[]>([]);
     const [showAdminPanel, setShowAdminPanel] = useState(false);
 
+    const canManageUnlocks = useMemo(() => {
+        if (isAdmin) return true;
+        if (!currentUser?.funcao) return false;
+        return [
+            'Coordenador Regional',
+            'Coordenador Pedagógico',
+            'Gestor Geral',
+            'Gestor Pedagógico'
+        ].includes(currentUser.funcao);
+    }, [currentUser, isAdmin]);
+
     const isEtapaReadOnly = useMemo(() => {
         if (isAdmin) return false;
         return etapaDoc?.bloqueada || false;
@@ -1394,10 +1408,17 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     }, [activeTurma, avaliacaoBimestre, avaliacaoEtapa, selectedComponenteCurricular]);
 
     const loadAllPendingRequests = async () => {
-        if (!isAdmin && currentUser?.funcao !== 'Coordenador Regional') return;
+        if (!isAdmin && !canManageUnlocks) return;
         try {
             const requests = await ccSolicitacaoDesbloqueioService.getTodasPendentes();
-            setAllPendingRequests(requests);
+            
+            let filteredRequests = requests;
+            if (!isAdmin && currentUser?.funcao !== 'Coordenador Regional') {
+                const userSchoolIds = currentUser?.escolasIds || [];
+                filteredRequests = requests.filter(r => userSchoolIds.includes(r.escola_id));
+            }
+            
+            setAllPendingRequests(filteredRequests);
         } catch (error) {
             console.error('Erro ao carregar solicitações pendentes:', error);
         }
@@ -2085,20 +2106,24 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                 return (
                     <div className="space-y-6 animate-fade-in">
                         {/* Status Header */}
-                        <div className="bg-slate-900 text-white rounded-2xl p-4 flex justify-between items-center shadow-lg">
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 border border-emerald-500/30">
-                                    <CheckCircle2 className="w-5 h-5" />
+                        {etapaDoc?.status === 'enviada' && (
+                            <div className="bg-slate-900 text-white rounded-2xl p-4 flex justify-between items-center shadow-lg animate-fade-in">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 border border-emerald-500/30">
+                                        <CheckCircle2 className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-sm tracking-wide">ETAPA CONCLUÍDA E ENVIADA</h3>
+                                        <p className="text-xs text-slate-400">
+                                            RELATÓRIO ENVIADO À COORDENAÇÃO EM {etapaDoc.enviada_em ? new Date(etapaDoc.enviada_em).toLocaleString() : '14/10/2024 ÀS 10:42'}
+                                        </p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h3 className="font-bold text-sm tracking-wide">ETAPA CONCLUÍDA E ENVIADA</h3>
-                                    <p className="text-xs text-slate-400">RELATÓRIO ENVIADO À COORDENAÇÃO PEDAGÓGICA EM 14/10/2024 ÀS 10:42</p>
+                                <div className="bg-emerald-900/50 border border-emerald-500/30 px-4 py-2 rounded-xl text-emerald-400 text-xs font-bold flex items-center gap-2">
+                                    <CheckCircle2 className="w-4 h-4" /> PROTOCOLO: #{etapaDoc.id?.substring(0, 8).toUpperCase() || '2024-3B-7742'}
                                 </div>
                             </div>
-                            <div className="bg-emerald-900/50 border border-emerald-500/30 px-4 py-2 rounded-xl text-emerald-400 text-xs font-bold flex items-center gap-2">
-                                <CheckCircle2 className="w-4 h-4" /> PROTOCOLO: #2024-3B-7742
-                            </div>
-                        </div>
+                        )}
 
                         {/* Seletor de Etapas para Avaliação Docente */}
                         {
@@ -2168,7 +2193,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                     <Printer className="w-4 h-4" /> Imprimir {avaliacaoBimestre === 'Resultado Consolidado' ? 'Relatório' : avaliacaoBimestre}
                                 </button>
 
-                                {etapaDoc?.status === 'enviada' && !isAdmin && (
+                                {etapaDoc?.status === 'enviada' && !canManageUnlocks && (
                                     <button
                                         onClick={() => setShowUnlockModal(true)}
                                         disabled={hasPendingUnlockRequest}
@@ -2178,7 +2203,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                     </button>
                                 )}
 
-                                {isAdmin && etapaDoc?.status === 'enviada' && (
+                                {canManageUnlocks && etapaDoc?.status === 'enviada' && (
                                     <button
                                         onClick={() => setShowAdminPanel(!showAdminPanel)}
                                         className="bg-purple-600 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-purple-700 flex items-center gap-2 transition-all shadow-lg shadow-purple-200"
@@ -3013,7 +3038,11 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                         <td className="p-4 text-center">{renderConceptBadge(student.id, 'pes', student.pes)}</td>
                                                         <td className="p-4 text-center">{renderConceptBadge(student.id, 'con', student.con)}</td>
                                                         <td className="p-4 text-center">
-                                                            <button onClick={() => handleOpenGradeEditor(student)} className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-bold text-xs px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer min-w-[3rem]">
+                                                            <button 
+                                                                onClick={isEtapaReadOnly ? undefined : () => handleOpenGradeEditor(student)} 
+                                                                disabled={isEtapaReadOnly}
+                                                                className={`font-bold text-xs px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors min-w-[3rem] ${isEtapaReadOnly ? 'bg-slate-100 text-slate-400 cursor-default' : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700 cursor-pointer'}`}
+                                                            >
                                                                 {student.media.toFixed(1)}
                                                             </button>
                                                         </td>
@@ -4177,7 +4206,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 flex gap-3">
                             <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
                             <p className="text-xs text-amber-800 leading-relaxed">
-                                <strong>Atenção:</strong> A solicitação será enviada para a coordenação regional. Justifique o motivo da alteração necessária após o envio oficial.
+                                <strong>Atenção:</strong> A solicitação será enviada para a coordenação pedagógica, gestor pedagógico ou gestor geral da unidade escolar. Justifique o motivo da alteração necessária após o envio oficial.
                             </p>
                         </div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Justificativa da Edição</label>
