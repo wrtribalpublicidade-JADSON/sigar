@@ -53,6 +53,7 @@ interface AtividadesComplementaresProps {
 export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> = ({ userEscolaIds, escolaName, currentUser }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCat, setSelectedCat] = useState('todas');
+    const [selectedSchoolId, setSelectedSchoolId] = useState<string>('todas');
     const [atividades, setAtividades] = useState<Atividade[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -392,12 +393,23 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                atv.instrutor?.toLowerCase()?.includes(search) || false);
         const normalizedCat = normalizeCategoria(atv.categoria);
         const matchesCat = selectedCat === 'todas' || normalizedCat === selectedCat;
-        return matchesSearch && matchesCat;
+        const matchesSchool = selectedSchoolId === 'todas' || atv.escola_id === selectedSchoolId;
+        return matchesSearch && matchesCat && matchesSchool;
     });
 
+    const schoolFilteredAtividades = React.useMemo(() => {
+        return atividades.filter(atv => {
+            if (!atv) return false;
+            return selectedSchoolId === 'todas' || atv.escola_id === selectedSchoolId;
+        });
+    }, [atividades, selectedSchoolId]);
+
     // Dynamic Stats Calculation
-    const totalInscritos = atividades.reduce((sum: number, atv: Atividade) => sum + (atv?.inscritos || 0), 0);
-    const totalOficinasAtivas = atividades.filter(a => a?.status === 'Ativa').length;
+    const totalInscritos = schoolFilteredAtividades.reduce((sum: number, atv: Atividade) => sum + (atv?.inscritos || 0), 0);
+    const totalOficinasAtivas = schoolFilteredAtividades.filter(a => a?.status === 'Ativa').length;
+
+    const selectedSchoolObj = escolasComplementares.find(e => e.id === selectedSchoolId);
+    const displayedSchoolName = selectedSchoolObj ? selectedSchoolObj.nome : (escolaName || (userEscolaIds && userEscolaIds.length > 0 ? 'Múltiplas Unidades' : 'Todas as Unidades'));
     
     // Filter turmas complementares for list
     const filteredTurmasComp = turmasComp.filter(t => {
@@ -737,14 +749,23 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                             </div>
                         </div>
                         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
-                            <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center">
+                            <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center shrink-0">
                                 <MapPin size={24} />
                             </div>
-                            <div>
-                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Unidade Escolar</p>
-                                <p className="text-xl font-black text-slate-800 truncate max-w-[200px]" title={escolaName || 'Múltiplas Unidades'}>
-                                    {escolaName || (userEscolaIds && userEscolaIds.length > 0 ? 'Múltiplas Unidades' : 'Todas as Unidades')}
-                                </p>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Unidade Escolar</p>
+                                <select
+                                    value={selectedSchoolId}
+                                    onChange={e => setSelectedSchoolId(e.target.value)}
+                                    className="w-full bg-transparent border-none p-0 text-xl font-black text-slate-800 uppercase outline-none focus:ring-0 cursor-pointer hover:text-indigo-600 transition-colors truncate"
+                                >
+                                    <option value="todas">
+                                        {userEscolaIds && userEscolaIds.length > 0 ? 'Múltiplas Unidades' : 'Todas as Unidades'}
+                                    </option>
+                                    {escolasComplementares.map(esc => (
+                                        <option key={esc.id} value={esc.id}>{esc.nome.toUpperCase()}</option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
                     </div>

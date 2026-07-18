@@ -347,11 +347,20 @@ export const AtividadeModal: React.FC<AtividadeModalProps> = ({ isOpen, onClose,
             let resolvedAreaId = '';
             let resolvedSubareaName = '';
 
+            const getBaseName = (name: string): string => {
+                if (!name) return '';
+                return name.replace(/\s*-\s*TURMA\s*\d+/i, '').trim();
+            };
+            const baseNome = getBaseName(atividadeToEdit.nome);
+            let resolvedNome = baseNome;
+
             for (const area of ATIVIDADES_ESTRUTURA) {
                 for (const sub of area.subareas) {
-                    if (sub.atividades.includes(atividadeToEdit.nome)) {
+                    const matchedAct = sub.atividades.find(act => act.toLowerCase() === baseNome.toLowerCase());
+                    if (matchedAct) {
                         resolvedAreaId = area.id;
                         resolvedSubareaName = sub.nome;
+                        resolvedNome = matchedAct;
                         break;
                     }
                 }
@@ -369,7 +378,7 @@ export const AtividadeModal: React.FC<AtividadeModalProps> = ({ isOpen, onClose,
             setSelectedSubareaName(resolvedSubareaName);
 
             setFormData({
-                nome: atividadeToEdit.nome,
+                nome: resolvedNome,
                 categoria: resolvedAreaId || normalizedCategory,
                 subarea: resolvedSubareaName || atividadeToEdit.subarea || '',
                 unidadeEscolar: atividadeToEdit.unidadeEscolar,

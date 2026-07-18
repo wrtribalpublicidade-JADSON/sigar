@@ -6,7 +6,7 @@ import { Button } from './ui/Button';
 import { 
   BookOpen, Plus, Search, Edit2, Trash2, Printer, 
   X, Calendar, School as SchoolIcon, Bookmark, Save,
-  Layers, Check
+  Layers, Check, Maximize2, Minimize2
 } from 'lucide-react';
 import { Escola, Coordenador } from '../types';
 import { supabase } from '../services/supabase';
@@ -98,6 +98,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
   const [metodologia, setMetodologia] = useState('');
   const [recursos, setRecursos] = useState('');
   const [avaliacao, setAvaliacao] = useState('');
+  const [expandedFields, setExpandedFields] = useState<Record<string, boolean>>({});
 
   const allowedComponentes = useMemo(() => {
     if (currentUser && currentUser.funcao === 'Professor') {
@@ -680,6 +681,96 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
     return matchesSearch && matchesSchool && matchesClass;
   });
 
+  const printCoursePlan = useMemo(() => {
+    if (!printPlan) return null;
+    return coursePlans.find((p: any) => 
+      p.componente === printPlan.componente && 
+      p.anoSerie === printPlan.anoSerie && 
+      p.bimestre === printPlan.periodo
+    );
+  }, [coursePlans, printPlan]);
+
+  const printPlanData = useMemo(() => {
+    if (!printCoursePlan || !printCoursePlan.itens) {
+      return { objetos: [], habilidades: [], links: [] };
+    }
+    
+    const objetosMap = new Map<string, any>();
+    const habilidadesMap = new Map<string, any>();
+    const links: { objetoId: string; habilidadeId: string }[] = [];
+    
+    printCoursePlan.itens.forEach((item: any) => {
+      if (item.objetos) {
+        item.objetos.forEach((obj: any) => {
+          objetosMap.set(obj.id, obj);
+        });
+      }
+      if (item.habilidades) {
+        item.habilidades.forEach((hab: any) => {
+          habilidadesMap.set(hab.id, hab);
+        });
+      }
+      if (item.links) {
+        item.links.forEach((link: any) => {
+          links.push(link);
+        });
+      }
+    });
+    
+    return {
+      objetos: Array.from(objetosMap.values()),
+      habilidades: Array.from(habilidadesMap.values()),
+      links
+    };
+  }, [printCoursePlan]);
+
+  const printedObjectsAndSkills = useMemo(() => {
+    if (!printPlan) return [];
+    
+    const { objetos, habilidades, links } = printPlanData;
+    
+    // Find which objects from course plan are selected in the printPlan
+    const selectedObjs = objetos.filter((o: any) => 
+      printPlan.objetivos.toLowerCase().includes(o.descricao.toLowerCase().trim())
+    );
+    
+    // Find which skills from course plan are selected in the printPlan
+    const selectedHabs = habilidades.filter((h: any) => 
+      printPlan.habilidades.toLowerCase().includes(h.codigo.toLowerCase().trim())
+    );
+
+    // Group selected skills by selected objects
+    const grouped: { objeto: string; habilidades: string[] }[] = [];
+    const matchedHabIds = new Set<string>();
+
+    selectedObjs.forEach((obj: any) => {
+      // Find links for this object
+      const linkedHabIds = links
+        .filter(l => l.objetoId === obj.id)
+        .map(l => l.habilidadeId);
+      
+      const linkedHabs = selectedHabs.filter((h: any) => linkedHabIds.includes(h.id));
+      
+      grouped.push({
+        objeto: obj.descricao,
+        habilidades: linkedHabs.map((h: any) => `${h.codigo}: ${h.descricao}`)
+      });
+
+      linkedHabs.forEach((h: any) => matchedHabIds.add(h.id));
+    });
+
+    // Are there any selected skills that weren't linked to any selected object?
+    const orphanedHabs = selectedHabs.filter((h: any) => !matchedHabIds.has(h.id));
+    if (orphanedHabs.length > 0) {
+      grouped.push({
+        objeto: 'Outras Habilidades Vinculadas',
+        habilidades: orphanedHabs.map((h: any) => `${h.codigo}: ${h.descricao}`)
+      });
+    }
+
+    return grouped;
+  }, [printPlan, printPlanData]);
+
   const handlePrint = (plan: LessonPlan) => {
     setPrintPlan(plan);
     setTimeout(() => {
@@ -702,42 +793,122 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
 
       {/* Printable Area - Hidden on Screen */}
       {printPlan && createPortal(
-        <div id="print-report" className="hidden print:block bg-white p-8 text-black text-xs font-sans">
-          <div className="text-center border-b pb-4 mb-6">
-            <h1 className="text-lg font-black tracking-tight">SISTEMA INTEGRADO DE GESTÃO DE APRENDIZAGEM (SIGAR)</h1>
-            <p className="text-[10px] text-gray-500 uppercase font-bold mt-1">Instrumental - Guia de Aprendizagem Docente</p>
+        <div id="print-report" className="hidden print:block bg-white text-slate-900" style={{ fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif" }}>
+          
+          {/* ====== INSTITUTIONAL HEADER ====== */}
+          <div className="text-center mb-4 pb-3" style={{ borderBottom: '2pt solid #0f172a' }}>
+            <p style={{ fontSize: '8pt', fontWeight: 700, letterSpacing: '0.25em', textTransform: 'uppercase', color: '#64748b', marginBottom: '2pt' }}>
+              ESTADO DO MARANHÃO
+            </p>
+            <p style={{ fontSize: '10pt', fontWeight: 900, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#0f172a', marginBottom: '2pt' }}>
+              PREFEITURA MUNICIPAL DE HUMBERTO DE CAMPOS
+            </p>
+            <p style={{ fontSize: '8pt', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#64748b', marginBottom: '10pt' }}>
+              SECRETARIA MUNICIPAL DE EDUCAÇÃO
+            </p>
+            <div style={{ width: '60pt', height: '1.5pt', background: '#f97316', margin: '0 auto 6pt' }} />
+            <h1 style={{ fontSize: '14pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#0f172a', margin: '0 0 4pt' }}>
+              Guia de Aprendizagem Docente
+            </h1>
+            <p style={{ fontSize: '9pt', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>
+              Ensino Fundamental
+            </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mb-6 border p-4 rounded-lg bg-gray-50">
-            <div>
-              <p><strong>Unidade Escolar:</strong> {printPlan.escolaNome}</p>
-              <p><strong>Turma:</strong> {printPlan.turmaNome}</p>
-              <p><strong>Ano/Série:</strong> {printPlan.anoSerie || '---'}</p>
-              <p><strong>Data:</strong> {new Date(printPlan.data + 'T12:00:00').toLocaleDateString()}</p>
-            </div>
-            <div>
-              <p><strong>Componente Curricular:</strong> {printPlan.componente}</p>
-              <p><strong>Período:</strong> {printPlan.periodo || '---'}</p>
-              <p><strong>Título da Aula:</strong> {printPlan.titulo}</p>
+          {/* ====== IDENTIFICATION BLOCK ====== */}
+          <div style={{ padding: '8pt 10pt', background: '#f8fafc', border: '0.5pt solid #e2e8f0', marginBottom: '10pt', borderRadius: '4pt' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15pt' }}>
+              <div className="space-y-1">
+                <p style={{ fontSize: '7pt', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '1pt' }}>
+                  Unidade Escolar
+                </p>
+                <p style={{ fontSize: '9pt', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                  {printPlan.escolaNome}
+                </p>
+                <p style={{ fontSize: '7pt', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '6pt', marginBottom: '1pt' }}>
+                  Turma / Ano
+                </p>
+                <p style={{ fontSize: '9pt', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                  {printPlan.turmaNome} {printPlan.anoSerie ? `— ${printPlan.anoSerie}` : ''}
+                </p>
+                <p style={{ fontSize: '7pt', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '6pt', marginBottom: '1pt' }}>
+                  Data
+                </p>
+                <p style={{ fontSize: '9pt', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                  {new Date(printPlan.data + 'T12:00:00').toLocaleDateString()}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p style={{ fontSize: '7pt', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '1pt' }}>
+                  Componente Curricular
+                </p>
+                <p style={{ fontSize: '9pt', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                  {printPlan.componente}
+                </p>
+                <p style={{ fontSize: '7pt', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '6pt', marginBottom: '1pt' }}>
+                  Período
+                </p>
+                <p style={{ fontSize: '9pt', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                  {printPlan.periodo || '---'}
+                </p>
+                <p style={{ fontSize: '7pt', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '6pt', marginBottom: '1pt' }}>
+                  Título da Aula
+                </p>
+                <p style={{ fontSize: '9pt', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                  {printPlan.titulo}
+                </p>
+              </div>
             </div>
           </div>
 
           <div className="space-y-4">
-            <div className="border p-3 rounded-lg">
-              <h3 className="font-bold border-b pb-1 mb-1 text-slate-800 uppercase text-[9px] tracking-widest">Objetivos de Aprendizagem</h3>
-              <p className="whitespace-pre-line text-gray-700">{printPlan.objetivos}</p>
-            </div>
-            
-            {printPlan.habilidades && (
+            {printedObjectsAndSkills.length > 0 ? (
               <div className="border p-3 rounded-lg">
-                <h3 className="font-bold border-b pb-1 mb-1 text-slate-800 uppercase text-[9px] tracking-widest">Habilidades BNCC</h3>
-                <p className="whitespace-pre-line text-gray-700">{printPlan.habilidades}</p>
+                <h3 className="font-bold border-b pb-1 mb-2 text-slate-800 uppercase text-[9px] tracking-widest">
+                  Objetos de Conhecimento e Habilidades BNCC Associadas
+                </h3>
+                <div className="space-y-3">
+                  {printedObjectsAndSkills.map((group, idx) => (
+                    <div key={idx} className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                      <p style={{ fontSize: '8.5pt', fontWeight: 700, color: '#0f172a', margin: '0 0 4pt' }}>
+                        <strong>Objeto de Conhecimento:</strong> {group.objeto}
+                      </p>
+                      {group.habilidades.length > 0 ? (
+                        <ul className="pl-4 list-disc space-y-1">
+                          {group.habilidades.map((hab, hIdx) => (
+                            <li key={hIdx} style={{ fontSize: '7.5pt', color: '#334155' }}>
+                              {hab}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p style={{ fontSize: '7pt', color: '#94a3b8', fontStyle: 'italic', margin: 0 }}>
+                          Nenhuma habilidade BNCC explicitamente vinculada neste objeto.
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
+            ) : (
+              <>
+                <div className="border p-3 rounded-lg">
+                  <h3 className="font-bold border-b pb-1 mb-1 text-slate-800 uppercase text-[9px] tracking-widest">Objetivos de Aprendizagem / Objetos de Conhecimento</h3>
+                  <p className="whitespace-pre-line text-gray-700">{printPlan.objetivos}</p>
+                </div>
+                
+                {printPlan.habilidades && (
+                  <div className="border p-3 rounded-lg">
+                    <h3 className="font-bold border-b pb-1 mb-1 text-slate-800 uppercase text-[9px] tracking-widest">Habilidades BNCC</h3>
+                    <p className="whitespace-pre-line text-gray-700">{printPlan.habilidades}</p>
+                  </div>
+                )}
+              </>
             )}
 
             <div className="border p-3 rounded-lg">
               <h3 className="font-bold border-b pb-1 mb-1 text-slate-800 uppercase text-[9px] tracking-widest">Procedimentos Metodológicos</h3>
-              <p className="whitespace-pre-line text-gray-700">{printPlan.metodologia}</p>
+              <p className="whitespace-pre-line text-gray-700">{printPlan.metodologia || '---'}</p>
             </div>
 
             {printPlan.recursos && (
@@ -749,7 +920,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
 
             <div className="border p-3 rounded-lg">
               <h3 className="font-bold border-b pb-1 mb-1 text-slate-800 uppercase text-[9px] tracking-widest">Critérios de Avaliação</h3>
-              <p className="whitespace-pre-line text-gray-700">{printPlan.avaliacao}</p>
+              <p className="whitespace-pre-line text-gray-700">{printPlan.avaliacao || '---'}</p>
             </div>
           </div>
 
@@ -979,60 +1150,130 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Objeto de Conhecimento *</label>
-              <textarea 
-                value={objetivos}
-                onChange={e => setObjetivos(e.target.value)}
-                placeholder="Descreva o objeto de conhecimento..."
-                required
-                rows={3}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
-              />
+              <div className="relative group">
+                <textarea 
+                  value={objetivos}
+                  onChange={e => setObjetivos(e.target.value)}
+                  placeholder="Descreva o objeto de conhecimento..."
+                  required
+                  rows={expandedFields['objetivos'] ? 15 : 3}
+                  className="w-full pl-3 pr-10 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setExpandedFields(prev => ({ ...prev, objetivos: !prev.objetivos }))}
+                  className="absolute right-2.5 bottom-2.5 p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-colors shadow-sm"
+                  title={expandedFields['objetivos'] ? "Recolher caixa de texto" : "Expandir caixa de texto"}
+                >
+                  {expandedFields['objetivos'] ? (
+                    <Minimize2 className="w-3.5 h-3.5" />
+                  ) : (
+                    <Maximize2 className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Habilidades BNCC (Códigos/Descrição)</label>
-              <textarea 
-                value={habilidades}
-                onChange={e => setHabilidades(e.target.value)}
-                placeholder="Ex: EF05MA03, EF05MA04..."
-                rows={3}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
-              />
+              <div className="relative group">
+                <textarea 
+                  value={habilidades}
+                  onChange={e => setHabilidades(e.target.value)}
+                  placeholder="Ex: EF05MA03, EF05MA04..."
+                  rows={expandedFields['habilidades'] ? 15 : 3}
+                  className="w-full pl-3 pr-10 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setExpandedFields(prev => ({ ...prev, habilidades: !prev.habilidades }))}
+                  className="absolute right-2.5 bottom-2.5 p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-colors shadow-sm"
+                  title={expandedFields['habilidades'] ? "Recolher caixa de texto" : "Expandir caixa de texto"}
+                >
+                  {expandedFields['habilidades'] ? (
+                    <Minimize2 className="w-3.5 h-3.5" />
+                  ) : (
+                    <Maximize2 className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              </div>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Procedimentos Metodológicos</label>
-              <textarea 
-                value={metodologia}
-                onChange={e => setMetodologia(e.target.value)}
-                placeholder="Como a aula será conduzida..."
-                rows={3}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
-              />
+              <div className="relative group">
+                <textarea 
+                  value={metodologia}
+                  onChange={e => setMetodologia(e.target.value)}
+                  placeholder="Como a aula será conduzida..."
+                  rows={expandedFields['metodologia'] ? 15 : 3}
+                  className="w-full pl-3 pr-10 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setExpandedFields(prev => ({ ...prev, metodologia: !prev.metodologia }))}
+                  className="absolute right-2.5 bottom-2.5 p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-colors shadow-sm"
+                  title={expandedFields['metodologia'] ? "Recolher caixa de texto" : "Expandir caixa de texto"}
+                >
+                  {expandedFields['metodologia'] ? (
+                    <Minimize2 className="w-3.5 h-3.5" />
+                  ) : (
+                    <Maximize2 className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Recursos Didáticos</label>
-              <textarea 
-                value={recursos}
-                onChange={e => setRecursos(e.target.value)}
-                placeholder="Livros, projetor, cartolina..."
-                rows={3}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
-              />
+              <div className="relative group">
+                <textarea 
+                  value={recursos}
+                  onChange={e => setRecursos(e.target.value)}
+                  placeholder="Livros, projetor, cartolina..."
+                  rows={expandedFields['recursos'] ? 15 : 3}
+                  className="w-full pl-3 pr-10 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setExpandedFields(prev => ({ ...prev, recursos: !prev.recursos }))}
+                  className="absolute right-2.5 bottom-2.5 p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-colors shadow-sm"
+                  title={expandedFields['recursos'] ? "Recolher caixa de texto" : "Expandir caixa de texto"}
+                >
+                  {expandedFields['recursos'] ? (
+                    <Minimize2 className="w-3.5 h-3.5" />
+                  ) : (
+                    <Maximize2 className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Critérios de Avaliação</label>
-              <textarea 
-                value={avaliacao}
-                onChange={e => setAvaliacao(e.target.value)}
-                placeholder="Como o aprendizado será aferido..."
-                rows={3}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
-              />
+              <div className="relative group">
+                <textarea 
+                  value={avaliacao}
+                  onChange={e => setAvaliacao(e.target.value)}
+                  placeholder="Como o aprendizado será aferido..."
+                  rows={expandedFields['avaliacao'] ? 15 : 3}
+                  className="w-full pl-3 pr-10 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setExpandedFields(prev => ({ ...prev, avaliacao: !prev.avaliacao }))}
+                  className="absolute right-2.5 bottom-2.5 p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-colors shadow-sm"
+                  title={expandedFields['avaliacao'] ? "Recolher caixa de texto" : "Expandir caixa de texto"}
+                >
+                  {expandedFields['avaliacao'] ? (
+                    <Minimize2 className="w-3.5 h-3.5" />
+                  ) : (
+                    <Maximize2 className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              </div>
             </div>
           </div>
 

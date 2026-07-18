@@ -19,6 +19,7 @@ export interface Atividade {
     objetivos: string;
     materiais: string;
     status: 'Ativa' | 'Encerrada' | 'Planejada';
+    created_at?: string;
 }
 
 export interface AtividadeLog {
@@ -52,7 +53,7 @@ export const activitiesService = {
 
         if (error) throw error;
 
-        return (data || []).map(atv => ({
+        const atvs = (data || []).map(atv => ({
             ...atv,
             unidadeEscolar: atv.unidade_escolar,
             diasSemana: atv.dias_semana,
@@ -62,6 +63,56 @@ export const activitiesService = {
             publicoAlvo: atv.publico_alvo,
             inscritos: atv.atividade_alunos?.[0]?.count || 0
         }));
+
+        const sorted = [...atvs].sort((a, b) => {
+            const dateA = a.created_at || a.id;
+            const dateB = b.created_at || b.id;
+            return String(dateA).localeCompare(String(dateB));
+        });
+
+        const getBaseName = (name: string): string => {
+            if (!name) return '';
+            return name.replace(/\s*-\s*TURMA\s*\d+/i, '').trim();
+        };
+
+        const counters: Record<string, number> = {};
+
+        const mapped = sorted.map(atv => {
+            const escolaId = atv.escola_id || 'unknown';
+            const baseName = getBaseName(atv.nome).toUpperCase();
+            const key = `${escolaId}_${baseName}`;
+            
+            counters[key] = (counters[key] || 0) + 1;
+            const count = counters[key];
+            const suffix = `TURMA ${String(count).padStart(2, '0')}`;
+            
+            return {
+                ...atv,
+                nome: `${baseName} - ${suffix}`
+            };
+        });
+
+        const getTurmaNumber = (name: string): number => {
+            const match = name.match(/-\s*TURMA\s*(\d+)/i);
+            return match ? parseInt(match[1], 10) : 9999;
+        };
+
+        return mapped.sort((a, b) => {
+            const numA = getTurmaNumber(a.nome);
+            const numB = getTurmaNumber(b.nome);
+            if (numA !== numB) {
+                return numA - numB;
+            }
+            
+            // Secondary sort by name
+            const nameComp = a.nome.localeCompare(b.nome);
+            if (nameComp !== 0) return nameComp;
+
+            // Tertiary sort by creation date descending
+            const dateA = a.created_at || a.id;
+            const dateB = b.created_at || b.id;
+            return String(dateB).localeCompare(String(dateA));
+        });
     },
 
     async saveAtividade(atv: Partial<Atividade>): Promise<Atividade> {
