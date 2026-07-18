@@ -115,19 +115,19 @@ export const PrintableBoletim: React.FC<PrintableBoletimProps> = ({ sheet }) => 
       <div style={{ marginBottom: '14pt' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', border: '0.5pt solid #e2e8f0' }}>
           <thead>
-            <tr style={{ background: '#0f172a' }}>
-              <th style={{ padding: '6pt 8pt', fontSize: '7.5pt', color: '#fff', textTransform: 'uppercase', textAlign: 'center', width: '6%' }}>Nº</th>
-              <th style={{ padding: '6pt 8pt', fontSize: '7.5pt', color: '#fff', textTransform: 'uppercase', textAlign: 'left', width: '44%' }}>Estudante</th>
-              <th style={{ padding: '6pt 8pt', fontSize: '7.5pt', color: '#fff', textTransform: 'uppercase', textAlign: 'center', width: '9%' }}>AV1</th>
-              <th style={{ padding: '6pt 8pt', fontSize: '7.5pt', color: '#fff', textTransform: 'uppercase', textAlign: 'center', width: '9%' }}>AV2</th>
-              <th style={{ padding: '6pt 8pt', fontSize: '7.5pt', color: '#fff', textTransform: 'uppercase', textAlign: 'center', width: '10%' }}>Qualitativa</th>
-              <th style={{ padding: '6pt 8pt', fontSize: '7.5pt', color: '#fff', textTransform: 'uppercase', textAlign: 'center', width: '11%' }}>Recuperação</th>
-              <th style={{ padding: '6pt 8pt', fontSize: '7.5pt', color: '#fff', textTransform: 'uppercase', textAlign: 'center', width: '11%' }}>Média Final</th>
+            <tr style={{ background: '#f8fafc', borderBottom: '1.5pt solid #0f172a' }}>
+              <th style={{ padding: '6pt 8pt', fontSize: '7.5pt', color: '#0f172a', fontWeight: 800, textTransform: 'uppercase', textAlign: 'center', width: '6%', border: '0.5pt solid #e2e8f0' }}>Nº</th>
+              <th style={{ padding: '6pt 8pt', fontSize: '7.5pt', color: '#0f172a', fontWeight: 800, textTransform: 'uppercase', textAlign: 'left', width: '44%', border: '0.5pt solid #e2e8f0' }}>Estudante</th>
+              <th style={{ padding: '6pt 8pt', fontSize: '7.5pt', color: '#0f172a', fontWeight: 800, textTransform: 'uppercase', textAlign: 'center', width: '9%', border: '0.5pt solid #e2e8f0' }}>AV1</th>
+              <th style={{ padding: '6pt 8pt', fontSize: '7.5pt', color: '#0f172a', fontWeight: 800, textTransform: 'uppercase', textAlign: 'center', width: '9%', border: '0.5pt solid #e2e8f0' }}>AV2</th>
+              <th style={{ padding: '6pt 8pt', fontSize: '7.5pt', color: '#0f172a', fontWeight: 800, textTransform: 'uppercase', textAlign: 'center', width: '10%', border: '0.5pt solid #e2e8f0' }}>Qualitativa</th>
+              <th style={{ padding: '6pt 8pt', fontSize: '7.5pt', color: '#0f172a', fontWeight: 800, textTransform: 'uppercase', textAlign: 'center', width: '11%', border: '0.5pt solid #e2e8f0' }}>Recuperação</th>
+              <th style={{ padding: '6pt 8pt', fontSize: '7.5pt', color: '#0f172a', fontWeight: 800, textTransform: 'uppercase', textAlign: 'center', width: '11%', border: '0.5pt solid #e2e8f0' }}>Média Final</th>
             </tr>
           </thead>
           <tbody>
             {sheet.students.map((student, idx) => {
-              const isApproved = student.mediaFinal >= 6.0;
+              const isApproved = student.mediaFinal >= 7.0;
               return (
                 <tr key={student.id} style={{ background: idx % 2 === 0 ? '#fff' : '#f8fafc', borderBottom: '0.5pt solid #e2e8f0' }}>
                   <td style={{ padding: '5pt 8pt', fontSize: '8pt', fontWeight: 700, color: '#64748b', textAlign: 'center' }}>
@@ -164,7 +164,7 @@ export const PrintableBoletim: React.FC<PrintableBoletimProps> = ({ sheet }) => 
           <span style={{ fontSize: '7.5pt', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Média Geral da Turma
           </span>
-          <span style={{ fontSize: '13pt', fontWeight: 900, color: sheet.mediaTurma >= 6.0 ? '#059669' : '#b45309' }}>
+          <span style={{ fontSize: '13pt', fontWeight: 900, color: sheet.mediaTurma >= 7.0 ? '#059669' : '#b45309' }}>
             {Number(sheet.mediaTurma).toFixed(2).replace('.', ',')}
           </span>
         </div>

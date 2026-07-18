@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import {
     LayoutDashboard, School, Users, FileText,
-    ChevronLeft, ChevronRight, Menu, X, LogOut, PlusCircle, BarChart3, TrendingUp, ClipboardCheck, GraduationCap, ClipboardList, Bell, Shield, FileStack, Library, KeyRound, Baby, Utensils, BookOpen
+    ChevronLeft, ChevronRight, Menu, X, LogOut, PlusCircle, BarChart3, TrendingUp, ClipboardCheck, GraduationCap, ClipboardList, Bell, Shield, FileStack, Library, KeyRound, Baby, Utensils, BookOpen, Settings
 } from 'lucide-react';
 import { ViewState } from '../../types';
 import { getAccessForSidebarItem } from '../../utils/permissions';
-
+ 
 interface SidebarProps {
     currentView: ViewState;
     onNavigate: (view: ViewState) => void;
@@ -17,7 +17,7 @@ interface SidebarProps {
     isAdmin?: boolean;
     userRole?: string;
 }
-
+ 
 interface NavItemProps {
     icon: React.ElementType;
     label: string;
@@ -28,7 +28,7 @@ interface NavItemProps {
     isHighlighted?: boolean;
     hasNotification?: boolean;
 }
-
+ 
 const NavItem: React.FC<NavItemProps> = ({ icon: Icon, label, isActive, isCollapsed, onClick, isHighlighted, hasNotification }) => (
     <button
         onClick={onClick}
@@ -67,11 +67,11 @@ const NavItem: React.FC<NavItemProps> = ({ icon: Icon, label, isActive, isCollap
         )}
     </button>
 );
-
+ 
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, userName, userEmail, isAdmin, userRole, notificationCount = 0 }) => {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [isMobileOpen, setIsMobileOpen] = useState(false);
-
+ 
     useEffect(() => {
         const handleResize = () => {
             if (window.innerWidth < 768) {
@@ -84,13 +84,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
-
+ 
     const mainNavItems = [
         { icon: LayoutDashboard, label: 'Visão Geral', view: 'DASHBOARD' as ViewState },
         { icon: School, label: 'Escolas', view: 'LISTA_ESCOLAS' as ViewState },
         { icon: GraduationCap, label: 'Estudantes', view: 'GESTAO_ESTUDANTES' as ViewState },
     ];
-
+ 
     const managementNavItems = [
         { icon: Users, label: 'Equipe', view: 'COORDENADORES' as ViewState },
         { icon: FileText, label: 'Relatórios', view: 'RELATORIOS' as ViewState },
@@ -102,6 +102,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
         { icon: Shield, label: 'Auditoria', view: 'AUDIT_LOGS' as ViewState },
         { icon: KeyRound, label: 'Permissões', view: 'PERMISSOES' as ViewState },
         { icon: Utensils, label: 'Merenda Escolar', view: 'MERENDA_ESCOLAR' as ViewState },
+        { icon: Settings, label: 'Configurações da Rede', view: 'GESTAO_REDE' as ViewState },
     ];
 
     const diarioClasseNavItems = [

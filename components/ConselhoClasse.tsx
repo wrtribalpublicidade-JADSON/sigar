@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { PageHeader } from './ui/PageHeader';
+import { useConfiguracao } from '../context/ConfiguracaoContext';
 import { Users, BookOpen, UserCheck, AlertTriangle, GraduationCap, Edit, Trash2, Calendar, Hand, Book, CheckSquare, MessageCircle, Search, Printer, Lock, Send, CheckCircle2, FileText, LayoutDashboard, TrendingUp, TrendingDown, Minus, ArrowUpRight, ArrowDownRight, AlertCircle, FileDown, Download, Baby, School, ArrowRight } from 'lucide-react';
 import { CadastroTurmaModal, TurmaData } from './modals/CadastroTurmaModal';
 import { StudentReportModal } from './modals/StudentReportModal';
@@ -134,6 +135,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     onEscolaChange,
     isDemoMode = false
 }) => {
+    const { configuracao, isPeriodoBloqueado } = useConfiguracao();
     const parentModuleId = forcedEtapa === 'infantil' ? 'conselho_infantil' : 'conselho_fundamental';
     
     const tabs = useMemo(() => [
@@ -213,22 +215,25 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     const [avaliacaoBimestre, setAvaliacaoBimestre] = useState('Resultado Consolidado');
     const [selectedComponenteCurricular, setSelectedComponenteCurricular] = useState('Língua Portuguesa');
 
-    const COMPONENTES_CURRICULARES = [
-        'Língua Portuguesa',
-        'Matemática',
-        'Ciências',
-        'Geografia',
-        'História',
-        'Educação Física',
-        'Arte',
-        'Ensino Religioso',
-        'Língua Inglesa'
-    ];
+    const COMPONENTES_CURRICULARES = configuracao?.componentes_curriculares?.length > 0
+        ? configuracao.componentes_curriculares
+        : [
+            'Língua Portuguesa',
+            'Matemática',
+            'Ciências',
+            'Geografia',
+            'História',
+            'Educação Física',
+            'Arte',
+            'Ensino Religioso',
+            'Língua Inglesa'
+        ];
     const [isTurmaModalOpen, setIsTurmaModalOpen] = useState(false);
     const [isStudentReportOpen, setIsStudentReportOpen] = useState(false);
     const [activeStudentReport, setActiveStudentReport] = useState<any>(null);
     const [turmasCadastradas, setTurmasCadastradas] = useState<TurmaData[]>([]);
     const [activeTurma, setActiveTurma] = useState<TurmaData | null>(null);
+    const isBlocked = isPeriodoBloqueado(avaliacaoBimestre, currentUser?.funcao);
     const [isLoadingTurmas, setIsLoadingTurmas] = useState(false);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [isLoadingStudents, setIsLoadingStudents] = useState(false);
@@ -1329,13 +1334,15 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     // ============================================
     // ESTADOS: ACOMPANHAMENTO DOCENTE - ED. INFANTIL
     // ============================================
-    const CAMPOS_EXPERIENCIA_BNCC = [
-        'O eu, o outro e o nós',
-        'Corpo, gestos e movimentos',
-        'Traços, sons, cores e formas',
-        'Escuta, fala, pensamento e imaginação',
-        'Espaços, tempos, quantidades, relações e transformações'
-    ];
+    const CAMPOS_EXPERIENCIA_BNCC = configuracao?.campos_experiencia?.length > 0
+        ? configuracao.campos_experiencia
+        : [
+            'O eu, o outro e o nós',
+            'Corpo, gestos e movimentos',
+            'Traços, sons, cores e formas',
+            'Escuta, fala, pensamento e imaginação',
+            'Espaços, tempos, quantidades, relações e transformações'
+        ];
 
     const [acompInfantilForm, setAcompInfantilForm] = useState({
         id: '',

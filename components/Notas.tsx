@@ -11,6 +11,7 @@ import { Escola, Coordenador } from '../types';
 import { supabase } from '../services/supabase';
 import { logAudit } from '../services/logService';
 import { useNotification } from '../context/NotificationContext';
+import { useConfiguracao } from '../context/ConfiguracaoContext';
 import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
 import { PrintableBoletim } from './PrintableBoletim';
 
@@ -82,6 +83,7 @@ const formatGradeValue = (val: any): string => {
 };
 
 export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, userEmail, currentUser, subHeader }) => {
+  const { configuracao, isPeriodoBloqueado } = useConfiguracao();
   const { showNotification } = showNotificationContext();
   const [sheets, setSheets] = useState<GradeSheet[]>([]);
   const [turmas, setTurmas] = useState<any[]>([]);
@@ -105,15 +107,23 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
   const [selectedTurmaId, setSelectedTurmaId] = useState('');
   const [componente, setComponente] = useState(COMPONENTES[0]);
   const [bimestre, setBimestre] = useState(BIMESTRES[0]);
+  const isBlocked = isPeriodoBloqueado(bimestre, currentUser?.funcao);
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
+
+  const componentesRede = useMemo(() => {
+    if (configuracao && configuracao.componentes_curriculares && configuracao.componentes_curriculares.length > 0) {
+      return configuracao.componentes_curriculares;
+    }
+    return COMPONENTES;
+  }, [configuracao]);
 
   const allowedComponentes = useMemo(() => {
     if (currentUser && currentUser.funcao === 'Professor') {
       const assigned = currentUser.turmaComponentes?.[selectedTurmaId] || [];
       if (assigned.length > 0) return assigned;
     }
-    return COMPONENTES;
-  }, [currentUser, selectedTurmaId]);
+    return componentesRede;
+  }, [currentUser, selectedTurmaId, componentesRede]);
 
   useEffect(() => {
     if (allowedComponentes.length > 0) {
@@ -536,7 +546,7 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
     students.forEach(s => {
       const media = gradesMap[s.id]?.mediaFinal || 0;
       sum += media;
-      if (media >= 6.0) {
+      if (media >= (configuracao?.nota_minima_aprovacao ?? 7.0)) {
         approved++;
       }
     });
@@ -821,7 +831,7 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
           <div className="flex items-end">
             <Button 
               onClick={handleSaveGrades}
-              disabled={isLoadingStudents || students.length === 0}
+              disabled={isLoadingStudents || students.length === 0 || isBlocked}
               className="w-full rounded-xl text-xs font-black py-2 bg-brand-orange hover:bg-orange-600 shadow-md flex items-center justify-center gap-1.5"
             >
               <Save className="w-4 h-4" />
@@ -837,7 +847,7 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
           <Card className="bg-white border-slate-100 p-4 rounded-2xl flex items-center justify-between shadow-sm">
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Média da Turma</p>
-              <h3 className={`text-2xl font-black mt-1 ${stats.mediaTurma >= 6.0 ? 'text-emerald-600' : 'text-amber-600'}`}>
+              <h3 className={`text-2xl font-black mt-1 ${stats.mediaTurma >= (configuracao?.nota_minima_aprovacao ?? 7.0) ? 'text-emerald-600' : 'text-amber-600'}`}>
                 {stats.mediaTurma.toFixed(2).replace('.', ',')}
               </h3>
             </div>
@@ -848,7 +858,7 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
 
           <Card className="bg-white border-slate-100 p-4 rounded-2xl flex items-center justify-between shadow-sm">
             <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Taxa de Aprovados (Nota &gt;= 6.0)</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Taxa de Aprovados (Nota &gt;= {(configuracao?.nota_minima_aprovacao ?? 7.0).toFixed(1).replace('.', ',')})</p>
               <div className="flex items-center gap-2 mt-1">
                 <h3 className="text-2xl font-black text-emerald-600">{stats.taxaAprovacao}%</h3>
                 <div className="w-20 bg-slate-100 rounded-full h-1.5">
@@ -876,6 +886,17 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
       {/* Spreadsheet Grade Card */}
       {selectedTurmaId && (
         <Card className="bg-white border-slate-200 shadow-sm rounded-2xl overflow-hidden p-0">
+          {isBlocked && (
+            <div className="bg-amber-50 border-l-4 border-amber-500 text-amber-800 p-4 flex items-start gap-3 border-b border-slate-105">
+              <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-xs font-black uppercase">Lançamento Bloqueado</h4>
+                <p className="text-[11px] font-semibold text-amber-700 mt-0.5 leading-relaxed">
+                  O período selecionado ({bimestre}) está fora do prazo letivo permitido ou foi bloqueado manualmente pela rede de ensino. Apenas a visualização está liberada.
+                </p>
+              </div>
+            </div>
+          )}
           <div className="p-4 border-b border-slate-100">
             <div className="relative w-full max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
@@ -914,7 +935,7 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
                 <tbody className="divide-y divide-slate-100">
                   {filteredStudents.map((student, idx) => {
                     const gradeObj = gradesMap[student.id] || { av1: '', av2: '', qualitativa: '', recuperacao: '', mediaFinal: 0 };
-                    const isApproved = gradeObj.mediaFinal >= 6.0;
+                    const isApproved = gradeObj.mediaFinal >= (configuracao?.nota_minima_aprovacao ?? 7.0);
 
                     return (
                       <tr key={student.id} className="hover:bg-slate-50/50 transition-colors">
@@ -936,7 +957,8 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
                             onChange={e => handleGradeChange(student.id, 'av1', e.target.value)}
                             onBlur={() => handleGradeBlur(student.id, 'av1')}
                             placeholder="0,00"
-                            className="w-16 px-2 py-1.5 border border-slate-200 rounded-lg text-center font-bold text-slate-700 focus:border-brand-orange outline-none"
+                            disabled={isBlocked}
+                            className="w-16 px-2 py-1.5 border border-slate-200 rounded-lg text-center font-bold text-slate-700 focus:border-brand-orange outline-none disabled:bg-slate-50 disabled:text-slate-400"
                           />
                         </td>
  
@@ -947,7 +969,8 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
                             onChange={e => handleGradeChange(student.id, 'av2', e.target.value)}
                             onBlur={() => handleGradeBlur(student.id, 'av2')}
                             placeholder="0,00"
-                            className="w-16 px-2 py-1.5 border border-slate-200 rounded-lg text-center font-bold text-slate-700 focus:border-brand-orange outline-none"
+                            disabled={isBlocked}
+                            className="w-16 px-2 py-1.5 border border-slate-200 rounded-lg text-center font-bold text-slate-700 focus:border-brand-orange outline-none disabled:bg-slate-50 disabled:text-slate-400"
                           />
                         </td>
  
@@ -958,7 +981,8 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
                             onChange={e => handleGradeChange(student.id, 'qualitativa', e.target.value)}
                             onBlur={() => handleGradeBlur(student.id, 'qualitativa')}
                             placeholder="0,00"
-                            className="w-16 px-2 py-1.5 border border-slate-200 rounded-lg text-center font-bold text-slate-700 focus:border-brand-orange outline-none"
+                            disabled={isBlocked}
+                            className="w-16 px-2 py-1.5 border border-slate-200 rounded-lg text-center font-bold text-slate-700 focus:border-brand-orange outline-none disabled:bg-slate-50 disabled:text-slate-400"
                           />
                         </td>
  
@@ -969,7 +993,8 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
                             onChange={e => handleGradeChange(student.id, 'recuperacao', e.target.value)}
                             onBlur={() => handleGradeBlur(student.id, 'recuperacao')}
                             placeholder="0,00"
-                            className="w-16 px-2 py-1.5 border border-slate-200 rounded-lg text-center font-bold text-slate-700 focus:border-brand-orange outline-none bg-orange-50/30"
+                            disabled={isBlocked}
+                            className="w-16 px-2 py-1.5 border border-slate-200 rounded-lg text-center font-bold text-slate-700 focus:border-brand-orange outline-none bg-orange-50/30 disabled:bg-slate-50 disabled:text-slate-400"
                           />
                         </td>
  
@@ -1036,7 +1061,7 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
                       </td>
                       <td className="px-6 py-3 text-center">
                         <span className={`inline-block font-black text-xs px-2.5 py-0.5 rounded-full
-                          ${sheet.mediaTurma >= 6.0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-500'}`}
+                          ${sheet.mediaTurma >= (configuracao?.nota_minima_aprovacao ?? 7.0) ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-500'}`}
                         >
                           {Number(sheet.mediaTurma).toFixed(2).replace('.', ',')}
                         </span>

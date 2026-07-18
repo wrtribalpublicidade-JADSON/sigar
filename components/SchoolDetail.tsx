@@ -8,6 +8,7 @@ import { CadastroTurmaModal } from './modals/CadastroTurmaModal';
 import { PrintableChecklistReport } from './PrintableChecklistReport';
 import { PrintableCartaApresentacao } from './PrintableCartaApresentacao';
 import { PrintableSchoolDocument } from './PrintableSchoolDocument';
+import { AtasFinaisTab } from './AtasFinaisTab';
 import { hasTabAccess, hasFullTabAccess } from '../utils/permissions';
 import {
   BarChart,
@@ -90,7 +91,7 @@ const ETAPAS_COHORTS = [
 ];
 
 export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadores = [], historicoVisitas, onBack, onUpdate, onUpdateVisitStatus, isDemoMode, userRole, onUpdateCoordenadorTurmas }) => {
-  const [activeTab, setActiveTab] = useState<'plano' | 'visitas' | 'turmas' | 'rh' | 'acompanhamento' | 'detalhamento_turmas' | 'documentos' | 'matriculas' | 'professores'>('acompanhamento');
+  const [activeTab, setActiveTab] = useState<'plano' | 'visitas' | 'turmas' | 'rh' | 'acompanhamento' | 'detalhamento_turmas' | 'documentos' | 'matriculas' | 'professores' | 'atas_finais'>('acompanhamento');
   const [selectedVisitForPrint, setSelectedVisitForPrint] = useState<Visita | null>(null);
   const [selectedServidorForCarta, setSelectedServidorForCarta] = useState<RecursoHumano | null>(null);
   const [formData, setFormData] = useState<DadosEducacionais>(escola.dadosEducacionais);
@@ -210,7 +211,8 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
       { id: 'plano', icon: Target, label: 'Plano de Ação' },
       { id: 'visitas', icon: History, label: 'Histórico' },
       { id: 'documentos', icon: FileText, label: 'Documentos' },
-      { id: 'professores', icon: Users, label: 'Professores' }
+      { id: 'professores', icon: Users, label: 'Professores' },
+      { id: 'atas_finais', icon: FileText, label: 'Atas Finais' }
     ];
     return allTabs.filter(tab => hasTabAccess('escolas', tab.id, userRole));
   }, [userRole]);
@@ -2362,6 +2364,16 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                   </div>
                 )}
               </div>
+            )
+          }
+          {
+            activeTab === 'atas_finais' && (
+              <AtasFinaisTab
+                escola={escola}
+                schoolTurmas={schoolTurmas}
+                isDemoMode={isDemoMode}
+                userRole={userRole}
+              />
             )
           }
         </div>

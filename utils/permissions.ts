@@ -31,6 +31,7 @@ const VIEW_TO_MODULE: Record<string, string> = {
     'NOTAS': 'diario_fundamental',
     'DIARIO_FUNDAMENTAL': 'diario_fundamental',
     'DIARIO_INFANTIL': 'diario_infantil',
+    'GESTAO_REDE': 'gestao_rede',
 };
 
 // Sidebar label → moduleId mapping
@@ -58,6 +59,7 @@ const SIDEBAR_LABEL_TO_MODULE: Record<string, string> = {
     'Notas': 'diario_fundamental',
     'Ensino Fundamental': 'diario_fundamental',
     'Educação Infantil': 'diario_infantil',
+    'Configurações da Rede': 'gestao_rede',
 };
 
 export const ALL_MODULES = [
@@ -75,7 +77,8 @@ export const ALL_MODULES = [
             { id: 'plano', name: 'Plano de Ação' },
             { id: 'visitas', name: 'Histórico' },
             { id: 'documentos', name: 'Documentos' },
-            { id: 'professores', name: 'Professores' }
+            { id: 'professores', name: 'Professores' },
+            { id: 'atas_finais', name: 'Atas Finais' }
         ]
     },
     { id: 'equipe', name: 'Equipe / Gestão de Usuários', group: 'Gestão' },
@@ -149,6 +152,11 @@ export const ALL_MODULES = [
             { id: 'painel_resultados', name: 'Painel de Resultados' }
         ]
     },
+    {
+        id: 'gestao_rede',
+        name: 'Configurações da Rede',
+        group: 'Gestão'
+    }
 ];
 
 export const ALL_ROLES = [
@@ -165,16 +173,16 @@ export const ALL_ROLES = [
 
 export const DEFAULT_PERMISSIONS: Record<string, Record<string, AccessLevel>> = {
     'Administrador': Object.fromEntries(ALL_MODULES.map(m => [m.id, 'full'])),
-    'Coordenador Regional': Object.fromEntries(ALL_MODULES.map(m => [m.id, m.id === 'auditoria' ? 'none' : 'full'])),
-    'Técnico Pedagógico': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['equipe', 'auditoria'].includes(m.id) ? 'none' : 'full'])),
+    'Coordenador Regional': Object.fromEntries(ALL_MODULES.map(m => [m.id, m.id === 'auditoria' ? 'none' : m.id === 'gestao_rede' ? 'readonly' : 'full'])),
+    'Técnico Pedagógico': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['equipe', 'auditoria', 'gestao_rede'].includes(m.id) ? 'none' : 'full'])),
     'Professor': Object.fromEntries(ALL_MODULES.map(m => [
         m.id,
         ['diario_fundamental', 'diario_infantil'].includes(m.id) ? 'full' : ['dashboard', 'conselho_fundamental', 'conselho_infantil', 'notificacoes', 'atividades_comp', 'estudantes'].includes(m.id) ? 'readonly' : 'none'
     ])),
-    'Coordenador Pedagógico': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['auditoria', 'equipe'].includes(m.id) ? 'none' : 'full'])),
-    'Gestor Geral': Object.fromEntries(ALL_MODULES.map(m => [m.id, m.id === 'auditoria' ? 'readonly' : 'full'])),
-    'Gestor Pedagógico': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['auditoria', 'equipe'].includes(m.id) ? 'readonly' : 'full'])),
-    'Auxiliar Administrativo': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['auditoria', 'equipe', 'indicadores'].includes(m.id) ? 'none' : 'full'])),
+    'Coordenador Pedagógico': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['auditoria', 'equipe', 'gestao_rede'].includes(m.id) ? 'none' : 'full'])),
+    'Gestor Geral': Object.fromEntries(ALL_MODULES.map(m => [m.id, m.id === 'auditoria' ? 'readonly' : m.id === 'gestao_rede' ? 'none' : 'full'])),
+    'Gestor Pedagógico': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['auditoria', 'equipe', 'gestao_rede'].includes(m.id) ? 'readonly' : 'full'])),
+    'Auxiliar Administrativo': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['auditoria', 'equipe', 'indicadores', 'gestao_rede'].includes(m.id) ? 'none' : 'full'])),
     'Monitor de Atividade Complementar': Object.fromEntries(ALL_MODULES.map(m => [
         m.id,
         m.id === 'atividades_comp' ? 'full' : ['dashboard', 'estudantes'].includes(m.id) ? 'readonly' : 'none'

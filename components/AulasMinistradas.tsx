@@ -6,11 +6,12 @@ import { Button } from './ui/Button';
 import { 
   FileText, Plus, Search, Edit2, Trash2, Printer, 
   X, Calendar, School as SchoolIcon, BookOpen, Save, ClipboardList,
-  Layers, Check
+  Layers, Check, AlertTriangle
 } from 'lucide-react';
 import { Escola, Coordenador } from '../types';
 import { supabase } from '../services/supabase';
 import { useNotification } from '../context/NotificationContext';
+import { useConfiguracao } from '../context/ConfiguracaoContext';
 import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
 
 interface AulasMinistradasProps {
@@ -80,6 +81,7 @@ const ANOS_SERIES = [
 ];
 
 export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isDemoMode, isAdmin, userEmail, currentUser, subHeader }) => {
+  const { configuracao, isPeriodoBloqueado, isDataBloqueada } = useConfiguracao();
   const { showNotification } = useNotification();
   const [logs, setLogs] = useState<ClassLog[]>([]);
   const [turmas, setTurmas] = useState<any[]>([]);
@@ -96,14 +98,22 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
   const [conteudo, setConteudo] = useState('');
   const [atividades, setAtividades] = useState('');
   const [observacoes, setObservacoes] = useState('');
+  const isBlocked = isPeriodoBloqueado(periodo, currentUser?.funcao) || isDataBloqueada(dataAula, currentUser?.funcao);
+
+  const componentesRede = useMemo(() => {
+    if (configuracao && configuracao.componentes_curriculares && configuracao.componentes_curriculares.length > 0) {
+      return configuracao.componentes_curriculares;
+    }
+    return COMPONENTES;
+  }, [configuracao]);
 
   const allowedComponentes = useMemo(() => {
     if (currentUser && currentUser.funcao === 'Professor') {
       const assigned = currentUser.turmaComponentes?.[selectedTurmaId] || [];
       if (assigned.length > 0) return assigned;
     }
-    return COMPONENTES;
-  }, [currentUser, selectedTurmaId]);
+    return componentesRede;
+  }, [currentUser, selectedTurmaId, componentesRede]);
 
   useEffect(() => {
     if (allowedComponentes.length > 0) {
@@ -620,6 +630,7 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isBlocked) return;
 
     if (!selectedEscolaId || !selectedTurmaId || !conteudo.trim()) {
       showNotification('error', 'Preencha todos os campos obrigatórios (*).');
@@ -851,6 +862,17 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
         </div>
 
         <form onSubmit={handleSave} className="space-y-4">
+          {isBlocked && (
+            <div className="bg-amber-50 border-l-4 border-amber-500 text-amber-800 p-4 flex items-start gap-3 rounded-2xl">
+              <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-xs font-black uppercase">Lançamento Bloqueado</h4>
+                <p className="text-[11px] font-semibold text-amber-700 mt-0.5 leading-relaxed">
+                  O período letivo selecionado ({periodo}) ou a data ({new Date(dataAula + 'T12:00:00').toLocaleDateString('pt-BR')}) estão fora do prazo letivo permitido ou foram bloqueados manualmente pela rede de ensino. Apenas a visualização está liberada.
+                </p>
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Data *</label>
@@ -1149,7 +1171,7 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
                 Cancelar
               </Button>
             )}
-            <Button type="submit" variant="primary" className="rounded-xl text-xs font-black py-2 bg-brand-orange hover:bg-orange-600 shadow-md flex items-center gap-1.5">
+            <Button type="submit" variant="primary" disabled={isBlocked} className="rounded-xl text-xs font-black py-2 bg-brand-orange hover:bg-orange-600 shadow-md flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed">
               <Save className="w-4 h-4" />
               {editingId ? 'Salvar Edição' : 'Salvar Registro'}
             </Button>

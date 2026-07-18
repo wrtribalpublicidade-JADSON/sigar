@@ -36,6 +36,7 @@ import { Frequencia } from './components/Frequencia';
 import { Notas } from './components/Notas';
 import { DiarioFundamental } from './components/DiarioFundamental';
 import { DiarioInfantil } from './components/DiarioInfantil';
+import { GestaoRede } from './components/GestaoRede';
 import { ViewState, Escola, Visita, Coordenador, Segmento } from './types';
 import { supabase } from './services/supabase';
 import { useNotification } from './context/NotificationContext';
@@ -1312,6 +1313,8 @@ export default function App() {
         return <DiarioFundamental escolas={escolas} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={effectiveUser || null} />;
       case 'DIARIO_INFANTIL':
         return <DiarioInfantil escolas={escolas} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={effectiveUser || null} />;
+      case 'GESTAO_REDE':
+        return <GestaoRede />;
       default:
         return <div>Página não encontrada</div>;
     }
