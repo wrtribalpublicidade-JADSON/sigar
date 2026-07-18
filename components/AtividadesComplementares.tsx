@@ -3,7 +3,7 @@ import {
     BookOpen, Trophy, Music, Palette, Code, Users, 
     Calendar, Search, Plus, Filter, ChevronRight, 
     Clock, MapPin, Star, Pencil, Trash2, Heart, Brain, Leaf,
-    UserPlus, X, CheckCircle2, Printer
+    UserPlus, X, CheckCircle2, Printer, AlertTriangle
 } from 'lucide-react';
 import { AtividadeModal } from './AtividadeModal';
 import { DiarioAtividadeModal } from './DiarioAtividadeModal';
@@ -12,6 +12,7 @@ import { supabase } from '../services/supabase';
 import { turmaCompService, TurmaComp } from '../services/turmaCompService';
 import { PrintableTurmaCompReport } from './PrintableTurmaCompReport';
 import { Coordenador } from '../types';
+import { ConfirmModal } from './ui/ConfirmModal';
 
 interface Student {
     id: number;
@@ -78,6 +79,8 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
     const [isManageActivitiesOpen, setIsManageActivitiesOpen] = useState(false);
     const [selectedActivitiesForTurma, setSelectedActivitiesForTurma] = useState<string[]>([]);
     const [isAddingStudent, setIsAddingStudent] = useState(false);
+    const [isMinActivitiesAlertOpen, setIsMinActivitiesAlertOpen] = useState(false);
+    const [turno, setTurno] = useState<'MATUTINO' | 'VESPERTINO' | 'NOTURNO'>('MATUTINO');
     const [allStudents, setAllStudents] = useState<Student[]>([]);
     const [isLoadingAllStudents, setIsLoadingAllStudents] = useState(false);
     const [studentSearch, setStudentSearch] = useState('');
@@ -176,13 +179,39 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
         }
     };
 
+    const handleSchoolChange = (schoolId: string) => {
+        setSelectedSchoolIdForNewTurma(schoolId);
+        if (schoolId) {
+            const schoolTurmas = turmasComp.filter(t => t.escola_id === schoolId);
+            const count = schoolTurmas.length;
+            const nextNum = count + 1;
+            const schoolObj = escolasComplementares.find(esc => esc.id === schoolId);
+            const schoolName = schoolObj ? schoolObj.nome.toUpperCase() : '';
+            setNewTurmaNome(`EDUCA +AÇÃO - TURMA ${String(nextNum).padStart(2, '0')}${schoolName ? ` | ${schoolName}` : ''}`);
+        }
+    };
+
     const openNewTurmaModal = () => {
         setNewTurmaNome('');
         setEditingTurma(null);
+        setTurno('MATUTINO');
         if (escolasComplementares.length === 1) {
-            setSelectedSchoolIdForNewTurma(escolasComplementares[0].id);
+            const schoolId = escolasComplementares[0].id;
+            setSelectedSchoolIdForNewTurma(schoolId);
+            const schoolTurmas = turmasComp.filter(t => t.escola_id === schoolId);
+            const count = schoolTurmas.length;
+            const nextNum = count + 1;
+            const schoolName = escolasComplementares[0].nome.toUpperCase();
+            setNewTurmaNome(`EDUCA +AÇÃO - TURMA ${String(nextNum).padStart(2, '0')} | ${schoolName}`);
         } else if (userEscolaIds && userEscolaIds.length === 1) {
-            setSelectedSchoolIdForNewTurma(userEscolaIds[0]);
+            const schoolId = userEscolaIds[0];
+            setSelectedSchoolIdForNewTurma(schoolId);
+            const schoolTurmas = turmasComp.filter(t => t.escola_id === schoolId);
+            const count = schoolTurmas.length;
+            const nextNum = count + 1;
+            const schoolObj = escolasComplementares.find(esc => esc.id === schoolId);
+            const schoolName = schoolObj ? schoolObj.nome.toUpperCase() : '';
+            setNewTurmaNome(`EDUCA +AÇÃO - TURMA ${String(nextNum).padStart(2, '0')}${schoolName ? ` | ${schoolName}` : ''}`);
         } else {
             setSelectedSchoolIdForNewTurma('');
         }
@@ -193,6 +222,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
         setNewTurmaNome(turma.nome);
         setEditingTurma(turma);
         setSelectedSchoolIdForNewTurma(turma.escola_id);
+        setTurno((turma.turno || 'MATUTINO') as any);
         setIsTurmaModalOpen(true);
     };
 
@@ -206,7 +236,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
 
         try {
             if (editingTurma) {
-                const updated = await turmaCompService.updateTurma(editingTurma.id, newTurmaNome.trim(), selectedSchoolIdForNewTurma);
+                const updated = await turmaCompService.updateTurma(editingTurma.id, newTurmaNome.trim(), selectedSchoolIdForNewTurma, turno);
                 await fetchTurmasComp();
                 setNewTurmaNome('');
                 setSelectedSchoolIdForNewTurma('');
@@ -214,7 +244,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                 setIsTurmaModalOpen(false);
                 handleSelectTurma(updated.id);
             } else {
-                const newTurma = await turmaCompService.createTurma(newTurmaNome.trim(), selectedSchoolIdForNewTurma);
+                const newTurma = await turmaCompService.createTurma(newTurmaNome.trim(), selectedSchoolIdForNewTurma, turno);
                 await fetchTurmasComp();
                 setNewTurmaNome('');
                 setSelectedSchoolIdForNewTurma('');
@@ -264,6 +294,12 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
 
     const handleAddStudentToTurma = async (student: Student) => {
         if (!selectedTurmaId) return;
+
+        if (selectedActivitiesForTurma.length < 5) {
+            setIsMinActivitiesAlertOpen(true);
+            return;
+        }
+
         if (turmaDetails.students.some(s => s.id === student.id)) {
             alert('Este estudante já está vinculado a esta turma.');
             return;
@@ -285,6 +321,14 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
             console.error('Error adding student to class:', err);
             alert('Erro ao vincular estudante.');
         }
+    };
+
+    const handleVincularAlunoClick = () => {
+        if (selectedActivitiesForTurma.length < 5) {
+            setIsMinActivitiesAlertOpen(true);
+            return;
+        }
+        setIsAddingStudent(true);
     };
 
     const handleRemoveStudentFromTurma = async (studentId: number, nome: string) => {
@@ -549,12 +593,16 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                             <div>
                                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Nome da Turma</label>
                                 <input 
-                                    autoFocus
                                     type="text" 
-                                    placeholder="Ex: Turma A - Oficinas da Tarde" 
+                                    placeholder={selectedSchoolIdForNewTurma ? "Nome gerado automaticamente..." : "Selecione a escola para gerar o nome..."} 
                                     value={newTurmaNome}
                                     onChange={e => setNewTurmaNome(e.target.value)}
-                                    className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-indigo-500/10 transition-all outline-none"
+                                    className={`w-full border-none rounded-xl px-4 py-3 text-sm font-bold outline-none ${
+                                        editingTurma 
+                                            ? 'bg-slate-50 focus:ring-2 focus:ring-indigo-500/10 text-slate-800' 
+                                            : 'bg-slate-100 cursor-not-allowed text-slate-500'
+                                    }`}
+                                    readOnly={!editingTurma}
                                     required
                                 />
                             </div>
@@ -562,7 +610,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Unidade Escolar</label>
                                 <select 
                                     value={selectedSchoolIdForNewTurma}
-                                    onChange={e => setSelectedSchoolIdForNewTurma(e.target.value)}
+                                    onChange={e => handleSchoolChange(e.target.value)}
                                     className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-indigo-500/10 transition-all outline-none text-slate-700 cursor-pointer"
                                     required
                                 >
@@ -573,6 +621,19 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                     {escolasComplementares.length === 0 && (
                                         <option value="" disabled>Carregando unidades...</option>
                                     )}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Turno</label>
+                                <select 
+                                    value={turno}
+                                    onChange={e => setTurno(e.target.value as any)}
+                                    className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-indigo-500/10 transition-all outline-none text-slate-700 cursor-pointer"
+                                    required
+                                >
+                                    <option value="MATUTINO">MATUTINO</option>
+                                    <option value="VESPERTINO">VESPERTINO</option>
+                                    <option value="NOTURNO">NOTURNO</option>
                                 </select>
                             </div>
                         </div>
@@ -956,7 +1017,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                                 {t.nome}
                                             </h4>
                                             <div className="flex justify-between items-center w-full text-[10px] text-slate-400 font-bold">
-                                                <span>{t.alunos_count} alunos</span>
+                                                <span>{t.alunos_count} alunos • {t.turno ? t.turno.toUpperCase() : 'MATUTINO'}</span>
                                                 <span className={isSelected ? 'text-indigo-600 font-black' : 'text-slate-500'}>
                                                     {t.atividades_count} atividades
                                                 </span>
@@ -1047,7 +1108,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                             <Printer size={16} /> Imprimir
                                         </button>
                                         <button
-                                            onClick={() => setIsAddingStudent(true)}
+                                            onClick={handleVincularAlunoClick}
                                             className="bg-indigo-600 text-white px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 active:scale-95 self-stretch sm:self-auto text-center justify-center animate-in fade-in"
                                         >
                                             <UserPlus size={16} /> Vincular Aluno
@@ -1193,6 +1254,18 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                     onClose={() => setIsPrintingTurma(false)}
                 />
             )}
+
+            <ConfirmModal
+                isOpen={isMinActivitiesAlertOpen}
+                onClose={() => setIsMinActivitiesAlertOpen(false)}
+                onConfirm={() => setIsMinActivitiesAlertOpen(false)}
+                title="Aviso de Vinculação"
+                message="Não é possível vincular estudantes, pois a turma ainda não possui o mínimo de 5 atividades vinculadas."
+                icon={AlertTriangle}
+                variant="warning"
+                showCancel={false}
+                confirmText="Entendido"
+            />
         </div>
     );
 };

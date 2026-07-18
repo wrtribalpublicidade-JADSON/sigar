@@ -14,6 +14,7 @@ interface ConfirmModalProps {
     cancelText?: string;
     variant?: 'danger' | 'info' | 'warning' | 'success';
     children?: React.ReactNode;
+    showCancel?: boolean;
 }
 
 export const ConfirmModal: React.FC<ConfirmModalProps> = ({
@@ -26,7 +27,8 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
     confirmText = 'Confirmar',
     cancelText = 'Cancelar',
     variant = 'info',
-    children
+    children,
+    showCancel = true
 }) => {
     if (!isOpen) return null;
 
@@ -90,12 +92,14 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
                 </div>
 
                 <div className="bg-slate-50 border-t border-slate-100 p-6 flex flex-col-reverse sm:flex-row justify-end gap-3 rounded-b-2xl">
-                    <button
-                        onClick={onClose}
-                        className="w-full sm:w-auto px-6 py-2.5 text-slate-600 font-bold bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-200 transition-all shadow-sm"
-                    >
-                        {cancelText}
-                    </button>
+                    {showCancel && (
+                        <button
+                            onClick={onClose}
+                            className="w-full sm:w-auto px-6 py-2.5 text-slate-600 font-bold bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-200 transition-all shadow-sm"
+                        >
+                            {cancelText}
+                        </button>
+                    )}
                     <button
                         onClick={onConfirm}
                         className={`w-full sm:w-auto px-8 py-2.5 font-bold rounded-xl shadow-lg focus:outline-none focus:ring-4 transition-all flex items-center justify-center gap-2 ${styles.btnClass}`}

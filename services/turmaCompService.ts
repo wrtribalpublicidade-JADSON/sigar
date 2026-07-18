@@ -4,6 +4,7 @@ export interface TurmaComp {
     id: string;
     nome: string;
     escola_id: string;
+    turno?: string;
     created_at: string;
     alunos_count?: number;
     atividades_count?: number;
@@ -44,10 +45,10 @@ export const turmaCompService = {
         }));
     },
 
-    async createTurma(nome: string, escolaId: string): Promise<TurmaComp> {
+    async createTurma(nome: string, escolaId: string, turno?: string): Promise<TurmaComp> {
         const { data, error } = await supabase
             .from('turmas_atividades_comp')
-            .insert({ nome, escola_id: escolaId })
+            .insert({ nome, escola_id: escolaId, turno })
             .select()
             .single();
 
@@ -55,10 +56,10 @@ export const turmaCompService = {
         return data;
     },
 
-    async updateTurma(id: string, nome: string, escolaId: string): Promise<TurmaComp> {
+    async updateTurma(id: string, nome: string, escolaId: string, turno?: string): Promise<TurmaComp> {
         const { data, error } = await supabase
             .from('turmas_atividades_comp')
-            .update({ nome, escola_id: escolaId })
+            .update({ nome, escola_id: escolaId, turno })
             .eq('id', id)
             .select()
             .single();
