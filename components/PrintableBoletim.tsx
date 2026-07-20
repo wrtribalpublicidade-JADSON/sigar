@@ -17,6 +17,7 @@ interface GradeSheet {
   escolaNome: string;
   turmaId: string;
   turmaNome: string;
+  anoSerie?: string;
   componente: string;
   bimestre: string;
   mediaTurma: number;
@@ -81,10 +82,10 @@ export const PrintableBoletim: React.FC<PrintableBoletimProps> = ({ sheet }) => 
             </tr>
             <tr>
               <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc' }}>
-                Turma / Turno
+                Ano / Turma / Turno
               </td>
               <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 600, color: '#334155' }}>
-                {sheet.turmaNome}
+                {sheet.anoSerie ? `${sheet.anoSerie} • ${sheet.turmaNome}` : sheet.turmaNome}
               </td>
               <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', width: '18%', background: '#f8fafc' }}>
                 Período

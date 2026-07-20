@@ -40,6 +40,7 @@ interface GradeSheet {
   escolaNome: string;
   turmaId: string;
   turmaNome: string;
+  anoSerie?: string;
   componente: string;
   bimestre: string;
   mediaTurma: number;
@@ -177,9 +178,11 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
         .select('id, name, year, shift');
       
       const turmaMap = new Map<string, string>();
+      const turmaAnoMap = new Map<string, string>();
       if (!turmasError && allTurmas) {
         allTurmas.forEach((t: any) => {
           turmaMap.set(t.id, `${t.name || t.year} • ${t.shift || ''}`);
+          turmaAnoMap.set(t.id, t.year || '');
         });
       }
 
@@ -193,6 +196,7 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
         const escolaObj = escolas.find(esc => esc.id === p.escola_id);
         const escolaNome = escolaObj ? escolaObj.nome : 'Unidade';
         const turmaNome = turmaMap.get(p.turma_id) || 'Turma';
+        const anoSerie = turmaAnoMap.get(p.turma_id) || '';
 
         return {
           id: p.id,
@@ -200,6 +204,7 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
           escolaNome,
           turmaId: p.turma_id,
           turmaNome,
+          anoSerie,
           componente: p.componente,
           bimestre: p.bimestre,
           mediaTurma: Number(p.media_turma),
@@ -222,7 +227,18 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
       const saved = localStorage.getItem('sigar_notas_sheets');
       if (saved) {
         try {
-          setSheets(JSON.parse(saved));
+          const parsed = JSON.parse(saved);
+          const demoTurmas = [
+            { id: 'demo-t1', name: '1º ANO A', year: '1º ANO', shift: 'MANHÃ' },
+            { id: 'demo-t2', name: '2º ANO B', year: '2º ANO', shift: 'TARDE' },
+            { id: 'demo-t3', name: '5º ANO A', year: '5º ANO', shift: 'MANHÃ' },
+          ];
+          const demoTurmaAnoMap = new Map(demoTurmas.map(t => [t.id, t.year]));
+          const mapped = parsed.map((s: any) => ({
+            ...s,
+            anoSerie: s.anoSerie || demoTurmaAnoMap.get(s.turmaId) || ''
+          }));
+          setSheets(mapped);
         } catch (e) {
           console.error(e);
         }
@@ -567,6 +583,7 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
     const escolaNome = escolas.find(e => e.id === selectedEscolaId)?.nome || 'Unidade';
     const turmaObj = turmas.find(t => t.id === selectedTurmaId);
     const turmaNome = turmaObj ? `${turmaObj.name || turmaObj.year} • ${turmaObj.shift || ''}` : 'Turma';
+    const anoSerie = turmaObj ? (turmaObj.year || '') : '';
 
     const sheetStudents: StudentGrade[] = students.map(s => {
       const grade = gradesMap[s.id] || { av1: '', av2: '', qualitativa: '', recuperacao: '', mediaFinal: 0 };
@@ -592,6 +609,7 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
       escolaNome,
       turmaId: selectedTurmaId,
       turmaNome,
+      anoSerie,
       componente,
       bimestre,
       mediaTurma: stats.mediaTurma,
@@ -1030,6 +1048,7 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
               <thead className="bg-slate-50 border-b border-slate-100 uppercase text-[10px] font-black text-slate-500 tracking-wider">
                 <tr>
                   <th className="px-6 py-4">Escola</th>
+                  <th className="px-6 py-4">Ano/Série</th>
                   <th className="px-6 py-4">Turma / Componente</th>
                   <th className="px-6 py-4 text-center">Período</th>
                   <th className="px-6 py-4 text-center">Média Geral</th>
@@ -1040,7 +1059,7 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
               <tbody className="divide-y divide-slate-100">
                 {sheets.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-400 font-semibold">
+                    <td colSpan={7} className="py-12 text-center text-slate-400 font-semibold">
                       Nenhuma pauta de notas cadastrada no histórico.
                     </td>
                   </tr>
@@ -1049,6 +1068,9 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
                     <tr key={sheet.id} className="hover:bg-slate-50/50 transition-colors group">
                       <td className="px-6 py-3 font-bold text-slate-800">
                         {sheet.escolaNome}
+                      </td>
+                      <td className="px-6 py-3 text-slate-600 font-semibold">
+                        {sheet.anoSerie || '-'}
                       </td>
                       <td className="px-6 py-3">
                         <div className="font-bold text-slate-700">{sheet.turmaNome}</div>
