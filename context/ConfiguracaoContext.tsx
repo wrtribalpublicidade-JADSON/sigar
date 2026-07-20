@@ -80,14 +80,11 @@ export const ConfiguracaoProvider: React.FC<{ children: ReactNode }> = ({ childr
             return true;
         }
 
-        // 2. Check date range
+        // 2. Check date range (only if the period has not started yet)
         const todayStr = new Date().toISOString().split('T')[0]; // "YYYY-MM-DD"
         
         if (period.inicio && todayStr < period.inicio) {
             return true; // Not started yet
-        }
-        if (period.fim && todayStr > period.fim) {
-            return true; // Already ended
         }
 
         return false;
