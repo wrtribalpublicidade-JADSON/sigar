@@ -76,10 +76,45 @@ export const logAudit = async (
     }
 };
 
-export const fetchAccessLogs = async (): Promise<AccessLog[]> => {
-    const { data, error } = await supabase
-        .from('access_logs')
-        .select('*')
+export const fetchAccessLogs = async (filters?: {
+    user?: string;
+    year?: string;
+    month?: string;
+    day?: string;
+}): Promise<AccessLog[]> => {
+    let query = supabase.from('access_logs').select('*');
+
+    if (filters) {
+        if (filters.user) {
+            const term = `%${filters.user.toLowerCase()}%`;
+            query = query.or(`user_email.ilike.${term},user_name.ilike.${term}`);
+        }
+
+        if (filters.year || filters.month || filters.day) {
+            const now = new Date();
+            const y = filters.year ? parseInt(filters.year) : now.getFullYear();
+            
+            if (filters.month !== '' && filters.month !== undefined) {
+                const m = parseInt(filters.month);
+                if (filters.day !== '' && filters.day !== undefined) {
+                    const d = parseInt(filters.day);
+                    const start = new Date(y, m, d, 0, 0, 0, 0).toISOString();
+                    const end = new Date(y, m, d, 23, 59, 59, 999).toISOString();
+                    query = query.gte('created_at', start).lte('created_at', end);
+                } else {
+                    const start = new Date(y, m, 1, 0, 0, 0, 0).toISOString();
+                    const end = new Date(y, m + 1, 1, 0, 0, 0, 0).toISOString();
+                    query = query.gte('created_at', start).lt('created_at', end);
+                }
+            } else if (filters.year) {
+                const start = new Date(y, 0, 1, 0, 0, 0, 0).toISOString();
+                const end = new Date(y + 1, 0, 1, 0, 0, 0, 0).toISOString();
+                query = query.gte('created_at', start).lt('created_at', end);
+            }
+        }
+    }
+
+    const { data, error } = await query
         .order('created_at', { ascending: false })
         .limit(100);
 
@@ -90,10 +125,50 @@ export const fetchAccessLogs = async (): Promise<AccessLog[]> => {
     return data as AccessLog[];
 };
 
-export const fetchAuditLogs = async (): Promise<AuditLog[]> => {
-    const { data, error } = await supabase
-        .from('audit_logs')
-        .select('*')
+export const fetchAuditLogs = async (filters?: {
+    user?: string;
+    module?: string;
+    year?: string;
+    month?: string;
+    day?: string;
+}): Promise<AuditLog[]> => {
+    let query = supabase.from('audit_logs').select('*');
+
+    if (filters) {
+        if (filters.user) {
+            const term = `%${filters.user.toLowerCase()}%`;
+            query = query.or(`user_email.ilike.${term},user_name.ilike.${term}`);
+        }
+
+        if (filters.module) {
+            query = query.eq('module', filters.module);
+        }
+
+        if (filters.year || filters.month || filters.day) {
+            const now = new Date();
+            const y = filters.year ? parseInt(filters.year) : now.getFullYear();
+            
+            if (filters.month !== '' && filters.month !== undefined) {
+                const m = parseInt(filters.month);
+                if (filters.day !== '' && filters.day !== undefined) {
+                    const d = parseInt(filters.day);
+                    const start = new Date(y, m, d, 0, 0, 0, 0).toISOString();
+                    const end = new Date(y, m, d, 23, 59, 59, 999).toISOString();
+                    query = query.gte('created_at', start).lte('created_at', end);
+                } else {
+                    const start = new Date(y, m, 1, 0, 0, 0, 0).toISOString();
+                    const end = new Date(y, m + 1, 1, 0, 0, 0, 0).toISOString();
+                    query = query.gte('created_at', start).lt('created_at', end);
+                }
+            } else if (filters.year) {
+                const start = new Date(y, 0, 1, 0, 0, 0, 0).toISOString();
+                const end = new Date(y + 1, 0, 1, 0, 0, 0, 0).toISOString();
+                query = query.gte('created_at', start).lt('created_at', end);
+            }
+        }
+    }
+
+    const { data, error } = await query
         .order('created_at', { ascending: false })
         .limit(100);
 

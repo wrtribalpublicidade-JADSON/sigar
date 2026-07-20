@@ -13,11 +13,20 @@ export const AuditLogDashboard: React.FC<AuditLogDashboardProps> = ({ onBack }) 
     const [accessLogs, setAccessLogs] = useState<AccessLog[]>([]);
     const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
     const [loading, setLoading] = useState(false);
+    const [searchInput, setSearchInput] = useState('');
     const [filterUser, setFilterUser] = useState('');
     const [filterModule, setFilterModule] = useState('');
     const [filterYear, setFilterYear] = useState('');
     const [filterMonth, setFilterMonth] = useState('');
     const [filterDay, setFilterDay] = useState('');
+
+    // Debounce searchInput into filterUser
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setFilterUser(searchInput);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchInput]);
 
     const MONTHS = [
         { value: '0', label: 'Janeiro' },
@@ -37,11 +46,18 @@ export const AuditLogDashboard: React.FC<AuditLogDashboardProps> = ({ onBack }) 
     const loadData = async () => {
         setLoading(true);
         try {
+            const filters = {
+                user: filterUser,
+                module: filterModule,
+                year: filterYear,
+                month: filterMonth,
+                day: filterDay
+            };
             if (activeTab === 'ACCESS') {
-                const data = await fetchAccessLogs();
+                const data = await fetchAccessLogs(filters);
                 setAccessLogs(data);
             } else {
-                const data = await fetchAuditLogs();
+                const data = await fetchAuditLogs(filters);
                 setAuditLogs(data);
             }
         } catch (error) {
@@ -53,18 +69,17 @@ export const AuditLogDashboard: React.FC<AuditLogDashboardProps> = ({ onBack }) 
 
     useEffect(() => {
         loadData();
-    }, [activeTab]);
+    }, [activeTab, filterUser, filterModule, filterYear, filterMonth, filterDay]);
 
     const years = React.useMemo(() => {
-        const allYears = new Set<string>();
-        const logs = activeTab === 'ACCESS' ? accessLogs : auditLogs;
-        logs.forEach(log => {
-            if (log.created_at) {
-                allYears.add(new Date(log.created_at).getFullYear().toString());
-            }
-        });
-        return Array.from(allYears).sort((a, b) => b.localeCompare(a));
-    }, [accessLogs, auditLogs, activeTab]);
+        const currentYear = new Date().getFullYear();
+        const startYear = 2025;
+        const list = [];
+        for (let y = currentYear; y >= startYear; y--) {
+            list.push(y.toString());
+        }
+        return list;
+    }, []);
 
     const days = Array.from({ length: 31 }, (_, i) => (i + 1).toString());
 
@@ -189,8 +204,8 @@ export const AuditLogDashboard: React.FC<AuditLogDashboardProps> = ({ onBack }) 
                     <input
                         type="text"
                         placeholder="Buscar por usuário/nome/email..."
-                        value={filterUser}
-                        onChange={(e) => setFilterUser(e.target.value)}
+                        value={searchInput}
+                        onChange={(e) => setSearchInput(e.target.value)}
                         className="pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-orange/20 focus:border-brand-orange w-64"
                     />
                 </div>
