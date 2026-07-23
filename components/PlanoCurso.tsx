@@ -434,6 +434,24 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
   const [anoReferencia, setAnoReferencia] = useState(new Date().getFullYear().toString());
   const [anoSerie, setAnoSerie] = useState(ANOS_SERIES[0]);
   const [componente, setComponente] = useState(COMPONENTES[0]);
+  const allowedComponentes = useMemo(() => {
+    if (currentUser && currentUser.funcao === 'Professor') {
+      const allTeacherAssigned = Object.values(currentUser.turmaComponentes || {}).flat();
+      if (allTeacherAssigned.length > 0) {
+        return Array.from(new Set(allTeacherAssigned));
+      }
+      return [];
+    }
+    return COMPONENTES;
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (allowedComponentes.length > 0) {
+      if (!allowedComponentes.includes(componente)) {
+        setComponente(allowedComponentes[0]);
+      }
+    }
+  }, [allowedComponentes, componente]);
   const [bimestre, setBimestre] = useState(BIMESTRES[0]);
   
   // Structured Planning Items
@@ -1388,7 +1406,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
                 required
                 className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
               >
-                {COMPONENTES.map(c => (
+                {allowedComponentes.map(c => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>

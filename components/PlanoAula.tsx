@@ -99,8 +99,11 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
 
   const allowedComponentes = useMemo(() => {
     if (currentUser && currentUser.funcao === 'Professor') {
-      const assigned = currentUser.turmaComponentes?.[selectedTurmaId] || [];
-      if (assigned.length > 0) return assigned;
+      if (selectedTurmaId) {
+        return currentUser.turmaComponentes?.[selectedTurmaId] || [];
+      }
+      const allTeacherAssigned = Object.values(currentUser.turmaComponentes || {}).flat();
+      return Array.from(new Set(allTeacherAssigned));
     }
     return COMPONENTES;
   }, [currentUser, selectedTurmaId]);
@@ -355,7 +358,12 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       let filteredPlansData = data || [];
       if (currentUser && currentUser.funcao === 'Professor') {
         const assignedIds = currentUser.turmasIds || [];
-        filteredPlansData = filteredPlansData.filter((p: any) => assignedIds.includes(p.turma_id));
+        filteredPlansData = filteredPlansData.filter((p: any) => {
+          if (!assignedIds.includes(p.turma_id)) return false;
+          const assignedComps = currentUser.turmaComponentes?.[p.turma_id] || [];
+          if (assignedComps.length > 0 && !assignedComps.includes(p.componente)) return false;
+          return true;
+        });
       }
 
       const formattedPlans: LessonPlan[] = filteredPlansData.map((p: any) => {
