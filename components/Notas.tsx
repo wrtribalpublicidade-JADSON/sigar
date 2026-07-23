@@ -48,6 +48,9 @@ interface GradeSheet {
   taxaAprovacao: number;
   students: StudentGrade[];
   criadoEm: string;
+  createdBy?: string;
+  updatedBy?: string;
+  professorNome?: string;
 }
 
 const COMPONENTES = [
@@ -118,6 +121,7 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
   const [historyFilterTurma, setHistoryFilterTurma] = useState('');
   const [historyFilterComponente, setHistoryFilterComponente] = useState('');
   const [historyFilterBimestre, setHistoryFilterBimestre] = useState('');
+  const [historyFilterProfessor, setHistoryFilterProfessor] = useState('');
 
   const [historyItemsPerPage, setHistoryItemsPerPage] = useState(10);
   const [historyCurrentPage, setHistoryCurrentPage] = useState(1);
@@ -125,7 +129,7 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
   // Reset page to 1 whenever any filter or items-per-page changes
   useEffect(() => {
     setHistoryCurrentPage(1);
-  }, [historyFilterEscola, historyFilterAnoSerie, historyFilterTurma, historyFilterComponente, historyFilterBimestre, historyItemsPerPage]);
+  }, [historyFilterEscola, historyFilterAnoSerie, historyFilterTurma, historyFilterComponente, historyFilterBimestre, historyFilterProfessor, historyItemsPerPage]);
 
   const componentesRede = useMemo(() => {
     if (configuracao && configuracao.componentes_curriculares && configuracao.componentes_curriculares.length > 0) {
@@ -237,6 +241,20 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
         turmaAnoMap.set(t.id, t.year || '');
       });
 
+      // Fetch coordenadores to map emails to teacher names
+      const { data: allCoords } = await supabase
+        .from('coordenadores')
+        .select('contato, nome');
+
+      const coordMap = new Map<string, string>();
+      if (allCoords) {
+        allCoords.forEach((c: any) => {
+          if (c.contato && c.nome) {
+            coordMap.set(c.contato.toLowerCase().trim(), c.nome.trim());
+          }
+        });
+      }
+
       let filteredSheets = allSheetsData;
       if (currentUser && currentUser.funcao === 'Professor') {
         const assignedIds = currentUser.turmasIds || [];
@@ -248,6 +266,9 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
         const escolaNome = escolaObj ? escolaObj.nome : 'Unidade';
         const turmaNome = turmaMap.get(p.turma_id) || 'Turma';
         const anoSerie = turmaAnoMap.get(p.turma_id) || '';
+
+        const authorEmail = (p.updated_by || p.created_by || '').toLowerCase().trim();
+        const professorNome = coordMap.get(authorEmail) || authorEmail || '';
 
         return {
           id: p.id,
@@ -261,7 +282,10 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
           mediaTurma: Number(p.media_turma),
           taxaAprovacao: p.taxa_aprovacao,
           students: p.students || [],
-          criadoEm: p.created_at
+          criadoEm: p.created_at,
+          createdBy: p.created_by,
+          updatedBy: p.updated_by,
+          professorNome
         };
       });
 
@@ -810,48 +834,114 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
   const historyOptions = useMemo(() => {
     const escolasMap = new Map<string, string>();
     const anosSet = new Set<string>();
-    const turmasMap = new Map<string, string>();
+    const turmasSet = new Set<string>();
     const componentesSet = new Set<string>();
     const bimestresSet = new Set<string>();
+    const professoresSet = new Set<string>();
 
     sheets.forEach(s => {
-      if (s.escolaId && s.escolaNome) escolasMap.set(s.escolaId, s.escolaNome);
-      if (s.anoSerie && !isEducaInfantilYear(s.anoSerie)) anosSet.add(s.anoSerie);
-      if (s.turmaId && s.turmaNome) {
-        if (!historyFilterEscola || s.escolaId === historyFilterEscola) {
-          turmasMap.set(s.turmaId, s.turmaNome);
+      const matchEscola = !historyFilterEscola || s.escolaId === historyFilterEscola;
+      const matchAno = !historyFilterAnoSerie || s.anoSerie === historyFilterAnoSerie;
+      const matchTurma = !historyFilterTurma || s.turmaNome === historyFilterTurma;
+      const matchComp = !historyFilterComponente || s.componente === historyFilterComponente;
+      const matchBimestre = !historyFilterBimestre || s.bimestre === historyFilterBimestre;
+      const matchProf = !historyFilterProfessor || s.professorNome === historyFilterProfessor || s.updatedBy === historyFilterProfessor || s.createdBy === historyFilterProfessor;
+
+      // 1. Escolas
+      if (s.escolaId && s.escolaNome) {
+        if (matchAno && matchTurma && matchComp && matchBimestre && matchProf) {
+          escolasMap.set(s.escolaId, s.escolaNome);
         }
       }
-      if (s.componente) componentesSet.add(s.componente);
-      if (s.bimestre) bimestresSet.add(s.bimestre);
+
+      // 2. Anos/Séries
+      if (s.anoSerie && !isEducaInfantilYear(s.anoSerie)) {
+        if (matchEscola && matchTurma && matchComp && matchBimestre && matchProf) {
+          anosSet.add(s.anoSerie);
+        }
+      }
+
+      // 3. Turmas
+      if (s.turmaNome) {
+        if (matchEscola && matchAno && matchComp && matchBimestre && matchProf) {
+          turmasSet.add(s.turmaNome);
+        }
+      }
+
+      // 4. Componentes
+      if (s.componente) {
+        if (matchEscola && matchAno && matchTurma && matchBimestre && matchProf) {
+          componentesSet.add(s.componente);
+        }
+      }
+
+      // 5. Bimestres
+      if (s.bimestre) {
+        if (matchEscola && matchAno && matchTurma && matchComp && matchProf) {
+          bimestresSet.add(s.bimestre);
+        }
+      }
+
+      // 6. Professores
+      if (s.professorNome) {
+        if (matchEscola && matchAno && matchTurma && matchComp && matchBimestre) {
+          professoresSet.add(s.professorNome);
+        }
+      }
     });
 
     const escolasList = Array.from(escolasMap.entries()).map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome));
     const anosList = Array.from(anosSet).sort();
-    const turmasList = Array.from(turmasMap.entries()).map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome));
-    const componentesList = Array.from(componentesSet).sort();
+    const turmasList = Array.from(turmasSet).sort((a, b) => a.localeCompare(b));
+    const componentesList = Array.from(componentesSet).sort((a, b) => a.localeCompare(b));
     const bimestresList = Array.from(bimestresSet).sort();
+    const professoresList = Array.from(professoresSet).sort((a, b) => a.localeCompare(b));
 
     return {
       escolas: escolasList,
       anosSeries: anosList,
       turmas: turmasList,
       componentes: componentesList,
-      bimestres: bimestresList
+      bimestres: bimestresList,
+      professores: professoresList
     };
-  }, [sheets, historyFilterEscola]);
+  }, [sheets, historyFilterEscola, historyFilterAnoSerie, historyFilterTurma, historyFilterComponente, historyFilterBimestre, historyFilterProfessor]);
+
+  // Reset selected filters if no longer available in filtered historyOptions
+  useEffect(() => {
+    if (historyFilterTurma && !historyOptions.turmas.includes(historyFilterTurma)) {
+      setHistoryFilterTurma('');
+    }
+    if (historyFilterProfessor && !historyOptions.professores.includes(historyFilterProfessor)) {
+      setHistoryFilterProfessor('');
+    }
+  }, [historyOptions.turmas, historyOptions.professores, historyFilterTurma, historyFilterProfessor]);
 
   // Filtered History Sheets
   const filteredSheetsHistory = useMemo(() => {
     return sheets.filter(s => {
       if (historyFilterEscola && s.escolaId !== historyFilterEscola) return false;
       if (historyFilterAnoSerie && s.anoSerie !== historyFilterAnoSerie) return false;
-      if (historyFilterTurma && s.turmaId !== historyFilterTurma) return false;
+      if (historyFilterTurma && s.turmaNome !== historyFilterTurma) return false;
       if (historyFilterComponente && s.componente !== historyFilterComponente) return false;
       if (historyFilterBimestre && s.bimestre !== historyFilterBimestre) return false;
+      if (historyFilterProfessor && s.professorNome !== historyFilterProfessor && s.updatedBy !== historyFilterProfessor && s.createdBy !== historyFilterProfessor) return false;
       return true;
     });
-  }, [sheets, historyFilterEscola, historyFilterAnoSerie, historyFilterTurma, historyFilterComponente, historyFilterBimestre]);
+  }, [sheets, historyFilterEscola, historyFilterAnoSerie, historyFilterTurma, historyFilterComponente, historyFilterBimestre, historyFilterProfessor]);
+
+  const hasActiveHistoryFilters = Boolean(
+    historyFilterEscola || historyFilterAnoSerie || historyFilterTurma || historyFilterComponente || historyFilterBimestre || historyFilterProfessor
+  );
+
+  const handleClearHistoryFilters = () => {
+    setHistoryFilterEscola('');
+    setHistoryFilterAnoSerie('');
+    setHistoryFilterTurma('');
+    setHistoryFilterComponente('');
+    setHistoryFilterBimestre('');
+    setHistoryFilterProfessor('');
+  };
 
   // Pagination Math
   const totalHistoryItems = filteredSheetsHistory.length;
@@ -862,18 +952,6 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
     const start = (safeHistoryCurrentPage - 1) * historyItemsPerPage;
     return filteredSheetsHistory.slice(start, start + historyItemsPerPage);
   }, [filteredSheetsHistory, safeHistoryCurrentPage, historyItemsPerPage]);
-
-  const hasActiveHistoryFilters = Boolean(
-    historyFilterEscola || historyFilterAnoSerie || historyFilterTurma || historyFilterComponente || historyFilterBimestre
-  );
-
-  const handleClearHistoryFilters = () => {
-    setHistoryFilterEscola('');
-    setHistoryFilterAnoSerie('');
-    setHistoryFilterTurma('');
-    setHistoryFilterComponente('');
-    setHistoryFilterBimestre('');
-  };
 
   return (
     <div className="space-y-6 pb-12 animate-fade-in relative">
@@ -1183,7 +1261,7 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             {/* Escola */}
             <div>
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Escola</label>
@@ -1224,7 +1302,7 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
               >
                 <option value="">Todas as Turmas</option>
                 {historyOptions.turmas.map(t => (
-                  <option key={t.id} value={t.id}>{t.nome}</option>
+                  <option key={t} value={t}>{t}</option>
                 ))}
               </select>
             </div>
@@ -1255,6 +1333,21 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
                 <option value="">Todos os Bimestres</option>
                 {historyOptions.bimestres.map(b => (
                   <option key={b} value={b}>{b}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Professor */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Professor</label>
+              <select
+                value={historyFilterProfessor}
+                onChange={e => setHistoryFilterProfessor(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todos os Professores</option>
+                {historyOptions.professores.map(p => (
+                  <option key={p} value={p}>{p}</option>
                 ))}
               </select>
             </div>
@@ -1299,6 +1392,14 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
                         <div className="text-[10px] text-brand-orange font-bold uppercase mt-0.5">
                           {sheet.componente}
                         </div>
+                        {sheet.professorNome && (
+                          <div className="text-[10px] text-slate-400 font-medium mt-0.5 flex items-center gap-1">
+                            <span>Prof:</span>
+                            <span className="font-semibold text-slate-600 truncate max-w-[170px]" title={sheet.professorNome}>
+                              {sheet.professorNome}
+                            </span>
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-3 text-center font-bold text-slate-600">
                         {sheet.bimestre}
