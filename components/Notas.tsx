@@ -131,6 +131,17 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
     setHistoryCurrentPage(1);
   }, [historyFilterEscola, historyFilterAnoSerie, historyFilterTurma, historyFilterComponente, historyFilterBimestre, historyFilterProfessor, historyItemsPerPage]);
 
+  const allowedEscolas = useMemo(() => {
+    if (isAdmin || currentUser?.funcao === 'Administrador') {
+      return escolas;
+    }
+    const userSchoolIds = currentUser?.escolasIds || [];
+    if (userSchoolIds.length > 0) {
+      return escolas.filter(e => userSchoolIds.includes(e.id));
+    }
+    return escolas;
+  }, [escolas, isAdmin, currentUser]);
+
   const componentesRede = useMemo(() => {
     if (configuracao && configuracao.componentes_curriculares && configuracao.componentes_curriculares.length > 0) {
       return configuracao.componentes_curriculares;
@@ -259,6 +270,12 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
       }
 
       let filteredSheets = allSheetsData;
+      if (!isAdmin && currentUser && currentUser.funcao !== 'Administrador') {
+        const userSchoolIds = currentUser?.escolasIds || [];
+        if (userSchoolIds.length > 0) {
+          filteredSheets = filteredSheets.filter((p: any) => userSchoolIds.includes(p.escola_id));
+        }
+      }
       if (currentUser && currentUser.funcao === 'Professor') {
         const assignedIds = currentUser.turmasIds || [];
         const currentEmail = (currentUser.contato || userEmail || '').toLowerCase().trim();
@@ -334,15 +351,17 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
         }
       }
     } else {
-      if (escolas.length > 0) {
+      if (allowedEscolas.length > 0) {
         fetchRealSheets();
       }
     }
 
-    if (escolas.length > 0) {
-      setSelectedEscolaId(escolas[0].id);
+    if (allowedEscolas.length > 0) {
+      if (!selectedEscolaId || !allowedEscolas.some(e => e.id === selectedEscolaId)) {
+        setSelectedEscolaId(allowedEscolas[0].id);
+      }
     }
-  }, [escolas, isDemoMode]);
+  }, [allowedEscolas, isDemoMode]);
 
   // Load turmas when selected school changes
   useEffect(() => {
@@ -991,7 +1010,7 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Escola *</label>
             <SearchableSchoolSelect
-              escolas={escolas}
+              escolas={allowedEscolas}
               selectedId={selectedEscolaId}
               onChange={setSelectedEscolaId}
               inputClassName="pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"

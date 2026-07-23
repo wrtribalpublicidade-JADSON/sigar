@@ -97,6 +97,17 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
   const [avaliacao, setAvaliacao] = useState('');
   const [expandedFields, setExpandedFields] = useState<Record<string, boolean>>({});
 
+  const allowedEscolas = useMemo(() => {
+    if (isAdmin || currentUser?.funcao === 'Administrador') {
+      return escolas;
+    }
+    const userSchoolIds = currentUser?.escolasIds || [];
+    if (userSchoolIds.length > 0) {
+      return escolas.filter(e => userSchoolIds.includes(e.id));
+    }
+    return escolas;
+  }, [escolas, isAdmin, currentUser]);
+
   const allowedComponentes = useMemo(() => {
     if (currentUser && currentUser.funcao === 'Professor') {
       if (selectedTurmaId) {
@@ -356,6 +367,12 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       }
 
       let filteredPlansData = data || [];
+      if (!isAdmin && currentUser && currentUser.funcao !== 'Administrador') {
+        const userSchoolIds = currentUser?.escolasIds || [];
+        if (userSchoolIds.length > 0) {
+          filteredPlansData = filteredPlansData.filter((p: any) => userSchoolIds.includes(p.escola_id));
+        }
+      }
       if (currentUser && currentUser.funcao === 'Professor') {
         const assignedIds = currentUser.turmasIds || [];
         const currentEmail = (currentUser.contato || userEmail || '').toLowerCase().trim();
@@ -417,15 +434,17 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
         }
       }
     } else {
-      if (escolas.length > 0) {
+      if (allowedEscolas.length > 0) {
         fetchRealPlans();
       }
     }
 
-    if (escolas.length > 0) {
-      setSelectedEscolaId(escolas[0].id);
+    if (allowedEscolas.length > 0) {
+      if (!selectedEscolaId || !allowedEscolas.some(e => e.id === selectedEscolaId)) {
+        setSelectedEscolaId(allowedEscolas[0].id);
+      }
     }
-  }, [escolas, isDemoMode]);
+  }, [allowedEscolas, isDemoMode]);
 
   // Load turmas when selected school changes
   useEffect(() => {
@@ -977,7 +996,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Escola *</label>
               <SearchableSchoolSelect
-                escolas={escolas}
+                escolas={allowedEscolas}
                 selectedId={selectedEscolaId}
                 onChange={setSelectedEscolaId}
                 inputClassName="pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"

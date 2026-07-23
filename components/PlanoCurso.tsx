@@ -151,7 +151,7 @@ const createDefaultItem = (): ItemPlano => ({
   links: []
 });
 
-export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, userEmail, currentUser, subHeader }) => {
+export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isAdmin, userEmail, currentUser, subHeader }) => {
   const { showNotification } = useNotification();
   const [plans, setPlans] = useState<CoursePlan[]>([]);
 
@@ -433,6 +433,17 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ isDemoMode, isAdmin, use
   const [editingId, setEditingId] = useState<string | null>(null);
   const [anoReferencia, setAnoReferencia] = useState(new Date().getFullYear().toString());
   const [anoSerie, setAnoSerie] = useState(ANOS_SERIES[0]);
+  const allowedEscolas = useMemo(() => {
+    if (isAdmin || currentUser?.funcao === 'Administrador') {
+      return escolas;
+    }
+    const userSchoolIds = currentUser?.escolasIds || [];
+    if (userSchoolIds.length > 0) {
+      return escolas.filter(e => userSchoolIds.includes(e.id));
+    }
+    return escolas;
+  }, [escolas, isAdmin, currentUser]);
+
   const [componente, setComponente] = useState(COMPONENTES[0]);
   const allowedComponentes = useMemo(() => {
     if (currentUser && currentUser.funcao === 'Professor') {
