@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   ClipboardList, BookOpen, FileText, ClipboardCheck, GraduationCap
 } from 'lucide-react';
-import { Escola, Coordenador } from '../types';
+import { Escola, Coordenador, Segmento } from '../types';
 import { PlanoCurso } from './PlanoCurso';
 import { PlanoAula } from './PlanoAula';
 import { AulasMinistradas } from './AulasMinistradas';
@@ -27,6 +27,15 @@ export const DiarioFundamental: React.FC<DiarioFundamentalProps> = ({
   userEmail,
   currentUser
 }) => {
+  const fundamentalEscolas = useMemo(() => {
+    return escolas.filter(e => {
+      if (e.segmentos && e.segmentos.length > 0 && e.segmentos.every(s => s === Segmento.INFANTIL)) {
+        return false;
+      }
+      return true;
+    });
+  }, [escolas]);
+
   const tabs = [
     { id: 'plano_curso' as TabId, label: 'Plano de Curso', icon: ClipboardList },
     { id: 'plano_aula' as TabId, label: 'Guia de Aprendizagem', icon: BookOpen },
@@ -76,15 +85,15 @@ export const DiarioFundamental: React.FC<DiarioFundamentalProps> = ({
     }
     switch (activeTab) {
       case 'plano_curso':
-        return <PlanoCurso escolas={escolas} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={currentUser} subHeader={tabsNode} />;
+        return <PlanoCurso escolas={fundamentalEscolas} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={currentUser} subHeader={tabsNode} />;
       case 'plano_aula':
-        return <PlanoAula escolas={escolas} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={currentUser} subHeader={tabsNode} />;
+        return <PlanoAula escolas={fundamentalEscolas} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={currentUser} subHeader={tabsNode} />;
       case 'aulas_ministradas':
-        return <AulasMinistradas escolas={escolas} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={currentUser} subHeader={tabsNode} />;
+        return <AulasMinistradas escolas={fundamentalEscolas} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={currentUser} subHeader={tabsNode} />;
       case 'frequencia':
-        return <Frequencia escolas={escolas} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={currentUser} subHeader={tabsNode} />;
+        return <Frequencia escolas={fundamentalEscolas} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={currentUser} subHeader={tabsNode} />;
       case 'notas':
-        return <Notas escolas={escolas} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={currentUser} subHeader={tabsNode} />;
+        return <Notas escolas={fundamentalEscolas} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={currentUser} subHeader={tabsNode} />;
       default:
         return null;
     }

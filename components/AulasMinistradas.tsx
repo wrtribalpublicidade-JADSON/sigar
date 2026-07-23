@@ -13,6 +13,7 @@ import { supabase } from '../services/supabase';
 import { useNotification } from '../context/NotificationContext';
 import { useConfiguracao } from '../context/ConfiguracaoContext';
 import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
+import { isEducaInfantilYear } from '../utils';
 
 interface AulasMinistradasProps {
   escolas: Escola[];
@@ -72,10 +73,6 @@ const ANOS_SERIES = [
   '7º Ano',
   '8º Ano',
   '9º Ano',
-  'Creche II',
-  'Creche III',
-  'Pré I',
-  'Pré II',
   'EJA',
   'Outros'
 ];
@@ -550,6 +547,7 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
           const assignedIds = currentUser.turmasIds || [];
           filteredTurmas = filteredTurmas.filter((t: any) => assignedIds.includes(t.id));
         }
+        filteredTurmas = filteredTurmas.filter((t: any) => !isEducaInfantilYear(t.year));
         setTurmas(filteredTurmas);
       } catch (err) {
         console.error('Erro ao carregar turmas:', err);

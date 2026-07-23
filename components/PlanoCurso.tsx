@@ -97,10 +97,6 @@ const ANOS_SERIES = [
   '7º Ano',
   '8º Ano',
   '9º Ano',
-  'Creche II',
-  'Creche III',
-  'Pré I',
-  'Pré II',
   'EJA',
   'Outros'
 ];

@@ -3,7 +3,7 @@ import {
     BookOpen, Trophy, Music, Palette, Code, Users, 
     Calendar, Search, Plus, Filter, ChevronRight, 
     Clock, MapPin, Star, Pencil, Trash2, Heart, Brain, Leaf,
-    UserPlus, X, CheckCircle2, Printer, AlertTriangle
+    UserPlus, X, CheckCircle2, Printer, AlertTriangle, Sparkles
 } from 'lucide-react';
 import { AtividadeModal } from './AtividadeModal';
 import { DiarioAtividadeModal } from './DiarioAtividadeModal';
@@ -75,6 +75,15 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
     const [newTurmaNome, setNewTurmaNome] = useState('');
     const [selectedSchoolIdForNewTurma, setSelectedSchoolIdForNewTurma] = useState<string>('');
     const [editingTurma, setEditingTurma] = useState<TurmaComp | null>(null);
+    const [isConfirmingPadronizar, setIsConfirmingPadronizar] = useState(false);
+    const [standardizedNamePreview, setStandardizedNamePreview] = useState('');
+
+    React.useEffect(() => {
+        if (!isTurmaModalOpen) {
+            setIsConfirmingPadronizar(false);
+            setStandardizedNamePreview('');
+        }
+    }, [isTurmaModalOpen]);
     const [escolasComplementares, setEscolasComplementares] = useState<{ id: string; nome: string }[]>([]);
     const [isManageActivitiesOpen, setIsManageActivitiesOpen] = useState(false);
     const [selectedActivitiesForTurma, setSelectedActivitiesForTurma] = useState<string[]>([]);
@@ -86,6 +95,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
     const [studentSearch, setStudentSearch] = useState('');
     const [searchTurmaTerm, setSearchTurmaTerm] = useState('');
     const [turmaStudentSearch, setTurmaStudentSearch] = useState('');
+    const [selectedSchoolIdForTurmaFilter, setSelectedSchoolIdForTurmaFilter] = useState<string>('todas');
 
     const selectedTurma = turmasComp.find(t => t.id === selectedTurmaId) || null;
 
@@ -189,6 +199,23 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
             const schoolName = schoolObj ? schoolObj.nome.toUpperCase() : '';
             setNewTurmaNome(`EDUCA +AÇÃO - TURMA ${String(nextNum).padStart(2, '0')}${schoolName ? ` | ${schoolName}` : ''}`);
         }
+    };
+
+    const handleRequestPadronizar = () => {
+        if (!selectedSchoolIdForNewTurma) return;
+        const otherSchoolTurmas = turmasComp.filter(t => t.escola_id === selectedSchoolIdForNewTurma && t.id !== editingTurma?.id);
+        const count = otherSchoolTurmas.length;
+        const nextNum = count + 1;
+        const schoolObj = escolasComplementares.find(esc => esc.id === selectedSchoolIdForNewTurma);
+        const schoolName = schoolObj ? schoolObj.nome.toUpperCase() : '';
+        const generated = `EDUCA +AÇÃO - TURMA ${String(nextNum).padStart(2, '0')}${schoolName ? ` | ${schoolName}` : ''}`;
+        setStandardizedNamePreview(generated);
+        setIsConfirmingPadronizar(true);
+    };
+
+    const handleConfirmPadronizar = () => {
+        setNewTurmaNome(standardizedNamePreview);
+        setIsConfirmingPadronizar(false);
     };
 
     const openNewTurmaModal = () => {
@@ -459,7 +486,8 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
     const filteredTurmasComp = turmasComp.filter(t => {
         if (!t) return false;
         const q = searchTurmaTerm.toLowerCase();
-        return t.nome.toLowerCase().includes(q);
+        const matchesSchool = selectedSchoolIdForTurmaFilter === 'todas' || t.escola_id === selectedSchoolIdForTurmaFilter;
+        return matchesSchool && t.nome.toLowerCase().includes(q);
     });
 
     // Filter students in selected turma
@@ -598,13 +626,56 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                     value={newTurmaNome}
                                     onChange={e => setNewTurmaNome(e.target.value)}
                                     className={`w-full border-none rounded-xl px-4 py-3 text-sm font-bold outline-none ${
-                                        editingTurma 
+                                        editingTurma && !/^EDUCA \+AÇÃO - TURMA \d+/i.test(newTurmaNome)
                                             ? 'bg-slate-50 focus:ring-2 focus:ring-indigo-500/10 text-slate-800' 
                                             : 'bg-slate-100 cursor-not-allowed text-slate-500'
                                     }`}
-                                    readOnly={!editingTurma}
+                                    readOnly={!editingTurma || /^EDUCA \+AÇÃO - TURMA \d+/i.test(newTurmaNome)}
                                     required
                                 />
+                                {editingTurma && /^EDUCA \+AÇÃO - TURMA \d+/i.test(newTurmaNome) && (
+                                    <p className="text-[10px] text-slate-400 font-bold mt-1">
+                                        * O nome de turmas do projeto EDUCA +AÇÃO não pode ser editado.
+                                    </p>
+                                )}
+                                {editingTurma && !/^EDUCA \+AÇÃO - TURMA \d+/i.test(newTurmaNome) && (
+                                    <div className="mt-2">
+                                        <button
+                                            type="button"
+                                            onClick={handleRequestPadronizar}
+                                            className="text-xs font-black uppercase text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5 transition-colors"
+                                        >
+                                            <Sparkles size={14} />
+                                            Padronizar Nome
+                                        </button>
+                                    </div>
+                                )}
+                                {isConfirmingPadronizar && (
+                                    <div className="bg-indigo-50 border-2 border-indigo-100 rounded-2xl p-4 mt-3 space-y-3">
+                                        <p className="text-xs font-bold text-slate-700 leading-relaxed">
+                                            Deseja padronizar o nome desta turma? O nome será alterado para:
+                                            <span className="block font-black text-indigo-700 mt-1.5 p-2 bg-white rounded-lg border border-indigo-100/50 break-words">
+                                                {standardizedNamePreview}
+                                            </span>
+                                        </p>
+                                        <div className="flex gap-2 justify-end">
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsConfirmingPadronizar(false)}
+                                                className="px-3 py-1.5 rounded-lg text-[10px] font-black uppercase text-slate-500 hover:bg-slate-200/50 transition-all"
+                                            >
+                                                Cancelar
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={handleConfirmPadronizar}
+                                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all"
+                                            >
+                                                Confirmar Nome
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                             <div>
                                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Unidade Escolar</label>
@@ -995,6 +1066,19 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                 onChange={e => setSearchTurmaTerm(e.target.value)}
                                 className="w-full bg-slate-50 border-none rounded-xl pl-9 pr-3 py-2.5 text-xs font-bold focus:ring-2 focus:ring-indigo-500/10 transition-all outline-none"
                             />
+                        </div>
+
+                        <div>
+                            <select
+                                value={selectedSchoolIdForTurmaFilter}
+                                onChange={e => setSelectedSchoolIdForTurmaFilter(e.target.value)}
+                                className="w-full bg-slate-50 border-none rounded-xl px-3 py-2.5 text-xs font-bold focus:ring-2 focus:ring-indigo-500/10 transition-all outline-none text-slate-600 cursor-pointer"
+                            >
+                                <option value="todas">Todas as Unidades Escolares</option>
+                                {escolasComplementares.map(esc => (
+                                    <option key={esc.id} value={esc.id}>{esc.nome}</option>
+                                ))}
+                            </select>
                         </div>
 
                         <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">

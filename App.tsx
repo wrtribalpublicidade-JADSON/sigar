@@ -1037,6 +1037,13 @@ export default function App() {
       );
     }
 
+    const escolasFundamental = escolas.filter(e => {
+      if (e.segmentos && e.segmentos.length > 0 && e.segmentos.every(s => s === Segmento.INFANTIL)) {
+        return false;
+      }
+      return true;
+    });
+
     switch (currentView) {
       case 'LISTA_ESCOLAS':
         return (
@@ -1300,17 +1307,17 @@ export default function App() {
       case 'MERENDA_ESCOLAR':
         return <MerendaEscolar escolas={escolas} isAdmin={isAdmin} isDemoMode={isDemoMode} canEdit={isAdmin || hasFullAccess('MERENDA_ESCOLAR', effectiveUser?.funcao)} />;
       case 'PLANO_CURSO':
-        return <PlanoCurso escolas={escolas} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={effectiveUser || null} />;
+        return <PlanoCurso escolas={escolasFundamental} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={effectiveUser || null} />;
       case 'PLANO_AULA':
-        return <PlanoAula escolas={escolas} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={effectiveUser || null} />;
+        return <PlanoAula escolas={escolasFundamental} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={effectiveUser || null} />;
       case 'AULAS_MINISTRADAS':
-        return <AulasMinistradas escolas={escolas} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={effectiveUser || null} />;
+        return <AulasMinistradas escolas={escolasFundamental} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={effectiveUser || null} />;
       case 'FREQUENCIA':
-        return <Frequencia escolas={escolas} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={effectiveUser || null} />;
+        return <Frequencia escolas={escolasFundamental} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={effectiveUser || null} />;
       case 'NOTAS':
-        return <Notas escolas={escolas} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={effectiveUser || null} />;
+        return <Notas escolas={escolasFundamental} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={effectiveUser || null} />;
       case 'DIARIO_FUNDAMENTAL':
-        return <DiarioFundamental escolas={escolas} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={effectiveUser || null} />;
+        return <DiarioFundamental escolas={escolasFundamental} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={effectiveUser || null} />;
       case 'DIARIO_INFANTIL':
         return <DiarioInfantil escolas={escolas} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={effectiveUser || null} />;
       case 'GESTAO_REDE':

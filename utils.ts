@@ -256,3 +256,18 @@ export const validateCpf = (cpf: string) => {
   return true;
 };
 
+export const isEducaInfantilYear = (yearStr: string): boolean => {
+  if (!yearStr) return false;
+  const lower = yearStr.toLowerCase().trim();
+  return (
+    lower.includes('creche') ||
+    lower.includes('bercario') ||
+    lower.includes('berçário') ||
+    lower.includes('pré-escola') ||
+    lower.includes('pre-escola') ||
+    lower.includes('pré escola') ||
+    lower.includes('pre escola') ||
+    lower.includes('infantil')
+  );
+};
+

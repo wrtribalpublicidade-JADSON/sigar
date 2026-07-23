@@ -11,6 +11,7 @@ import { supabase } from '../services/supabase';
 import { useNotification } from '../context/NotificationContext';
 import { useConfiguracao } from '../context/ConfiguracaoContext';
 import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
+import { isEducaInfantilYear } from '../utils';
 
 interface FrequenciaProps {
   escolas: Escola[];
@@ -94,9 +95,9 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
     }
   }, [allowedComponentes, componente]);
 
-  // Extract unique available Year/Grade levels
+  // Extract unique available Year/Grade levels (excluding Educação Infantil)
   const availableAnosSeries = useMemo(() => {
-    const years = turmas.map(t => t.year).filter(Boolean);
+    const years = turmas.map(t => t.year).filter(Boolean).filter(y => !isEducaInfantilYear(y));
     return Array.from(new Set(years)).sort();
   }, [turmas]);
 
@@ -223,6 +224,7 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
           const assignedIds = currentUser.turmasIds || [];
           filteredTurmas = filteredTurmas.filter((t: any) => assignedIds.includes(t.id));
         }
+        filteredTurmas = filteredTurmas.filter((t: any) => !isEducaInfantilYear(t.year));
         setTurmas(filteredTurmas);
       } catch (err) {
         console.error('Erro ao carregar turmas:', err);
