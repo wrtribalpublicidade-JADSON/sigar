@@ -358,11 +358,18 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       let filteredPlansData = data || [];
       if (currentUser && currentUser.funcao === 'Professor') {
         const assignedIds = currentUser.turmasIds || [];
+        const currentEmail = (currentUser.contato || userEmail || '').toLowerCase().trim();
+
         filteredPlansData = filteredPlansData.filter((p: any) => {
           if (!assignedIds.includes(p.turma_id)) return false;
           const assignedComps = currentUser.turmaComponentes?.[p.turma_id] || [];
-          if (assignedComps.length > 0 && !assignedComps.includes(p.componente)) return false;
-          return true;
+          const authorEmail = (p.updated_by || p.created_by || '').toLowerCase().trim();
+
+          if (authorEmail && currentEmail && authorEmail === currentEmail) return true;
+          if (assignedComps.length > 0) {
+            return assignedComps.includes(p.componente);
+          }
+          return false;
         });
       }
 
