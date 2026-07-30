@@ -8,6 +8,7 @@ import { CadastroTurmaModal } from './modals/CadastroTurmaModal';
 import { PrintableChecklistReport } from './PrintableChecklistReport';
 import { PrintableCartaApresentacao } from './PrintableCartaApresentacao';
 import { PrintableSchoolDocument } from './PrintableSchoolDocument';
+import { PrintableTurmaMatriculasReport } from './PrintableTurmaMatriculasReport';
 import { AtasFinaisTab } from './AtasFinaisTab';
 import { hasTabAccess, hasFullTabAccess } from '../utils/permissions';
 import {
@@ -132,6 +133,12 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
   const [selectedStudentForPrint, setSelectedStudentForPrint] = useState<Aluno | null>(null);
   const [printDocData, setPrintDocData] = useState<any>(null);
   const [isPrintingDocument, setIsPrintingDocument] = useState(false);
+
+  // Class report printing states
+  const [isPrintTurmaModalOpen, setIsPrintTurmaModalOpen] = useState(false);
+  const [selectedTurmaForReport, setSelectedTurmaForReport] = useState<any>(null);
+  const [reportStatusFilter, setReportStatusFilter] = useState<'ALL' | 'Ativo' | 'Inativo'>('ALL');
+  const [isPrintingTurmaReport, setIsPrintingTurmaReport] = useState(false);
 
   const loadStudentsList = async () => {
     if (!escola.id) return;
@@ -511,6 +518,32 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
     if (!turma) return '---';
     return `${turma.year || turma.anoSerie || ''} - ${turma.name || turma.identificacao || ''}`;
   };
+
+  const studentsForSelectedReportTurma = useMemo(() => {
+    if (!selectedTurmaForReport) return [];
+    const tYear = (selectedTurmaForReport.year || selectedTurmaForReport.anoSerie || '').toLowerCase().trim();
+    const tName = (selectedTurmaForReport.name || '').toLowerCase().trim();
+    const tFull = `${tYear} - ${tName}`.trim();
+
+    return students.filter(s => {
+      if (reportStatusFilter !== 'ALL' && s.status !== reportStatusFilter) return false;
+      if (s.class_id && String(s.class_id) === String(selectedTurmaForReport.id)) return true;
+
+      const sStage = (s.stage || '').toLowerCase().trim();
+      if (!sStage) return false;
+      if (sStage === tFull || sStage === tName || (tYear && sStage.includes(tYear))) return true;
+      return false;
+    }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }, [selectedTurmaForReport, students, reportStatusFilter]);
+
+  const teacherNamesForReportTurma = useMemo(() => {
+    if (!selectedTurmaForReport) return escola.coordenador || 'Não atribuído';
+    const teachers = schoolTeachers.filter(t => (t.turmasIds || []).includes(selectedTurmaForReport.id));
+    if (teachers.length > 0) {
+      return teachers.map(t => t.nome).join(', ');
+    }
+    return escola.coordenador || 'Não atribuído';
+  }, [selectedTurmaForReport, schoolTeachers, escola.coordenador]);
 
   const visibleEtapas = useMemo(() => {
     return ETAPAS_COHORTS.filter(etapa => {
@@ -1936,14 +1969,28 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                       Gerenciamento de alunos matriculados nesta unidade de ensino.
                     </p>
                   </div>
-                  {canEditTab && (
+                  <div className="flex flex-wrap items-center gap-3">
                     <button
-                      onClick={() => { setSelectedStudent(null); setIsCadastroModalOpen(true); }}
-                      className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2"
+                      onClick={() => {
+                        if (schoolTurmas.length > 0 && !selectedTurmaForReport) {
+                          setSelectedTurmaForReport(schoolTurmas[0]);
+                        }
+                        setIsPrintTurmaModalOpen(true);
+                      }}
+                      className="bg-white hover:bg-slate-50 text-slate-700 px-5 py-2.5 rounded-xl font-semibold shadow-sm border border-slate-200 hover:border-orange-300 hover:text-orange-600 transition-all flex items-center gap-2"
                     >
-                      <UserPlus size={18} /> Cadastrar Aluno
+                      <Printer size={18} className="text-orange-500" /> Relatório de Turma
                     </button>
-                  )}
+
+                    {canEditTab && (
+                      <button
+                        onClick={() => { setSelectedStudent(null); setIsCadastroModalOpen(true); }}
+                        className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2"
+                      >
+                        <UserPlus size={18} /> Cadastrar Aluno
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex flex-col md:flex-row gap-4 items-center bg-white p-3 rounded-2xl border border-slate-200 shadow-sm transition-all duration-300">
@@ -2451,6 +2498,130 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
           }))}
           escolas={[escola]}
         />
+      )}
+
+      {isPrintingTurmaReport && selectedTurmaForReport && (
+        <PrintableTurmaMatriculasReport
+          escola={escola}
+          turma={selectedTurmaForReport}
+          professoresNomes={teacherNamesForReportTurma}
+          students={studentsForSelectedReportTurma}
+          onClose={() => {
+            setIsPrintingTurmaReport(false);
+          }}
+        />
+      )}
+
+      {isPrintTurmaModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-xl flex flex-col overflow-hidden animate-scale-up">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <div>
+                <h4 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                  <Printer className="w-5 h-5 text-orange-500" /> Imprimir Relatório de Turma
+                </h4>
+                <p className="text-xs text-slate-500 mt-1">
+                  Selecione a turma e visualize a lista nominal de alunos para impressão.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsPrintTurmaModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-white hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 border border-slate-200/60 shadow-sm transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider">
+                  Selecione a Turma
+                </label>
+                {schoolTurmas.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic">Nenhuma turma cadastrada nesta unidade escolar.</p>
+                ) : (
+                  <select
+                    value={selectedTurmaForReport?.id || ''}
+                    onChange={(e) => {
+                      const found = schoolTurmas.find(t => String(t.id) === e.target.value);
+                      setSelectedTurmaForReport(found || null);
+                    }}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-orange-500 focus:bg-white transition-all"
+                  >
+                    {schoolTurmas.map(t => (
+                      <option key={t.id} value={t.id}>
+                        {(t.year || t.anoSerie) ? `${t.year || t.anoSerie} - ` : ''}{t.name} ({t.shift || 'MANHÃ'})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider">
+                  Filtro de Status do Aluno
+                </label>
+                <select
+                  value={reportStatusFilter}
+                  onChange={(e) => setReportStatusFilter(e.target.value as any)}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-orange-500 focus:bg-white transition-all"
+                >
+                  <option value="ALL">Todos os Alunos (Ativos e Inativos)</option>
+                  <option value="Ativo">Apenas Alunos Ativos</option>
+                  <option value="Inativo">Apenas Alunos Inativos</option>
+                </select>
+              </div>
+
+              {selectedTurmaForReport && (
+                <div className="bg-orange-50/60 border border-orange-100 rounded-2xl p-4 space-y-3 text-xs">
+                  <div className="flex justify-between items-center border-b border-orange-100 pb-2">
+                    <span className="font-bold text-orange-900 text-sm">Resumo do Relatório</span>
+                    <span className="bg-orange-500 text-white font-black px-2.5 py-0.5 rounded-full text-[10px]">
+                      {studentsForSelectedReportTurma.length} estudantes
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-slate-700 font-medium">
+                    <div>
+                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Turma:</span>
+                      <span className="font-bold text-slate-800">
+                        {(selectedTurmaForReport.year || selectedTurmaForReport.anoSerie) ? `${selectedTurmaForReport.year || selectedTurmaForReport.anoSerie} - ` : ''}{selectedTurmaForReport.name}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Turno:</span>
+                      <span className="font-bold text-slate-800">{selectedTurmaForReport.shift || 'MANHÃ'}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Professor(a) Responsável:</span>
+                      <span className="font-bold text-slate-800">{teacherNamesForReportTurma}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+              <Button
+                variant="ghost"
+                onClick={() => setIsPrintTurmaModalOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="primary"
+                disabled={!selectedTurmaForReport}
+                onClick={() => {
+                  setIsPrintTurmaModalOpen(false);
+                  setIsPrintingTurmaReport(true);
+                }}
+                className="flex items-center gap-2"
+              >
+                <Printer className="w-4 h-4" />
+                Imprimir Relatório
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

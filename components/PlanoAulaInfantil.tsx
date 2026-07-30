@@ -698,73 +698,200 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
 
       {/* Printable Area - Hidden on Screen */}
       {printPlan && createPortal(
-        <div id="print-report" className="hidden print:block bg-white p-8 text-black text-xs font-sans text-left">
-          <div className="text-center border-b pb-4 mb-6">
-            <h1 className="text-lg font-black tracking-tight">SISTEMA INTEGRADO DE GESTÃO DE APRENDIZAGEM (SIGAR)</h1>
-            <p className="text-[10px] text-gray-500 uppercase font-bold mt-1">Guia de Aprendizagem e Projetos - Educação Infantil</p>
+        <div id="print-report" className="hidden print:block bg-white text-slate-900" style={{ fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif" }}>
+          
+          {/* ====== INSTITUTIONAL HEADER ====== */}
+          <div className="text-center mb-3 pb-3" style={{ borderBottom: '2pt solid #0f172a' }}>
+            <p style={{ fontSize: '8pt', fontWeight: 700, letterSpacing: '0.25em', textTransform: 'uppercase', color: '#64748b', marginBottom: '2pt' }}>
+              ESTADO DO MARANHÃO
+            </p>
+            <p style={{ fontSize: '10pt', fontWeight: 900, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#0f172a', marginBottom: '2pt' }}>
+              PREFEITURA MUNICIPAL DE HUMBERTO DE CAMPOS
+            </p>
+            <p style={{ fontSize: '8pt', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#64748b', marginBottom: '10pt' }}>
+              SECRETARIA MUNICIPAL DE EDUCAÇÃO
+            </p>
+            <div style={{ width: '60pt', height: '1.5pt', background: '#f97316', margin: '0 auto 6pt' }} />
+            <h1 style={{ fontSize: '16pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#0f172a', margin: '0 0 4pt' }}>
+              GUIA DE APRENDIZAGEM DOCENTE
+            </h1>
+            <p style={{ fontSize: '8pt', fontWeight: 700, color: '#64748b', letterSpacing: '0.15em', textTransform: 'uppercase' }}>
+              EDUCAÇÃO INFANTIL
+            </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mb-6 border p-4 rounded-lg bg-gray-50">
+          {/* ====== PROTOCOL & EMISSION ====== */}
+          <div className="print-avoid-break" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6pt 10pt', background: '#f8fafc', border: '0.5pt solid #e2e8f0', marginBottom: '10pt' }}>
             <div>
-              <p><strong>Unidade Escolar:</strong> {printPlan.escolaNome}</p>
-              <p><strong>Bimestre / Período:</strong> {printPlan.periodo}</p>
-              <p><strong>Data de Referência:</strong> {new Date(printPlan.data + 'T12:00:00').toLocaleDateString('pt-BR')}</p>
+              <p style={{ fontSize: '7pt', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: '2pt' }}>
+                Identificação do Documento
+              </p>
+              <p style={{ fontSize: '12pt', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.01em' }}>
+                GUIA Nº {printPlan.id?.split('-')[0].toUpperCase() || 'REF'}/{new Date().getFullYear()}
+              </p>
             </div>
-            <div>
-              <p><strong>Faixa Etária / Grupo:</strong> {printPlan.anoSerie}</p>
-              <p><strong>Campo de Experiência:</strong> {printPlan.campoExperiencia}</p>
-              <p><strong>Projeto / Tema:</strong> {printPlan.titulo}</p>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{ fontSize: '7pt', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: '2pt' }}>
+                Emissão do Sistema
+              </p>
+              <p style={{ fontSize: '9pt', fontWeight: 600, color: '#475569', fontFamily: "'JetBrains Mono', monospace" }}>
+                {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+              </p>
             </div>
           </div>
 
-          <div className="space-y-4 text-[10px]">
-            <div>
-              <h3 className="font-bold border-b pb-1 mb-1 text-xs">Objetivos de Desenvolvimento BNCC Trabalhados</h3>
-              <ul className="list-disc pl-5 space-y-1">
-                {printPlan.habilidades && printPlan.habilidades.length > 0 ? (
-                  printPlan.habilidades.map(code => {
+          {/* ====== IDENTIFICATION BLOCK ====== */}
+          <div className="print-avoid-break" style={{ marginBottom: '12pt' }}>
+            <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', background: '#0f172a', color: '#fff', padding: '5pt 10pt', marginBottom: '0' }}>
+              Dados de Identificação
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <tbody>
+                <tr>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', width: '22%', background: '#f8fafc' }}>
+                    Unidade Escolar
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '10pt', fontWeight: 700, color: '#0f172a' }} colSpan={3}>
+                    {printPlan.escolaNome}
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc', width: '22%' }}>
+                    Faixa Etária / Grupo
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 600, color: '#334155', width: '28%' }}>
+                    {printPlan.anoSerie}
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc', width: '22%' }}>
+                    Campo de Experiência
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 700, color: '#0f172a', width: '28%' }}>
+                    {printPlan.campoExperiencia}
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc' }}>
+                    Bimestre / Período
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 600, color: '#334155' }}>
+                    {printPlan.periodo}
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc' }}>
+                    Data de Referência
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 700, color: '#0f172a' }}>
+                    {new Date(printPlan.data + 'T12:00:00').toLocaleDateString('pt-BR')}
+                  </td>
+                </tr>
+                {printPlan.titulo && (
+                  <tr>
+                    <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc' }}>
+                      Projeto / Tema
+                    </td>
+                    <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 700, color: '#0f172a' }} colSpan={3}>
+                      {printPlan.titulo}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ====== OBJETIVOS DE DESENVOLVIMENTO BNCC ====== */}
+          <div className="print-avoid-break" style={{ marginBottom: '10pt' }}>
+            <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', background: '#0f172a', color: '#fff', padding: '5pt 10pt' }}>
+              Objetivos de Desenvolvimento BNCC Trabalhados
+            </div>
+            <div style={{ padding: '10pt 12pt', border: '0.5pt solid #e2e8f0', borderTop: 'none' }}>
+              {printPlan.habilidades && printPlan.habilidades.length > 0 ? (
+                <ul style={{ margin: 0, paddingLeft: '14pt', listStyleType: 'disc' }}>
+                  {printPlan.habilidades.map(code => {
                     const desc = getObjectiveDescription(code);
                     return (
-                      <li key={code}>
-                        <strong>{code}</strong>{desc ? `: ${desc}` : ''}
+                      <li key={code} style={{ fontSize: '8pt', color: '#334155', lineHeight: '1.5', marginBottom: '2pt' }}>
+                        <strong style={{ color: '#0f172a' }}>{code}</strong>{desc ? `: ${desc}` : ''}
                       </li>
                     );
-                  })
-                ) : (
-                  <p className="italic text-gray-400">Nenhum objetivo específico selecionado.</p>
-                )}
-              </ul>
+                  })}
+                </ul>
+              ) : (
+                <p style={{ fontSize: '9pt', color: '#94a3b8', fontStyle: 'italic', margin: 0 }}>Nenhum objetivo específico selecionado.</p>
+              )}
             </div>
+          </div>
 
-            <div>
-              <h3 className="font-bold border-b pb-1 mb-1 text-xs">Vivências / Campo de Experiência</h3>
+          {/* ====== VIVÊNCIAS / CAMPO DE EXPERIÊNCIA ====== */}
+          <div className="print-avoid-break" style={{ marginBottom: '10pt' }}>
+            <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', background: '#0f172a', color: '#fff', padding: '5pt 10pt' }}>
+              Vivências / Campo de Experiência
+            </div>
+            <div style={{ padding: '10pt 12pt', border: '0.5pt solid #e2e8f0', borderTop: 'none', fontSize: '9pt', color: '#334155', lineHeight: '1.6', minHeight: '35pt' }}>
               <p className="whitespace-pre-wrap">{printPlan.objetivos}</p>
             </div>
+          </div>
 
-            <div>
-              <h3 className="font-bold border-b pb-1 mb-1 text-xs">Vivências e Metodologia Aplicada</h3>
+          {/* ====== VIVÊNCIAS E METODOLOGIA APLICADA ====== */}
+          <div className="print-avoid-break" style={{ marginBottom: '10pt' }}>
+            <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', background: '#0f172a', color: '#fff', padding: '5pt 10pt' }}>
+              Vivências e Metodologia Aplicada
+            </div>
+            <div style={{ padding: '10pt 12pt', border: '0.5pt solid #e2e8f0', borderTop: 'none', fontSize: '9pt', color: '#334155', lineHeight: '1.6', minHeight: '35pt' }}>
               <p className="whitespace-pre-wrap">{printPlan.metodologia}</p>
             </div>
+          </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <h3 className="font-bold border-b pb-1 mb-1 text-xs">Recursos Didáticos</h3>
+          {/* ====== RECURSOS E AVALIAÇÃO ====== */}
+          <div className="grid grid-cols-2 gap-4 print-avoid-break" style={{ marginBottom: '10pt' }}>
+            <div>
+              <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', background: '#0f172a', color: '#fff', padding: '5pt 10pt' }}>
+                Recursos Didáticos
+              </div>
+              <div style={{ padding: '10pt 12pt', border: '0.5pt solid #e2e8f0', borderTop: 'none', fontSize: '9pt', color: '#334155', lineHeight: '1.6', minHeight: '40pt' }}>
                 <p className="whitespace-pre-wrap">{printPlan.recursos}</p>
               </div>
-              <div>
-                <h3 className="font-bold border-b pb-1 mb-1 text-xs">Avaliação / Registros Pedagógicos</h3>
+            </div>
+            <div>
+              <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', background: '#0f172a', color: '#fff', padding: '5pt 10pt' }}>
+                Avaliação / Registros Pedagógicos
+              </div>
+              <div style={{ padding: '10pt 12pt', border: '0.5pt solid #e2e8f0', borderTop: 'none', fontSize: '9pt', color: '#334155', lineHeight: '1.6', minHeight: '40pt' }}>
                 <p className="whitespace-pre-wrap">{printPlan.avaliacao}</p>
               </div>
             </div>
           </div>
 
-          <div className="mt-20 grid grid-cols-2 gap-12 text-center">
-            <div className="border-t pt-2">
-              <p className="font-bold">Assinatura do Professor(a)</p>
+          {/* ====== SIGNATURES ====== */}
+          <div className="print-signatures" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40pt', paddingTop: '24pt', marginTop: '16pt' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ borderTop: '1.5pt solid #0f172a', width: '100%', marginBottom: '6pt' }} />
+              <p style={{ fontSize: '9pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#0f172a', marginBottom: '2pt' }}>
+                Assinatura do Professor(a)
+              </p>
+              <p style={{ fontSize: '7pt', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#64748b', fontFamily: "'JetBrains Mono', monospace", marginBottom: '2pt' }}>
+                PROFESSOR(A) RESPONSÁVEL
+              </p>
+              <p style={{ fontSize: '7pt', color: '#94a3b8', fontStyle: 'italic' }}>
+                Assinatura e Carimbo
+              </p>
             </div>
-            <div className="border-t pt-2">
-              <p className="font-bold">Assinatura da Coordenação Pedagógica</p>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ borderTop: '1.5pt solid #0f172a', width: '100%', marginBottom: '6pt' }} />
+              <p style={{ fontSize: '9pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#0f172a', marginBottom: '2pt' }}>
+                Assinatura da Coordenação Pedagógica
+              </p>
+              <p style={{ fontSize: '7pt', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#64748b', fontFamily: "'JetBrains Mono', monospace", marginBottom: '2pt' }}>
+                EQUIPE GESTORA / PEDAGÓGICA
+              </p>
+              <p style={{ fontSize: '7pt', color: '#94a3b8', fontStyle: 'italic' }}>
+                Assinatura e Carimbo
+              </p>
             </div>
+          </div>
+
+          {/* ====== FOOTER ====== */}
+          <div className="print-footer" style={{ marginTop: '24pt', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '6.5pt', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.3em', borderTop: '0.5pt solid #e2e8f0', paddingTop: '6pt' }}>
+            <span>SIGAR • Sistema Integrado de Gestão de Aprendizagem</span>
+            <span>Secretaria Municipal de Educação • Humberto de Campos/MA</span>
           </div>
         </div>,
         document.body

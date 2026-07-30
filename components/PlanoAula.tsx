@@ -828,7 +828,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
         <div id="print-report" className="hidden print:block bg-white text-slate-900" style={{ fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif" }}>
           
           {/* ====== INSTITUTIONAL HEADER ====== */}
-          <div className="text-center mb-4 pb-3" style={{ borderBottom: '2pt solid #0f172a' }}>
+          <div className="text-center mb-3 pb-3" style={{ borderBottom: '2pt solid #0f172a' }}>
             <p style={{ fontSize: '8pt', fontWeight: 700, letterSpacing: '0.25em', textTransform: 'uppercase', color: '#64748b', marginBottom: '2pt' }}>
               ESTADO DO MARANHÃO
             </p>
@@ -839,82 +839,112 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
               SECRETARIA MUNICIPAL DE EDUCAÇÃO
             </p>
             <div style={{ width: '60pt', height: '1.5pt', background: '#f97316', margin: '0 auto 6pt' }} />
-            <h1 style={{ fontSize: '14pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#0f172a', margin: '0 0 4pt' }}>
-              Guia de Aprendizagem Docente
+            <h1 style={{ fontSize: '16pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#0f172a', margin: '0 0 4pt' }}>
+              GUIA DE APRENDIZAGEM DOCENTE
             </h1>
-            <p style={{ fontSize: '9pt', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>
-              Ensino Fundamental
+            <p style={{ fontSize: '8pt', fontWeight: 700, color: '#64748b', letterSpacing: '0.15em', textTransform: 'uppercase' }}>
+              ENSINO FUNDAMENTAL
             </p>
           </div>
 
-          {/* ====== IDENTIFICATION BLOCK ====== */}
-          <div style={{ padding: '8pt 10pt', background: '#f8fafc', border: '0.5pt solid #e2e8f0', marginBottom: '10pt', borderRadius: '4pt' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15pt' }}>
-              <div className="space-y-1">
-                <p style={{ fontSize: '7pt', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '1pt' }}>
-                  Unidade Escolar
-                </p>
-                <p style={{ fontSize: '9pt', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                  {printPlan.escolaNome}
-                </p>
-                <p style={{ fontSize: '7pt', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '6pt', marginBottom: '1pt' }}>
-                  Turma / Ano
-                </p>
-                <p style={{ fontSize: '9pt', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                  {printPlan.turmaNome} {printPlan.anoSerie ? `— ${printPlan.anoSerie}` : ''}
-                </p>
-                <p style={{ fontSize: '7pt', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '6pt', marginBottom: '1pt' }}>
-                  Data
-                </p>
-                <p style={{ fontSize: '9pt', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                  {new Date(printPlan.data + 'T12:00:00').toLocaleDateString()}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <p style={{ fontSize: '7pt', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '1pt' }}>
-                  Componente Curricular
-                </p>
-                <p style={{ fontSize: '9pt', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                  {printPlan.componente}
-                </p>
-                <p style={{ fontSize: '7pt', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '6pt', marginBottom: '1pt' }}>
-                  Período
-                </p>
-                <p style={{ fontSize: '9pt', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                  {printPlan.periodo || '---'}
-                </p>
-                <p style={{ fontSize: '7pt', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '6pt', marginBottom: '1pt' }}>
-                  Título da Aula
-                </p>
-                <p style={{ fontSize: '9pt', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                  {printPlan.titulo}
-                </p>
-              </div>
+          {/* ====== PROTOCOL & EMISSION ====== */}
+          <div className="print-avoid-break" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6pt 10pt', background: '#f8fafc', border: '0.5pt solid #e2e8f0', marginBottom: '10pt' }}>
+            <div>
+              <p style={{ fontSize: '7pt', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: '2pt' }}>
+                Identificação do Documento
+              </p>
+              <p style={{ fontSize: '12pt', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.01em' }}>
+                GUIA Nº {printPlan.id?.split('-')[0].toUpperCase() || 'REF'}/{new Date().getFullYear()}
+              </p>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{ fontSize: '7pt', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: '2pt' }}>
+                Emissão do Sistema
+              </p>
+              <p style={{ fontSize: '9pt', fontWeight: 600, color: '#475569', fontFamily: "'JetBrains Mono', monospace" }}>
+                {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+              </p>
             </div>
           </div>
 
-          <div className="space-y-4">
+          {/* ====== IDENTIFICATION BLOCK ====== */}
+          <div className="print-avoid-break" style={{ marginBottom: '12pt' }}>
+            <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', background: '#0f172a', color: '#fff', padding: '5pt 10pt', marginBottom: '0' }}>
+              Dados de Identificação
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <tbody>
+                <tr>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', width: '22%', background: '#f8fafc' }}>
+                    Unidade Escolar
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '10pt', fontWeight: 700, color: '#0f172a' }} colSpan={3}>
+                    {printPlan.escolaNome}
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc', width: '22%' }}>
+                    Turma / Ano
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 600, color: '#334155', width: '28%' }}>
+                    {printPlan.turmaNome} {printPlan.anoSerie ? `— ${printPlan.anoSerie}` : ''}
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc', width: '22%' }}>
+                    Componente Curricular
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 700, color: '#0f172a', width: '28%' }}>
+                    {printPlan.componente}
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc' }}>
+                    Data
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 700, color: '#0f172a' }}>
+                    {new Date(printPlan.data + 'T12:00:00').toLocaleDateString('pt-BR')}
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc' }}>
+                    Bimestre / Período
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 600, color: '#334155' }}>
+                    {printPlan.periodo || '---'}
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc' }}>
+                    Título da Aula
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 700, color: '#0f172a' }} colSpan={3}>
+                    {printPlan.titulo}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* ====== CONTENT SECTIONS ====== */}
+          <div className="space-y-3">
             {printedObjectsAndSkills.length > 0 ? (
-              <div className="border p-3 rounded-lg">
-                <h3 className="font-bold border-b pb-1 mb-2 text-slate-800 uppercase text-[9px] tracking-widest">
+              <div className="print-avoid-break" style={{ marginBottom: '10pt' }}>
+                <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', background: '#0f172a', color: '#fff', padding: '5pt 10pt' }}>
                   Objetos de Conhecimento e Habilidades BNCC Associadas
-                </h3>
-                <div className="space-y-3">
+                </div>
+                <div style={{ padding: '10pt 12pt', border: '0.5pt solid #e2e8f0', borderTop: 'none', display: 'flex', flexDirection: 'column', gap: '8pt' }}>
                   {printedObjectsAndSkills.map((group, idx) => (
-                    <div key={idx} className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    <div key={idx} style={{ background: '#f8fafc', padding: '8pt 10pt', border: '0.5pt solid #e2e8f0', borderRadius: '4pt' }}>
                       <p style={{ fontSize: '8.5pt', fontWeight: 700, color: '#0f172a', margin: '0 0 4pt' }}>
                         <strong>Objeto de Conhecimento:</strong> {group.objeto}
                       </p>
                       {group.habilidades.length > 0 ? (
-                        <ul className="pl-4 list-disc space-y-1">
+                        <ul style={{ margin: 0, paddingLeft: '14pt', listStyleType: 'disc' }}>
                           {group.habilidades.map((hab, hIdx) => (
-                            <li key={hIdx} style={{ fontSize: '7.5pt', color: '#334155' }}>
+                            <li key={hIdx} style={{ fontSize: '7.5pt', color: '#334155', lineHeight: '1.4' }}>
                               {hab}
                             </li>
                           ))}
                         </ul>
                       ) : (
-                        <p style={{ fontSize: '7pt', color: '#94a3b8', fontStyle: 'italic', margin: 0 }}>
+                        <p style={{ fontSize: '7.5pt', color: '#94a3b8', fontStyle: 'italic', margin: 0 }}>
                           Nenhuma habilidade BNCC explicitamente vinculada neste objeto.
                         </p>
                       )}
@@ -924,45 +954,90 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
               </div>
             ) : (
               <>
-                <div className="border p-3 rounded-lg">
-                  <h3 className="font-bold border-b pb-1 mb-1 text-slate-800 uppercase text-[9px] tracking-widest">Objetivos de Aprendizagem / Objetos de Conhecimento</h3>
-                  <p className="whitespace-pre-line text-gray-700">{printPlan.objetivos}</p>
+                <div className="print-avoid-break" style={{ marginBottom: '10pt' }}>
+                  <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', background: '#0f172a', color: '#fff', padding: '5pt 10pt' }}>
+                    Objetivos de Aprendizagem / Objetos de Conhecimento
+                  </div>
+                  <div style={{ padding: '10pt 12pt', border: '0.5pt solid #e2e8f0', borderTop: 'none', fontSize: '9pt', color: '#334155', lineHeight: '1.6', minHeight: '35pt' }}>
+                    <p className="whitespace-pre-line">{printPlan.objetivos}</p>
+                  </div>
                 </div>
                 
                 {printPlan.habilidades && (
-                  <div className="border p-3 rounded-lg">
-                    <h3 className="font-bold border-b pb-1 mb-1 text-slate-800 uppercase text-[9px] tracking-widest">Habilidades BNCC</h3>
-                    <p className="whitespace-pre-line text-gray-700">{printPlan.habilidades}</p>
+                  <div className="print-avoid-break" style={{ marginBottom: '10pt' }}>
+                    <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', background: '#0f172a', color: '#fff', padding: '5pt 10pt' }}>
+                      Habilidades BNCC
+                    </div>
+                    <div style={{ padding: '10pt 12pt', border: '0.5pt solid #e2e8f0', borderTop: 'none', fontSize: '9pt', color: '#334155', lineHeight: '1.6', minHeight: '35pt' }}>
+                      <p className="whitespace-pre-line">{printPlan.habilidades}</p>
+                    </div>
                   </div>
                 )}
               </>
             )}
 
-            <div className="border p-3 rounded-lg">
-              <h3 className="font-bold border-b pb-1 mb-1 text-slate-800 uppercase text-[9px] tracking-widest">Procedimentos Metodológicos</h3>
-              <p className="whitespace-pre-line text-gray-700">{printPlan.metodologia || '---'}</p>
+            <div className="print-avoid-break" style={{ marginBottom: '10pt' }}>
+              <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', background: '#0f172a', color: '#fff', padding: '5pt 10pt' }}>
+                Procedimentos Metodológicos
+              </div>
+              <div style={{ padding: '10pt 12pt', border: '0.5pt solid #e2e8f0', borderTop: 'none', fontSize: '9pt', color: '#334155', lineHeight: '1.6', minHeight: '35pt' }}>
+                <p className="whitespace-pre-line">{printPlan.metodologia || '---'}</p>
+              </div>
             </div>
 
             {printPlan.recursos && (
-              <div className="border p-3 rounded-lg">
-                <h3 className="font-bold border-b pb-1 mb-1 text-slate-800 uppercase text-[9px] tracking-widest">Recursos Didáticos</h3>
-                <p className="whitespace-pre-line text-gray-700">{printPlan.recursos}</p>
+              <div className="print-avoid-break" style={{ marginBottom: '10pt' }}>
+                <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', background: '#0f172a', color: '#fff', padding: '5pt 10pt' }}>
+                  Recursos Didáticos
+                </div>
+                <div style={{ padding: '10pt 12pt', border: '0.5pt solid #e2e8f0', borderTop: 'none', fontSize: '9pt', color: '#334155', lineHeight: '1.6', minHeight: '35pt' }}>
+                  <p className="whitespace-pre-line">{printPlan.recursos}</p>
+                </div>
               </div>
             )}
 
-            <div className="border p-3 rounded-lg">
-              <h3 className="font-bold border-b pb-1 mb-1 text-slate-800 uppercase text-[9px] tracking-widest">Critérios de Avaliação</h3>
-              <p className="whitespace-pre-line text-gray-700">{printPlan.avaliacao || '---'}</p>
+            <div className="print-avoid-break" style={{ marginBottom: '10pt' }}>
+              <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', background: '#0f172a', color: '#fff', padding: '5pt 10pt' }}>
+                Critérios de Avaliação
+              </div>
+              <div style={{ padding: '10pt 12pt', border: '0.5pt solid #e2e8f0', borderTop: 'none', fontSize: '9pt', color: '#334155', lineHeight: '1.6', minHeight: '35pt' }}>
+                <p className="whitespace-pre-line">{printPlan.avaliacao || '---'}</p>
+              </div>
             </div>
           </div>
 
-          <div className="mt-16 flex justify-around">
-            <div className="text-center w-60 border-t pt-2">
-              <p className="font-bold text-[10px] text-gray-600">Assinatura do Docente</p>
+          {/* ====== SIGNATURES ====== */}
+          <div className="print-signatures" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40pt', paddingTop: '24pt', marginTop: '16pt' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ borderTop: '1.5pt solid #0f172a', width: '100%', marginBottom: '6pt' }} />
+              <p style={{ fontSize: '9pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#0f172a', marginBottom: '2pt' }}>
+                Assinatura do Docente
+              </p>
+              <p style={{ fontSize: '7pt', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#64748b', fontFamily: "'JetBrains Mono', monospace", marginBottom: '2pt' }}>
+                PROFESSOR(A) RESPONSÁVEL
+              </p>
+              <p style={{ fontSize: '7pt', color: '#94a3b8', fontStyle: 'italic' }}>
+                Assinatura e Carimbo
+              </p>
             </div>
-            <div className="text-center w-60 border-t pt-2">
-              <p className="font-bold text-[10px] text-gray-600">Coordenação Pedagógica</p>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ borderTop: '1.5pt solid #0f172a', width: '100%', marginBottom: '6pt' }} />
+              <p style={{ fontSize: '9pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#0f172a', marginBottom: '2pt' }}>
+                Coordenação Pedagógica
+              </p>
+              <p style={{ fontSize: '7pt', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#64748b', fontFamily: "'JetBrains Mono', monospace", marginBottom: '2pt' }}>
+                EQUIPE GESTORA / PEDAGÓGICA
+              </p>
+              <p style={{ fontSize: '7pt', color: '#94a3b8', fontStyle: 'italic' }}>
+                Assinatura e Carimbo
+              </p>
             </div>
+          </div>
+
+          {/* ====== FOOTER ====== */}
+          <div className="print-footer" style={{ marginTop: '24pt', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '6.5pt', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.3em', borderTop: '0.5pt solid #e2e8f0', paddingTop: '6pt' }}>
+            <span>SIGAR • Sistema Integrado de Gestão de Aprendizagem</span>
+            <span>Secretaria Municipal de Educação • Humberto de Campos/MA</span>
           </div>
         </div>,
         document.body

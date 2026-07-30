@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { PageHeader } from './ui/PageHeader';
 import { 
   Users, Search, Plus, Edit2, Trash2, 
-  GraduationCap, X, RefreshCw, UserPlus, Upload
+  GraduationCap, X, RefreshCw, UserPlus, Upload, Printer, FileText
 } from 'lucide-react';
 import { CadastroEstudanteModal } from './modals/CadastroEstudanteModal';
 import { CadastroTurmaModal, TurmaData } from './modals/CadastroTurmaModal';
@@ -42,8 +43,17 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
   const [isTurmaModalOpen, setIsTurmaModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Aluno | null>(null);
+  const [printDossierStudent, setPrintDossierStudent] = useState<Aluno | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [turmas, setTurmas] = useState<TurmaData[]>([]);
+
+  const handlePrintDossier = (student: Aluno) => {
+    setPrintDossierStudent(student);
+    setTimeout(() => {
+      window.print();
+      setPrintDossierStudent(null);
+    }, 150);
+  };
 
   const handleOpenModal = (student?: Aluno) => {
     setSelectedStudent(student || null);
@@ -445,6 +455,9 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
                                     </td>
                                     <td className="px-6 py-4 text-right">
                                         <div className="flex items-center justify-end gap-1 opacity-20 group-hover:opacity-100 transition-opacity">
+                                            <button onClick={() => handlePrintDossier(student)} className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-all" title="Imprimir Dossiê do Estudante">
+                                                <Printer size={16} />
+                                            </button>
                                             <button onClick={() => handleOpenModal(student)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="Editar">
                                                 <Edit2 size={16} />
                                             </button>
@@ -556,6 +569,233 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
             escolas={escolas}
             isDemoMode={isDemoMode}
         />
+
+      {/* ====== PRINTABLE DOSSIÊ COMPONENT ====== */}
+      {printDossierStudent && createPortal(
+        <div id="print-report" className="hidden print:block bg-white text-slate-900" style={{ fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif" }}>
+          
+          {/* ====== INSTITUTIONAL HEADER ====== */}
+          <div className="text-center mb-3 pb-3" style={{ borderBottom: '2pt solid #0f172a' }}>
+            <p style={{ fontSize: '8pt', fontWeight: 700, letterSpacing: '0.25em', textTransform: 'uppercase', color: '#64748b', marginBottom: '2pt' }}>
+              ESTADO DO MARANHÃO
+            </p>
+            <p style={{ fontSize: '10pt', fontWeight: 900, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#0f172a', marginBottom: '2pt' }}>
+              PREFEITURA MUNICIPAL DE HUMBERTO DE CAMPOS
+            </p>
+            <p style={{ fontSize: '8pt', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#64748b', marginBottom: '10pt' }}>
+              SECRETARIA MUNICIPAL DE EDUCAÇÃO
+            </p>
+            <div style={{ width: '60pt', height: '1.5pt', background: '#f97316', margin: '0 auto 6pt' }} />
+            <h1 style={{ fontSize: '16pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#0f172a', margin: '0 0 4pt' }}>
+              DOSSIÊ INDIVIDUAL DO ESTUDANTE
+            </h1>
+            <p style={{ fontSize: '8pt', fontWeight: 700, color: '#64748b', letterSpacing: '0.15em', textTransform: 'uppercase' }}>
+              CADASTRO UNIFICADO E REGISTRO ESCOLAR INTEGRADO
+            </p>
+          </div>
+
+          {/* ====== PROTOCOL & EMISSION ====== */}
+          <div className="print-avoid-break" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6pt 10pt', background: '#f8fafc', border: '0.5pt solid #e2e8f0', marginBottom: '10pt' }}>
+            <div>
+              <p style={{ fontSize: '7pt', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: '2pt' }}>
+                Identificação do Documento
+              </p>
+              <p style={{ fontSize: '12pt', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.01em' }}>
+                DOSSIÊ Nº {printDossierStudent.registration_number || printDossierStudent.id}/{new Date().getFullYear()}
+              </p>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{ fontSize: '7pt', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: '2pt' }}>
+                Emissão do Sistema
+              </p>
+              <p style={{ fontSize: '9pt', fontWeight: 600, color: '#475569', fontFamily: "'JetBrains Mono', monospace" }}>
+                {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            </div>
+          </div>
+
+          {/* ====== SECTION 1: DADOS PESSOAIS ====== */}
+          <div className="print-avoid-break" style={{ marginBottom: '12pt' }}>
+            <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', background: '#0f172a', color: '#fff', padding: '5pt 10pt', marginBottom: '0' }}>
+              1. Dados Pessoais do Estudante
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <tbody>
+                <tr>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', width: '22%', background: '#f8fafc' }}>
+                    Nome Completo
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '10pt', fontWeight: 900, color: '#0f172a' }} colSpan={3}>
+                    {printDossierStudent.name}
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc', width: '22%' }}>
+                    Nº de Matrícula
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 700, color: '#0f172a', width: '28%' }}>
+                    {printDossierStudent.registration_number || '---'}
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc', width: '22%' }}>
+                    CPF do Estudante
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 700, color: '#0f172a', width: '28%' }}>
+                    {printDossierStudent.cpf || '---'}
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc' }}>
+                    Data de Nascimento
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 600, color: '#334155' }}>
+                    {printDossierStudent.birth_date ? new Date(printDossierStudent.birth_date + 'T12:00:00').toLocaleDateString('pt-BR') : '---'}
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc' }}>
+                    Gênero / Sexo
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 600, color: '#334155' }}>
+                    {printDossierStudent.gender || '---'}
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc' }}>
+                    Ano de Ingresso / Matrícula
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 600, color: '#334155' }}>
+                    {printDossierStudent.ano_matricula || '---'}
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc' }}>
+                    Situação / Status
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 700 }}>
+                    <span style={{
+                      padding: '2pt 8pt',
+                      borderRadius: '12pt',
+                      fontSize: '7.5pt',
+                      fontWeight: 800,
+                      backgroundColor: (printDossierStudent.status as string === 'Ativo' || printDossierStudent.status as string === 'active') ? '#d1fae5' : '#fee2e2',
+                      color: (printDossierStudent.status as string === 'Ativo' || printDossierStudent.status as string === 'active') ? '#047857' : '#b91c1c'
+                    }}>
+                      {printDossierStudent.status?.toUpperCase() || 'ATIVO'}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* ====== SECTION 2: VÍNCULO ESCOLAR ====== */}
+          <div className="print-avoid-break" style={{ marginBottom: '12pt' }}>
+            <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', background: '#0f172a', color: '#fff', padding: '5pt 10pt', marginBottom: '0' }}>
+              2. Vínculo Escolar e Matrícula
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <tbody>
+                <tr>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', width: '22%', background: '#f8fafc' }}>
+                    Unidade Escolar
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9.5pt', fontWeight: 700, color: '#0f172a' }} colSpan={3}>
+                    {escolas.find(e => String(e.id) === String(printDossierStudent.escola_id))?.nome || 'Unidade Escolar Não Identificada'}
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc', width: '22%' }}>
+                    Etapa / Modalidade
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 600, color: '#334155', width: '28%' }}>
+                    {printDossierStudent.stage || '---'}
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc', width: '22%' }}>
+                    Turma / Ano / Turno
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 700, color: '#0f172a', width: '28%' }}>
+                    {getStudentTurmaInfo(printDossierStudent.class_id)}
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc' }}>
+                    Professor(a) Responsável
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 600, color: '#334155' }} colSpan={3}>
+                    {printDossierStudent.professor_responsavel || 'Não Atribuído / Geral'}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* ====== SECTION 3: OBSERVAÇÕES E HISTÓRICO ====== */}
+          <div className="print-avoid-break" style={{ marginBottom: '12pt' }}>
+            <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', background: '#0f172a', color: '#fff', padding: '5pt 10pt' }}>
+              3. Registros Pedagógicos e Observações
+            </div>
+            <div style={{ padding: '10pt 12pt', border: '0.5pt solid #e2e8f0', borderTop: 'none', fontSize: '9pt', color: '#334155', lineHeight: '1.6', minHeight: '50pt' }}>
+              <p className="whitespace-pre-line">{printDossierStudent.observations || 'Sem observações ou ressalvas cadastradas até a presente data.'}</p>
+            </div>
+          </div>
+
+          {/* ====== SECTION 4: AUDITORIA ====== */}
+          <div className="print-avoid-break" style={{ marginBottom: '12pt' }}>
+            <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', background: '#0f172a', color: '#fff', padding: '5pt 10pt' }}>
+              4. Controle do Registro Escolar
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <tbody>
+                <tr>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', width: '22%', background: '#f8fafc' }}>
+                    Data do Cadastro
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 600, color: '#334155', width: '28%' }}>
+                    {printDossierStudent.created_at ? new Date(printDossierStudent.created_at).toLocaleDateString('pt-BR') : '---'}
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc', width: '22%' }}>
+                    ID de Registro de Sistema
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 600, color: '#334155', fontFamily: "'JetBrains Mono', monospace", width: '28%' }}>
+                    #{printDossierStudent.id}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* ====== SIGNATURES ====== */}
+          <div className="print-signatures" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40pt', paddingTop: '24pt', marginTop: '20pt' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ borderTop: '1.5pt solid #0f172a', width: '100%', marginBottom: '6pt' }} />
+              <p style={{ fontSize: '9pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#0f172a', marginBottom: '2pt' }}>
+                Responsável pelo Cadastro / Secretaria Escolar
+              </p>
+              <p style={{ fontSize: '7pt', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#64748b', fontFamily: "'JetBrains Mono', monospace", marginBottom: '2pt' }}>
+                SECRETARIA ESCOLAR
+              </p>
+              <p style={{ fontSize: '7pt', color: '#94a3b8', fontStyle: 'italic' }}>
+                Assinatura e Carimbo
+              </p>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ borderTop: '1.5pt solid #0f172a', width: '100%', marginBottom: '6pt' }} />
+              <p style={{ fontSize: '9pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#0f172a', marginBottom: '2pt' }}>
+                Direção / Coordenação Pedagógica
+              </p>
+              <p style={{ fontSize: '7pt', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#64748b', fontFamily: "'JetBrains Mono', monospace", marginBottom: '2pt' }}>
+                EQUIPE GESTORA / PEDAGÓGICA
+              </p>
+              <p style={{ fontSize: '7pt', color: '#94a3b8', fontStyle: 'italic' }}>
+                Assinatura e Carimbo
+              </p>
+            </div>
+          </div>
+
+          {/* ====== FOOTER ====== */}
+          <div className="print-footer" style={{ marginTop: '30pt', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '6.5pt', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.3em', borderTop: '0.5pt solid #e2e8f0', paddingTop: '6pt' }}>
+            <span>SIGAR • Sistema Integrado de Gestão de Aprendizagem</span>
+            <span>Secretaria Municipal de Educação • Humberto de Campos/MA</span>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };

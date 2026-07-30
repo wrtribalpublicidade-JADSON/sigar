@@ -268,11 +268,18 @@
     print-color-adjust: exact !important;
   }
 
+  /* Print report container clearance for fixed footer */
+  #print-report,
+  [id^="print-"] {
+    padding-bottom: 50pt !important;
+  }
+
   /* Signature block spacing */
   .print-signatures {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
-    margin-top: 40pt !important;
+    margin-top: 25pt !important;
+    margin-bottom: 40pt !important;
   }
 
   /* Footer */
@@ -284,8 +291,11 @@
     text-align: center !important;
     font-size: 7pt !important;
     color: #94a3b8 !important;
+    background-color: #ffffff !important;
     border-top: 0.5pt solid #e2e8f0 !important;
-    padding-top: 4pt !important;
+    padding-top: 6pt !important;
+    padding-bottom: 6pt !important;
+    z-index: 9999 !important;
   }
 
   /* No links in print */
