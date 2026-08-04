@@ -7,14 +7,15 @@ import {
 import { 
     BarChart3, Award, Users, Filter, School, MapPin, 
     Target, Activity, TrendingUp, GraduationCap, BookOpen, ChevronDown,
-    Pencil, Trash2, Printer, Search
+    Pencil, Trash2, Printer, Search, Loader2
 } from 'lucide-react';
+import { Button } from './ui/Button';
 import { Escola, Coordenador, RegistroFluenciaSAMAHC } from '../types';
 import { SamahcFluenciaModal } from './modals/SamahcFluenciaModal';
 import { SamahcEvolutionModal } from './modals/SamahcEvolutionModal';
 import { PrintableSamahcFluenciaReport } from './reports/PrintableSamahcFluenciaReport';
 import { PrintableAlfabetometroModal } from './modals/PrintableAlfabetometroModal';
-import { PrintableAlfabetometroReport } from './reports/PrintableAlfabetometroReport';
+import { PrintableAlfabetometroReport, AlfabetometroDocumentView } from './reports/PrintableAlfabetometroReport';
 import { samahcService } from '../services/samahcService';
 
 function useDebounce<T>(value: T, delay: number): T {
@@ -74,6 +75,43 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
         year: number;
         records: any[];
     } | null>(null);
+
+    // States for inline Alfabetômetro document preview
+    const [alfabetometroEscolaId, setAlfabetometroEscolaId] = useState<string>('Todas');
+    const [alfabetometroModo, setAlfabetometroModo] = useState<string>('page');
+    const [alfabetometroGrade, setAlfabetometroGrade] = useState<string>('Toda a escola (consolidado)');
+    const [alfabetometroAno, setAlfabetometroAno] = useState<number>(new Date().getFullYear());
+    const [alfabetometroPreviewRecords, setAlfabetometroPreviewRecords] = useState<any[]>([]);
+    const [isLoadingAlfabetometroPreview, setIsLoadingAlfabetometroPreview] = useState<boolean>(false);
+
+    // Fetch records for inline Alfabetômetro preview
+    React.useEffect(() => {
+        if (activeView !== 'ALFABETÔMETRO') return;
+
+        let isMounted = true;
+        const fetchPreviewRecords = async () => {
+            setIsLoadingAlfabetometroPreview(true);
+            try {
+                const recs = await samahcService.getPrintRecords(
+                    alfabetometroEscolaId,
+                    alfabetometroAno,
+                    alfabetometroGrade
+                );
+                if (isMounted) {
+                    setAlfabetometroPreviewRecords(recs);
+                }
+            } catch (err) {
+                console.error('Error fetching alfabetometro preview records:', err);
+            } finally {
+                if (isMounted) {
+                    setIsLoadingAlfabetometroPreview(false);
+                }
+            }
+        };
+
+        fetchPreviewRecords();
+        return () => { isMounted = false; };
+    }, [activeView, alfabetometroEscolaId, alfabetometroGrade, alfabetometroAno]);
 
     // Data management for performance
     const [samahcRecords, setSamahcRecords] = useState<{ registro: RegistroFluenciaSAMAHC; escola: Escola }[]>([]);
@@ -459,21 +497,40 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
         setIsEditModalOpen(false);
     };
 
-    const handleStudentEvolution = (studentName: string) => {
-        // Find all records for this student across ALL schools
-        const studentRecords: { registro: RegistroFluenciaSAMAHC; escola: Escola }[] = [];
-        
-        escolas.forEach(escola => {
-            const regs = escola.dadosEducacionais?.registrosFluenciaSamahc || [];
-            regs.forEach(r => {
-                if (r.estudanteNome.trim().toUpperCase() === studentName.trim().toUpperCase()) {
-                    studentRecords.push({ registro: r, escola });
-                }
+    const handleStudentEvolution = async (studentName: string) => {
+        if (!studentName) return;
+        setIsLoading(true);
+        try {
+            const rawRecords = await samahcService.getAllForEvolution(studentName);
+            
+            const studentRecords = rawRecords.map(r => {
+                const escolaObj = Array.isArray(r.escolas) ? r.escolas[0] : (r.escola || r.escolas);
+                return {
+                    registro: {
+                        id: r.id,
+                        estudanteNome: r.estudante_nome || r.estudanteNome,
+                        anoSerie: r.ano_serie || r.anoSerie,
+                        nivelDesempenho: r.nivel_desempenho || r.nivelDesempenho,
+                        tipoAvaliacao: r.tipo_avaliacao || r.tipoAvaliacao,
+                        ano: r.ano,
+                        turno: r.turno,
+                        createdAt: r.created_at || r.createdAt
+                    } as RegistroFluenciaSAMAHC,
+                    escola: {
+                        id: r.escola_id,
+                        nome: escolaObj?.nome || 'Escola não vinculada'
+                    } as Escola
+                };
             });
-        });
 
-        setSelectedStudentForEvolution({ name: studentName, records: studentRecords });
-        setIsEvolutionModalOpen(true);
+            setSelectedStudentForEvolution({ name: studentName, records: studentRecords });
+            setIsEvolutionModalOpen(true);
+        } catch (error) {
+            console.error('Error fetching student evolution:', error);
+            alert('Erro ao carregar o histórico de evolução do estudante.');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handlePrintAlfabetometro = async (params: { escolaId: string; escolaNome: string; grade: string; year: number }) => {
@@ -912,22 +969,124 @@ export const SamahcDashboard: React.FC<SamahcDashboardProps> = ({ escolas, coord
             s.schoolName.toLowerCase().includes(alfabetometroSchoolSearch.toLowerCase())
         );
 
+        const selectedSchoolObj = escolas.find(e => e.id === alfabetometroEscolaId);
+        const previewSchoolName = alfabetometroEscolaId === 'Todas' || !selectedSchoolObj
+            ? 'Rede Municipal de Ensino'
+            : selectedSchoolObj.nome;
+
         return (
-            <div className="space-y-6">
-                {/* Header Actions */}
-                <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                    <div>
-                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Gerador de Alfabetômetro</h3>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Gere o modelo oficial do alfabetômetro para impressão</p>
+            <div className="space-y-6 animate-fade-in">
+                {/* Control Card for Filters & Printing */}
+                <div className="p-6 bg-white border border-slate-200 shadow-sm rounded-2xl">
+                    <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-4 w-full">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 flex-1">
+                            {/* UNIDADE ESCOLAR */}
+                            <div>
+                                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">
+                                    Selecionar UNIDADE ESCOLAR
+                                </label>
+                                <select
+                                    value={alfabetometroEscolaId}
+                                    onChange={e => setAlfabetometroEscolaId(e.target.value)}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 font-semibold"
+                                >
+                                    <option value="Todas">Todas as Escolas (Rede Municipal)</option>
+                                    {filteredEscolas.map(e => (
+                                        <option key={e.id} value={e.id}>{e.nome}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* MODO DE IMPRESSÃO */}
+                            <div>
+                                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">
+                                    MODO DE IMPRESSÃO
+                                </label>
+                                <select
+                                    value={alfabetometroModo}
+                                    onChange={e => setAlfabetometroModo(e.target.value)}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 font-semibold"
+                                >
+                                    <option value="page">Uma página (escola ou ano específico)</option>
+                                </select>
+                            </div>
+
+                            {/* ANO / SÉRIE */}
+                            <div>
+                                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">
+                                    Selecionar ANO / SÉRIE
+                                </label>
+                                <select
+                                    value={alfabetometroGrade}
+                                    onChange={e => setAlfabetometroGrade(e.target.value)}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 font-semibold"
+                                >
+                                    <option value="Toda a escola (consolidado)">Toda a escola (consolidado)</option>
+                                    {['1º ANO', '2º ANO', '3º ANO', '4º ANO', '5º ANO', '6º ANO', '7º ANO', '8º ANO', '9º ANO', 'EJA', 'MULTI'].map(s => (
+                                        <option key={s} value={s}>{s}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* ANO LETIVO */}
+                            <div>
+                                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">
+                                    Selecionar ANO LETIVO
+                                </label>
+                                <select
+                                    value={alfabetometroAno}
+                                    onChange={e => setAlfabetometroAno(Number(e.target.value))}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 font-semibold"
+                                >
+                                    {[new Date().getFullYear(), new Date().getFullYear() - 1, 2025, 2024, 2023].map(y => (
+                                        <option key={y} value={y}>{y}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-wrap sm:flex-nowrap gap-2">
+                            <Button
+                                onClick={() => handlePrintAlfabetometro({
+                                    escolaId: alfabetometroEscolaId,
+                                    escolaNome: previewSchoolName,
+                                    grade: alfabetometroGrade,
+                                    year: alfabetometroAno
+                                })}
+                                className="rounded-xl px-5 py-3 text-xs font-bold bg-brand-orange hover:bg-orange-600 shadow-sm flex items-center gap-2"
+                            >
+                                <Printer className="w-4 h-4" />
+                                GERAR E IMPRIMIR
+                            </Button>
+                            <Button
+                                onClick={() => setIsPrintModalOpen(true)}
+                                variant="secondary"
+                                className="rounded-xl px-4 py-3 text-xs font-bold bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 shadow-sm flex items-center gap-2"
+                            >
+                                <Printer className="w-4 h-4 text-orange-500" />
+                                ABRIR MODAL
+                            </Button>
+                        </div>
                     </div>
-                    <button
-                        onClick={() => setIsPrintModalOpen(true)}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-black shadow-lg shadow-slate-200 hover:bg-black transition-all"
-                    >
-                        <Printer className="w-4 h-4 text-orange-500" />
-                        GERAR ALFABETÔMETRO
-                    </button>
                 </div>
+
+                {/* Document Live Preview Container (matching Atas Finais layout) */}
+                {isLoadingAlfabetometroPreview ? (
+                    <div className="flex flex-col items-center justify-center py-24 bg-white rounded-3xl border border-slate-200">
+                        <Loader2 className="w-10 h-10 text-brand-orange animate-spin mb-3" />
+                        <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Carregando pré-visualização do Alfabetômetro...</p>
+                    </div>
+                ) : (
+                    <div className="bg-slate-100 rounded-3xl border border-slate-200 p-6 overflow-x-auto">
+                        <AlfabetometroDocumentView 
+                            schoolName={previewSchoolName}
+                            grade={alfabetometroGrade}
+                            year={alfabetometroAno}
+                            records={alfabetometroPreviewRecords}
+                            isInline={true}
+                        />
+                    </div>
+                )}
 
                 {/* Top Summary Widget */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -3,11 +3,14 @@ import { createPortal } from 'react-dom';
 import { PageHeader } from './ui/PageHeader';
 import { 
   Users, Search, Plus, Edit2, Trash2, 
-  GraduationCap, X, RefreshCw, UserPlus, Upload, Printer, FileText
+  GraduationCap, X, RefreshCw, UserPlus, Upload, Printer, FileText,
+  ArrowRightLeft, Bell
 } from 'lucide-react';
 import { CadastroEstudanteModal } from './modals/CadastroEstudanteModal';
 import { CadastroTurmaModal, TurmaData } from './modals/CadastroTurmaModal';
 import { ImportEstudantesModal } from './modals/ImportEstudantesModal';
+import { TransferenciaEstudanteModal } from './modals/TransferenciaEstudanteModal';
+import { TransferenciasPendentesPopup, useTransferenciasPendentesCount } from './modals/TransferenciasPendentesPopup';
 import { Aluno, Escola, Coordenador } from '../types';
 import { supabase } from '../services/supabase';
 import { logAudit } from '../services/logService';
@@ -46,6 +49,20 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
   const [printDossierStudent, setPrintDossierStudent] = useState<Aluno | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [turmas, setTurmas] = useState<TurmaData[]>([]);
+
+  // Transfer state
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [transferStudent, setTransferStudent] = useState<Aluno | null>(null);
+  const [isPendentesPopupOpen, setIsPendentesPopupOpen] = useState(false);
+
+  // IDs of schools the current user has access to (for pending transfer badge)
+  const escolasIds = useMemo(() => escolas.map(e => String(e.id)), [escolas]);
+  const { count: pendentesCount, refresh: refreshPendentes } = useTransferenciasPendentesCount(escolasIds);
+
+  const handleOpenTransfer = (student: Aluno) => {
+    setTransferStudent(student);
+    setIsTransferModalOpen(true);
+  };
 
   const handlePrintDossier = (student: Aluno) => {
     setPrintDossierStudent(student);
@@ -347,6 +364,36 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
             ]}
         />
 
+        {/* Pending Transfers Alert Banner */}
+        {pendentesCount > 0 && (
+          <div 
+            onClick={() => setIsPendentesPopupOpen(true)}
+            className="cursor-pointer group bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between gap-4 shadow-sm hover:shadow-md hover:border-amber-300 transition-all duration-300 animate-fade-in"
+          >
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
+                  <Bell className="w-5 h-5 text-amber-600" />
+                </div>
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center text-[10px] font-black animate-bounce shadow-sm">
+                  {pendentesCount}
+                </span>
+              </div>
+              <div>
+                <p className="text-sm font-black text-slate-800">
+                  {pendentesCount === 1 ? 'Existe 1 solicitação' : `Existem ${pendentesCount} solicitações`} de transferência pendente{pendentesCount > 1 ? 's' : ''}
+                </p>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">
+                  Clique para visualizar e gerenciar as solicitações de vaga
+                </p>
+              </div>
+            </div>
+            <div className="px-4 py-2 bg-amber-100 rounded-xl text-[10px] font-black text-amber-700 uppercase tracking-wider group-hover:bg-amber-200 transition-colors">
+              Ver Solicitações
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-col md:flex-row gap-4 items-center bg-white p-3 rounded-2xl border border-slate-200 shadow-sm transition-all duration-300">
             <div className="relative flex-1 w-full">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 transition-colors group-focus-within:text-orange-500" />
@@ -455,6 +502,9 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
                                     </td>
                                     <td className="px-6 py-4 text-right">
                                         <div className="flex items-center justify-end gap-1 opacity-20 group-hover:opacity-100 transition-opacity">
+                                            <button onClick={() => handleOpenTransfer(student)} className="p-2 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-all" title="Transferir Estudante">
+                                                <ArrowRightLeft size={16} />
+                                            </button>
                                             <button onClick={() => handlePrintDossier(student)} className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-all" title="Imprimir Dossiê do Estudante">
                                                 <Printer size={16} />
                                             </button>
@@ -568,6 +618,25 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
             turmas={turmas}
             escolas={escolas}
             isDemoMode={isDemoMode}
+        />
+
+        <TransferenciaEstudanteModal
+            isOpen={isTransferModalOpen}
+            onClose={() => { setIsTransferModalOpen(false); setTransferStudent(null); }}
+            student={transferStudent}
+            escolas={escolas}
+            escolaOrigemId={transferStudent?.escola_id || ''}
+            onSuccess={() => { loadStudents(); refreshPendentes(); }}
+            currentUserName={currentUser?.nome || ''}
+        />
+
+        <TransferenciasPendentesPopup
+            isOpen={isPendentesPopupOpen}
+            onClose={() => setIsPendentesPopupOpen(false)}
+            escolas={escolas}
+            escolasIds={escolasIds}
+            onTransferApproved={() => { loadStudents(); refreshPendentes(); }}
+            currentUserName={currentUser?.nome || ''}
         />
 
       {/* ====== PRINTABLE DOSSIÊ COMPONENT ====== */}

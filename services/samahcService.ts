@@ -184,22 +184,41 @@ export const samahcService = {
   },
 
   async getPrintRecords(schoolId: string, year: number, grade?: string) {
-    let query = supabase
-      .from('registros_fluencia_samahc')
-      .select('nivel_desempenho, tipo_avaliacao, estudante_nome, ano_serie, etapa, created_at')
-      .eq('escola_id', schoolId)
-      .eq('ano', year);
+    const allRecords: any[] = [];
+    const pageSize = 1000;
+    let from = 0;
+    let hasMore = true;
 
-    if (grade && grade !== 'Toda a escola (consolidado)' && grade !== 'Todas') {
-      query = query.eq('ano_serie', grade);
+    while (hasMore) {
+      let query = supabase
+        .from('registros_fluencia_samahc')
+        .select('nivel_desempenho, tipo_avaliacao, estudante_nome, ano_serie, etapa, created_at')
+        .eq('ano', year);
+
+      if (schoolId && schoolId !== 'Todas' && schoolId !== 'todas') {
+        query = query.eq('escola_id', schoolId);
+      }
+
+      if (grade && grade !== 'Toda a escola (consolidado)' && grade !== 'Todas') {
+        query = query.eq('ano_serie', grade);
+      }
+
+      const { data, error } = await query.range(from, from + pageSize - 1);
+      if (error) {
+        console.error('Error fetching print records:', error);
+        throw error;
+      }
+
+      if (data && data.length > 0) {
+        allRecords.push(...data);
+        from += pageSize;
+        hasMore = data.length === pageSize;
+      } else {
+        hasMore = false;
+      }
     }
 
-    const { data, error } = await query;
-    if (error) {
-      console.error('Error fetching print records:', error);
-      throw error;
-    }
-    return data.map(r => ({
+    return allRecords.map(r => ({
       ...r,
       estudanteNome: r.estudante_nome,
       anoSerie: r.ano_serie,

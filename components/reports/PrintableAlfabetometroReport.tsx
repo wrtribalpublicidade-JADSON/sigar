@@ -1,22 +1,21 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 
-interface PrintableAlfabetometroReportProps {
-    isOpen: boolean;
+export interface AlfabetometroDocumentViewProps {
     schoolName: string;
     grade: string;
     year: number;
     records: any[];
+    isInline?: boolean;
 }
 
-export const PrintableAlfabetometroReport: React.FC<PrintableAlfabetometroReportProps> = ({
-    isOpen,
+export const AlfabetometroDocumentView: React.FC<AlfabetometroDocumentViewProps> = ({
     schoolName,
     grade,
     year,
-    records = []
+    records = [],
+    isInline = false
 }) => {
-    if (!isOpen) return null;
 
     // Helper functions for mapping database values
     const getNivelKey = (nivel: string): 'fluente' | 'iniciante' | 'n4' | 'n3' | 'n2' | 'n1' => {
@@ -104,16 +103,16 @@ export const PrintableAlfabetometroReport: React.FC<PrintableAlfabetometroReport
     const displayForm2Count = pctForm2Real !== null ? (counts.fluente.form2 + counts.iniciante.form2) : Math.round((displayForm2Pct / 100) * (totals.form2 || totalStudents));
     const displaySomativaCount = pctSomativaReal !== null ? (counts.fluente.somativa + counts.iniciante.somativa) : Math.round((displaySomativaPct / 100) * (totals.somativa || totalStudents));
 
-    return createPortal(
+    return (
         <div 
-            id="print-report" 
-            className="hidden print:block bg-white text-slate-900 print-keep-bg p-8" 
+            id={isInline ? undefined : "print-report"} 
+            className={isInline ? "bg-[#FFFBEA] text-slate-900 p-6 md:p-8 max-w-5xl mx-auto shadow-2xl rounded-sm min-h-[850px] flex flex-col justify-between" : "hidden print:block bg-white text-slate-900 print-keep-bg p-8"} 
             style={{ 
                 fontFamily: "'Inter', sans-serif", 
                 backgroundColor: '#FFFBEA', 
-                minHeight: '280mm',
+                minHeight: isInline ? 'auto' : '280mm',
                 boxSizing: 'border-box',
-                border: '8px double #C21B1B',
+                border: 'none',
                 margin: '0 auto',
                 padding: '24px'
             }}
@@ -122,22 +121,15 @@ export const PrintableAlfabetometroReport: React.FC<PrintableAlfabetometroReport
             <div className="flex justify-between items-center border-b-4 border-yellow-400 pb-3 mb-4">
                 <div className="flex items-center gap-3">
                     {/* Circle Logo Graphic */}
-                    <div 
-                        className="print-keep-bg flex items-center justify-center rounded-full" 
+                    <img 
+                        src="/semed-logo.png" 
+                        alt="Logo SEMED" 
+                        className="print-keep-bg object-contain" 
                         style={{ 
-                            width: '56px', 
-                            height: '56px', 
-                            border: '3px solid #10B981', 
-                            backgroundColor: '#FFFFFF',
-                            boxShadow: '0 0 0 3px #FBBF24'
-                        }}
-                    >
-                        <div className="text-center">
-                            <span style={{ fontSize: '7px', fontWeight: 900, color: '#10B981', display: 'block', lineHeight: 1 }}>SEMED</span>
-                            <span style={{ fontSize: '5px', fontWeight: 700, color: '#F59E0B', display: 'block', lineHeight: 1 }}>HUMBERTO</span>
-                            <span style={{ fontSize: '5px', fontWeight: 700, color: '#64748B', display: 'block', lineHeight: 1 }}>DE CAMPOS</span>
-                        </div>
-                    </div>
+                            width: '64px', 
+                            height: '64px'
+                        }} 
+                    />
                     <div>
                         <h2 style={{ fontSize: '10px', fontWeight: 800, color: '#475569', margin: 0, letterSpacing: '0.05em' }}>PREFEITURA MUNICIPAL DE HUMBERTO DE CAMPOS</h2>
                         <h3 style={{ fontSize: '11px', fontWeight: 900, color: '#1E293B', margin: 0, letterSpacing: '0.02em' }}>SECRETARIA MUNICIPAL DE EDUCAÇÃO</h3>
@@ -484,7 +476,35 @@ export const PrintableAlfabetometroReport: React.FC<PrintableAlfabetometroReport
                 <span>SIGAR • SISTEMA INTEGRADO DE GESTÃO</span>
                 <span>RELATÓRIO EMITIDO EM {new Date().toLocaleDateString('pt-BR')}</span>
             </div>
-        </div>,
+        </div>
+    );
+};
+
+export interface PrintableAlfabetometroReportProps {
+    isOpen: boolean;
+    schoolName: string;
+    grade: string;
+    year: number;
+    records: any[];
+}
+
+export const PrintableAlfabetometroReport: React.FC<PrintableAlfabetometroReportProps> = ({
+    isOpen,
+    schoolName,
+    grade,
+    year,
+    records = []
+}) => {
+    if (!isOpen) return null;
+
+    return createPortal(
+        <AlfabetometroDocumentView 
+            schoolName={schoolName}
+            grade={grade}
+            year={year}
+            records={records}
+            isInline={false}
+        />,
         document.body
     );
 };

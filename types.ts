@@ -172,6 +172,30 @@ export interface RecursoHumano {
    created_at?: string;
  }
  
+ // Interface para Transferência de Estudante
+ export interface TransferenciaEstudante {
+   id: string;
+   aluno_id: number;
+   aluno_nome: string;
+   tipo: 'INTERNA' | 'EXTERNA';
+   escola_origem_id: string;
+   escola_origem_nome: string;
+   turma_origem_id?: string;
+   escola_destino_id?: string;
+   escola_destino_nome?: string;
+   turma_destino_id?: string;
+   turma_destino_nome?: string;
+   turno_destino?: string;
+   escola_externa_nome?: string;
+   status: 'PENDENTE' | 'EM_ANALISE' | 'APROVADO' | 'NEGADO';
+   motivo?: string;
+   motivo_resposta?: string;
+   solicitado_por?: string;
+   respondido_por?: string;
+   created_at?: string;
+   updated_at?: string;
+ }
+
  // Interface para Acompanhamento Mensal
 export type StatusAcompanhamento = 'Sim' | 'Não' | 'Parcialmente' | null;
 
