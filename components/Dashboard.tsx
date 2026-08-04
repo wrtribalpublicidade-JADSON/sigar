@@ -11,6 +11,7 @@ import {
 } from 'recharts';
 import { exportToCSV, checkSchoolPendencies } from '../utils';
 import { PendingAlerts } from './PendingAlerts';
+import { RegionalPendenciesOverview } from './RegionalPendenciesOverview';
 
 interface DashboardProps {
   escolas: Escola[];
@@ -196,6 +197,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         ))}
       </div>
+
+      {/* Regional Coordinator 17 Dimensions Pendencies Overview */}
+      <RegionalPendenciesOverview
+        escolas={escolas}
+        currentUser={currentUser}
+        onNavigateToEscola={onNavigateToDetail}
+      />
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
