@@ -11,6 +11,7 @@ import { CadastroTurmaModal, TurmaData } from './modals/CadastroTurmaModal';
 import { ImportEstudantesModal } from './modals/ImportEstudantesModal';
 import { TransferenciaEstudanteModal } from './modals/TransferenciaEstudanteModal';
 import { TransferenciasPendentesPopup, useTransferenciasPendentesCount } from './modals/TransferenciasPendentesPopup';
+import { PrintableBoletimIndividualEstudante } from './PrintableBoletimIndividualEstudante';
 import { Aluno, Escola, Coordenador } from '../types';
 import { supabase } from '../services/supabase';
 import { logAudit } from '../services/logService';
@@ -46,6 +47,8 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
   const [isTurmaModalOpen, setIsTurmaModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Aluno | null>(null);
+  const [selectedStudentForDossier, setSelectedStudentForDossier] = useState<Aluno | null>(null);
+  const [printBoletimStudent, setPrintBoletimStudent] = useState<Aluno | null>(null);
   const [printDossierStudent, setPrintDossierStudent] = useState<Aluno | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [turmas, setTurmas] = useState<TurmaData[]>([]);
@@ -505,7 +508,10 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
                                             <button onClick={() => handleOpenTransfer(student)} className="p-2 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-all" title="Transferir Estudante">
                                                 <ArrowRightLeft size={16} />
                                             </button>
-                                            <button onClick={() => handlePrintDossier(student)} className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-all" title="Imprimir Dossiê do Estudante">
+                                            <button onClick={() => setPrintBoletimStudent(student)} className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-all" title="Imprimir Boletim de Desempenho Escolar">
+                                                <FileText size={16} />
+                                            </button>
+                                            <button onClick={() => handlePrintDossier(student)} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all" title="Imprimir Dossiê do Estudante">
                                                 <Printer size={16} />
                                             </button>
                                             <button onClick={() => handleOpenModal(student)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="Editar">
@@ -864,6 +870,16 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
           </div>
         </div>,
         document.body
+      )}
+
+      {/* Printable Individual Boletim Component */}
+      {printBoletimStudent && (
+        <PrintableBoletimIndividualEstudante
+          escola={escolas.find(e => e.id === printBoletimStudent.escola_id) || escolas[0]}
+          student={printBoletimStudent}
+          turmaInfo={getStudentTurmaInfo(printBoletimStudent.class_id)}
+          onClose={() => setPrintBoletimStudent(null)}
+        />
       )}
     </div>
   );

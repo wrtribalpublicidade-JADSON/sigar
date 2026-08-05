@@ -9,6 +9,7 @@ import { PrintableChecklistReport } from './PrintableChecklistReport';
 import { PrintableCartaApresentacao } from './PrintableCartaApresentacao';
 import { PrintableSchoolDocument } from './PrintableSchoolDocument';
 import { PrintableTurmaMatriculasReport } from './PrintableTurmaMatriculasReport';
+import { PrintableBoletimIndividualEstudante } from './PrintableBoletimIndividualEstudante';
 import { AtasFinaisTab } from './AtasFinaisTab';
 import { hasTabAccess, hasFullTabAccess } from '../utils/permissions';
 import {
@@ -138,6 +139,9 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
   const [isPrintTurmaModalOpen, setIsPrintTurmaModalOpen] = useState(false);
   const [selectedTurmaForReport, setSelectedTurmaForReport] = useState<any>(null);
   const [reportStatusFilter, setReportStatusFilter] = useState<'ALL' | 'Ativo' | 'Inativo'>('ALL');
+  
+  // Boletim printing state
+  const [printBoletimStudent, setPrintBoletimStudent] = useState<Aluno | null>(null);
   const [isPrintingTurmaReport, setIsPrintingTurmaReport] = useState(false);
 
   const loadStudentsList = async () => {
@@ -2044,7 +2048,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                           <th className="px-6 py-4">Ano / Série</th>
                           <th className="px-6 py-4 text-center">Etapa</th>
                           <th className="px-6 py-4 text-center">Status</th>
-                          {canEditTab && <th className="px-6 py-4 text-right">Ações</th>}
+                          <th className="px-6 py-4 text-right">Ações</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -2098,28 +2102,37 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                                   {(student.status as string === 'Ativo' || student.status as string === 'active') ? 'Ativo' : student.status}
                                 </span>
                               </td>
-                              {canEditTab && (
-                                <td className="px-6 py-4 text-right">
+                              <td className="px-6 py-4 text-right">
                                   <div className="flex items-center justify-end gap-1 opacity-20 group-hover:opacity-100 transition-opacity">
                                     <button
-                                      onClick={() => { setSelectedStudent(student); setIsCadastroModalOpen(true); }}
-                                      className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
-                                      title="Editar Aluno"
+                                      onClick={() => setPrintBoletimStudent(student)}
+                                      className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-all"
+                                      title="Imprimir Boletim de Desempenho Escolar"
                                     >
-                                      <Edit size={16} />
+                                      <FileText size={16} />
                                     </button>
-                                    <button
-                                      onClick={() => handleDeleteStudent(student.id)}
-                                      className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                                      title="Excluir Aluno"
-                                    >
-                                      <Trash2 size={16} />
-                                    </button>
+                                    {canEditTab && (
+                                      <>
+                                        <button
+                                          onClick={() => { setSelectedStudent(student); setIsCadastroModalOpen(true); }}
+                                          className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                                          title="Editar Aluno"
+                                        >
+                                          <Edit size={16} />
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteStudent(student.id)}
+                                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                          title="Excluir Aluno"
+                                        >
+                                          <Trash2 size={16} />
+                                        </button>
+                                      </>
+                                    )}
                                   </div>
                                 </td>
-                              )}
-                            </tr>
-                          ))
+                              </tr>
+                            ))
                         )}
                       </tbody>
                     </table>
@@ -2622,6 +2635,15 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
             </div>
           </div>
         </div>
+      )}
+      {/* Printable Individual Boletim Component */}
+      {printBoletimStudent && (
+        <PrintableBoletimIndividualEstudante
+          escola={escola}
+          student={printBoletimStudent}
+          turmaInfo={getStudentTurmaInfo(printBoletimStudent.class_id)}
+          onClose={() => setPrintBoletimStudent(null)}
+        />
       )}
     </div>
   );
