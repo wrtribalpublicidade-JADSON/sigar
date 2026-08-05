@@ -5,7 +5,7 @@ import { Button } from './ui/Button';
 import { 
   GraduationCap, School as SchoolIcon, Users, CheckCircle, 
   Loader2, Save, AlertTriangle, HelpCircle, FileSpreadsheet, RefreshCw,
-  Percent
+  Percent, Printer
 } from 'lucide-react';
 import { Escola, Coordenador, Segmento, Aluno } from '../types';
 import { supabase } from '../services/supabase';
@@ -13,6 +13,7 @@ import { useNotification } from '../context/NotificationContext';
 import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
 import { BNCC_INFANTIL } from './ConselhoClasse';
 import { ccAvaliacaoInfantilService, ccEstudanteService } from '../services/gestaoConselhoService';
+import { PrintableAvaliacaoDocenteInfantilReport } from './PrintableAvaliacaoDocenteInfantilReport';
 
 interface AvaliacaoDocenteInfantilProps {
   escolas: Escola[];
@@ -47,14 +48,15 @@ export const AvaliacaoDocenteInfantil: React.FC<AvaliacaoDocenteInfantilProps> =
   const [selectedEscolaId, setSelectedEscolaId] = useState('');
   const [selectedGrupo, setSelectedGrupo] = useState('');
   const [selectedTurmaId, setSelectedTurmaId] = useState('');
-  const [selectedBimestre, setSelectedBimestre] = useState(PERIODOS[0]);
-  const [selectedCampo, setSelectedCampo] = useState(CAMPOS_EXPERIENCIA[0]);
+  const [selectedBimestre, setSelectedBimestre] = useState('');
+  const [selectedCampo, setSelectedCampo] = useState('');
 
   // Loaded Data
   const [turmas, setTurmas] = useState<any[]>([]);
   const [students, setStudents] = useState<Aluno[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   // Concept Map: studentId_skillCode -> Concept ('D' | 'ED' | 'ND')
   const [evaluations, setEvaluations] = useState<Record<string, 'D' | 'ED' | 'ND'>>({});
@@ -131,12 +133,15 @@ export const AvaliacaoDocenteInfantil: React.FC<AvaliacaoDocenteInfantilProps> =
     return turmas.filter(t => isTurmaInAnoSerie(t, selectedGrupo));
   }, [turmas, selectedGrupo]);
 
-  const currentSchoolId = selectedEscolaId || (escolasInfantil.length > 0 ? escolasInfantil[0].id : '');
+  const currentSchoolId = selectedEscolaId;
 
   // 1. Fetch ECE classes when school changes
   useEffect(() => {
+    if (!currentSchoolId) {
+      setTurmas([]);
+      return;
+    }
     const fetchTurmas = async () => {
-      if (!currentSchoolId) return;
       try {
         const { data, error } = await supabase
           .from('turmas')
@@ -172,30 +177,7 @@ export const AvaliacaoDocenteInfantil: React.FC<AvaliacaoDocenteInfantilProps> =
     } else {
       fetchTurmas();
     }
-  }, [currentSchoolId, isDemoMode]);
-
-  // 2. Auto-select first Grupo when school changes
-  useEffect(() => {
-    if (availableAnosSeries.length > 0) {
-      if (!availableAnosSeries.includes(selectedGrupo)) {
-        setSelectedGrupo(availableAnosSeries[0]);
-      }
-    } else {
-      setSelectedGrupo('');
-    }
-  }, [availableAnosSeries, selectedGrupo]);
-
-  // 3. Auto-select first class when Grupo changes
-  useEffect(() => {
-    if (availableTurmas.length > 0) {
-      const exists = availableTurmas.some(t => t.id === selectedTurmaId);
-      if (!exists) {
-        setSelectedTurmaId(availableTurmas[0].id);
-      }
-    } else {
-      setSelectedTurmaId('');
-    }
-  }, [availableTurmas, selectedTurmaId]);
+  }, [currentSchoolId, isDemoMode, currentUser]);
 
   // 4. Fetch students when selected class changes
   useEffect(() => {
@@ -215,11 +197,17 @@ export const AvaliacaoDocenteInfantil: React.FC<AvaliacaoDocenteInfantilProps> =
             .from('alunos')
             .select('*')
             .eq('class_id', selectedTurmaId)
-            .in('status', ['active', 'Ativo'])
             .order('name');
 
           if (error) throw error;
-          setStudents(data || []);
+
+          const activeStudents = (data || []).filter((s: any) =>
+            !s.status ||
+            (s.status.toLowerCase() !== 'inactive' &&
+             s.status.toLowerCase() !== 'inativo' &&
+             s.status.toLowerCase() !== 'transferido')
+          );
+          setStudents(activeStudents);
         }
       } catch (err) {
         console.error('Erro ao buscar alunos:', err);
@@ -260,6 +248,8 @@ export const AvaliacaoDocenteInfantil: React.FC<AvaliacaoDocenteInfantilProps> =
       }
       
       const studentIds = students.map(s => s.id);
+      const normalizeStr = (str: string) => (str || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
       try {
         let evs: any[] = [];
         
@@ -269,9 +259,9 @@ export const AvaliacaoDocenteInfantil: React.FC<AvaliacaoDocenteInfantilProps> =
           if (saved) {
             const allLocal = JSON.parse(saved);
             evs = allLocal.filter((item: any) => 
-              studentIds.includes(item.student_id) && 
-              item.period === bimestreNum &&
-              item.campo_experiencia.toUpperCase() === selectedCampo.toUpperCase()
+              studentIds.map(String).includes(String(item.student_id || item.estudante_id)) && 
+              Number(item.period || item.bimestre) === bimestreNum &&
+              normalizeStr(item.campo_experiencia) === normalizeStr(selectedCampo)
             );
           } else {
             // Load from service mock
@@ -288,12 +278,66 @@ export const AvaliacaoDocenteInfantil: React.FC<AvaliacaoDocenteInfantilProps> =
             turma_id: selectedTurmaId,
             campo_experiencia: selectedCampo
           });
+
+          // Fallback check 1: Query cc_i_avaliacao by student IDs & bimestre if evs is empty
+          if ((!evs || evs.length === 0) && studentIds.length > 0) {
+            try {
+              const table = 'cc_i_avaliacao';
+              const { data: dbData } = await supabase
+                .from(table)
+                .select('*')
+                .in('estudante_id', studentIds)
+                .eq('bimestre', bimestreNum);
+
+              if (dbData && dbData.length > 0) {
+                evs = dbData
+                  .filter(item => !item.campo_experiencia || normalizeStr(item.campo_experiencia) === normalizeStr(selectedCampo))
+                  .map(item => ({
+                    ...item,
+                    student_id: item.estudante_id,
+                    period: item.bimestre,
+                    status: item.conceito || item.status
+                  }));
+              }
+            } catch (fbErr) {
+              console.warn('Fallback cc_i_avaliacao query failed:', fbErr);
+            }
+          }
+
+          // Fallback check 2: Query pareceres_infantil legacy table if still empty
+          if ((!evs || evs.length === 0) && studentIds.length > 0) {
+            try {
+              const { data: pData } = await supabase
+                .from('pareceres_infantil')
+                .select('*')
+                .in('student_id', studentIds);
+
+              if (pData && pData.length > 0) {
+                evs = pData
+                  .filter(item => !item.campo_experiencia || normalizeStr(item.campo_experiencia) === normalizeStr(selectedCampo))
+                  .map(item => ({
+                    ...item,
+                    student_id: item.student_id,
+                    period: Number(item.bimestre || item.period) || bimestreNum,
+                    skill_code: item.skill_code || item.habilidade_codigo,
+                    status: item.conceito || item.status,
+                    campo_experiencia: item.campo_experiencia
+                  }));
+              }
+            } catch (fbErr2) {
+              console.warn('Fallback pareceres_infantil query failed:', fbErr2);
+            }
+          }
         }
 
         const map: Record<string, 'D' | 'ED' | 'ND'> = {};
-        evs.forEach(item => {
-          const key = `${item.student_id}_${item.skill_code}`;
-          map[key] = item.status || item.conceito;
+        (evs || []).forEach(item => {
+          const sid = String(item.student_id || item.estudante_id || '');
+          const skey = item.skill_code || item.habilidade_codigo;
+          if (sid && skey) {
+            const key = `${sid}_${skey}`;
+            map[key] = item.status || item.conceito;
+          }
         });
 
         setEvaluations(map);
@@ -319,9 +363,12 @@ export const AvaliacaoDocenteInfantil: React.FC<AvaliacaoDocenteInfantilProps> =
 
     Object.entries(evaluations).forEach(([key, val]) => {
       // Key format: studentId_skillCode
-      const [studentId, skillCode] = key.split('_');
-      // Ensure this matches currently loaded student and skills
-      const studentExists = students.some(s => String(s.id) === studentId);
+      const lastUnderscore = key.lastIndexOf('_');
+      if (lastUnderscore === -1) return;
+      const studentId = key.substring(0, lastUnderscore);
+      const skillCode = key.substring(lastUnderscore + 1);
+
+      const studentExists = students.some(s => String(s.id) === String(studentId));
       const skillExists = currentObjectives.some(obj => obj.code === skillCode);
 
       if (studentExists && skillExists) {
@@ -437,7 +484,14 @@ export const AvaliacaoDocenteInfantil: React.FC<AvaliacaoDocenteInfantilProps> =
         subtitle="Registro qualitativo do desenvolvimento dos estudantes em relação aos objetivos de aprendizagem BNCC"
         icon={GraduationCap}
         badgeText="DIÁRIO DE CLASSE"
-        actions={[]}
+        actions={[
+          {
+            label: 'Imprimir Relatório',
+            icon: Printer,
+            onClick: () => setIsPrinting(true),
+            variant: 'secondary'
+          }
+        ]}
       />
 
       {subHeader}
@@ -450,7 +504,13 @@ export const AvaliacaoDocenteInfantil: React.FC<AvaliacaoDocenteInfantilProps> =
             <SearchableSchoolSelect
               escolas={escolasInfantil}
               selectedId={selectedEscolaId}
-              onChange={setSelectedEscolaId}
+              onChange={(id) => {
+                setSelectedEscolaId(id);
+                setSelectedGrupo('');
+                setSelectedTurmaId('');
+                setSelectedBimestre('');
+                setSelectedCampo('');
+              }}
               placeholder="Selecione a Unidade"
               inputClassName="pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
             />
@@ -460,14 +520,21 @@ export const AvaliacaoDocenteInfantil: React.FC<AvaliacaoDocenteInfantilProps> =
             <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Grupo/Faixa Etária *</label>
             <select 
               value={selectedGrupo}
-              onChange={e => setSelectedGrupo(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+              disabled={!selectedEscolaId}
+              onChange={e => {
+                setSelectedGrupo(e.target.value);
+                setSelectedTurmaId('');
+                setSelectedBimestre('');
+                setSelectedCampo('');
+              }}
+              className={`w-full px-3 py-2 border rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all ${
+                !selectedEscolaId 
+                  ? 'bg-slate-100 border-slate-100 text-slate-400 cursor-not-allowed' 
+                  : 'bg-white border-slate-200 text-slate-700'
+              }`}
             >
-              {availableAnosSeries.length === 0 ? (
-                <option value="">Nenhum grupo cadastrado</option>
-              ) : (
-                availableAnosSeries.map(a => <option key={a} value={a}>{a}</option>)
-              )}
+              <option value="">{!selectedEscolaId ? 'Aguardando Unidade...' : 'Selecione o Grupo'}</option>
+              {availableAnosSeries.map(a => <option key={a} value={a}>{a}</option>)}
             </select>
           </div>
 
@@ -475,16 +542,28 @@ export const AvaliacaoDocenteInfantil: React.FC<AvaliacaoDocenteInfantilProps> =
             <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Turma *</label>
             <select 
               value={selectedTurmaId}
-              onChange={e => setSelectedTurmaId(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+              disabled={!selectedEscolaId || !selectedGrupo}
+              onChange={e => {
+                const val = e.target.value;
+                setSelectedTurmaId(val);
+                if (val) {
+                  if (!selectedBimestre) setSelectedBimestre(PERIODOS[0]);
+                  if (!selectedCampo) setSelectedCampo(CAMPOS_EXPERIENCIA[0]);
+                } else {
+                  setSelectedBimestre('');
+                  setSelectedCampo('');
+                }
+              }}
+              className={`w-full px-3 py-2 border rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all ${
+                (!selectedEscolaId || !selectedGrupo) 
+                  ? 'bg-slate-100 border-slate-100 text-slate-400 cursor-not-allowed' 
+                  : 'bg-white border-slate-200 text-slate-700'
+              }`}
             >
-              {availableTurmas.length === 0 ? (
-                <option value="">Nenhuma turma encontrada</option>
-              ) : (
-                availableTurmas.map(t => (
-                  <option key={t.id} value={t.id}>{`${t.name || t.anoSerie || t.year} • ${t.shift || t.turno || ''}`}</option>
-                ))
-              )}
+              <option value="">{!selectedGrupo ? 'Aguardando Grupo...' : 'Selecione a Turma'}</option>
+              {availableTurmas.map(t => (
+                <option key={t.id} value={t.id}>{`${t.name || t.anoSerie || t.year} • ${t.shift || t.turno || ''}`}</option>
+              ))}
             </select>
           </div>
 
@@ -492,9 +571,21 @@ export const AvaliacaoDocenteInfantil: React.FC<AvaliacaoDocenteInfantilProps> =
             <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Período Avaliativo *</label>
             <select 
               value={selectedBimestre}
-              onChange={e => setSelectedBimestre(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+              disabled={!selectedEscolaId || !selectedGrupo || !selectedTurmaId}
+              onChange={e => {
+                const val = e.target.value;
+                setSelectedBimestre(val);
+                if (val && !selectedCampo) {
+                  setSelectedCampo(CAMPOS_EXPERIENCIA[0]);
+                }
+              }}
+              className={`w-full px-3 py-2 border rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all ${
+                (!selectedEscolaId || !selectedGrupo || !selectedTurmaId) 
+                  ? 'bg-slate-100 border-slate-100 text-slate-400 cursor-not-allowed' 
+                  : 'bg-white border-slate-200 text-slate-700'
+              }`}
             >
+              <option value="">{!selectedTurmaId ? 'Aguardando Turma...' : 'Selecione o Período'}</option>
               {PERIODOS.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
@@ -503,72 +594,114 @@ export const AvaliacaoDocenteInfantil: React.FC<AvaliacaoDocenteInfantilProps> =
             <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Campo de Experiência *</label>
             <select 
               value={selectedCampo}
+              disabled={!selectedEscolaId || !selectedGrupo || !selectedTurmaId || !selectedBimestre}
               onChange={e => setSelectedCampo(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+              className={`w-full px-3 py-2 border rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all ${
+                (!selectedEscolaId || !selectedGrupo || !selectedTurmaId || !selectedBimestre) 
+                  ? 'bg-slate-100 border-slate-100 text-slate-400 cursor-not-allowed' 
+                  : 'bg-white border-slate-200 text-slate-700'
+              }`}
             >
+              <option value="">{!selectedBimestre ? 'Aguardando Período...' : 'Selecione o Campo'}</option>
               {CAMPOS_EXPERIENCIA.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
         </div>
       </Card>
 
-      {/* Summary Stats Panels */}
-      {students.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-4 duration-200">
-          <Card className="bg-slate-55 border-slate-200/50 p-4 rounded-xl flex items-center gap-4">
-            <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center font-black">
-              <Users className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Estudantes</p>
-              <h4 className="text-md font-black text-slate-800">{students.length} matriculados</h4>
-            </div>
-          </Card>
-
-          <Card className="bg-slate-55 border-slate-200/50 p-4 rounded-xl flex items-center gap-4">
-            <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center font-black">
-              <CheckCircle className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Preenchimento</p>
-              <h4 className="text-md font-black text-slate-800">{stats.completionRate}% concluído</h4>
-            </div>
-          </Card>
-
-          <Card className="bg-slate-55 border-slate-200/50 p-4 rounded-xl flex items-center gap-4">
-            <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center font-black">
-              <Percent className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Consolidação Média</p>
-              <h4 className="text-md font-black text-slate-800">{stats.consolidationRate}% consolidado</h4>
-            </div>
-          </Card>
-
-          <Card className="bg-slate-55 border-slate-200/50 p-4 rounded-xl flex items-center gap-4">
-            <div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-lg flex items-center justify-center font-black">
-              <AlertTriangle className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Células Pendentes</p>
-              <h4 className="text-md font-black text-slate-800">{stats.pending} objetivos</h4>
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {/* Main Grid / Assessment Table */}
-      {loading ? (
-        <Card className="p-12 text-center bg-white border-slate-200">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto text-orange-600 mb-2" />
-          <p className="text-xs font-bold text-slate-500 uppercase">Carregando dados da turma...</p>
+      {/* Conditional Content Rendering */}
+      {!selectedEscolaId ? (
+        <Card className="p-12 text-center bg-white border-slate-200 shadow-sm rounded-2xl">
+          <HelpCircle className="w-12 h-12 mx-auto text-slate-300 mb-3" />
+          <h3 className="text-base font-bold text-slate-700 uppercase tracking-tight">Nenhuma Unidade Escolar Selecionada</h3>
+          <p className="text-xs font-medium text-slate-500 max-w-md mx-auto mt-1">
+            Selecione uma unidade escolar no filtro acima para habilitar as opções de Grupo/Faixa Etária, Turma, Período e Campo de Experiência.
+          </p>
         </Card>
-      ) : students.length === 0 ? (
-        <Card className="p-12 text-center bg-white border-slate-200">
-          <HelpCircle className="w-12 h-12 mx-auto text-slate-300 mb-2" />
-          <p className="text-xs font-bold text-slate-500 uppercase">Selecione uma turma com estudantes matriculados para iniciar.</p>
+      ) : !selectedGrupo ? (
+        <Card className="p-12 text-center bg-white border-slate-200 shadow-sm rounded-2xl">
+          <HelpCircle className="w-12 h-12 mx-auto text-slate-300 mb-3" />
+          <h3 className="text-base font-bold text-slate-700 uppercase tracking-tight">Selecione o Grupo / Faixa Etária</h3>
+          <p className="text-xs font-medium text-slate-500 max-w-md mx-auto mt-1">
+            Escolha o grupo da Educação Infantil (Creche ou Pré-Escola) para habilitar as turmas disponíveis.
+          </p>
+        </Card>
+      ) : !selectedTurmaId ? (
+        <Card className="p-12 text-center bg-white border-slate-200 shadow-sm rounded-2xl">
+          <HelpCircle className="w-12 h-12 mx-auto text-slate-300 mb-3" />
+          <h3 className="text-base font-bold text-slate-700 uppercase tracking-tight">Selecione a Turma</h3>
+          <p className="text-xs font-medium text-slate-500 max-w-md mx-auto mt-1">
+            Escolha a turma desejada para listar os estudantes matriculados e habilitar o período avaliativo.
+          </p>
+        </Card>
+      ) : (!selectedBimestre || !selectedCampo) ? (
+        <Card className="p-12 text-center bg-white border-slate-200 shadow-sm rounded-2xl">
+          <HelpCircle className="w-12 h-12 mx-auto text-slate-300 mb-3" />
+          <h3 className="text-base font-bold text-slate-700 uppercase tracking-tight">Selecione o Período e o Campo de Experiência</h3>
+          <p className="text-xs font-medium text-slate-500 max-w-md mx-auto mt-1">
+            Defina o período avaliativo e o campo de experiência da BNCC para carregar a matriz de avaliação.
+          </p>
         </Card>
       ) : (
+        <>
+          {/* Summary Stats Panels */}
+          {students.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-4 duration-200">
+              <Card className="bg-slate-55 border-slate-200/50 p-4 rounded-xl flex items-center gap-4">
+                <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center font-black">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Estudantes</p>
+                  <h4 className="text-md font-black text-slate-800">{students.length} matriculados</h4>
+                </div>
+              </Card>
+
+              <Card className="bg-slate-55 border-slate-200/50 p-4 rounded-xl flex items-center gap-4">
+                <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center font-black">
+                  <CheckCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Preenchimento</p>
+                  <h4 className="text-md font-black text-slate-800">{stats.completionRate}% concluído</h4>
+                </div>
+              </Card>
+
+              <Card className="bg-slate-55 border-slate-200/50 p-4 rounded-xl flex items-center gap-4">
+                <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center font-black">
+                  <Percent className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Consolidação Média</p>
+                  <h4 className="text-md font-black text-slate-800">{stats.consolidationRate}% consolidado</h4>
+                </div>
+              </Card>
+
+              <Card className="bg-slate-55 border-slate-200/50 p-4 rounded-xl flex items-center gap-4">
+                <div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-lg flex items-center justify-center font-black">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Células Pendentes</p>
+                  <h4 className="text-md font-black text-slate-800">{stats.pending} objetivos</h4>
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {/* Main Grid / Assessment Table */}
+          {loading ? (
+            <Card className="p-12 text-center bg-white border-slate-200">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto text-orange-600 mb-2" />
+              <p className="text-xs font-bold text-slate-500 uppercase">Carregando dados da turma...</p>
+            </Card>
+          ) : students.length === 0 ? (
+            <Card className="p-12 text-center bg-white border-slate-200">
+              <HelpCircle className="w-12 h-12 mx-auto text-slate-300 mb-2" />
+              <h3 className="text-base font-bold text-slate-700 uppercase tracking-tight">Nenhum Estudante Matriculado</h3>
+              <p className="text-xs font-medium text-slate-500 max-w-md mx-auto mt-1">Esta turma não possui estudantes ativos cadastrados.</p>
+            </Card>
+          ) : (
         <Card className="p-0 overflow-hidden border-slate-200 shadow-sm bg-white rounded-2xl animate-in fade-in duration-300">
           {/* Legend header */}
           <div className="bg-slate-50 px-6 py-3 border-b border-slate-100 flex flex-wrap justify-between items-center gap-4">
@@ -752,6 +885,15 @@ export const AvaliacaoDocenteInfantil: React.FC<AvaliacaoDocenteInfantilProps> =
             <div className="flex gap-2">
               <Button
                 variant="secondary"
+                onClick={() => setIsPrinting(true)}
+                disabled={students.length === 0}
+                className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 bg-white transition-all flex items-center gap-1.5 shadow-sm"
+              >
+                <Printer className="w-3.5 h-3.5 text-orange-500" />
+                Imprimir Relatório
+              </Button>
+              <Button
+                variant="secondary"
                 onClick={() => {
                   if (window.confirm('Deseja descartar as alterações não salvas?')) {
                     setEvaluations({ ...initialEvaluations });
@@ -774,6 +916,25 @@ export const AvaliacaoDocenteInfantil: React.FC<AvaliacaoDocenteInfantilProps> =
             </div>
           </div>
         </Card>
+      )}
+    </>
+  )}
+
+      {/* Printable Report Portal Component */}
+      {isPrinting && (
+        <PrintableAvaliacaoDocenteInfantilReport
+          escolaNome={escolasInfantil.find(e => e.id === selectedEscolaId)?.nome || 'Unidade Escolar'}
+          grupoFaixaEtaria={selectedGrupo}
+          turmaNome={availableTurmas.find(t => t.id === selectedTurmaId)?.name || availableTurmas.find(t => t.id === selectedTurmaId)?.anoSerie || 'Turma'}
+          turno={availableTurmas.find(t => t.id === selectedTurmaId)?.shift || availableTurmas.find(t => t.id === selectedTurmaId)?.turno}
+          periodoBimestre={selectedBimestre}
+          campoExperiencia={selectedCampo}
+          students={students}
+          objectives={currentObjectives}
+          evaluations={evaluations}
+          stats={stats}
+          onClose={() => setIsPrinting(false)}
+        />
       )}
     </div>
   );
