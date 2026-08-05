@@ -7,6 +7,7 @@ import { checkSchoolPendencies } from '../utils';
 interface PendingAlertsProps {
     escolas: Escola[];
     visitas?: Visita[];
+    coordenadores?: Coordenador[];
     coordenador: Coordenador;
     onNavigateToEscola: (escolaId: string) => void;
 }
@@ -22,6 +23,7 @@ interface Pendency {
 export const PendingAlerts: React.FC<PendingAlertsProps> = ({
     escolas,
     visitas = [],
+    coordenadores = [],
     coordenador,
     onNavigateToEscola
 }) => {
@@ -34,7 +36,7 @@ export const PendingAlerts: React.FC<PendingAlertsProps> = ({
         const list: Pendency[] = [];
 
         mySchools.forEach(escola => {
-            const schoolPendencies = checkSchoolPendencies(escola, visitas);
+            const schoolPendencies = checkSchoolPendencies(escola, visitas, coordenadores);
             schoolPendencies.forEach(p => {
                 list.push({
                     escolaId: escola.id,

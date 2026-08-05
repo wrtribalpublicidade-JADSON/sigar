@@ -119,7 +119,7 @@ const countTotalClasses = (detalhada: any): number => {
   return total;
 };
 
-export const checkSchoolPendencies = (escola: Escola, visitas?: any[]) => {
+export const checkSchoolPendencies = (escola: Escola, visitas?: any[], coordenadores?: any[]) => {
   const pendencies: { type: PendencyType; label: string; severity: 'critical' | 'warning' }[] = [];
 
   if (!escola) return [];
@@ -160,7 +160,9 @@ export const checkSchoolPendencies = (escola: Escola, visitas?: any[]) => {
     }
 
     // 3. Recursos Humanos
-    if (!escola.recursosHumanos || !Array.isArray(escola.recursosHumanos) || escola.recursosHumanos.length === 0) {
+    const hasRH = escola.recursosHumanos && Array.isArray(escola.recursosHumanos) && escola.recursosHumanos.length > 0;
+    const hasCoordsTeachers = coordenadores && coordenadores.some((c: any) => c.funcao === 'Professor' && c.escolasIds && c.escolasIds.some((id: any) => String(id) === String(escola.id)));
+    if (!hasRH && !hasCoordsTeachers) {
       pendencies.push({ type: 'RH', label: 'Quadro de RH não preenchido', severity: 'warning' });
     }
 

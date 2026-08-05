@@ -168,6 +168,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <PendingAlerts
             escolas={escolas}
             visitas={visitas}
+            coordenadores={coordenadores}
             coordenador={currentUser}
             onNavigateToEscola={onNavigateToDetail}
           />
@@ -201,6 +202,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* Regional Coordinator 17 Dimensions Pendencies Overview */}
       <RegionalPendenciesOverview
         escolas={escolas}
+        coordenadores={coordenadores}
         currentUser={currentUser}
         onNavigateToEscola={onNavigateToDetail}
       />

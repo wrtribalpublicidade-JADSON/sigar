@@ -10,6 +10,7 @@ import { supabase } from '../services/supabase';
 
 interface RegionalPendenciesOverviewProps {
   escolas: Escola[];
+  coordenadores?: Coordenador[];
   currentUser?: Coordenador;
   onNavigateToEscola?: (escolaId: string) => void;
 }
@@ -20,11 +21,12 @@ export interface DimensionDef {
   description: string;
   category: 'Docência & Turmas' | 'Pedagógico' | 'Gestão' | 'Atividades & Reuniões';
   icon: React.ElementType;
-  check: (escola: Escola, dbData: Record<string, Set<string>>) => { isPending: boolean; reason: string };
+  check: (escola: Escola, dbData: Record<string, Set<string>>, coordenadores?: Coordenador[]) => { isPending: boolean; reason: string };
 }
 
 export const RegionalPendenciesOverview: React.FC<RegionalPendenciesOverviewProps> = ({
   escolas,
+  coordenadores = [],
   currentUser,
   onNavigateToEscola
 }) => {
@@ -68,6 +70,16 @@ export const RegionalPendenciesOverview: React.FC<RegionalPendenciesOverviewProp
         }
       };
 
+      const safeFetchArray = async (table: string, fields: string) => {
+        try {
+          const { data, error } = await supabase.from(table).select(fields);
+          if (error || !data) return [];
+          return data;
+        } catch {
+          return [];
+        }
+      };
+
       const [
         planosCurso,
         planosCursoInfantil,
@@ -84,7 +96,10 @@ export const RegionalPendenciesOverview: React.FC<RegionalPendenciesOverviewProp
         reuniaoEstudantil,
         avaliacaoDocente,
         acompanhamentoDocente,
-        encaminhamentos
+        encaminhamentos,
+        dbCoords,
+        dbCoordEscolas,
+        dbCoordTurmas
       ] = await Promise.all([
         safeFetchSet('planos_curso'),
         safeFetchSet('planos_curso_infantil'),
@@ -101,10 +116,50 @@ export const RegionalPendenciesOverview: React.FC<RegionalPendenciesOverviewProp
         safeFetchSet('ig_reuniao_estudantil', ['escola_id']),
         safeFetchSet('avaliacao_docente_infantil', ['escola_id']),
         safeFetchSet('acompanhamento_docente', ['escola_id']),
-        safeFetchSet('encaminhamentos', ['escola_id'])
+        safeFetchSet('encaminhamentos', ['escola_id']),
+        safeFetchArray('coordenadores', 'id, funcao, escolas_ids, turmas_ids'),
+        safeFetchArray('coordenador_escolas', 'coordenador_id, escola_id'),
+        safeFetchArray('coordenador_turmas', 'coordenador_id, turma_id')
       ]);
 
       if (!isMounted) return;
+
+      // Process teacher maps
+      const professoresSet = new Set<string>();
+      const professoresComTurmasSet = new Set<string>();
+
+      const coordEscolaMap: Record<string, string[]> = {};
+      dbCoordEscolas.forEach((ce: any) => {
+        if (ce.coordenador_id && ce.escola_id) {
+          const cid = String(ce.coordenador_id);
+          if (!coordEscolaMap[cid]) coordEscolaMap[cid] = [];
+          coordEscolaMap[cid].push(String(ce.escola_id));
+        }
+      });
+
+      const coordTurmaCount: Record<string, number> = {};
+      dbCoordTurmas.forEach((ct: any) => {
+        if (ct.coordenador_id) {
+          const cid = String(ct.coordenador_id);
+          coordTurmaCount[cid] = (coordTurmaCount[cid] || 0) + 1;
+        }
+      });
+
+      dbCoords.forEach((c: any) => {
+        if (c.funcao === 'Professor') {
+          const cid = String(c.id);
+          const schIds = c.escolas_ids || coordEscolaMap[cid] || [];
+          const hasTurmas = (c.turmas_ids && c.turmas_ids.length > 0) || (coordTurmaCount[cid] && coordTurmaCount[cid] > 0);
+
+          schIds.forEach((sid: any) => {
+            const sStr = String(sid);
+            professoresSet.add(sStr);
+            if (hasTurmas) {
+              professoresComTurmasSet.add(sStr);
+            }
+          });
+        }
+      });
 
       // Merge planos_curso
       const guiasSet = new Set([...planosCurso, ...planosCursoInfantil]);
@@ -124,7 +179,9 @@ export const RegionalPendenciesOverview: React.FC<RegionalPendenciesOverviewProp
         reuniaoEstudantil,
         avaliacaoDocente,
         acompanhamentoDocente,
-        encaminhamentos
+        encaminhamentos,
+        professores: professoresSet,
+        professoresComTurmas: professoresComTurmasSet
       });
 
       setIsLoading(false);
@@ -142,12 +199,40 @@ export const RegionalPendenciesOverview: React.FC<RegionalPendenciesOverviewProp
       description: 'Quadro de docentes e alocação nas turmas da unidade',
       category: 'Docência & Turmas',
       icon: Users,
-      check: (escola) => {
-        const hasRH = escola.recursosHumanos && escola.recursosHumanos.length > 0;
-        const hasProfessors = hasRH && escola.recursosHumanos.some(r => r.funcao === 'Professor');
-        if (!hasRH) return { isPending: true, reason: 'Quadro de RH não cadastrado' };
-        if (!hasProfessors) return { isPending: true, reason: 'Nenhum professor alocado no quadro' };
-        return { isPending: false, reason: 'Quadro de professores ativo' };
+      check: (escola, db, coordenadoresList) => {
+        const schoolIdStr = String(escola.id);
+
+        // 1. Check in coordenadores list from props or state
+        const teachersFromProps = (coordenadoresList || []).filter(
+          c => c.funcao === 'Professor' && c.escolasIds && c.escolasIds.some(id => String(id) === schoolIdStr)
+        );
+
+        // 2. Check in DB teacher sets
+        const hasDbTeachers = db.professores && db.professores.has(schoolIdStr);
+        const hasDbTeachersWithTurmas = db.professoresComTurmas && db.professoresComTurmas.has(schoolIdStr);
+
+        // 3. Check in escola.recursosHumanos
+        const teachersFromRH = (escola.recursosHumanos || []).filter(
+          r => r.funcao === 'Professor' || r.funcao?.toLowerCase().includes('profess')
+        );
+
+        const totalProfessors = teachersFromProps.length + teachersFromRH.length + (hasDbTeachers ? 1 : 0);
+
+        if (totalProfessors === 0) {
+          return { isPending: true, reason: 'Nenhum professor alocado no quadro' };
+        }
+
+        const teachersWithTurmasFromProps = teachersFromProps.filter(
+          t => (t.turmasIds && t.turmasIds.length > 0) || (t.turmaComponentes && Object.keys(t.turmaComponentes).length > 0)
+        );
+
+        const hasTurmasVinculadas = teachersWithTurmasFromProps.length > 0 || hasDbTeachersWithTurmas || teachersFromRH.length > 0;
+
+        if (!hasTurmasVinculadas) {
+          return { isPending: true, reason: 'Professores cadastrados sem vínculo de turmas' };
+        }
+
+        return { isPending: false, reason: 'Quadro de professores e vínculos ativo' };
       }
     },
     {
@@ -360,7 +445,7 @@ export const RegionalPendenciesOverview: React.FC<RegionalPendenciesOverviewProp
       const okEscolas: Escola[] = [];
 
       regionalEscolas.forEach(escola => {
-        const result = dim.check(escola, dbData);
+        const result = dim.check(escola, dbData, coordenadores);
         if (result.isPending) {
           pendingEscolas.push({ escola, reason: result.reason });
         } else {
@@ -383,7 +468,7 @@ export const RegionalPendenciesOverview: React.FC<RegionalPendenciesOverviewProp
         okEscolas
       };
     });
-  }, [dimensions, regionalEscolas, dbData]);
+  }, [dimensions, regionalEscolas, dbData, coordenadores]);
 
   // Filtro por termo e categoria
   const filteredStats = useMemo(() => {
@@ -402,11 +487,11 @@ export const RegionalPendenciesOverview: React.FC<RegionalPendenciesOverviewProp
     const totalEscolas = regionalEscolas.length;
     const totalPendingCount = dimensionStats.reduce((acc, curr) => acc + curr.pendingCount, 0);
     const fullyCompliantEscolas = regionalEscolas.filter(escola => {
-      return dimensions.every(dim => !dim.check(escola, dbData).isPending);
+      return dimensions.every(dim => !dim.check(escola, dbData, coordenadores).isPending);
     }).length;
 
     return { totalDimensions, totalEscolas, totalPendingCount, fullyCompliantEscolas };
-  }, [dimensionStats, regionalEscolas, dimensions, dbData]);
+  }, [dimensionStats, regionalEscolas, dimensions, dbData, coordenadores]);
 
   const categories = ['TODAS', 'Docência & Turmas', 'Pedagógico', 'Gestão', 'Atividades & Reuniões'];
 
