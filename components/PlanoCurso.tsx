@@ -1053,8 +1053,10 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
       const matchesSearch = modalSearchTerm === '' || 
                             hab.codigo.toLowerCase().includes(modalSearchTerm.toLowerCase()) || 
                             hab.descricao.toLowerCase().includes(modalSearchTerm.toLowerCase());
-      const matchesComponent = modalComponenteFilter === 'ALL' || hab.componente === modalComponenteFilter;
-      const matchesGrade = modalAnoSerieFilter === 'ALL' || hab.anoSerie === modalAnoSerieFilter;
+      const matchesComponent = modalComponenteFilter === 'ALL' || 
+                               (hab.componente && hab.componente.toLowerCase().trim() === modalComponenteFilter.toLowerCase().trim());
+      const matchesGrade = modalAnoSerieFilter === 'ALL' || 
+                           (hab.anoSerie && hab.anoSerie.toLowerCase().trim() === modalAnoSerieFilter.toLowerCase().trim());
       return matchesSearch && matchesComponent && matchesGrade;
     });
   }, [habRepository, modalSearchTerm, modalComponenteFilter, modalAnoSerieFilter]);

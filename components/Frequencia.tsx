@@ -4,7 +4,8 @@ import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { 
   ClipboardCheck, Calendar, School as SchoolIcon, Search, Save, CheckCircle, 
-  XCircle, Percent, Users, Loader2, ListFilter, Trash2, AlertTriangle, RotateCcw
+  XCircle, Percent, Users, Loader2, ListFilter, Trash2, AlertTriangle, RotateCcw,
+  Printer, Edit
 } from 'lucide-react';
 import { Escola, Coordenador } from '../types';
 import { supabase } from '../services/supabase';
@@ -12,6 +13,7 @@ import { useNotification } from '../context/NotificationContext';
 import { useConfiguracao } from '../context/ConfiguracaoContext';
 import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
 import { isEducaInfantilYear, isCampoExperienciaInfantil, normalizeSubjectName } from '../utils';
+import { PrintableFrequencia } from './PrintableFrequencia';
 
 interface FrequenciaProps {
   escolas: Escola[];
@@ -65,6 +67,7 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
   const [turmas, setTurmas] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [attendanceMap, setAttendanceMap] = useState<Record<string | number, boolean>>({});
+  const [selectedSheetForPrint, setSelectedSheetForPrint] = useState<AttendanceSheet | null>(null);
 
   // Filter & Context State
   const [dataFreq, setDataFreq] = useState(new Date().toISOString().split('T')[0]);
@@ -543,6 +546,30 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
       setSheets(updatedSheets);
       localStorage.setItem('sigar_frequencia_sheets', JSON.stringify(updatedSheets));
     }
+  };
+
+  const handlePrintSheet = (sheet: AttendanceSheet) => {
+    setSelectedSheetForPrint(sheet);
+    setTimeout(() => {
+      window.print();
+    }, 150);
+  };
+
+  const handleEditSheet = (sheet: AttendanceSheet) => {
+    if (sheet.data) setDataFreq(sheet.data);
+    if (sheet.escolaId) setSelectedEscolaId(sheet.escolaId);
+    if (sheet.anoSerie) setSelectedAnoSerie(sheet.anoSerie);
+    if (sheet.turmaId) setSelectedTurmaId(sheet.turmaId);
+    if (sheet.componente) setComponente(sheet.componente);
+
+    const newMap: Record<string | number, boolean> = {};
+    (sheet.students || []).forEach(st => {
+      newMap[st.id] = st.present;
+    });
+    setAttendanceMap(newMap);
+
+    showNotification('success', `Chamada da turma ${sheet.turmaNome} (${sheet.data}) carregada no formulário para edição.`);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDeleteSheet = async (id: string) => {
@@ -1206,6 +1233,20 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
                       <td className="px-6 py-3 text-right">
                         <div className="flex items-center justify-end gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
                           <button 
+                            onClick={() => handlePrintSheet(sheet)} 
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" 
+                            title="Imprimir Relatório de Frequência"
+                          >
+                            <Printer size={15} />
+                          </button>
+                          <button 
+                            onClick={() => handleEditSheet(sheet)} 
+                            className="p-1.5 text-slate-400 hover:text-brand-orange hover:bg-orange-50 rounded-lg transition-all" 
+                            title="Editar Chamada"
+                          >
+                            <Edit size={15} />
+                          </button>
+                          <button 
                             onClick={() => handleDeleteSheet(sheet.id)} 
                             className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" 
                             title="Excluir Registro"
@@ -1222,6 +1263,9 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
           </div>
         </Card>
       </div>
+
+      {/* Printable Report Portal Component */}
+      <PrintableFrequencia sheet={selectedSheetForPrint} />
     </div>
   );
 };
