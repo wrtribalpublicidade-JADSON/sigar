@@ -6,13 +6,13 @@ import { Button } from './ui/Button';
 import { 
   BookOpen, Plus, Search, Edit2, Trash2, Printer, 
   X, Calendar, School as SchoolIcon, Bookmark, Save,
-  Layers, Check, Maximize2, Minimize2
+  Layers, Check, Maximize2, Minimize2, ListFilter, RotateCcw
 } from 'lucide-react';
 import { Escola, Coordenador } from '../types';
 import { supabase } from '../services/supabase';
 import { useNotification } from '../context/NotificationContext';
 import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
-import { isEducaInfantilYear } from '../utils';
+import { isEducaInfantilYear, isCampoExperienciaInfantil, normalizeSubjectName } from '../utils';
 
 interface PlanoAulaProps {
   escolas: Escola[];
@@ -40,6 +40,7 @@ interface LessonPlan {
   criadoEm: string;
   anoSerie: string;
   periodo: string;
+  professor?: string;
 }
 
 const COMPONENTES = [
@@ -336,13 +337,66 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
     }
   }, [editingId, activeCoursePlan]);
 
-  // Filters
+  // History Filter States & Teacher Map
+  const [coordenadoresList, setCoordenadoresList] = useState<any[]>([]);
+  const [historyFilterEscola, setHistoryFilterEscola] = useState('');
+  const [historyFilterAnoSerie, setHistoryFilterAnoSerie] = useState('');
+  const [historyFilterTurma, setHistoryFilterTurma] = useState('');
+  const [historyFilterComponente, setHistoryFilterComponente] = useState('');
+  const [historyFilterBimestre, setHistoryFilterBimestre] = useState('');
+  const [historyFilterProfessor, setHistoryFilterProfessor] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [schoolFilter, setSchoolFilter] = useState('ALL');
-  const [classFilter, setClassFilter] = useState('ALL');
 
   // Print Mode State
   const [printPlan, setPrintPlan] = useState<LessonPlan | null>(null);
+
+  // Fetch teacher names from coordenadores
+  useEffect(() => {
+    const fetchCoordenadores = async () => {
+      if (isDemoMode) return;
+      try {
+        const { data, error } = await supabase
+          .from('coordenadores')
+          .select('contato, nome');
+
+        if (!error && data) {
+          setCoordenadoresList(data);
+        }
+      } catch (err) {
+        console.error('Erro ao carregar coordenadores:', err);
+      }
+    };
+    fetchCoordenadores();
+  }, [isDemoMode]);
+
+  const coordMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (coordenadoresList && coordenadoresList.length > 0) {
+      coordenadoresList.forEach((c: any) => {
+        if (c.contato && c.nome) {
+          map.set(c.contato.toLowerCase().trim(), c.nome.trim());
+        }
+      });
+    }
+    if (currentUser) {
+      if (currentUser.contato && currentUser.nome) {
+        map.set(currentUser.contato.toLowerCase().trim(), currentUser.nome.trim());
+      }
+      if ((currentUser as any).email && currentUser.nome) {
+        map.set(((currentUser as any).email as string).toLowerCase().trim(), currentUser.nome.trim());
+      }
+    }
+    return map;
+  }, [coordenadoresList, currentUser]);
+
+  const getTeacherName = (emailOrName: string | undefined): string => {
+    if (!emailOrName) return '---';
+    const lower = emailOrName.toLowerCase().trim();
+    if (coordMap.has(lower)) {
+      return coordMap.get(lower)!;
+    }
+    return emailOrName;
+  };
 
   const fetchRealPlans = async () => {
     try {
@@ -402,7 +456,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
           escolaNome,
           turmaId: p.turma_id,
           turmaNome,
-          componente: p.componente,
+          componente: normalizeSubjectName(p.componente),
           titulo: p.titulo,
           objetivos: p.objetivos || '',
           habilidades: p.habilidades || '',
@@ -411,7 +465,8 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
           avaliacao: p.avaliacao || '',
           anoSerie: p.ano_serie,
           periodo: p.periodo,
-          criadoEm: p.created_at
+          criadoEm: p.created_at,
+          professor: getTeacherName(p.updated_by || p.created_by || p.professor)
         };
       });
 
@@ -705,13 +760,132 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
     setSelectedHabilidadeIds([]);
   };
 
-  const filteredPlans = plans.filter(p => {
-    const matchesSearch = p.titulo.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          p.componente.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesSchool = schoolFilter === 'ALL' || p.escolaId === schoolFilter;
-    const matchesClass = classFilter === 'ALL' || p.turmaId === classFilter;
-    return matchesSearch && matchesSchool && matchesClass;
-  });
+  // History Options & Filtered plans memoization
+  const historyOptions = useMemo(() => {
+    const escolasMap = new Map<string, string>();
+    const anosSet = new Set<string>();
+    const turmasSet = new Set<string>();
+    const componentesSet = new Set<string>();
+    const bimestresSet = new Set<string>();
+    const professoresSet = new Set<string>();
+
+    plans.forEach(plan => {
+      // Exclude ECE entries and campos de experiência from Fundamental view
+      if (plan.anoSerie && isEducaInfantilYear(plan.anoSerie)) return;
+      if (plan.componente && isCampoExperienciaInfantil(plan.componente)) return;
+
+      const normComp = normalizeSubjectName(plan.componente);
+      const profName = getTeacherName(plan.professor);
+
+      const matchEscola = !historyFilterEscola || plan.escolaId === historyFilterEscola;
+      const matchAno = !historyFilterAnoSerie || plan.anoSerie === historyFilterAnoSerie;
+      const matchTurma = !historyFilterTurma || plan.turmaNome === historyFilterTurma;
+      const matchComp = !historyFilterComponente || normComp === historyFilterComponente;
+      const matchBimestre = !historyFilterBimestre || plan.periodo === historyFilterBimestre;
+      const matchProf = !historyFilterProfessor || profName === historyFilterProfessor || plan.professor === historyFilterProfessor;
+
+      // Escolas
+      if (plan.escolaId && plan.escolaNome) {
+        if (matchAno && matchTurma && matchComp && matchBimestre && matchProf) {
+          escolasMap.set(plan.escolaId, plan.escolaNome);
+        }
+      }
+
+      // Anos/Séries
+      if (plan.anoSerie) {
+        if (matchEscola && matchTurma && matchComp && matchBimestre && matchProf) {
+          anosSet.add(plan.anoSerie);
+        }
+      }
+
+      // Turmas
+      if (plan.turmaNome) {
+        if (matchEscola && matchAno && matchComp && matchBimestre && matchProf) {
+          turmasSet.add(plan.turmaNome);
+        }
+      }
+
+      // Componentes
+      if (normComp) {
+        if (matchEscola && matchAno && matchTurma && matchBimestre && matchProf) {
+          componentesSet.add(normComp);
+        }
+      }
+
+      // Bimestres
+      if (plan.periodo) {
+        if (matchEscola && matchAno && matchTurma && matchComp && matchProf) {
+          bimestresSet.add(plan.periodo);
+        }
+      }
+
+      // Professores
+      if (profName) {
+        if (matchEscola && matchAno && matchTurma && matchComp && matchBimestre) {
+          professoresSet.add(profName);
+        }
+      }
+    });
+
+    const escolasList = Array.from(escolasMap.entries()).map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome));
+    const anosList = Array.from(anosSet).sort();
+    const turmasList = Array.from(turmasSet).sort((a, b) => a.localeCompare(b));
+    const componentesList = Array.from(componentesSet).sort((a, b) => a.localeCompare(b));
+    const bimestresList = Array.from(bimestresSet).sort();
+    const professoresList = Array.from(professoresSet).sort((a, b) => a.localeCompare(b));
+
+    return {
+      escolas: escolasList,
+      anosSeries: anosList,
+      turmas: turmasList,
+      componentes: componentesList,
+      bimestres: bimestresList,
+      professores: professoresList
+    };
+  }, [plans, historyFilterEscola, historyFilterAnoSerie, historyFilterTurma, historyFilterComponente, historyFilterBimestre, historyFilterProfessor, coordMap]);
+
+  const hasActiveHistoryFilters = Boolean(
+    historyFilterEscola || historyFilterAnoSerie || historyFilterTurma || historyFilterComponente || historyFilterBimestre || historyFilterProfessor
+  );
+
+  const handleClearHistoryFilters = () => {
+    setHistoryFilterEscola('');
+    setHistoryFilterAnoSerie('');
+    setHistoryFilterTurma('');
+    setHistoryFilterComponente('');
+    setHistoryFilterBimestre('');
+    setHistoryFilterProfessor('');
+  };
+
+  const filteredPlans = useMemo(() => {
+    return plans.filter(plan => {
+      // Exclude ECE entries and campos de experiência from Fundamental view
+      if (plan.anoSerie && isEducaInfantilYear(plan.anoSerie)) return false;
+      if (plan.componente && isCampoExperienciaInfantil(plan.componente)) return false;
+
+      const normComp = normalizeSubjectName(plan.componente);
+      const profName = getTeacherName(plan.professor);
+
+      if (historyFilterEscola && plan.escolaId !== historyFilterEscola) return false;
+      if (historyFilterAnoSerie && plan.anoSerie !== historyFilterAnoSerie) return false;
+      if (historyFilterTurma && plan.turmaNome !== historyFilterTurma) return false;
+      if (historyFilterComponente && normComp !== historyFilterComponente) return false;
+      if (historyFilterBimestre && plan.periodo !== historyFilterBimestre) return false;
+      if (historyFilterProfessor && profName !== historyFilterProfessor && plan.professor !== historyFilterProfessor) return false;
+
+      if (searchTerm.trim()) {
+        const term = searchTerm.toLowerCase().trim();
+        const matchesTitulo = (plan.titulo || '').toLowerCase().includes(term);
+        const matchesObjetivos = (plan.objetivos || '').toLowerCase().includes(term);
+        const matchesEscola = (plan.escolaNome || '').toLowerCase().includes(term);
+        const matchesTurma = (plan.turmaNome || '').toLowerCase().includes(term);
+        const matchesComp = normComp.toLowerCase().includes(term);
+        if (!matchesTitulo && !matchesObjetivos && !matchesEscola && !matchesTurma && !matchesComp) return false;
+      }
+
+      return true;
+    });
+  }, [plans, historyFilterEscola, historyFilterAnoSerie, historyFilterTurma, historyFilterComponente, historyFilterBimestre, historyFilterProfessor, searchTerm, coordMap]);
 
   const printCoursePlan = useMemo(() => {
     if (!printPlan) return null;
@@ -1403,32 +1577,131 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h3 className="text-md font-black text-slate-800 uppercase tracking-wider">Histórico de Guias de Aprendizagem</h3>
-            <p className="text-xs text-slate-500 mt-0.5">Consulte, edite ou exporte as guias já elaboradas</p>
+            <p className="text-xs text-slate-500 mt-0.5 font-medium">Consulte, edite ou exporte as guias já elaboradas</p>
           </div>
 
-          <div className="flex flex-wrap gap-2 w-full md:w-auto">
-            <div className="relative flex-1 md:flex-none">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <input 
-                type="text" 
-                placeholder="Buscar por tema..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-white outline-none focus:border-brand-orange transition-all text-xs font-semibold"
-              />
-            </div>
-
-            <SearchableSchoolSelect
-              escolas={escolas}
-              selectedId={schoolFilter}
-              onChange={setSchoolFilter}
-              showAllOption={true}
-              allOptionLabel="Todas Unidades"
-              className="max-w-[240px]"
-              inputClassName="pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
+          <div className="relative w-full md:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+            <input 
+              type="text" 
+              placeholder="Buscar por tema..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-white outline-none focus:border-brand-orange transition-all text-xs font-semibold"
             />
           </div>
         </div>
+
+        {/* History Filters Card */}
+        <Card className="bg-white border-slate-200 shadow-sm p-4 rounded-2xl">
+          <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+            <div className="flex items-center gap-2">
+              <ListFilter className="text-brand-orange w-4 h-4" />
+              <span className="text-xs font-black text-slate-700 uppercase tracking-wider">Filtros do Histórico</span>
+            </div>
+            {hasActiveHistoryFilters && (
+              <button
+                onClick={handleClearHistoryFilters}
+                className="flex items-center gap-1 text-[11px] font-bold text-slate-500 hover:text-brand-orange transition-colors"
+              >
+                <RotateCcw size={12} />
+                <span>Limpar Filtros</span>
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {/* Escola */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Escola</label>
+              <select
+                value={historyFilterEscola}
+                onChange={e => setHistoryFilterEscola(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todas as Escolas</option>
+                {historyOptions.escolas.map(e => (
+                  <option key={e.id} value={e.id}>{e.nome}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Ano/Série */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Ano/Série</label>
+              <select
+                value={historyFilterAnoSerie}
+                onChange={e => setHistoryFilterAnoSerie(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todos os Anos/Séries</option>
+                {historyOptions.anosSeries.map(a => (
+                  <option key={a} value={a}>{a}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Turma */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Turma</label>
+              <select
+                value={historyFilterTurma}
+                onChange={e => setHistoryFilterTurma(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todas as Turmas</option>
+                {historyOptions.turmas.map(t => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Componente */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Componente</label>
+              <select
+                value={historyFilterComponente}
+                onChange={e => setHistoryFilterComponente(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todos os Componentes</option>
+                {historyOptions.componentes.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Bimestre */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Bimestre</label>
+              <select
+                value={historyFilterBimestre}
+                onChange={e => setHistoryFilterBimestre(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todos os Bimestres</option>
+                {historyOptions.bimestres.map(b => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Professor */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Professor</label>
+              <select
+                value={historyFilterProfessor}
+                onChange={e => setHistoryFilterProfessor(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todos os Professores</option>
+                {historyOptions.professores.map(p => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </Card>
 
         <Card className="p-0 overflow-hidden border-slate-200 shadow-sm bg-white rounded-2xl">
           <div className="overflow-x-auto">
@@ -1463,7 +1736,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
                       <td className="px-6 py-3">
                         <div className="font-bold text-slate-700">{plan.turmaNome}</div>
                         <div className="text-[10px] text-brand-orange font-bold uppercase mt-0.5">
-                          {plan.componente}
+                          {normalizeSubjectName(plan.componente)}
                         </div>
                       </td>
                       <td className="px-6 py-3">

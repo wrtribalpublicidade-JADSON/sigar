@@ -68,6 +68,7 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
   const [students, setStudents] = useState<any[]>([]);
   const [attendanceMap, setAttendanceMap] = useState<Record<string | number, boolean>>({});
   const [selectedSheetForPrint, setSelectedSheetForPrint] = useState<AttendanceSheet | null>(null);
+  const [editingSheet, setEditingSheet] = useState<AttendanceSheet | null>(null);
 
   // Filter & Context State
   const [dataFreq, setDataFreq] = useState(new Date().toISOString().split('T')[0]);
@@ -349,25 +350,25 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
   // Sync selectedAnoSerie when availableAnosSeries changes
   useEffect(() => {
     if (availableAnosSeries.length > 0) {
-      if (!availableAnosSeries.includes(selectedAnoSerie)) {
+      if (!availableAnosSeries.includes(selectedAnoSerie) && !editingSheet) {
         setSelectedAnoSerie(availableAnosSeries[0]);
       }
-    } else {
+    } else if (!editingSheet) {
       setSelectedAnoSerie('');
     }
-  }, [availableAnosSeries, selectedAnoSerie]);
+  }, [availableAnosSeries, selectedAnoSerie, editingSheet]);
 
   // Sync selectedTurmaId when availableTurmas changes
   useEffect(() => {
     if (availableTurmas.length > 0) {
       const exists = availableTurmas.some(t => t.id === selectedTurmaId);
-      if (!exists) {
+      if (!exists && !editingSheet) {
         setSelectedTurmaId(availableTurmas[0].id);
       }
-    } else {
+    } else if (!editingSheet) {
       setSelectedTurmaId('');
     }
-  }, [availableTurmas, selectedTurmaId]);
+  }, [availableTurmas, selectedTurmaId, editingSheet]);
 
   // Load students when selected class changes
   useEffect(() => {
@@ -394,9 +395,23 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
           { id: 110, name: 'João Pedro Oliveira' }
         ];
         setStudents(demoStudents);
-        // Pre-fill presence map with true
+        
         const initialMap: Record<string | number, boolean> = {};
-        demoStudents.forEach(s => { initialMap[s.id] = true; });
+        const sheetStudentsMap = new Map<string, boolean>();
+        if (editingSheet && editingSheet.turmaId === selectedTurmaId) {
+          (editingSheet.students || []).forEach(st => {
+            sheetStudentsMap.set(String(st.id), st.present);
+          });
+        }
+
+        demoStudents.forEach(s => {
+          const sIdStr = String(s.id);
+          if (editingSheet && editingSheet.turmaId === selectedTurmaId && sheetStudentsMap.has(sIdStr)) {
+            initialMap[s.id] = sheetStudentsMap.get(sIdStr)!;
+          } else {
+            initialMap[s.id] = true;
+          }
+        });
         setAttendanceMap(initialMap);
         setIsLoadingStudents(false);
         return;
@@ -410,11 +425,24 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
           .order('name');
 
         if (error) throw error;
-        setStudents(data || []);
+        const loadedStudents = data || [];
+        setStudents(loadedStudents);
         
         const initialMap: Record<string | number, boolean> = {};
-        (data || []).forEach((s: any) => {
-          initialMap[s.id] = true; // Default to present
+        const sheetStudentsMap = new Map<string, boolean>();
+        if (editingSheet && editingSheet.turmaId === selectedTurmaId) {
+          (editingSheet.students || []).forEach(st => {
+            sheetStudentsMap.set(String(st.id), st.present);
+          });
+        }
+
+        loadedStudents.forEach((s: any) => {
+          const sIdStr = String(s.id);
+          if (editingSheet && editingSheet.turmaId === selectedTurmaId && sheetStudentsMap.has(sIdStr)) {
+            initialMap[s.id] = sheetStudentsMap.get(sIdStr)!;
+          } else {
+            initialMap[s.id] = true; // Default to present
+          }
         });
         setAttendanceMap(initialMap);
       } catch (err) {
@@ -426,7 +454,7 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
     };
 
     fetchStudents();
-  }, [selectedTurmaId, isDemoMode]);
+  }, [selectedTurmaId, isDemoMode, editingSheet]);
 
   const handleToggleAttendance = (studentId: string | number) => {
     if (isBlocked) return;
@@ -546,6 +574,8 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
       setSheets(updatedSheets);
       localStorage.setItem('sigar_frequencia_sheets', JSON.stringify(updatedSheets));
     }
+
+    setEditingSheet(null);
   };
 
   const handlePrintSheet = (sheet: AttendanceSheet) => {
@@ -556,17 +586,12 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
   };
 
   const handleEditSheet = (sheet: AttendanceSheet) => {
+    setEditingSheet(sheet);
     if (sheet.data) setDataFreq(sheet.data);
     if (sheet.escolaId) setSelectedEscolaId(sheet.escolaId);
     if (sheet.anoSerie) setSelectedAnoSerie(sheet.anoSerie);
     if (sheet.turmaId) setSelectedTurmaId(sheet.turmaId);
     if (sheet.componente) setComponente(sheet.componente);
-
-    const newMap: Record<string | number, boolean> = {};
-    (sheet.students || []).forEach(st => {
-      newMap[st.id] = st.present;
-    });
-    setAttendanceMap(newMap);
 
     showNotification('success', `Chamada da turma ${sheet.turmaNome} (${sheet.data}) carregada no formulário para edição.`);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -791,7 +816,24 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
 
       {subHeader}
 
-      {/* Filters & Configuration */}
+      {/* Configuration & Selection Bar */}
+      {editingSheet && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs font-bold text-amber-900 shadow-sm">
+          <div className="flex items-center gap-2">
+            <Edit className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>
+              Modo de Edição Ativo: Editando chamada da turma <strong>{editingSheet.turmaNome}</strong> referente a <strong>{new Date(editingSheet.data + 'T12:00:00').toLocaleDateString()}</strong>.
+            </span>
+          </div>
+          <Button 
+            onClick={() => setEditingSheet(null)}
+            className="bg-white hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs px-3 py-1.5 rounded-xl font-bold transition-all shrink-0"
+          >
+            Cancelar Edição
+          </Button>
+        </div>
+      )}
+
       <Card className="bg-white border-slate-200 shadow-sm p-6 rounded-2xl">
         <div className="flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
           <ListFilter className="text-brand-orange w-5 h-5" />

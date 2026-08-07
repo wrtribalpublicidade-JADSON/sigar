@@ -4,12 +4,13 @@ import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { 
   ClipboardCheck, Calendar, School as SchoolIcon, Search, Save, CheckCircle, 
-  XCircle, Percent, Users, Loader2, ListFilter, Trash2
+  XCircle, Percent, Users, Loader2, ListFilter, Trash2, RotateCcw, Printer, Edit
 } from 'lucide-react';
 import { Escola, Coordenador, Segmento } from '../types';
 import { supabase } from '../services/supabase';
 import { useNotification } from '../context/NotificationContext';
 import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
+import { PrintableFrequencia } from './PrintableFrequencia';
 
 interface FrequenciaInfantilProps {
   escolas: Escola[];
@@ -40,6 +41,7 @@ interface AttendanceSheetInfantil {
   rate: number; // Percentage
   students: StudentAttendance[];
   criadoEm: string;
+  professor?: string;
 }
 
 const PERIODOS = ['1º Bimestre', '2º Bimestre', '3º Bimestre', '4º Bimestre'];
@@ -69,6 +71,19 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
   const [studentSearch, setStudentSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Edit & Print States
+  const [editingSheet, setEditingSheet] = useState<AttendanceSheetInfantil | null>(null);
+  const [selectedSheetForPrint, setSelectedSheetForPrint] = useState<AttendanceSheetInfantil | null>(null);
+
+  // History Filters & Teacher Map States
+  const [coordenadoresList, setCoordenadoresList] = useState<any[]>([]);
+  const [historyFilterEscola, setHistoryFilterEscola] = useState('');
+  const [historyFilterAnoSerie, setHistoryFilterAnoSerie] = useState('');
+  const [historyFilterTurma, setHistoryFilterTurma] = useState('');
+  const [historyFilterPeriodo, setHistoryFilterPeriodo] = useState('');
+  const [historyFilterProfessor, setHistoryFilterProfessor] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Filter schools to only those offering Educação Infantil
   const escolasInfantil = useMemo(() => {
@@ -206,14 +221,14 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
 
     if (turmasMatchSchool) {
       if (availableAnosSeries.length > 0) {
-        if (!availableAnosSeries.includes(anoSerie)) {
+        if (!availableAnosSeries.includes(anoSerie) && !editingSheet) {
           setAnoSerie(availableAnosSeries[0]);
         }
-      } else {
+      } else if (!editingSheet) {
         setAnoSerie('');
       }
     }
-  }, [availableAnosSeries, anoSerie, selectedEscolaId, turmas, isDemoMode]);
+  }, [availableAnosSeries, anoSerie, selectedEscolaId, turmas, isDemoMode, editingSheet]);
 
   // Sync selectedTurmaId selection when availableTurmas changes
   useEffect(() => {
@@ -224,14 +239,62 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
     if (turmasMatchSchool) {
       if (availableTurmas.length > 0) {
         const exists = availableTurmas.some(t => t.id === selectedTurmaId);
-        if (!exists) {
+        if (!exists && !editingSheet) {
           setSelectedTurmaId(availableTurmas[0].id);
         }
-      } else {
+      } else if (!editingSheet) {
         setSelectedTurmaId('');
       }
     }
-  }, [availableTurmas, selectedTurmaId, selectedEscolaId, turmas, isDemoMode]);
+  }, [availableTurmas, selectedTurmaId, selectedEscolaId, turmas, isDemoMode, editingSheet]);
+
+  // Fetch teacher names from coordenadores
+  useEffect(() => {
+    const fetchCoordenadores = async () => {
+      if (isDemoMode) return;
+      try {
+        const { data, error } = await supabase
+          .from('coordenadores')
+          .select('contato, nome');
+
+        if (!error && data) {
+          setCoordenadoresList(data);
+        }
+      } catch (err) {
+        console.error('Erro ao carregar coordenadores ECE:', err);
+      }
+    };
+    fetchCoordenadores();
+  }, [isDemoMode]);
+
+  const coordMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (coordenadoresList && coordenadoresList.length > 0) {
+      coordenadoresList.forEach((c: any) => {
+        if (c.contato && c.nome) {
+          map.set(c.contato.toLowerCase().trim(), c.nome.trim());
+        }
+      });
+    }
+    if (currentUser) {
+      if (currentUser.contato && currentUser.nome) {
+        map.set(currentUser.contato.toLowerCase().trim(), currentUser.nome.trim());
+      }
+      if ((currentUser as any).email && currentUser.nome) {
+        map.set(((currentUser as any).email as string).toLowerCase().trim(), currentUser.nome.trim());
+      }
+    }
+    return map;
+  }, [coordenadoresList, currentUser]);
+
+  const getTeacherName = (emailOrName: string | undefined): string => {
+    if (!emailOrName) return '---';
+    const lower = emailOrName.toLowerCase().trim();
+    if (coordMap.has(lower)) {
+      return coordMap.get(lower)!;
+    }
+    return emailOrName;
+  };
 
   // Load attendance sheets on mount or school change
   useEffect(() => {
@@ -258,14 +321,15 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
             escolaId: d.escola_id,
             escolaNome: escolas.find(e => e.id === d.escola_id)?.nome || 'Unidade',
             turmaId: d.turma_id,
-            turmaNome: d.ano_serie, // Placeholder or fetch
+            turmaNome: d.ano_serie,
             anoSerie: d.ano_serie,
             periodo: d.periodo,
             presentesCount: d.presentes_count || 0,
             totalCount: d.total_count || 0,
             rate: d.rate,
             students: d.students || [],
-            criadoEm: d.created_at
+            criadoEm: d.created_at,
+            professor: getTeacherName(d.updated_by || d.created_by || d.professor)
           }));
           setSheets(formatted);
         } else {
@@ -280,7 +344,7 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
     };
 
     loadSheets();
-  }, [isDemoMode, escolas]);
+  }, [isDemoMode, escolas, coordMap]);
 
   // Fetch students for active ECE class
   useEffect(() => {
@@ -303,29 +367,33 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
         if (error) throw error;
         setStudents(data || []);
 
-        // Try to check if sheet already exists for this date and ECE class
-        const existing = sheets.find(s => 
-          s.data === dataFreq && 
-          s.turmaId === selectedTurmaId
-        );
-
-        if (existing) {
-          // Load existing attendance map
-          const map: Record<string | number, boolean> = {};
-          existing.students.forEach(s => {
-            map[s.id] = s.present;
+        // Check if we are currently editing a sheet for this turma
+        const initialMap: Record<string | number, boolean> = {};
+        const sheetStudentsMap = new Map<string, boolean>();
+        
+        if (editingSheet && editingSheet.turmaId === selectedTurmaId) {
+          (editingSheet.students || []).forEach(st => {
+            sheetStudentsMap.set(String(st.id), st.present);
           });
-          setAttendanceMap(map);
-          setPeriodo(existing.periodo);
-          showNotification('success', 'Presenças salvas carregadas para a data selecionada.');
         } else {
-          // Default all present
-          const map: Record<string | number, boolean> = {};
-          (data || []).forEach(s => {
-            map[s.id] = true;
-          });
-          setAttendanceMap(map);
+          const existing = sheets.find(s => s.data === dataFreq && s.turmaId === selectedTurmaId);
+          if (existing) {
+            (existing.students || []).forEach(st => {
+              sheetStudentsMap.set(String(st.id), st.present);
+            });
+            setPeriodo(existing.periodo);
+          }
         }
+
+        (data || []).forEach((s: any) => {
+          const sIdStr = String(s.id);
+          if (sheetStudentsMap.has(sIdStr)) {
+            initialMap[s.id] = sheetStudentsMap.get(sIdStr)!;
+          } else {
+            initialMap[s.id] = true;
+          }
+        });
+        setAttendanceMap(initialMap);
 
       } catch (err) {
         console.error('Erro ao carregar alunos:', err);
@@ -335,7 +403,7 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
     };
 
     fetchStudents();
-  }, [selectedTurmaId, dataFreq, sheets]);
+  }, [selectedTurmaId, dataFreq, sheets, editingSheet]);
 
   // Toggle single presence
   const toggleAttendance = (id: string | number) => {
@@ -413,11 +481,15 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
       s.data === dataFreq && 
       s.turmaId === selectedTurmaId
     );
+         if (existingIndex > -1) {
+      payload.id = sheets[existingIndex].id;
+    }
 
+    setSaving(true);
     try {
       if (!isDemoMode) {
         const dbPayload = {
-          id: existingIndex > -1 ? sheets[existingIndex].id : payload.id,
+          id: payload.id,
           data: payload.data,
           escola_id: payload.escolaId,
           turma_id: payload.turmaId,
@@ -441,33 +513,53 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
       let updatedSheets: AttendanceSheetInfantil[];
       if (existingIndex > -1) {
         updatedSheets = [...sheets];
-        updatedSheets[existingIndex] = { ...payload, id: sheets[existingIndex].id };
-        showNotification('success', 'Chamada ECE atualizada com sucesso!');
+        updatedSheets[existingIndex] = payload;
+        showNotification('success', 'Chamada da Educação Infantil atualizada com sucesso!');
       } else {
         updatedSheets = [payload, ...sheets];
-        showNotification('success', 'Chamada ECE registrada com sucesso!');
+        showNotification('success', 'Chamada da Educação Infantil registrada com sucesso!');
       }
 
       setSheets(updatedSheets);
       if (isDemoMode) {
         localStorage.setItem('sigar_frequencia_sheets_infantil', JSON.stringify(updatedSheets));
       }
+      setEditingSheet(null);
     } catch (err) {
       console.error('Erro ao salvar chamada ECE:', err);
-      showNotification('error', 'Erro ao salvar a chamada.');
+      showNotification('error', 'Erro ao salvar a chamada de Educação Infantil.');
     } finally {
       setSaving(false);
     }
   };
 
+  const handlePrintSheet = (sheet: AttendanceSheetInfantil) => {
+    setSelectedSheetForPrint(sheet);
+    setTimeout(() => {
+      window.print();
+    }, 150);
+  };
+
+  const handleEditSheet = (sheet: AttendanceSheetInfantil) => {
+    setEditingSheet(sheet);
+    if (sheet.data) setDataFreq(sheet.data);
+    if (sheet.escolaId) setSelectedEscolaId(sheet.escolaId);
+    if (sheet.anoSerie) setAnoSerie(sheet.anoSerie);
+    if (sheet.turmaId) setSelectedTurmaId(sheet.turmaId);
+    if (sheet.periodo) setPeriodo(sheet.periodo);
+
+    showNotification('success', `Chamada da turma ${sheet.turmaNome} (${sheet.data}) carregada no formulário para edição.`);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleDeleteSheet = async (id: string) => {
-    if (!confirm('Deseja realmente remover esta folha de frequência?')) return;
-    
+    if (!confirm('Deseja realmente remover este registro de frequência?')) return;
+
     try {
       if (!isDemoMode) {
         const { error } = await supabase
           .from('frequencia_sheets_infantil')
-          .update({ ativo: false, updated_at: new Date().toISOString() })
+          .delete()
           .eq('id', id);
 
         if (error) throw error;
@@ -478,12 +570,107 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
       if (isDemoMode) {
         localStorage.setItem('sigar_frequencia_sheets_infantil', JSON.stringify(updated));
       }
-      showNotification('success', 'Registro de frequência excluído.');
+      showNotification('success', 'Registro de frequência removido com sucesso.');
     } catch (err) {
-      console.error('Erro ao excluir chamada:', err);
-      showNotification('error', 'Falha ao deletar do banco.');
+      console.error('Erro ao excluir registro:', err);
+      showNotification('error', 'Erro ao excluir registro de frequência.');
     }
   };
+
+  // History Options & Filtered sheets memoization
+  const historyOptions = useMemo(() => {
+    const escolasMap = new Map<string, string>();
+    const anosSet = new Set<string>();
+    const turmasSet = new Set<string>();
+    const periodosSet = new Set<string>();
+    const professoresSet = new Set<string>();
+
+    sheets.forEach(sheet => {
+      const matchEscola = !historyFilterEscola || sheet.escolaId === historyFilterEscola;
+      const matchAno = !historyFilterAnoSerie || sheet.anoSerie === historyFilterAnoSerie;
+      const matchTurma = !historyFilterTurma || sheet.turmaNome === historyFilterTurma;
+      const matchPeriodo = !historyFilterPeriodo || sheet.periodo === historyFilterPeriodo;
+      const profName = getTeacherName(sheet.professor);
+      const matchProf = !historyFilterProfessor || profName === historyFilterProfessor || sheet.professor === historyFilterProfessor;
+
+      if (sheet.escolaId && sheet.escolaNome) {
+        if (matchAno && matchTurma && matchPeriodo && matchProf) {
+          escolasMap.set(sheet.escolaId, sheet.escolaNome);
+        }
+      }
+
+      if (sheet.anoSerie) {
+        if (matchEscola && matchTurma && matchPeriodo && matchProf) {
+          anosSet.add(sheet.anoSerie);
+        }
+      }
+
+      if (sheet.turmaNome) {
+        if (matchEscola && matchAno && matchPeriodo && matchProf) {
+          turmasSet.add(sheet.turmaNome);
+        }
+      }
+
+      if (sheet.periodo) {
+        if (matchEscola && matchAno && matchTurma && matchProf) {
+          periodosSet.add(sheet.periodo);
+        }
+      }
+
+      if (profName) {
+        if (matchEscola && matchAno && matchTurma && matchPeriodo) {
+          professoresSet.add(profName);
+        }
+      }
+    });
+
+    const escolasList = Array.from(escolasMap.entries()).map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome));
+    const anosList = Array.from(anosSet).sort();
+    const turmasList = Array.from(turmasSet).sort((a, b) => a.localeCompare(b));
+    const periodosList = Array.from(periodosSet).sort();
+    const professoresList = Array.from(professoresSet).sort((a, b) => a.localeCompare(b));
+
+    return {
+      escolas: escolasList,
+      anosSeries: anosList,
+      turmas: turmasList,
+      periodos: periodosList,
+      professores: professoresList
+    };
+  }, [sheets, historyFilterEscola, historyFilterAnoSerie, historyFilterTurma, historyFilterPeriodo, historyFilterProfessor, coordMap]);
+
+  const hasActiveHistoryFilters = Boolean(
+    historyFilterEscola || historyFilterAnoSerie || historyFilterTurma || historyFilterPeriodo || historyFilterProfessor
+  );
+
+  const handleClearHistoryFilters = () => {
+    setHistoryFilterEscola('');
+    setHistoryFilterAnoSerie('');
+    setHistoryFilterTurma('');
+    setHistoryFilterPeriodo('');
+    setHistoryFilterProfessor('');
+  };
+
+  const filteredSheets = useMemo(() => {
+    return sheets.filter(sheet => {
+      const profName = getTeacherName(sheet.professor);
+      if (historyFilterEscola && sheet.escolaId !== historyFilterEscola) return false;
+      if (historyFilterAnoSerie && sheet.anoSerie !== historyFilterAnoSerie) return false;
+      if (historyFilterTurma && sheet.turmaNome !== historyFilterTurma) return false;
+      if (historyFilterPeriodo && sheet.periodo !== historyFilterPeriodo) return false;
+      if (historyFilterProfessor && profName !== historyFilterProfessor && sheet.professor !== historyFilterProfessor) return false;
+
+      if (searchTerm.trim()) {
+        const term = searchTerm.toLowerCase().trim();
+        const matchesEscola = sheet.escolaNome.toLowerCase().includes(term);
+        const matchesTurma = sheet.turmaNome.toLowerCase().includes(term);
+        const matchesGrupo = (sheet.anoSerie || '').toLowerCase().includes(term);
+        if (!matchesEscola && !matchesTurma && !matchesGrupo) return false;
+      }
+
+      return true;
+    });
+  }, [sheets, historyFilterEscola, historyFilterAnoSerie, historyFilterTurma, historyFilterPeriodo, historyFilterProfessor, searchTerm, coordMap]);
 
   const filteredStudents = useMemo(() => {
     return students.filter(s => 
@@ -502,6 +689,24 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
       />
 
       {subHeader}
+
+      {/* Configuration & Selection Bar */}
+      {editingSheet && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs font-bold text-amber-900 shadow-sm">
+          <div className="flex items-center gap-2">
+            <Edit className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>
+              Modo de Edição Ativo: Editando chamada da turma <strong>{editingSheet.turmaNome}</strong> referente a <strong>{new Date(editingSheet.data + 'T12:00:00').toLocaleDateString()}</strong>.
+            </span>
+          </div>
+          <Button 
+            onClick={() => setEditingSheet(null)}
+            className="bg-white hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs px-3 py-1.5 rounded-xl font-bold transition-all shrink-0"
+          >
+            Cancelar Edição
+          </Button>
+        </div>
+      )}
 
       {/* Filters & Configuration */}
       <Card className="bg-white border-slate-200 shadow-sm p-6 rounded-2xl">
@@ -762,10 +967,119 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
 
       {/* Saved Sheets History */}
       <div className="space-y-4">
-        <div>
-          <h3 className="text-md font-black text-slate-800 uppercase tracking-wider">Histórico de Chamadas Registradas</h3>
-          <p className="text-xs text-slate-500 mt-0.5 font-medium">Histórico de pautas de frequências salvas no sistema</p>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h3 className="text-md font-black text-slate-800 uppercase tracking-wider">Histórico de Chamadas Registradas</h3>
+            <p className="text-xs text-slate-500 mt-0.5 font-medium">Histórico de pautas de frequências salvas no sistema</p>
+          </div>
+
+          <div className="relative w-full md:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+            <input 
+              type="text" 
+              placeholder="Buscar por turma, escola..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-white outline-none focus:border-brand-orange transition-all text-xs font-semibold"
+            />
+          </div>
         </div>
+
+        {/* History Filters Card */}
+        <Card className="bg-white border-slate-200 shadow-sm p-4 rounded-2xl">
+          <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+            <div className="flex items-center gap-2">
+              <ListFilter className="text-brand-orange w-4 h-4" />
+              <span className="text-xs font-black text-slate-700 uppercase tracking-wider">Filtros do Histórico</span>
+            </div>
+            {hasActiveHistoryFilters && (
+              <button
+                onClick={handleClearHistoryFilters}
+                className="flex items-center gap-1 text-[11px] font-bold text-slate-500 hover:text-brand-orange transition-colors"
+              >
+                <RotateCcw size={12} />
+                <span>Limpar Filtros</span>
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            {/* Escola */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Escola</label>
+              <select
+                value={historyFilterEscola}
+                onChange={e => setHistoryFilterEscola(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todas as Escolas</option>
+                {historyOptions.escolas.map(e => (
+                  <option key={e.id} value={e.id}>{e.nome}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Grupo/Faixa Etária */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Grupo/Faixa Etária</label>
+              <select
+                value={historyFilterAnoSerie}
+                onChange={e => setHistoryFilterAnoSerie(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todos os Grupos</option>
+                {historyOptions.anosSeries.map(a => (
+                  <option key={a} value={a}>{a}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Turma */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Turma</label>
+              <select
+                value={historyFilterTurma}
+                onChange={e => setHistoryFilterTurma(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todas as Turmas</option>
+                {historyOptions.turmas.map(t => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Período Letivo */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Período Letivo</label>
+              <select
+                value={historyFilterPeriodo}
+                onChange={e => setHistoryFilterPeriodo(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todos os Períodos</option>
+                {historyOptions.periodos.map(p => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Professor */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Professor</label>
+              <select
+                value={historyFilterProfessor}
+                onChange={e => setHistoryFilterProfessor(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todos os Professores</option>
+                {historyOptions.professores.map(p => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </Card>
 
         <Card className="p-0 overflow-hidden border-slate-200 shadow-sm bg-white rounded-2xl">
           <div className="overflow-x-auto">
@@ -780,14 +1094,14 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {sheets.length === 0 ? (
+                {filteredSheets.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="py-12 text-center text-slate-400 font-semibold">
                       Nenhum registro de frequência salvo no histórico.
                     </td>
                   </tr>
                 ) : (
-                  sheets.map(sheet => (
+                  filteredSheets.map(sheet => (
                     <tr key={sheet.id} className="hover:bg-slate-50/50 transition-colors group">
                       <td className="px-6 py-3">
                         <div className="font-bold text-slate-800">
@@ -820,6 +1134,20 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
                       <td className="px-6 py-3 text-right">
                         <div className="flex items-center justify-end gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
                           <button 
+                            onClick={() => handlePrintSheet(sheet)} 
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" 
+                            title="Imprimir Relatório de Frequência"
+                          >
+                            <Printer size={15} />
+                          </button>
+                          <button 
+                            onClick={() => handleEditSheet(sheet)} 
+                            className="p-1.5 text-slate-400 hover:text-brand-orange hover:bg-orange-50 rounded-lg transition-all" 
+                            title="Editar Chamada"
+                          >
+                            <Edit size={15} />
+                          </button>
+                          <button 
                             onClick={() => handleDeleteSheet(sheet.id)} 
                             className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" 
                             title="Excluir Registro"
@@ -837,6 +1165,8 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
         </Card>
       </div>
 
+      {/* Printable Report Portal Component */}
+      <PrintableFrequencia sheet={selectedSheetForPrint as any} />
     </div>
   );
 };
