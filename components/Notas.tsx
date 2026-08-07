@@ -14,7 +14,7 @@ import { useNotification } from '../context/NotificationContext';
 import { useConfiguracao } from '../context/ConfiguracaoContext';
 import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
 import { PrintableBoletim } from './PrintableBoletim';
-import { isEducaInfantilYear } from '../utils';
+import { isEducaInfantilYear, isCampoExperienciaInfantil, normalizeSubjectName } from '../utils';
 
 interface NotasProps {
   escolas: Escola[];
@@ -144,7 +144,7 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
 
   const componentesRede = useMemo(() => {
     if (configuracao && configuracao.componentes_curriculares && configuracao.componentes_curriculares.length > 0) {
-      return configuracao.componentes_curriculares;
+      return configuracao.componentes_curriculares.map(c => normalizeSubjectName(c));
     }
     return COMPONENTES;
   }, [configuracao]);
@@ -270,6 +270,14 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
       }
 
       let filteredSheets = allSheetsData;
+      // Exclude Early Childhood Education entries from Ensino Fundamental history
+      filteredSheets = filteredSheets.filter((p: any) => {
+        if (p.componente && isCampoExperienciaInfantil(p.componente)) return false;
+        const anoSerie = turmaAnoMap.get(p.turma_id) || p.ano_serie || '';
+        if (anoSerie && isEducaInfantilYear(anoSerie)) return false;
+        return true;
+      });
+
       if (!isAdmin && currentUser && currentUser.funcao !== 'Administrador') {
         const userSchoolIds = currentUser?.escolasIds || [];
         if (userSchoolIds.length > 0) {
@@ -309,7 +317,7 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
           turmaId: p.turma_id,
           turmaNome,
           anoSerie,
-          componente: p.componente,
+          componente: normalizeSubjectName(p.componente),
           bimestre: p.bimestre,
           mediaTurma: Number(p.media_turma),
           taxaAprovacao: p.taxa_aprovacao,
@@ -902,8 +910,8 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
         }
       }
 
-      // 4. Componentes
-      if (s.componente) {
+      // 4. Componentes (Filter out Early Childhood Campos de Experiência)
+      if (s.componente && !isCampoExperienciaInfantil(s.componente)) {
         if (matchEscola && matchAno && matchTurma && matchBimestre && matchProf) {
           componentesSet.add(s.componente);
         }
@@ -954,6 +962,10 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
   // Filtered History Sheets
   const filteredSheetsHistory = useMemo(() => {
     return sheets.filter(s => {
+      // Exclude Early Childhood Education entries from Fundamental history
+      if (s.anoSerie && isEducaInfantilYear(s.anoSerie)) return false;
+      if (s.componente && isCampoExperienciaInfantil(s.componente)) return false;
+
       if (historyFilterEscola && s.escolaId !== historyFilterEscola) return false;
       if (historyFilterAnoSerie && s.anoSerie !== historyFilterAnoSerie) return false;
       if (historyFilterTurma && s.turmaNome !== historyFilterTurma) return false;

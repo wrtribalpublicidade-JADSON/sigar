@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { PageHeader } from './ui/PageHeader';
 import { useConfiguracao } from '../context/ConfiguracaoContext';
-import { Users, BookOpen, UserCheck, AlertTriangle, GraduationCap, Edit, Trash2, Calendar, Hand, Book, CheckSquare, MessageCircle, Search, Printer, Lock, Send, CheckCircle2, FileText, LayoutDashboard, TrendingUp, TrendingDown, Minus, ArrowUpRight, ArrowDownRight, AlertCircle, FileDown, Download, Baby, School, ArrowRight } from 'lucide-react';
+import { Users, BookOpen, UserCheck, AlertTriangle, GraduationCap, Edit, Trash2, Calendar, Hand, Book, CheckSquare, MessageCircle, Search, Printer, Lock, Send, CheckCircle2, FileText, LayoutDashboard, TrendingUp, TrendingDown, Minus, ArrowUpRight, ArrowDownRight, AlertCircle, FileDown, Download, Baby, School, ArrowRight, HelpCircle } from 'lucide-react';
 import { CadastroTurmaModal, TurmaData } from './modals/CadastroTurmaModal';
 import { StudentReportModal } from './modals/StudentReportModal';
 import { CadastroEstudanteModal } from './modals/CadastroEstudanteModal';
@@ -1360,6 +1360,21 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     const [isEditingAcompInfantil, setIsEditingAcompInfantil] = useState(false);
 
     // ============================================
+    // ESTADOS: MODAIS DE CONFIRMAÇÃO E SUCESSO DE SALVAMENTO
+    // ============================================
+    const [saveConfirmModal, setSaveConfirmModal] = useState<{
+        isOpen: boolean;
+        title?: string;
+        message?: string;
+        onConfirm?: () => Promise<void> | void;
+    }>({ isOpen: false });
+
+    const [saveSuccessModal, setSaveSuccessModal] = useState<{
+        isOpen: boolean;
+        message?: string;
+    }>({ isOpen: false, message: 'Dados salvos com sucesso!' });
+
+    // ============================================
     // ESTADOS: STATUS DA ETAPA E DESBLOQUEIO
     // ============================================
     const [etapaDoc, setEtapaDoc] = useState<any>(null);
@@ -1437,8 +1452,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         }
     }, [showAdminPanel]);
 
-    const handleSaveAcompInfantil = async () => {
-        if (!acompInfantilForm.professor || !acompInfantilForm.crianca) return;
+    const executeSaveAcompInfantil = async () => {
         try {
             let acToSave = {
                 id: acompInfantilForm.id,
@@ -1480,12 +1494,26 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             }
             setIsEditingAcompInfantil(false);
             setAcompInfantilForm({ id: '', professor: '', agrupamento: '', periodoLetivo: '1º Bimestre', data: '', campoExperiencia: '', crianca: '', tipoInteracao: '', evidencias: '', intencionalidade: '' });
-        } catch (error) {
+            setSaveSuccessModal({ isOpen: true, message: 'Dados salvos com sucesso!' });
+        } catch (error: any) {
             console.error("Erro ao salvar acompanhamento infantil:", error);
-            alert("Erro ao salvar acompanhamento");
+            alert(`Erro ao salvar: ${error.message || 'Ocorreu um erro inesperado.'}`);
         } finally {
             setTimeout(() => setIsSaving(false), 800);
         }
+    };
+
+    const handleSaveAcompInfantil = () => {
+        if (!acompInfantilForm.professor || !acompInfantilForm.crianca) {
+            alert('Por favor, preencha o nome do professor e o nome da criança.');
+            return;
+        }
+        setSaveConfirmModal({
+            isOpen: true,
+            title: acompInfantilForm.id ? 'Confirmar Atualização' : 'Confirmar Salvamento',
+            message: 'Deseja confirmar o salvamento dos dados?',
+            onConfirm: executeSaveAcompInfantil
+        });
     };
 
     const handleEditAcompInfantil = async (acomp: any) => {
@@ -1515,8 +1543,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         }
     };
 
-    const handleSaveAcomp = async () => {
-        if (!acompForm.professor || !acompForm.estudante) return;
+    const executeSaveAcomp = async () => {
         try {
             let acToSave = {
                 id: acompForm.id,
@@ -1557,9 +1584,26 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             }
             setIsEditingAcomp(false);
             setAcompForm({ id: '', professor: '', componente: '', turma: '', periodoLetivo: '1º Bimestre', data: '', estudante: '', lider: '', dificuldades: '', intervencao: '' });
+            setSaveSuccessModal({ isOpen: true, message: 'Dados salvos com sucesso!' });
+        } catch (error: any) {
+            console.error("Erro ao salvar acompanhamento:", error);
+            alert(`Erro ao salvar: ${error.message || 'Ocorreu um erro inesperado.'}`);
         } finally {
             setTimeout(() => setIsSaving(false), 800);
         }
+    };
+
+    const handleSaveAcomp = () => {
+        if (!acompForm.professor || !acompForm.estudante) {
+            alert('Por favor, preencha o nome do professor e o nome do estudante.');
+            return;
+        }
+        setSaveConfirmModal({
+            isOpen: true,
+            title: acompForm.id ? 'Confirmar Atualização' : 'Confirmar Salvamento',
+            message: 'Deseja confirmar o salvamento dos dados?',
+            onConfirm: executeSaveAcomp
+        });
     };
 
     const handleEditAcomp = async (acomp: any) => {
@@ -1695,11 +1739,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
 
 
 
-    const handleSaveEnc = async () => {
-        if (!encForm.estudante || !encForm.descricao) {
-            alert('Por favor, preencha o nome do estudante e a descrição do caso.');
-            return;
-        }
+    const executeSaveEnc = async () => {
         try {
             let encToSave = {
                 id: encForm.id,
@@ -1739,13 +1779,26 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             }
             setIsEditingEnc(false);
             setEncForm({ id: '', estudante: '', turma: '', tipo: 'Pedagógico', descricao: '', encaminhamento: '', data: '', periodoLetivo: '1º Bimestre', status: 'Pendente', responsavel: '' });
-            alert("Registro salvo com sucesso!");
+            setSaveSuccessModal({ isOpen: true, message: 'Dados salvos com sucesso!' });
         } catch (error: any) {
             console.error("Erro ao salvar encaminhamento:", error);
             alert(`Erro ao salvar: ${error.message || 'Ocorreu um erro inesperado.'}`);
         } finally {
             setTimeout(() => setIsSaving(false), 800);
         }
+    };
+
+    const handleSaveEnc = () => {
+        if (!encForm.estudante || !encForm.descricao) {
+            alert('Por favor, preencha o nome do estudante e a descrição do caso.');
+            return;
+        }
+        setSaveConfirmModal({
+            isOpen: true,
+            title: encForm.id ? 'Confirmar Atualização' : 'Confirmar Salvamento',
+            message: 'Deseja confirmar o salvamento dos dados?',
+            onConfirm: executeSaveEnc
+        });
     };
 
     const handleEditEnc = async (enc: any) => {
@@ -1915,11 +1968,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     const [printingEncaminhamento, setPrintingEncaminhamento] = useState<any | null>(null);
     const [printingAcomp, setPrintingAcomp] = useState<any | null>(null);
 
-    const handleSaveEncInfantil = async () => {
-        if (!encInfantilForm.crianca || !encInfantilForm.evidencias) {
-            alert('Por favor, preencha o nome da criança e as evidências observadas.');
-            return;
-        }
+    const executeSaveEncInfantil = async () => {
         try {
             let encToSave = {
                 id: encInfantilForm.id,
@@ -1960,13 +2009,26 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             }
             setIsEditingEncInfantil(false);
             setEncInfantilForm({ id: '', crianca: '', agrupamento: '', campoExperiencia: '', periodoLetivo: '1º Bimestre', data: '', evidencias: '', estrategia: '', professor: '', status: 'Pendente' });
-            alert("Registro salvo com sucesso!");
+            setSaveSuccessModal({ isOpen: true, message: 'Dados salvos com sucesso!' });
         } catch (error: any) {
             console.error("Erro ao salvar encaminhamento infantil:", error);
             alert(`Erro ao salvar: ${error.message || 'Ocorreu um erro inesperado.'}`);
         } finally {
             setTimeout(() => setIsSaving(false), 800);
         }
+    };
+
+    const handleSaveEncInfantil = () => {
+        if (!encInfantilForm.crianca || !encInfantilForm.evidencias) {
+            alert('Por favor, preencha o nome da criança e as evidências observadas.');
+            return;
+        }
+        setSaveConfirmModal({
+            isOpen: true,
+            title: encInfantilForm.id ? 'Confirmar Atualização' : 'Confirmar Salvamento',
+            message: 'Deseja confirmar o salvamento dos dados?',
+            onConfirm: executeSaveEncInfantil
+        });
     };
 
     const handleEditEncInfantil = async (enc: any) => {
@@ -4558,6 +4620,71 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                     acompanhamento={printingAcomp}
                     onClose={() => setPrintingAcomp(null)}
                 />
+            )}
+
+            {/* Modal de Confirmação de Salvamento */}
+            {saveConfirmModal.isOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 text-center border border-slate-100 transform animate-in zoom-in-95 duration-200">
+                        <div className="w-12 h-12 bg-orange-50 text-brand-orange rounded-full flex items-center justify-center mx-auto mb-4 border border-orange-100 shadow-sm">
+                            <HelpCircle className="w-6 h-6 text-brand-orange" />
+                        </div>
+                        <h3 className="text-lg font-black text-slate-800 tracking-tight">
+                            {saveConfirmModal.title || 'Confirmar Salvamento'}
+                        </h3>
+                        <p className="text-xs font-semibold text-slate-500 mt-2 mb-6 leading-relaxed">
+                            {saveConfirmModal.message || 'Deseja confirmar o salvamento dos dados?'}
+                        </p>
+                        <div className="flex gap-3 justify-center">
+                            <button
+                                type="button"
+                                onClick={() => setSaveConfirmModal({ isOpen: false })}
+                                className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold rounded-xl text-xs transition-colors"
+                            >
+                                CANCELAR
+                            </button>
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    const confirmFn = saveConfirmModal.onConfirm;
+                                    setSaveConfirmModal({ isOpen: false });
+                                    if (confirmFn) {
+                                        await confirmFn();
+                                    }
+                                }}
+                                className="px-6 py-2.5 bg-brand-orange hover:bg-orange-600 text-white font-semibold rounded-xl text-xs shadow-lg shadow-orange-500/20 transition-colors"
+                            >
+                                CONFIRMAR
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Sucesso */}
+            {saveSuccessModal.isOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 text-center border border-slate-100 transform animate-in zoom-in-95 duration-200">
+                        <div className="w-12 h-12 bg-orange-50 text-brand-orange rounded-full flex items-center justify-center mx-auto mb-4 border border-orange-100 shadow-sm">
+                            <CheckCircle2 className="w-6 h-6 text-brand-orange animate-bounce" />
+                        </div>
+                        <h3 className="text-lg font-black text-slate-800 tracking-tight">
+                            {saveSuccessModal.message || 'Dados salvos com sucesso!'}
+                        </h3>
+                        <p className="text-xs font-semibold text-slate-500 mt-2 mb-6">
+                            As informações foram registradas com êxito.
+                        </p>
+                        <div className="flex justify-center">
+                            <button
+                                type="button"
+                                onClick={() => setSaveSuccessModal({ isOpen: false })}
+                                className="px-8 py-2.5 bg-brand-orange hover:bg-orange-600 text-white font-semibold rounded-xl text-xs shadow-lg shadow-orange-500/20 transition-colors"
+                            >
+                                OK
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

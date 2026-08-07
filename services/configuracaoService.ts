@@ -26,7 +26,7 @@ const DEFAULT_CONFIG: ConfiguracaoRede = {
         { id: 'b4', nome: '4º Bimestre', inicio: '2026-11-01', fim: '2026-12-31', bloqueado: false }
     ],
     componentes_curriculares: [
-        "Língua Portuguesa", "Matemática", "Ciências", "História", "Geografia", "Arte", "Educação Física", "Ensino Religioso", "Inglês"
+        "Língua Portuguesa", "Matemática", "Ciências", "História", "Geografia", "Arte", "Educação Física", "Ensino Religioso", "Língua Inglesa"
     ],
     campos_experiencia: [
         "O EU, O OUTRO E O NÓS",

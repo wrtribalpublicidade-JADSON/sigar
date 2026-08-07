@@ -6,7 +6,7 @@ import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { 
     Sliders, Calendar, BookOpen, GraduationCap, Save, Plus, Trash2, 
-    ShieldAlert, Clock, Check, RefreshCw
+    ShieldAlert, Clock, Check, RefreshCw, Edit2, X
 } from 'lucide-react';
 
 export const GestaoRede: React.FC = () => {
@@ -25,6 +25,13 @@ export const GestaoRede: React.FC = () => {
     // New item inputs
     const [newComponente, setNewComponente] = useState('');
     const [newCampo, setNewCampo] = useState('');
+
+    // Editing states
+    const [editingComponente, setEditingComponente] = useState<string | null>(null);
+    const [editingComponenteValue, setEditingComponenteValue] = useState<string>('');
+
+    const [editingCampo, setEditingCampo] = useState<string | null>(null);
+    const [editingCampoValue, setEditingCampoValue] = useState<string>('');
 
     useEffect(() => {
         if (configuracao) {
@@ -92,6 +99,58 @@ export const GestaoRede: React.FC = () => {
 
     const handleRemoveCampo = (campo: string) => {
         setCampos(prev => prev.filter(c => c !== campo));
+    };
+
+    // Componente Edit Handlers
+    const handleStartEditComponente = (comp: string) => {
+        setEditingComponente(comp);
+        setEditingComponenteValue(comp);
+    };
+
+    const handleSaveEditComponente = (oldVal: string) => {
+        const cleaned = editingComponenteValue.trim();
+        if (!cleaned) {
+            showNotification('warning', 'O nome do componente não pode ficar em branco.');
+            return;
+        }
+        if (cleaned !== oldVal && componentes.includes(cleaned)) {
+            showNotification('warning', 'Este componente curricular já existe.');
+            return;
+        }
+        setComponentes(prev => prev.map(c => c === oldVal ? cleaned : c));
+        setEditingComponente(null);
+        setEditingComponenteValue('');
+    };
+
+    const handleCancelEditComponente = () => {
+        setEditingComponente(null);
+        setEditingComponenteValue('');
+    };
+
+    // Campo de Experiencia Edit Handlers
+    const handleStartEditCampo = (campo: string) => {
+        setEditingCampo(campo);
+        setEditingCampoValue(campo);
+    };
+
+    const handleSaveEditCampo = (oldVal: string) => {
+        const cleaned = editingCampoValue.trim();
+        if (!cleaned) {
+            showNotification('warning', 'O nome do campo de experiência não pode ficar em branco.');
+            return;
+        }
+        if (cleaned !== oldVal && campos.includes(cleaned)) {
+            showNotification('warning', 'Este campo de experiência já existe.');
+            return;
+        }
+        setCampos(prev => prev.map(c => c === oldVal ? cleaned : c));
+        setEditingCampo(null);
+        setEditingCampoValue('');
+    };
+
+    const handleCancelEditCampo = () => {
+        setEditingCampo(null);
+        setEditingCampoValue('');
     };
 
     return (
@@ -296,14 +355,55 @@ export const GestaoRede: React.FC = () => {
                             <div className="border border-slate-100 rounded-2xl overflow-hidden divide-y divide-slate-100">
                                 {componentes.map((comp) => (
                                     <div key={comp} className="flex justify-between items-center px-5 py-3 hover:bg-slate-50 transition-colors">
-                                        <span className="text-xs font-bold text-slate-700">{comp}</span>
-                                        <button 
-                                            onClick={() => handleRemoveComponente(comp)}
-                                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                                            title="Excluir Componente"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
+                                        {editingComponente === comp ? (
+                                            <div className="flex items-center gap-2 w-full">
+                                                <input 
+                                                    type="text" 
+                                                    value={editingComponenteValue}
+                                                    onChange={e => setEditingComponenteValue(e.target.value)}
+                                                    onKeyDown={e => {
+                                                        if (e.key === 'Enter') handleSaveEditComponente(comp);
+                                                        if (e.key === 'Escape') handleCancelEditComponente();
+                                                    }}
+                                                    autoFocus
+                                                    className="flex-1 bg-white border border-brand-orange text-xs font-bold text-slate-800 px-3 py-1.5 rounded-xl outline-none shadow-sm focus:ring-2 focus:ring-brand-orange/20"
+                                                />
+                                                <button 
+                                                    onClick={() => handleSaveEditComponente(comp)}
+                                                    className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                                                    title="Salvar Alteração"
+                                                >
+                                                    <Check className="w-4 h-4" />
+                                                </button>
+                                                <button 
+                                                    onClick={handleCancelEditComponente}
+                                                    className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
+                                                    title="Cancelar"
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <span className="text-xs font-bold text-slate-700">{comp}</span>
+                                                <div className="flex items-center gap-1">
+                                                    <button 
+                                                        onClick={() => handleStartEditComponente(comp)}
+                                                        className="p-1.5 text-slate-400 hover:text-brand-orange hover:bg-orange-50 rounded-lg transition-all"
+                                                        title="Editar Componente"
+                                                    >
+                                                        <Edit2 className="w-4 h-4" />
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleRemoveComponente(comp)}
+                                                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                        title="Excluir Componente"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -341,14 +441,55 @@ export const GestaoRede: React.FC = () => {
                             <div className="border border-slate-100 rounded-2xl overflow-hidden divide-y divide-slate-100">
                                 {campos.map((c) => (
                                     <div key={c} className="flex justify-between items-center px-5 py-3 hover:bg-slate-50 transition-colors">
-                                        <span className="text-xs font-bold text-slate-700 uppercase tracking-tight">{c}</span>
-                                        <button 
-                                            onClick={() => handleRemoveCampo(c)}
-                                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                                            title="Excluir Campo"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
+                                        {editingCampo === c ? (
+                                            <div className="flex items-center gap-2 w-full">
+                                                <input 
+                                                    type="text" 
+                                                    value={editingCampoValue}
+                                                    onChange={e => setEditingCampoValue(e.target.value)}
+                                                    onKeyDown={e => {
+                                                        if (e.key === 'Enter') handleSaveEditCampo(c);
+                                                        if (e.key === 'Escape') handleCancelEditCampo();
+                                                    }}
+                                                    autoFocus
+                                                    className="flex-1 bg-white border border-brand-orange text-xs font-bold text-slate-800 px-3 py-1.5 rounded-xl outline-none shadow-sm focus:ring-2 focus:ring-brand-orange/20 uppercase tracking-tight"
+                                                />
+                                                <button 
+                                                    onClick={() => handleSaveEditCampo(c)}
+                                                    className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                                                    title="Salvar Alteração"
+                                                >
+                                                    <Check className="w-4 h-4" />
+                                                </button>
+                                                <button 
+                                                    onClick={handleCancelEditCampo}
+                                                    className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
+                                                    title="Cancelar"
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <span className="text-xs font-bold text-slate-700 uppercase tracking-tight">{c}</span>
+                                                <div className="flex items-center gap-1">
+                                                    <button 
+                                                        onClick={() => handleStartEditCampo(c)}
+                                                        className="p-1.5 text-slate-400 hover:text-brand-orange hover:bg-orange-50 rounded-lg transition-all"
+                                                        title="Editar Campo de Experiência"
+                                                    >
+                                                        <Edit2 className="w-4 h-4" />
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleRemoveCampo(c)}
+                                                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                        title="Excluir Campo"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                 ))}
                             </div>

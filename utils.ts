@@ -273,3 +273,38 @@ export const isEducaInfantilYear = (yearStr: string): boolean => {
   );
 };
 
+export const CAMPOS_EXPERIENCIA_INFANTIL = [
+  'O eu, o outro e o nós',
+  'Corpo, gestos e movimentos',
+  'Traços, sons, cores e formas',
+  'Escuta, fala, pensamento e imaginação',
+  'Espaços, tempos, quantidades, relações e transformações'
+];
+
+export const isCampoExperienciaInfantil = (componenteStr: string): boolean => {
+  if (!componenteStr) return false;
+  const lower = componenteStr.toLowerCase().trim();
+  if (
+    lower.includes('campo') ||
+    lower.includes('experiência') ||
+    lower.includes('experiencia') ||
+    lower.includes('(ei)') ||
+    lower.includes('educação infantil') ||
+    lower.includes('educacao infantil')
+  ) {
+    return true;
+  }
+  return CAMPOS_EXPERIENCIA_INFANTIL.some(c => 
+    lower === c.toLowerCase().trim() || lower.includes(c.toLowerCase().trim())
+  );
+};
+
+export const normalizeSubjectName = (name: string | undefined): string => {
+  if (!name) return '';
+  const trimmed = name.trim();
+  if (trimmed.toLowerCase() === 'inglês' || trimmed.toLowerCase() === 'ingles') {
+    return 'Língua Inglesa';
+  }
+  return trimmed;
+};
+

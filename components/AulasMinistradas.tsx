@@ -6,14 +6,14 @@ import { Button } from './ui/Button';
 import { 
   FileText, Plus, Search, Edit2, Trash2, Printer, 
   X, Calendar, School as SchoolIcon, BookOpen, Save, ClipboardList,
-  Layers, Check, AlertTriangle
+  Layers, Check, AlertTriangle, ListFilter, RotateCcw
 } from 'lucide-react';
 import { Escola, Coordenador } from '../types';
 import { supabase } from '../services/supabase';
 import { useNotification } from '../context/NotificationContext';
 import { useConfiguracao } from '../context/ConfiguracaoContext';
 import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
-import { isEducaInfantilYear } from '../utils';
+import { isEducaInfantilYear, isCampoExperienciaInfantil, normalizeSubjectName } from '../utils';
 
 interface AulasMinistradasProps {
   escolas: Escola[];
@@ -39,6 +39,7 @@ interface ClassLog {
   criadoEm: string;
   anoSerie: string;
   periodo: string;
+  professor?: string;
   selectedObjetoIds?: string[];
   selectedHabilidadeIds?: string[];
 }
@@ -73,8 +74,8 @@ const ANOS_SERIES = [
   '7º Ano',
   '8º Ano',
   '9º Ano',
-  'EJA',
-  'Outros'
+  'EJA - 1º Segmento',
+  'EJA - 2º Segmento'
 ];
 
 export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isDemoMode, isAdmin, userEmail, currentUser, subHeader }) => {
@@ -82,6 +83,7 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
   const { showNotification } = useNotification();
   const [logs, setLogs] = useState<ClassLog[]>([]);
   const [turmas, setTurmas] = useState<any[]>([]);
+  const [coordenadoresList, setCoordenadoresList] = useState<any[]>([]);
 
   // Form State
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -110,7 +112,7 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
 
   const componentesRede = useMemo(() => {
     if (configuracao && configuracao.componentes_curriculares && configuracao.componentes_curriculares.length > 0) {
-      return configuracao.componentes_curriculares;
+      return configuracao.componentes_curriculares.map(c => normalizeSubjectName(c));
     }
     return COMPONENTES;
   }, [configuracao]);
@@ -139,13 +141,66 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
   const [selectedObjetoIds, setSelectedObjetoIds] = useState<string[]>([]);
   const [selectedHabilidadeIds, setSelectedHabilidadeIds] = useState<string[]>([]);
 
-  // Filters
+  // History Filters State (matching Boletins e Pautas Lançadas)
+  const [historyFilterEscola, setHistoryFilterEscola] = useState('');
+  const [historyFilterAnoSerie, setHistoryFilterAnoSerie] = useState('');
+  const [historyFilterTurma, setHistoryFilterTurma] = useState('');
+  const [historyFilterComponente, setHistoryFilterComponente] = useState('');
+  const [historyFilterBimestre, setHistoryFilterBimestre] = useState('');
+  const [historyFilterProfessor, setHistoryFilterProfessor] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [schoolFilter, setSchoolFilter] = useState('ALL');
-  const [classFilter, setClassFilter] = useState('ALL');
 
   // Print Mode State
   const [printLog, setPrintLog] = useState<ClassLog | null>(null);
+
+  // Fetch team / coordinators to resolve emails to names
+  useEffect(() => {
+    const fetchCoordenadores = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('coordenadores')
+          .select('contato, nome');
+        if (!error && data) {
+          setCoordenadoresList(data);
+        }
+      } catch (err) {
+        console.error('Erro ao carregar coordenadores:', err);
+      }
+    };
+    fetchCoordenadores();
+  }, []);
+
+  const coordMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (coordenadoresList && coordenadoresList.length > 0) {
+      coordenadoresList.forEach((c: any) => {
+        if (c.contato && c.nome) {
+          map.set(c.contato.toLowerCase().trim(), c.nome.trim());
+        }
+      });
+    }
+    if (currentUser) {
+      if (currentUser.contato && currentUser.nome) {
+        map.set(currentUser.contato.toLowerCase().trim(), currentUser.nome.trim());
+      }
+      if ((currentUser as any).email && currentUser.nome) {
+        map.set(((currentUser as any).email as string).toLowerCase().trim(), currentUser.nome.trim());
+      }
+    }
+    return map;
+  }, [coordenadoresList, currentUser]);
+
+  const getTeacherName = (emailOrName: string | undefined): string => {
+    if (!emailOrName) return '---';
+    const lower = emailOrName.toLowerCase().trim();
+    if (coordMap.has(lower)) {
+      return coordMap.get(lower)!;
+    }
+    if (!emailOrName.includes('@')) return emailOrName;
+
+    const username = emailOrName.split('@')[0];
+    return username.charAt(0).toUpperCase() + username.slice(1);
+  };
 
   const fetchRealLogs = async () => {
     try {
@@ -170,6 +225,13 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
       }
 
       let filteredLogs = data || [];
+      // Filter out Early Childhood Education entries (ECE stages and Campos de Experiência)
+      filteredLogs = filteredLogs.filter((p: any) => {
+        if (p.componente && isCampoExperienciaInfantil(p.componente)) return false;
+        if (p.ano_serie && isEducaInfantilYear(p.ano_serie)) return false;
+        return true;
+      });
+
       if (!isAdmin && currentUser && currentUser.funcao !== 'Administrador') {
         const userSchoolIds = currentUser?.escolasIds || [];
         if (userSchoolIds.length > 0) {
@@ -205,13 +267,14 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
           escolaNome,
           turmaId: p.turma_id,
           turmaNome,
-          componente: p.componente,
+          componente: normalizeSubjectName(p.componente),
           aulas: p.aulas,
           conteudo: p.conteudo,
           atividades: p.atividades || '',
           observacoes: p.observacoes || '',
           anoSerie: p.ano_serie,
           periodo: p.periodo,
+          professor: getTeacherName(p.professor || p.updated_by || p.created_by || p.responsavel),
           selectedObjetoIds: p.selected_objeto_ids || [],
           selectedHabilidadeIds: p.selected_habilidade_ids || [],
           criadoEm: p.created_at
@@ -688,6 +751,7 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
       observacoes,
       anoSerie,
       periodo,
+      professor: currentUser?.nome || userEmail || '',
       selectedObjetoIds,
       selectedHabilidadeIds,
       criadoEm: new Date().toISOString()
@@ -804,13 +868,185 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
     setSelectedHabilidadeIds([]);
   };
 
-  const filteredLogs = logs.filter(l => {
-    const matchesSearch = l.conteudo.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          l.componente.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesSchool = schoolFilter === 'ALL' || l.escolaId === schoolFilter;
-    const matchesClass = classFilter === 'ALL' || l.turmaId === classFilter;
-    return matchesSearch && matchesSchool && matchesClass;
-  });
+  // Compute options for history filters dynamically (Matching Notas.tsx behavior)
+  const historyOptions = useMemo(() => {
+    const escolasMap = new Map<string, string>();
+    const anosSet = new Set<string>();
+    const turmasSet = new Set<string>();
+    const componentesSet = new Set<string>();
+    const bimestresSet = new Set<string>();
+    const professoresSet = new Set<string>();
+
+    logs.forEach(log => {
+      const matchEscola = !historyFilterEscola || log.escolaId === historyFilterEscola;
+      const matchAno = !historyFilterAnoSerie || log.anoSerie === historyFilterAnoSerie;
+      const matchTurma = !historyFilterTurma || log.turmaNome === historyFilterTurma;
+      const matchComp = !historyFilterComponente || log.componente === historyFilterComponente;
+      const matchBimestre = !historyFilterBimestre || log.periodo === historyFilterBimestre;
+      const profName = getTeacherName(log.professor);
+      const matchProf = !historyFilterProfessor || profName === historyFilterProfessor;
+
+      // 1. Escolas
+      if (log.escolaId && log.escolaNome) {
+        if (matchAno && matchTurma && matchComp && matchBimestre && matchProf) {
+          escolasMap.set(log.escolaId, log.escolaNome);
+        }
+      }
+
+      // 2. Anos/Séries (Filter out Early Childhood Education and "Outros")
+      if (log.anoSerie && !isEducaInfantilYear(log.anoSerie) && log.anoSerie !== 'Outros') {
+        if (matchEscola && matchTurma && matchComp && matchBimestre && matchProf) {
+          anosSet.add(log.anoSerie);
+        }
+      }
+
+      // 3. Turmas
+      if (log.turmaNome) {
+        if (matchEscola && matchAno && matchComp && matchBimestre && matchProf) {
+          turmasSet.add(log.turmaNome);
+        }
+      }
+
+      // 4. Componentes (Filter out Early Childhood Campos de Experiência)
+      if (log.componente && !isCampoExperienciaInfantil(log.componente)) {
+        if (matchEscola && matchAno && matchTurma && matchBimestre && matchProf) {
+          componentesSet.add(log.componente);
+        }
+      }
+
+      // 5. Bimestres
+      if (log.periodo) {
+        if (matchEscola && matchAno && matchTurma && matchComp && matchProf) {
+          bimestresSet.add(log.periodo);
+        }
+      }
+
+      // 6. Professores
+      if (profName && profName !== '---') {
+        if (matchEscola && matchAno && matchTurma && matchComp && matchBimestre) {
+          professoresSet.add(profName);
+        }
+      }
+    });
+
+    escolas.forEach(e => escolasMap.set(e.id, e.nome));
+    
+    if (anosSet.size === 0) {
+      ANOS_SERIES.forEach(a => {
+        if (!isEducaInfantilYear(a) && a !== 'Outros') anosSet.add(a);
+      });
+    }
+
+    if (componentesSet.size === 0) {
+      COMPONENTES.forEach(c => componentesSet.add(c));
+    }
+
+    if (bimestresSet.size === 0) {
+      BIMESTRES.forEach(b => bimestresSet.add(b));
+    }
+
+    if (professoresSet.size === 0 && currentUser?.nome) {
+      professoresSet.add(currentUser.nome);
+    }
+
+    return {
+      escolas: Array.from(escolasMap.entries()).map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome)),
+      anosSeries: Array.from(anosSet).sort(),
+      turmas: Array.from(turmasSet).sort((a, b) => a.localeCompare(b)),
+      componentes: Array.from(componentesSet).sort((a, b) => a.localeCompare(b)),
+      bimestres: Array.from(bimestresSet).sort(),
+      professores: Array.from(professoresSet).sort((a, b) => a.localeCompare(b))
+    };
+  }, [
+    logs, 
+    escolas, 
+    currentUser, 
+    coordenadoresList,
+    historyFilterEscola, 
+    historyFilterAnoSerie, 
+    historyFilterTurma, 
+    historyFilterComponente, 
+    historyFilterBimestre, 
+    historyFilterProfessor
+  ]);
+
+  const hasActiveHistoryFilters = useMemo(() => {
+    return Boolean(
+      historyFilterEscola ||
+      historyFilterAnoSerie ||
+      historyFilterTurma ||
+      historyFilterComponente ||
+      historyFilterBimestre ||
+      historyFilterProfessor ||
+      searchTerm
+    );
+  }, [
+    historyFilterEscola,
+    historyFilterAnoSerie,
+    historyFilterTurma,
+    historyFilterComponente,
+    historyFilterBimestre,
+    historyFilterProfessor,
+    searchTerm
+  ]);
+
+  const handleClearHistoryFilters = () => {
+    setHistoryFilterEscola('');
+    setHistoryFilterAnoSerie('');
+    setHistoryFilterTurma('');
+    setHistoryFilterComponente('');
+    setHistoryFilterBimestre('');
+    setHistoryFilterProfessor('');
+    setSearchTerm('');
+  };
+
+  const filteredLogs = useMemo(() => {
+    return logs.filter(l => {
+      // Exclude Early Childhood Education entries from Fundamental history
+      if (l.anoSerie && isEducaInfantilYear(l.anoSerie)) return false;
+      if (l.componente && isCampoExperienciaInfantil(l.componente)) return false;
+
+      const matchesSearch = !searchTerm || 
+        l.conteudo.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        l.componente.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        l.turmaNome.toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchesEscola = !historyFilterEscola || l.escolaId === historyFilterEscola;
+
+      const matchesAnoSerie = !historyFilterAnoSerie || 
+        l.anoSerie === historyFilterAnoSerie || 
+        l.anoSerie?.toLowerCase().includes(historyFilterAnoSerie.toLowerCase());
+
+      const matchesTurma = !historyFilterTurma || 
+        l.turmaNome === historyFilterTurma || 
+        l.turmaNome?.toLowerCase().includes(historyFilterTurma.toLowerCase()) || 
+        l.turmaId === historyFilterTurma;
+
+      const matchesComponente = !historyFilterComponente || 
+        l.componente.toLowerCase() === historyFilterComponente.toLowerCase();
+
+      const matchesBimestre = !historyFilterBimestre || 
+        l.periodo.toLowerCase() === historyFilterBimestre.toLowerCase();
+
+      const profName = getTeacherName(l.professor);
+      const matchesProfessor = !historyFilterProfessor || 
+        profName.toLowerCase() === historyFilterProfessor.toLowerCase() ||
+        (l.professor && l.professor.toLowerCase() === historyFilterProfessor.toLowerCase());
+
+      return matchesSearch && matchesEscola && matchesAnoSerie && matchesTurma && matchesComponente && matchesBimestre && matchesProfessor;
+    });
+  }, [
+    logs,
+    searchTerm,
+    historyFilterEscola,
+    historyFilterAnoSerie,
+    historyFilterTurma,
+    historyFilterComponente,
+    historyFilterBimestre,
+    historyFilterProfessor,
+    coordenadoresList,
+    currentUser
+  ]);
 
   const handlePrint = (log: ClassLog) => {
     setPrintLog(log);
@@ -1336,32 +1572,131 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h3 className="text-md font-black text-slate-800 uppercase tracking-wider">Histórico de Aulas Ministradas</h3>
-            <p className="text-xs text-slate-500 mt-0.5">Veja todas as aulas ministradas registradas no diário de classe</p>
+            <p className="text-xs text-slate-500 mt-0.5 font-medium">Veja todas as aulas ministradas registradas no diário de classe</p>
           </div>
 
-          <div className="flex flex-wrap gap-2 w-full md:w-auto">
-            <div className="relative flex-1 md:flex-none">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <input 
-                type="text" 
-                placeholder="Buscar por conteúdo..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-white outline-none focus:border-brand-orange transition-all text-xs font-semibold"
-              />
-            </div>
-
-            <SearchableSchoolSelect
-              escolas={escolas}
-              selectedId={schoolFilter}
-              onChange={setSchoolFilter}
-              showAllOption={true}
-              allOptionLabel="Todas Unidades"
-              className="max-w-[240px]"
-              inputClassName="pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
+          <div className="relative w-full md:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+            <input 
+              type="text" 
+              placeholder="Buscar por conteúdo..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-white outline-none focus:border-brand-orange transition-all text-xs font-semibold"
             />
           </div>
         </div>
+
+        {/* History Filters Card */}
+        <Card className="bg-white border-slate-200 shadow-sm p-4 rounded-2xl">
+          <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+            <div className="flex items-center gap-2">
+              <ListFilter className="text-brand-orange w-4 h-4" />
+              <span className="text-xs font-black text-slate-700 uppercase tracking-wider">Filtros do Histórico</span>
+            </div>
+            {hasActiveHistoryFilters && (
+              <button
+                onClick={handleClearHistoryFilters}
+                className="flex items-center gap-1 text-[11px] font-bold text-slate-500 hover:text-brand-orange transition-colors"
+              >
+                <RotateCcw size={12} />
+                <span>Limpar Filtros</span>
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {/* Escola */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Escola</label>
+              <select
+                value={historyFilterEscola}
+                onChange={e => setHistoryFilterEscola(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todas as Escolas</option>
+                {historyOptions.escolas.map(e => (
+                  <option key={e.id} value={e.id}>{e.nome}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Ano/Série */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Ano/Série</label>
+              <select
+                value={historyFilterAnoSerie}
+                onChange={e => setHistoryFilterAnoSerie(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todos os Anos/Séries</option>
+                {historyOptions.anosSeries.map(a => (
+                  <option key={a} value={a}>{a}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Turma */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Turma</label>
+              <select
+                value={historyFilterTurma}
+                onChange={e => setHistoryFilterTurma(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todas as Turmas</option>
+                {historyOptions.turmas.map(t => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Componente */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Componente</label>
+              <select
+                value={historyFilterComponente}
+                onChange={e => setHistoryFilterComponente(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todos os Componentes</option>
+                {historyOptions.componentes.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Bimestre */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Bimestre</label>
+              <select
+                value={historyFilterBimestre}
+                onChange={e => setHistoryFilterBimestre(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todos os Bimestres</option>
+                {historyOptions.bimestres.map(b => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Professor */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Professor</label>
+              <select
+                value={historyFilterProfessor}
+                onChange={e => setHistoryFilterProfessor(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todos os Professores</option>
+                {historyOptions.professores.map(p => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </Card>
 
         <Card className="p-0 overflow-hidden border-slate-200 shadow-sm bg-white rounded-2xl">
           <div className="overflow-x-auto">
