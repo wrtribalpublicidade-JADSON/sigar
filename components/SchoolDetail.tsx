@@ -11,6 +11,7 @@ import { PrintableSchoolDocument } from './PrintableSchoolDocument';
 import { PrintableTurmaMatriculasReport } from './PrintableTurmaMatriculasReport';
 import { PrintableBoletimIndividualEstudante } from './PrintableBoletimIndividualEstudante';
 import { AtasFinaisTab } from './AtasFinaisTab';
+import { FrequenciaAlunosTab } from './FrequenciaAlunosTab';
 import { hasTabAccess, hasFullTabAccess } from '../utils/permissions';
 import {
   BarChart,
@@ -93,7 +94,7 @@ const ETAPAS_COHORTS = [
 ];
 
 export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadores = [], historicoVisitas, onBack, onUpdate, onUpdateVisitStatus, isDemoMode, userRole, onUpdateCoordenadorTurmas }) => {
-  const [activeTab, setActiveTab] = useState<'plano' | 'visitas' | 'turmas' | 'rh' | 'acompanhamento' | 'detalhamento_turmas' | 'documentos' | 'matriculas' | 'professores' | 'atas_finais'>('acompanhamento');
+  const [activeTab, setActiveTab] = useState<'plano' | 'visitas' | 'turmas' | 'rh' | 'acompanhamento' | 'detalhamento_turmas' | 'documentos' | 'matriculas' | 'professores' | 'atas_finais' | 'frequencia_alunos'>('acompanhamento');
   const [selectedVisitForPrint, setSelectedVisitForPrint] = useState<Visita | null>(null);
   const [selectedServidorForCarta, setSelectedServidorForCarta] = useState<RecursoHumano | null>(null);
   const [formData, setFormData] = useState<DadosEducacionais>(escola.dadosEducacionais);
@@ -223,7 +224,8 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
       { id: 'visitas', icon: History, label: 'Histórico' },
       { id: 'documentos', icon: FileText, label: 'Documentos' },
       { id: 'professores', icon: Users, label: 'Professores' },
-      { id: 'atas_finais', icon: FileText, label: 'Atas Finais' }
+      { id: 'atas_finais', icon: FileText, label: 'Atas Finais' },
+      { id: 'frequencia_alunos', icon: ClipboardCheck, label: 'Frequência de Alunos' }
     ];
     return allTabs.filter(tab => hasTabAccess('escolas', tab.id, userRole));
   }, [userRole]);
@@ -2429,6 +2431,16 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
           {
             activeTab === 'atas_finais' && (
               <AtasFinaisTab
+                escola={escola}
+                schoolTurmas={schoolTurmas}
+                isDemoMode={isDemoMode}
+                userRole={userRole}
+              />
+            )
+          }
+          {
+            activeTab === 'frequencia_alunos' && (
+              <FrequenciaAlunosTab
                 escola={escola}
                 schoolTurmas={schoolTurmas}
                 isDemoMode={isDemoMode}

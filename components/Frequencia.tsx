@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { PageHeader } from './ui/PageHeader';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
+import { ConfirmModal } from './ui/ConfirmModal';
 import { 
   ClipboardCheck, Calendar, School as SchoolIcon, Search, Save, CheckCircle, 
   XCircle, Percent, Users, Loader2, ListFilter, Trash2, AlertTriangle, RotateCcw,
@@ -77,6 +78,9 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
   const [selectedTurmaId, setSelectedTurmaId] = useState('');
   const [componente, setComponente] = useState(COMPONENTES[0]);
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
+  const [hasLoadedStudents, setHasLoadedStudents] = useState(false);
+  const [showSaveConfirmModal, setShowSaveConfirmModal] = useState(false);
+  const [showSaveSuccessModal, setShowSaveSuccessModal] = useState(false);
   const isBlocked = isDataBloqueada(dataFreq, currentUser?.funcao);
 
   const allowedEscolas = useMemo(() => {
@@ -370,91 +374,100 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
     }
   }, [availableTurmas, selectedTurmaId, editingSheet]);
 
-  // Load students when selected class changes
+  // Reset student load state when filters change unless editing sheet
   useEffect(() => {
-    const fetchStudents = async () => {
-      if (!selectedTurmaId) {
-        setStudents([]);
-        setAttendanceMap({});
-        return;
-      }
+    if (!editingSheet) {
+      setHasLoadedStudents(false);
+      setStudents([]);
+      setAttendanceMap({});
+    }
+  }, [selectedEscolaId, selectedAnoSerie, selectedTurmaId, componente, dataFreq]);
 
-      setIsLoadingStudents(true);
+  const canLoadStudents = Boolean(dataFreq && selectedEscolaId && selectedAnoSerie && selectedTurmaId && componente);
 
-      if (isDemoMode) {
-        const demoStudents = [
-          { id: 101, name: 'Alice Silveira Barbosa' },
-          { id: 102, name: 'Arthur Gabriel Fernandes' },
-          { id: 103, name: 'Beatriz Costa Rodrigues' },
-          { id: 104, name: 'Caio Roberto Lima' },
-          { id: 105, name: 'Eduarda Vitória Gomes' },
-          { id: 106, name: 'Felipe Augusto Santos' },
-          { id: 107, name: 'Giovanna Mendes Vieira' },
-          { id: 108, name: 'Heitor Nogueira Lopes' },
-          { id: 109, name: 'Isabela Rocha Martins' },
-          { id: 110, name: 'João Pedro Oliveira' }
-        ];
-        setStudents(demoStudents);
-        
-        const initialMap: Record<string | number, boolean> = {};
-        const sheetStudentsMap = new Map<string, boolean>();
-        if (editingSheet && editingSheet.turmaId === selectedTurmaId) {
-          (editingSheet.students || []).forEach(st => {
-            sheetStudentsMap.set(String(st.id), st.present);
-          });
-        }
+  const fetchStudents = async () => {
+    if (!selectedTurmaId) {
+      setStudents([]);
+      setAttendanceMap({});
+      setHasLoadedStudents(false);
+      return;
+    }
 
-        demoStudents.forEach(s => {
-          const sIdStr = String(s.id);
-          if (editingSheet && editingSheet.turmaId === selectedTurmaId && sheetStudentsMap.has(sIdStr)) {
-            initialMap[s.id] = sheetStudentsMap.get(sIdStr)!;
-          } else {
-            initialMap[s.id] = true;
-          }
+    setIsLoadingStudents(true);
+
+    if (isDemoMode) {
+      const demoStudents = [
+        { id: 101, name: 'Alice Silveira Barbosa' },
+        { id: 102, name: 'Arthur Gabriel Fernandes' },
+        { id: 103, name: 'Beatriz Costa Rodrigues' },
+        { id: 104, name: 'Caio Roberto Lima' },
+        { id: 105, name: 'Eduarda Vitória Gomes' },
+        { id: 106, name: 'Felipe Augusto Santos' },
+        { id: 107, name: 'Giovanna Mendes Vieira' },
+        { id: 108, name: 'Heitor Nogueira Lopes' },
+        { id: 109, name: 'Isabela Rocha Martins' },
+        { id: 110, name: 'João Pedro Oliveira' }
+      ];
+      setStudents(demoStudents);
+      
+      const initialMap: Record<string | number, boolean> = {};
+      const sheetStudentsMap = new Map<string, boolean>();
+      if (editingSheet && editingSheet.turmaId === selectedTurmaId) {
+        (editingSheet.students || []).forEach(st => {
+          sheetStudentsMap.set(String(st.id), st.present);
         });
-        setAttendanceMap(initialMap);
-        setIsLoadingStudents(false);
-        return;
       }
 
-      try {
-        const { data, error } = await supabase
-          .from('alunos')
-          .select('*')
-          .eq('class_id', selectedTurmaId)
-          .order('name');
-
-        if (error) throw error;
-        const loadedStudents = data || [];
-        setStudents(loadedStudents);
-        
-        const initialMap: Record<string | number, boolean> = {};
-        const sheetStudentsMap = new Map<string, boolean>();
-        if (editingSheet && editingSheet.turmaId === selectedTurmaId) {
-          (editingSheet.students || []).forEach(st => {
-            sheetStudentsMap.set(String(st.id), st.present);
-          });
+      demoStudents.forEach(s => {
+        const sIdStr = String(s.id);
+        if (editingSheet && editingSheet.turmaId === selectedTurmaId && sheetStudentsMap.has(sIdStr)) {
+          initialMap[s.id] = sheetStudentsMap.get(sIdStr)!;
+        } else {
+          initialMap[s.id] = true;
         }
+      });
+      setAttendanceMap(initialMap);
+      setIsLoadingStudents(false);
+      setHasLoadedStudents(true);
+      return;
+    }
 
-        loadedStudents.forEach((s: any) => {
-          const sIdStr = String(s.id);
-          if (editingSheet && editingSheet.turmaId === selectedTurmaId && sheetStudentsMap.has(sIdStr)) {
-            initialMap[s.id] = sheetStudentsMap.get(sIdStr)!;
-          } else {
-            initialMap[s.id] = true; // Default to present
-          }
+    try {
+      const { data, error } = await supabase
+        .from('alunos')
+        .select('*')
+        .eq('class_id', selectedTurmaId)
+        .order('name');
+
+      if (error) throw error;
+      const loadedStudents = data || [];
+      setStudents(loadedStudents);
+      
+      const initialMap: Record<string | number, boolean> = {};
+      const sheetStudentsMap = new Map<string, boolean>();
+      if (editingSheet && editingSheet.turmaId === selectedTurmaId) {
+        (editingSheet.students || []).forEach(st => {
+          sheetStudentsMap.set(String(st.id), st.present);
         });
-        setAttendanceMap(initialMap);
-      } catch (err) {
-        console.error('Erro ao carregar estudantes:', err);
-        showNotification('error', 'Erro ao carregar alunos.');
-      } finally {
-        setIsLoadingStudents(false);
       }
-    };
 
-    fetchStudents();
-  }, [selectedTurmaId, isDemoMode, editingSheet]);
+      loadedStudents.forEach((s: any) => {
+        const sIdStr = String(s.id);
+        if (editingSheet && editingSheet.turmaId === selectedTurmaId && sheetStudentsMap.has(sIdStr)) {
+          initialMap[s.id] = sheetStudentsMap.get(sIdStr)!;
+        } else {
+          initialMap[s.id] = true; // Default to present
+        }
+      });
+      setAttendanceMap(initialMap);
+      setHasLoadedStudents(true);
+    } catch (err) {
+      console.error('Erro ao carregar estudantes:', err);
+      showNotification('error', 'Erro ao carregar alunos.');
+    } finally {
+      setIsLoadingStudents(false);
+    }
+  };
 
   const handleToggleAttendance = (studentId: string | number) => {
     if (isBlocked) return;
@@ -593,6 +606,7 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
     if (sheet.turmaId) setSelectedTurmaId(sheet.turmaId);
     if (sheet.componente) setComponente(sheet.componente);
 
+    setHasLoadedStudents(true);
     showNotification('success', `Chamada da turma ${sheet.turmaNome} (${sheet.data}) carregada no formulário para edição.`);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -840,7 +854,7 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
           <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight">Seleção de Turma e Período</h2>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-6 gap-4">
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Data da Chamada *</label>
             <div className="relative">
@@ -912,11 +926,33 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
               ))}
             </select>
           </div>
+
+          <div className="flex items-end">
+            <Button 
+              onClick={() => fetchStudents()}
+              disabled={!canLoadStudents || isLoadingStudents}
+              className="w-full rounded-xl text-xs font-black py-2 bg-brand-orange hover:bg-orange-600 shadow-md flex items-center justify-center gap-1.5 transition-all"
+            >
+              {isLoadingStudents ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
+              Carregar Estudantes
+            </Button>
+          </div>
         </div>
       </Card>
 
+      {/* Show placeholder if students not loaded yet */}
+      {!hasLoadedStudents && (
+        <Card className="bg-slate-50/50 border border-dashed border-slate-200 p-8 text-center rounded-2xl">
+          <Users className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+          <h4 className="text-sm font-bold text-slate-600 uppercase tracking-tight">Aguardando Seleção de Filtros</h4>
+          <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+            Preencha todos os campos acima (Data, Escola, Ano/Série, Turma e Componente) e clique no botão <span className="font-bold text-brand-orange">"Carregar Estudantes"</span> para exibir a lista de presença.
+          </p>
+        </Card>
+      )}
+
       {/* Stats Summary cards */}
-      {students.length > 0 && (
+      {hasLoadedStudents && students.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
           <Card className="bg-white border-slate-100 p-4 rounded-2xl flex items-center justify-between shadow-sm">
             <div>
@@ -969,7 +1005,7 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
       )}
 
       {/* Student List Sheet & Quick Action buttons */}
-      {selectedTurmaId && (
+      {hasLoadedStudents && selectedTurmaId && (
         <Card className="bg-white border-slate-200 shadow-sm rounded-2xl overflow-hidden p-0">
           {isBlocked && (
             <div className="bg-amber-50 border-l-4 border-amber-500 text-amber-800 p-4 flex items-start gap-3 border-b border-slate-100">
@@ -1080,7 +1116,7 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
 
           <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-end">
             <Button 
-              onClick={handleSaveSheet}
+              onClick={() => setShowSaveConfirmModal(true)}
               disabled={isLoadingStudents || students.length === 0 || isBlocked}
               className="rounded-xl text-xs font-black py-2.5 bg-brand-orange hover:bg-orange-600 shadow-md flex items-center gap-1.5"
             >
@@ -1308,6 +1344,37 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
 
       {/* Printable Report Portal Component */}
       <PrintableFrequencia sheet={selectedSheetForPrint} />
+
+      {/* Confirm Save Attendance Modal */}
+      <ConfirmModal 
+        isOpen={showSaveConfirmModal}
+        onClose={() => setShowSaveConfirmModal(false)}
+        onConfirm={async () => {
+          setShowSaveConfirmModal(false);
+          await handleSaveSheet();
+          setShowSaveSuccessModal(true);
+        }}
+        title="Confirmar Registro de Chamada"
+        message="Deseja realmente salvar a pauta de frequência com as marcações de presença/falta atuais?"
+        icon={ClipboardCheck}
+        variant="warning"
+        confirmText="Salvar Chamada"
+        cancelText="Cancelar"
+        showCancel={true}
+      />
+
+      {/* Success Modal */}
+      <ConfirmModal 
+        isOpen={showSaveSuccessModal}
+        onClose={() => setShowSaveSuccessModal(false)}
+        onConfirm={() => setShowSaveSuccessModal(false)}
+        title="Sucesso!"
+        message="Dados salvos com sucesso!"
+        icon={CheckCircle}
+        variant="success"
+        confirmText="OK"
+        showCancel={false}
+      />
     </div>
   );
 };

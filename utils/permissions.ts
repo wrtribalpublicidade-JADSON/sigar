@@ -78,7 +78,8 @@ export const ALL_MODULES = [
             { id: 'visitas', name: 'Histórico' },
             { id: 'documentos', name: 'Documentos' },
             { id: 'professores', name: 'Professores' },
-            { id: 'atas_finais', name: 'Atas Finais' }
+            { id: 'atas_finais', name: 'Atas Finais' },
+            { id: 'frequencia_alunos', name: 'Frequência de Alunos' }
         ]
     },
     { id: 'equipe', name: 'Equipe / Gestão de Usuários', group: 'Gestão' },

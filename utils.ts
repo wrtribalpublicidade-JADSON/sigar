@@ -308,3 +308,35 @@ export const normalizeSubjectName = (name: string | undefined): string => {
   return trimmed;
 };
 
+export const getFirstBusinessDayOfMonth = (year?: number, monthIndex?: number): string => {
+  const now = new Date();
+  const y = year ?? now.getFullYear();
+  const m = monthIndex ?? now.getMonth();
+  
+  let current = new Date(y, m, 1);
+  while (current.getDay() === 0 || current.getDay() === 6) {
+    current.setDate(current.getDate() + 1);
+  }
+  
+  const yyyy = current.getFullYear();
+  const mm = String(current.getMonth() + 1).padStart(2, '0');
+  const dd = String(current.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+export const getLastBusinessDayOfMonth = (year?: number, monthIndex?: number): string => {
+  const now = new Date();
+  const y = year ?? now.getFullYear();
+  const m = monthIndex ?? now.getMonth();
+  
+  let current = new Date(y, m + 1, 0);
+  while (current.getDay() === 0 || current.getDay() === 6) {
+    current.setDate(current.getDate() - 1);
+  }
+  
+  const yyyy = current.getFullYear();
+  const mm = String(current.getMonth() + 1).padStart(2, '0');
+  const dd = String(current.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+

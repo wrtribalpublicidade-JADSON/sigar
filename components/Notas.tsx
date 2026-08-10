@@ -2,10 +2,11 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { PageHeader } from './ui/PageHeader';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
+import { ConfirmModal } from './ui/ConfirmModal';
 import { 
   GraduationCap, School as SchoolIcon, Search, Save, Percent, 
   TrendingUp, Award, AlertTriangle, Loader2, ListFilter, Trash2,
-  Printer, Edit, ChevronLeft, ChevronRight, RotateCcw
+  Printer, Edit, ChevronLeft, ChevronRight, RotateCcw, Users, CheckCircle
 } from 'lucide-react';
 import { Escola, Coordenador } from '../types';
 import { supabase } from '../services/supabase';
@@ -114,6 +115,9 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
   const [bimestre, setBimestre] = useState(BIMESTRES[0]);
   const isBlocked = isPeriodoBloqueado(bimestre, currentUser?.funcao);
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
+  const [hasLoadedStudents, setHasLoadedStudents] = useState(false);
+  const [showSaveConfirmModal, setShowSaveConfirmModal] = useState(false);
+  const [showSaveSuccessModal, setShowSaveSuccessModal] = useState(false);
 
   // History Filters & Pagination State
   const [historyFilterEscola, setHistoryFilterEscola] = useState('');
@@ -462,113 +466,123 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
     }
   }, [availableTurmas, selectedTurmaId]);
 
-  // Load students and matching sheet values when selected class/subject/term changes
+  // Reset student load state when filters change unless editing historical sheet
   useEffect(() => {
-    const fetchStudentsAndGrades = async () => {
-      if (!selectedTurmaId) {
-        setStudents([]);
-        setGradesMap({});
-        return;
-      }
+    if (!editTurmaIdRef.current) {
+      setHasLoadedStudents(false);
+      setStudents([]);
+      setGradesMap({});
+    }
+  }, [selectedEscolaId, selectedAnoSerie, selectedTurmaId, componente, bimestre]);
 
-      setIsLoadingStudents(true);
+  const canLoadStudents = Boolean(selectedEscolaId && selectedAnoSerie && selectedTurmaId && componente && bimestre);
 
-      // Check if there is an existing saved sheet for this context
-      const savedSheet = sheets.find(s => 
-        s.escolaId === selectedEscolaId && 
-        s.turmaId === selectedTurmaId && 
-        s.componente === componente && 
-        s.bimestre === bimestre
-      );
+  const fetchStudentsAndGrades = async () => {
+    if (!selectedTurmaId) {
+      setStudents([]);
+      setGradesMap({});
+      setHasLoadedStudents(false);
+      return;
+    }
 
-      if (savedSheet) {
-        // Load students and grades from the saved sheet
-        const sheetStudents = savedSheet.students.map(s => ({ id: s.id, name: s.name }));
-        setStudents(sheetStudents);
-        
-        const map: Record<string | number, {
-          av1: string;
-          av2: string;
-          qualitativa: string;
-          recuperacao: string;
-          mediaFinal: number;
-        }> = {};
-        savedSheet.students.forEach(s => {
-          map[s.id] = {
-            av1: formatGradeValue(s.av1),
-            av2: formatGradeValue(s.av2),
-            qualitativa: formatGradeValue(s.qualitativa),
-            recuperacao: formatGradeValue(s.recuperacao),
-            mediaFinal: s.mediaFinal
-          };
-        });
-        setGradesMap(map);
-        setIsLoadingStudents(false);
-        return;
-      }
+    setIsLoadingStudents(true);
 
-      // If no saved sheet, fetch students from database/mock and initialize blank grades
-      if (isDemoMode) {
-        const demoStudents = [
-          { id: 101, name: 'Alice Silveira Barbosa' },
-          { id: 102, name: 'Arthur Gabriel Fernandes' },
-          { id: 103, name: 'Beatriz Costa Rodrigues' },
-          { id: 104, name: 'Caio Roberto Lima' },
-          { id: 105, name: 'Eduarda Vitória Gomes' },
-          { id: 106, name: 'Felipe Augusto Santos' },
-          { id: 107, name: 'Giovanna Mendes Vieira' },
-          { id: 108, name: 'Heitor Nogueira Lopes' },
-          { id: 109, name: 'Isabela Rocha Martins' },
-          { id: 110, name: 'João Pedro Oliveira' }
-        ];
-        setStudents(demoStudents);
-        
-        const map: Record<string | number, {
-          av1: string;
-          av2: string;
-          qualitativa: string;
-          recuperacao: string;
-          mediaFinal: number;
-        }> = {};
-        demoStudents.forEach(s => {
-          map[s.id] = { av1: '', av2: '', qualitativa: '', recuperacao: '', mediaFinal: 0 };
-        });
-        setGradesMap(map);
-        setIsLoadingStudents(false);
-        return;
-      }
+    // Check if there is an existing saved sheet for this context
+    const savedSheet = sheets.find(s => 
+      s.escolaId === selectedEscolaId && 
+      s.turmaId === selectedTurmaId && 
+      s.componente === componente && 
+      s.bimestre === bimestre
+    );
 
-      try {
-        const { data, error } = await supabase
-          .from('alunos')
-          .select('*')
-          .eq('class_id', selectedTurmaId)
-          .order('name');
+    if (savedSheet) {
+      // Load students and grades from the saved sheet
+      const sheetStudents = savedSheet.students.map(s => ({ id: s.id, name: s.name }));
+      setStudents(sheetStudents);
+      
+      const map: Record<string | number, {
+        av1: string;
+        av2: string;
+        qualitativa: string;
+        recuperacao: string;
+        mediaFinal: number;
+      }> = {};
+      savedSheet.students.forEach(s => {
+        map[s.id] = {
+          av1: formatGradeValue(s.av1),
+          av2: formatGradeValue(s.av2),
+          qualitativa: formatGradeValue(s.qualitativa),
+          recuperacao: formatGradeValue(s.recuperacao),
+          mediaFinal: s.mediaFinal
+        };
+      });
+      setGradesMap(map);
+      setIsLoadingStudents(false);
+      setHasLoadedStudents(true);
+      return;
+    }
 
-        if (error) throw error;
-        setStudents(data || []);
+    // If no saved sheet, fetch students from database/mock and initialize blank grades
+    if (isDemoMode) {
+      const demoStudents = [
+        { id: 101, name: 'Alice Silveira Barbosa' },
+        { id: 102, name: 'Arthur Gabriel Fernandes' },
+        { id: 103, name: 'Beatriz Costa Rodrigues' },
+        { id: 104, name: 'Caio Roberto Lima' },
+        { id: 105, name: 'Eduarda Vitória Gomes' },
+        { id: 106, name: 'Felipe Augusto Santos' },
+        { id: 107, name: 'Giovanna Mendes Vieira' },
+        { id: 108, name: 'Heitor Nogueira Lopes' },
+        { id: 109, name: 'Isabela Rocha Martins' },
+        { id: 110, name: 'João Pedro Oliveira' }
+      ];
+      setStudents(demoStudents);
+      
+      const map: Record<string | number, {
+        av1: string;
+        av2: string;
+        qualitativa: string;
+        recuperacao: string;
+        mediaFinal: number;
+      }> = {};
+      demoStudents.forEach(s => {
+        map[s.id] = { av1: '', av2: '', qualitativa: '', recuperacao: '', mediaFinal: 0 };
+      });
+      setGradesMap(map);
+      setIsLoadingStudents(false);
+      setHasLoadedStudents(true);
+      return;
+    }
 
-        const map: Record<string | number, {
-          av1: string;
-          av2: string;
-          qualitativa: string;
-          recuperacao: string;
-          mediaFinal: number;
-        }> = {};
-        (data || []).forEach((s: any) => {
-          map[s.id] = { av1: '', av2: '', qualitativa: '', recuperacao: '', mediaFinal: 0 };
-        });
-        setGradesMap(map);
-      } catch (err) {
-        console.error('Erro ao carregar estudantes:', err);
-        showNotification('error', 'Erro ao carregar alunos.');
-      } finally {
-        setIsLoadingStudents(false);
-      }
-    };
+    try {
+      const { data, error } = await supabase
+        .from('alunos')
+        .select('*')
+        .eq('class_id', selectedTurmaId)
+        .order('name');
 
-    fetchStudentsAndGrades();
-  }, [selectedTurmaId, selectedEscolaId, componente, bimestre, sheets, isDemoMode]);
+      if (error) throw error;
+      setStudents(data || []);
+
+      const map: Record<string | number, {
+        av1: string;
+        av2: string;
+        qualitativa: string;
+        recuperacao: string;
+        mediaFinal: number;
+      }> = {};
+      (data || []).forEach((s: any) => {
+        map[s.id] = { av1: '', av2: '', qualitativa: '', recuperacao: '', mediaFinal: 0 };
+      });
+      setGradesMap(map);
+      setHasLoadedStudents(true);
+    } catch (err) {
+      console.error('Erro ao carregar estudantes:', err);
+      showNotification('error', 'Erro ao carregar alunos.');
+    } finally {
+      setIsLoadingStudents(false);
+    }
+  };
 
   // Calculate final average based on: (AV1 + AV2 + Qualitativa) / 3, and if recovery is higher, replace it
   const calculateFinalMedia = (av1: string, av2: string, qual: string, rec: string): number => {
@@ -822,6 +836,7 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
       editTurmaIdRef.current = sheet.turmaId;
       setSelectedEscolaId(sheet.escolaId);
     }
+    setHasLoadedStudents(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -1093,19 +1108,30 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
 
           <div className="flex items-end">
             <Button 
-              onClick={handleSaveGrades}
-              disabled={isLoadingStudents || students.length === 0 || isBlocked}
-              className="w-full rounded-xl text-xs font-black py-2 bg-brand-orange hover:bg-orange-600 shadow-md flex items-center justify-center gap-1.5"
+              onClick={() => fetchStudentsAndGrades()}
+              disabled={!canLoadStudents || isLoadingStudents}
+              className="w-full rounded-xl text-xs font-black py-2 bg-brand-orange hover:bg-orange-600 shadow-md flex items-center justify-center gap-1.5 transition-all"
             >
-              <Save className="w-4 h-4" />
-              Salvar Notas
+              {isLoadingStudents ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
+              Carregar Estudantes
             </Button>
           </div>
         </div>
       </Card>
 
+      {/* Show placeholder if students not loaded yet */}
+      {!hasLoadedStudents && (
+        <Card className="bg-slate-50/50 border border-dashed border-slate-200 p-8 text-center rounded-2xl">
+          <GraduationCap className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+          <h4 className="text-sm font-bold text-slate-600 uppercase tracking-tight">Aguardando Seleção de Filtros</h4>
+          <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+            Preencha todos os campos acima (Escola, Ano/Série, Turma, Componente e Bimestre) e clique no botão <span className="font-bold text-brand-orange">"Carregar Estudantes"</span> para exibir a pauta de lançamento de notas.
+          </p>
+        </Card>
+      )}
+
       {/* Grades Dashboard Summary Stats */}
-      {students.length > 0 && (
+      {hasLoadedStudents && students.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Card className="bg-white border-slate-100 p-4 rounded-2xl flex items-center justify-between shadow-sm">
             <div>
@@ -1147,7 +1173,7 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
       )}
 
       {/* Spreadsheet Grade Card */}
-      {selectedTurmaId && (
+      {hasLoadedStudents && selectedTurmaId && (
         <Card className="bg-white border-slate-200 shadow-sm rounded-2xl overflow-hidden p-0">
           {isBlocked && (
             <div className="bg-amber-50 border-l-4 border-amber-500 text-amber-800 p-4 flex items-start gap-3 border-b border-slate-105">
@@ -1276,6 +1302,17 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
                 </tbody>
               </table>
             )}
+          </div>
+
+          <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-end">
+            <Button 
+              onClick={() => setShowSaveConfirmModal(true)}
+              disabled={isLoadingStudents || students.length === 0 || isBlocked}
+              className="rounded-xl text-xs font-black py-2.5 bg-brand-orange hover:bg-orange-600 shadow-md flex items-center gap-1.5"
+            >
+              <Save className="w-4 h-4" />
+              Salvar Notas
+            </Button>
           </div>
         </Card>
       )}
@@ -1559,6 +1596,37 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
       {selectedSheetForPrint && (
         <PrintableBoletim sheet={selectedSheetForPrint} />
       )}
+
+      {/* Confirm Save Grades Modal */}
+      <ConfirmModal 
+        isOpen={showSaveConfirmModal}
+        onClose={() => setShowSaveConfirmModal(false)}
+        onConfirm={async () => {
+          setShowSaveConfirmModal(false);
+          await handleSaveGrades();
+          setShowSaveSuccessModal(true);
+        }}
+        title="Confirmar Lançamento de Notas"
+        message="Deseja realmente salvar as notas lançadas para esta turma?"
+        icon={GraduationCap}
+        variant="warning"
+        confirmText="Salvar Notas"
+        cancelText="Cancelar"
+        showCancel={true}
+      />
+
+      {/* Success Modal */}
+      <ConfirmModal 
+        isOpen={showSaveSuccessModal}
+        onClose={() => setShowSaveSuccessModal(false)}
+        onConfirm={() => setShowSaveSuccessModal(false)}
+        title="Sucesso!"
+        message="Dados salvos com sucesso!"
+        icon={CheckCircle}
+        variant="success"
+        confirmText="OK"
+        showCancel={false}
+      />
     </div>
   );
 };
