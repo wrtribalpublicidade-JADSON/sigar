@@ -495,36 +495,20 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
       s.bimestre === bimestre
     );
 
-    if (savedSheet) {
-      // Load students and grades from the saved sheet
-      const sheetStudents = savedSheet.students.map(s => ({ id: s.id, name: s.name }));
-      setStudents(sheetStudents);
-      
-      const map: Record<string | number, {
-        av1: string;
-        av2: string;
-        qualitativa: string;
-        recuperacao: string;
-        mediaFinal: number;
-      }> = {};
-      savedSheet.students.forEach(s => {
-        map[s.id] = {
-          av1: formatGradeValue(s.av1),
-          av2: formatGradeValue(s.av2),
-          qualitativa: formatGradeValue(s.qualitativa),
-          recuperacao: formatGradeValue(s.recuperacao),
-          mediaFinal: s.mediaFinal
-        };
+    // Map saved grades by student ID and student name for reliable matching
+    const savedGradesById = new Map<string, any>();
+    const savedGradesByName = new Map<string, any>();
+    if (savedSheet && savedSheet.students) {
+      savedSheet.students.forEach(st => {
+        if (st.id) savedGradesById.set(String(st.id), st);
+        if (st.name) savedGradesByName.set(st.name.trim().toLowerCase(), st);
       });
-      setGradesMap(map);
-      setIsLoadingStudents(false);
-      setHasLoadedStudents(true);
-      return;
     }
 
-    // If no saved sheet, fetch students from database/mock and initialize blank grades
+    let classStudents: { id: string | number; name: string }[] = [];
+
     if (isDemoMode) {
-      const demoStudents = [
+      classStudents = [
         { id: 101, name: 'Alice Silveira Barbosa' },
         { id: 102, name: 'Arthur Gabriel Fernandes' },
         { id: 103, name: 'Beatriz Costa Rodrigues' },
@@ -536,52 +520,53 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
         { id: 109, name: 'Isabela Rocha Martins' },
         { id: 110, name: 'João Pedro Oliveira' }
       ];
-      setStudents(demoStudents);
-      
-      const map: Record<string | number, {
-        av1: string;
-        av2: string;
-        qualitativa: string;
-        recuperacao: string;
-        mediaFinal: number;
-      }> = {};
-      demoStudents.forEach(s => {
-        map[s.id] = { av1: '', av2: '', qualitativa: '', recuperacao: '', mediaFinal: 0 };
-      });
-      setGradesMap(map);
-      setIsLoadingStudents(false);
-      setHasLoadedStudents(true);
-      return;
+    } else {
+      try {
+        const { data, error } = await supabase
+          .from('alunos')
+          .select('*')
+          .eq('class_id', selectedTurmaId)
+          .order('name');
+
+        if (error) throw error;
+        classStudents = (data || []).map((s: any) => ({ id: s.id, name: s.name }));
+      } catch (err) {
+        console.error('Erro ao carregar estudantes:', err);
+        showNotification('error', 'Erro ao carregar alunos da turma.');
+        setIsLoadingStudents(false);
+        return;
+      }
     }
 
-    try {
-      const { data, error } = await supabase
-        .from('alunos')
-        .select('*')
-        .eq('class_id', selectedTurmaId)
-        .order('name');
+    setStudents(classStudents);
 
-      if (error) throw error;
-      setStudents(data || []);
+    // Build grades map for all current class students
+    const map: Record<string | number, {
+      av1: string;
+      av2: string;
+      qualitativa: string;
+      recuperacao: string;
+      mediaFinal: number;
+    }> = {};
 
-      const map: Record<string | number, {
-        av1: string;
-        av2: string;
-        qualitativa: string;
-        recuperacao: string;
-        mediaFinal: number;
-      }> = {};
-      (data || []).forEach((s: any) => {
+    classStudents.forEach(s => {
+      const savedGrade = savedGradesById.get(String(s.id)) || savedGradesByName.get(s.name.trim().toLowerCase());
+      if (savedGrade) {
+        map[s.id] = {
+          av1: formatGradeValue(savedGrade.av1),
+          av2: formatGradeValue(savedGrade.av2),
+          qualitativa: formatGradeValue(savedGrade.qualitativa),
+          recuperacao: formatGradeValue(savedGrade.recuperacao),
+          mediaFinal: Number(savedGrade.mediaFinal) || 0
+        };
+      } else {
         map[s.id] = { av1: '', av2: '', qualitativa: '', recuperacao: '', mediaFinal: 0 };
-      });
-      setGradesMap(map);
-      setHasLoadedStudents(true);
-    } catch (err) {
-      console.error('Erro ao carregar estudantes:', err);
-      showNotification('error', 'Erro ao carregar alunos.');
-    } finally {
-      setIsLoadingStudents(false);
-    }
+      }
+    });
+
+    setGradesMap(map);
+    setIsLoadingStudents(false);
+    setHasLoadedStudents(true);
   };
 
   // Calculate final average based on: (AV1 + AV2 + Qualitativa) / 3, and if recovery is higher, replace it
