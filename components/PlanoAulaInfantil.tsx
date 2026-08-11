@@ -6,7 +6,7 @@ import { Button } from './ui/Button';
 import { 
   BookOpen, Plus, Search, Edit2, Trash2, Printer, 
   X, Calendar, School as SchoolIcon, Bookmark, Save,
-  Check, Info, Layers
+  Check, Info, Layers, CheckCircle2, AlertCircle, Clock, MessageSquare
 } from 'lucide-react';
 import { Escola, Coordenador, Segmento } from '../types';
 import { supabase } from '../services/supabase';
@@ -40,6 +40,10 @@ interface LessonPlanInfantil {
   anoSerie: string;
   periodo: string;
   criadoEm: string;
+  status?: 'Em Análise' | 'Aprovado' | 'Devolvido para Correção';
+  observacaoCoordenacao?: string;
+  avaliadoPor?: string;
+  avaliadoEm?: string;
 }
 
 const FAiXAS_ETARIAS = ['Creche II', 'Creche III', 'Pré I', 'Pré II'];
@@ -92,6 +96,19 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [schoolFilter, setSchoolFilter] = useState('ALL');
   const [classFilter, setClassFilter] = useState('ALL');
+  const [historyFilterStatus, setHistoryFilterStatus] = useState<string>('');
+
+  // Evaluation Modal state
+  const [evaluatingPlan, setEvaluatingPlan] = useState<LessonPlanInfantil | null>(null);
+  const [evalObsText, setEvalObsText] = useState('');
+  const [evalTargetStatus, setEvalTargetStatus] = useState<'Aprovado' | 'Devolvido para Correção'>('Aprovado');
+
+  const canEvaluateGuia = useMemo(() => {
+    if (isAdmin) return true;
+    if (!currentUser?.funcao) return true;
+    const f = currentUser.funcao.toLowerCase();
+    return f.includes('coordenador') || f.includes('gestor') || f.includes('diretor') || f.includes('administrador') || f.includes('técnico') || f.includes('tecnico');
+  }, [isAdmin, currentUser]);
 
   // Printing State
   const [printPlan, setPrintPlan] = useState<LessonPlanInfantil | null>(null);
@@ -502,7 +519,11 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
             avaliacao: d.avaliacao,
             anoSerie: d.ano_serie,
             periodo: d.periodo,
-            criadoEm: d.created_at
+            criadoEm: d.created_at,
+            status: d.status || 'Em Análise',
+            observacaoCoordenacao: d.observacao_coordenacao || d.observacaoCoordenacao || '',
+            avaliadoPor: d.avaliado_por || d.avaliadoPor || '',
+            avaliadoEm: d.avaliado_em || d.avaliadoEm || ''
           }));
           setPlans(formatted);
         } else {
@@ -552,7 +573,9 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
       avaliacao,
       anoSerie,
       periodo,
-      criadoEm: new Date().toISOString()
+      criadoEm: new Date().toISOString(),
+      status: 'Em Análise',
+      observacaoCoordenacao: editingId ? (plans.find(p => p.id === editingId)?.observacaoCoordenacao || '') : ''
     };
 
     try {
@@ -571,6 +594,10 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
           avaliacao: payload.avaliacao,
           ano_serie: payload.anoSerie,
           periodo: payload.periodo,
+          status: payload.status || 'Em Análise',
+          observacao_coordenacao: payload.observacaoCoordenacao || '',
+          avaliado_por: payload.avaliadoPor || null,
+          avaliado_em: payload.avaliadoEm || null,
           updated_at: new Date().toISOString(),
           updated_by: userEmail || currentUser?.contato || 'user'
         };
@@ -684,16 +711,103 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
     }, 150);
   };
 
-  // Filter lists for dashboard
+  const openEvaluationModal = (plan: LessonPlanInfantil, initialStatus: 'Aprovado' | 'Devolvido para Correção') => {
+    setEvaluatingPlan(plan);
+    setEvalTargetStatus(initialStatus);
+    setEvalObsText(plan.observacaoCoordenacao || '');
+  };
+
+  const handleSaveEvaluation = async () => {
+    if (!evaluatingPlan) return;
+
+    if (evalTargetStatus === 'Devolvido para Correção' && !evalObsText.trim()) {
+      showNotification('error', 'Por favor, informe a observação do que deve ser ajustado.');
+      return;
+    }
+
+    const avaliadorNome = currentUser?.nome || userEmail || 'Coordenador';
+    const nowIso = new Date().toISOString();
+
+    const updatedPlan: LessonPlanInfantil = {
+      ...evaluatingPlan,
+      status: evalTargetStatus,
+      observacaoCoordenacao: evalObsText.trim(),
+      avaliadoPor: avaliadorNome,
+      avaliadoEm: nowIso
+    };
+
+    if (!isDemoMode) {
+      const { error } = await supabase
+        .from('guias_aprendizagem_infantil')
+        .update({
+          status: evalTargetStatus,
+          observacao_coordenacao: evalObsText.trim(),
+          avaliado_por: avaliadorNome,
+          avaliado_em: nowIso,
+          updated_at: nowIso,
+          updated_by: avaliadorNome
+        })
+        .eq('id', evaluatingPlan.id);
+
+      if (error) {
+        console.error('Erro ao atualizar avaliação no Supabase:', error);
+        showNotification('error', 'Erro ao salvar avaliação no banco de dados.');
+        return;
+      }
+    }
+
+    const updatedList = plans.map(p => p.id === evaluatingPlan.id ? updatedPlan : p);
+    setPlans(updatedList);
+    if (isDemoMode) {
+      localStorage.setItem('sigar_guias_aprendizagem_infantil', JSON.stringify(updatedList));
+    }
+
+    showNotification('success', evalTargetStatus === 'Aprovado' 
+      ? 'Guia ECE APROVADA com sucesso!' 
+      : 'Guia ECE DEVOLVIDA para correção.');
+
+    setEvaluatingPlan(null);
+    setEvalObsText('');
+  };
+
+  const renderStatusBadge = (status?: string) => {
+    const currentStatus = status || 'Em Análise';
+    if (currentStatus === 'Aprovado') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+          <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Aprovado
+        </span>
+      );
+    }
+    if (currentStatus === 'Devolvido para Correção') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200 shrink-0">
+          <AlertCircle className="w-3 h-3 text-rose-600" /> Devolvido para Correção
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+        <Clock className="w-3 h-3 text-amber-600" /> Em Análise
+      </span>
+    );
+  };
+
+  // Filtered plans for historical view
   const filteredPlans = useMemo(() => {
-    return plans.filter(p => {
-      const matchesSearch = p.titulo.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                            p.campoExperiencia.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesSchool = schoolFilter === 'ALL' || p.escolaId === schoolFilter;
-      const matchesClass = classFilter === 'ALL' || p.turmaId === classFilter;
-      return matchesSearch && matchesSchool && matchesClass;
+    return plans.filter(plan => {
+      const matchesSearch = 
+        plan.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        plan.objetivos.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        plan.campoExperiencia.toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchesSchool = schoolFilter === 'ALL' || plan.escolaId === schoolFilter;
+      const matchesClass = classFilter === 'ALL' || plan.turmaId === classFilter;
+      const matchesStatus = !historyFilterStatus || (plan.status || 'Em Análise') === historyFilterStatus;
+
+      return matchesSearch && matchesSchool && matchesClass && matchesStatus;
     });
-  }, [plans, searchTerm, schoolFilter, classFilter]);
+  }, [plans, searchTerm, schoolFilter, classFilter, historyFilterStatus]);
 
   return (
     <div className="space-y-6 pb-12 animate-fade-in relative text-left">
@@ -918,6 +1032,24 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
         </div>
 
         <form onSubmit={handleSave} className="space-y-4">
+          {editingId && plans.find(p => p.id === editingId)?.status === 'Devolvido para Correção' && (
+            <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-3 text-rose-800 animate-fade-in">
+              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+              <div>
+                <div className="text-xs font-black uppercase tracking-wider text-rose-900 mb-0.5">
+                  Guia Devolvida para Correção pela Coordenação Pedagógica
+                </div>
+                <p className="text-xs font-medium text-rose-700">
+                  {plans.find(p => p.id === editingId)?.observacaoCoordenacao || 'Efetue os ajustes necessários conforme as orientações.'}
+                </p>
+                {plans.find(p => p.id === editingId)?.avaliadoPor && (
+                  <span className="inline-block mt-1 text-[10px] font-bold text-rose-500">
+                    Devolvido por: {plans.find(p => p.id === editingId)?.avaliadoPor}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Data *</label>
@@ -1221,6 +1353,17 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
               />
             </div>
 
+            <select
+              value={historyFilterStatus}
+              onChange={e => setHistoryFilterStatus(e.target.value)}
+              className="px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+            >
+              <option value="">Todos os Status</option>
+              <option value="Em Análise">Em Análise</option>
+              <option value="Aprovado">Aprovado</option>
+              <option value="Devolvido para Correção">Devolvido para Correção</option>
+            </select>
+
             <SearchableSchoolSelect
               escolas={escolasInfantil}
               selectedId={schoolFilter}
@@ -1276,13 +1419,42 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
                         </div>
                       </td>
                       <td className="px-6 py-3">
-                        <div className="font-semibold text-slate-800 line-clamp-1">{plan.titulo}</div>
-                        <div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="font-semibold text-slate-800 line-clamp-1">{plan.titulo}</div>
+                          {renderStatusBadge(plan.status)}
+                        </div>
+                        <div className="text-[10px] text-slate-400 line-clamp-1">
                           Campo de Experiência: {plan.objetivos}
                         </div>
+                        {plan.status === 'Devolvido para Correção' && plan.observacaoCoordenacao && (
+                          <div className="mt-1.5 p-2 bg-rose-50 border border-rose-200 rounded-xl text-[11px] text-rose-800 flex items-start gap-1.5">
+                            <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="font-bold">Ajustes Solicitados:</span> {plan.observacaoCoordenacao}
+                            </div>
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center justify-end gap-1">
+                          {canEvaluateGuia && (
+                            <>
+                              <button
+                                onClick={() => openEvaluationModal(plan, 'Aprovado')}
+                                className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                                title="Aprovar Guia de Aprendizagem"
+                              >
+                                <CheckCircle2 size={16} />
+                              </button>
+                              <button
+                                onClick={() => openEvaluationModal(plan, 'Devolvido para Correção')}
+                                className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                                title="Devolver para Correção"
+                              >
+                                <AlertCircle size={16} />
+                              </button>
+                            </>
+                          )}
                           <button 
                             onClick={() => handlePrint(plan)} 
                             className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" 
@@ -1315,6 +1487,93 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
         </Card>
       </div>
 
+      {/* Evaluation Modal for Coordinators */}
+      {evaluatingPlan && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 animate-scale-up space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Bookmark className="w-5 h-5 text-brand-orange" />
+                <h3 className="text-base font-bold text-slate-800">
+                  Avaliar Guia de Aprendizagem ECE
+                </h3>
+              </div>
+              <button
+                onClick={() => setEvaluatingPlan(null)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3.5 space-y-1 text-xs text-slate-700">
+              <div><span className="font-bold text-slate-500 uppercase text-[10px]">Guia / Tema:</span> <span className="font-bold text-slate-800">{evaluatingPlan.titulo}</span></div>
+              <div><span className="font-bold text-slate-500 uppercase text-[10px]">Escola / Turma:</span> {evaluatingPlan.escolaNome} — {evaluatingPlan.turmaNome} ({evaluatingPlan.anoSerie})</div>
+              <div><span className="font-bold text-slate-500 uppercase text-[10px]">Campo de Experiência:</span> {evaluatingPlan.campoExperiencia} ({evaluatingPlan.periodo})</div>
+            </div>
+
+            <div className="space-y-3">
+              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider">
+                Selecione a Decisão
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setEvalTargetStatus('Aprovado')}
+                  className={`p-3 rounded-2xl border-2 flex items-center justify-center gap-2 font-bold text-xs transition-all ${
+                    evalTargetStatus === 'Aprovado'
+                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                  }`}
+                >
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  Aprovar Guia
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEvalTargetStatus('Devolvido para Correção')}
+                  className={`p-3 rounded-2xl border-2 flex items-center justify-center gap-2 font-bold text-xs transition-all ${
+                    evalTargetStatus === 'Devolvido para Correção'
+                      ? 'border-rose-500 bg-rose-50 text-rose-700 shadow-sm'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                  }`}
+                >
+                  <AlertCircle className="w-4 h-4 text-rose-600" />
+                  Devolver p/ Correção
+                </button>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
+                  Observações da Coordenação {evalTargetStatus === 'Devolvido para Correção' ? <span className="text-rose-500">*</span> : <span className="text-slate-400 font-normal">(Opcional)</span>}
+                </label>
+                <textarea
+                  value={evalObsText}
+                  onChange={e => setEvalObsText(e.target.value)}
+                  placeholder={evalTargetStatus === 'Devolvido para Correção' 
+                    ? "Descreva detalhadamente o que o professor deve ajustar na guia..." 
+                    : "Observações ou orientações pedagógicas complementares..."}
+                  rows={4}
+                  className="w-full p-3 border border-slate-200 rounded-2xl text-xs outline-none focus:border-brand-orange transition-all font-medium"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <Button variant="ghost" onClick={() => setEvaluatingPlan(null)}>
+                Cancelar
+              </Button>
+              <Button 
+                variant="primary" 
+                onClick={handleSaveEvaluation}
+                className={evalTargetStatus === 'Aprovado' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'}
+              >
+                {evalTargetStatus === 'Aprovado' ? 'Confirmar Aprovação' : 'Confirmar Devolução'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
