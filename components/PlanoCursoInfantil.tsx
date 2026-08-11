@@ -268,13 +268,17 @@ export const PlanoCursoInfantil: React.FC<PlanoCursoInfantilProps> = ({
             a.toLowerCase().includes(anoSerieVal.toLowerCase()) || anoSerieVal.toLowerCase().includes(a.toLowerCase())
           ) || anoSerieVal;
 
-          const groupKey = `${anoRefVal}-${matchedAnoSerie}-${matchedBimestre}`;
+          const matchedComponente = CAMPOS_EXPERIENCIA.includes(componenteVal) 
+            ? componenteVal 
+            : (CAMPOS_EXPERIENCIA.find(c => c.toLowerCase().includes(componenteVal.toLowerCase())) || 'O eu, o outro e o nós');
+
+          const groupKey = `${anoRefVal}-${matchedAnoSerie}-${matchedComponente}-${matchedBimestre}`;
 
           if (!groups[groupKey]) {
             groups[groupKey] = {
               anoReferencia: anoRefVal,
               anoSerie: matchedAnoSerie,
-              componente: CAMPOS_EXPERIENCIA.includes(componenteVal) ? componenteVal : (CAMPOS_EXPERIENCIA.find(c => c.toLowerCase().includes(componenteVal.toLowerCase())) || 'O eu, o outro e o nós'),
+              componente: matchedComponente,
               bimestre: matchedBimestre,
               itens: []
             };
@@ -336,6 +340,7 @@ export const PlanoCursoInfantil: React.FC<PlanoCursoInfantilProps> = ({
           const existingIdx = updatedPlans.findIndex(p => 
             p.anoReferencia === importedPlan.anoReferencia &&
             p.anoSerie === importedPlan.anoSerie &&
+            p.componente === importedPlan.componente &&
             p.bimestre === importedPlan.bimestre
           );
 
@@ -1061,11 +1066,12 @@ export const PlanoCursoInfantil: React.FC<PlanoCursoInfantilProps> = ({
       p.id !== editingId &&
       p.anoReferencia === anoReferencia &&
       p.anoSerie === anoSerie &&
+      p.componente === componente &&
       p.bimestre === bimestre
     );
 
     if (duplicate) {
-      showNotification('error', 'Já existe um plano cadastrado para este Ano, Série e Período.');
+      showNotification('error', 'Já existe um plano cadastrado para este Ano, Série, Campo de Experiência e Período.');
       return;
     }
 

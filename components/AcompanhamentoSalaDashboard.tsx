@@ -140,7 +140,22 @@ export const AcompanhamentoSalaDashboard: React.FC<AcompanhamentoSalaDashboardPr
         });
     }, [allObservacoes, activeFilterTab, searchTerm]);
 
+    const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [currentPage, setCurrentPage] = useState(1);
+
+    React.useEffect(() => {
+        setCurrentPage(1);
+    }, [activeFilterTab, searchTerm, selectedEscolaId, itemsPerPage]);
+
     const totalCount = filteredObservacoes.length;
+    const totalPages = Math.max(1, Math.ceil(totalCount / itemsPerPage));
+    const safeCurrentPage = Math.min(currentPage, totalPages);
+
+    const paginatedObservacoes = React.useMemo(() => {
+        const start = (safeCurrentPage - 1) * itemsPerPage;
+        return filteredObservacoes.slice(start, start + itemsPerPage);
+    }, [filteredObservacoes, safeCurrentPage, itemsPerPage]);
+
     const rascunhosCount = filteredObservacoes.filter(o => o.status === 'Rascunho').length;
     const concluidoCount = filteredObservacoes.filter(o => o.status === 'Concluído').length;
 
@@ -249,7 +264,7 @@ export const AcompanhamentoSalaDashboard: React.FC<AcompanhamentoSalaDashboardPr
                                         Nenhum professor encontrado com os filtros atuais.
                                     </td>
                                 </tr>
-                            ) : filteredObservacoes.map((obs) => (
+                            ) : paginatedObservacoes.map((obs) => (
                                 <tr key={obs.id} className="hover:bg-slate-50 transition-colors">
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
@@ -304,26 +319,67 @@ export const AcompanhamentoSalaDashboard: React.FC<AcompanhamentoSalaDashboardPr
                     </table>
                 </div>
 
-                <div className="p-4 border-t border-slate-100 flex items-center justify-between">
-                    <span className="text-sm font-medium text-slate-500">Mostrando {totalCount} professores</span>
-                    <div className="flex items-center gap-1">
-                        <button className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 transition-colors">
-                            <ChevronLeft className="w-4 h-4" />
-                        </button>
-                        <button className="w-8 h-8 flex items-center justify-center rounded-lg bg-blue-600 text-white font-bold text-sm shadow-sm">
-                            1
-                        </button>
-                        <button className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-colors">
-                            2
-                        </button>
-                        <button className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-colors">
-                            3
-                        </button>
-                        <button className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors">
-                            <ChevronRight className="w-4 h-4" />
-                        </button>
+                {totalCount > 0 && (
+                    <div className="p-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-semibold text-slate-600">
+                        <div>
+                            Mostrando{' '}
+                            <span className="font-bold text-slate-800">
+                                {Math.min((safeCurrentPage - 1) * itemsPerPage + 1, totalCount)}
+                            </span>{' '}
+                            a{' '}
+                            <span className="font-bold text-slate-800">
+                                {Math.min(safeCurrentPage * itemsPerPage, totalCount)}
+                            </span>{' '}
+                            de <span className="font-bold text-slate-800">{totalCount}</span> professores registrados
+                        </div>
+
+                        <div className="flex items-center gap-4">
+                            {/* Items per page selector */}
+                            <div className="flex items-center gap-2">
+                                <span className="text-slate-500">Exibir:</span>
+                                <select
+                                    value={itemsPerPage}
+                                    onChange={e => {
+                                        setItemsPerPage(Number(e.target.value));
+                                        setCurrentPage(1);
+                                    }}
+                                    className="px-2 py-1 border border-slate-200 rounded-lg bg-white outline-none text-xs font-bold text-slate-700 focus:border-blue-500 transition-all cursor-pointer"
+                                >
+                                    <option value={10}>10</option>
+                                    <option value={20}>20</option>
+                                    <option value={30}>30</option>
+                                    <option value={50}>50</option>
+                                    <option value={100}>100</option>
+                                </select>
+                            </div>
+
+                            {/* Page Navigation Buttons */}
+                            <div className="flex items-center gap-1.5">
+                                <button
+                                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                    disabled={safeCurrentPage === 1}
+                                    className="p-1.5 border border-slate-200 rounded-lg hover:bg-white disabled:opacity-40 disabled:hover:bg-transparent text-slate-600 transition-all cursor-pointer disabled:cursor-not-allowed"
+                                    title="Página Anterior"
+                                >
+                                    <ChevronLeft className="w-4 h-4" />
+                                </button>
+
+                                <span className="px-2 text-xs font-bold text-slate-700">
+                                    {safeCurrentPage} / {totalPages}
+                                </span>
+
+                                <button
+                                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                    disabled={safeCurrentPage === totalPages}
+                                    className="p-1.5 border border-slate-200 rounded-lg hover:bg-white disabled:opacity-40 disabled:hover:bg-transparent text-slate-600 transition-all cursor-pointer disabled:cursor-not-allowed"
+                                    title="Próxima Página"
+                                >
+                                    <ChevronRight className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
 
             {isModalOpen && selectedProfessor && (

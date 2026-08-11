@@ -6,7 +6,7 @@ import { Button } from './ui/Button';
 import { 
   FileText, Plus, Search, Edit2, Trash2, Printer, 
   X, Calendar, School as SchoolIcon, BookOpen, Save, ClipboardList,
-  Layers, Check, AlertTriangle, ListFilter, RotateCcw
+  Layers, Check, AlertTriangle, ListFilter, RotateCcw, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { Escola, Coordenador } from '../types';
 import { supabase } from '../services/supabase';
@@ -149,6 +149,22 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
   const [historyFilterBimestre, setHistoryFilterBimestre] = useState('');
   const [historyFilterProfessor, setHistoryFilterProfessor] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+
+  const [historyItemsPerPage, setHistoryItemsPerPage] = useState(10);
+  const [historyCurrentPage, setHistoryCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setHistoryCurrentPage(1);
+  }, [
+    historyFilterEscola,
+    historyFilterAnoSerie,
+    historyFilterTurma,
+    historyFilterComponente,
+    historyFilterBimestre,
+    historyFilterProfessor,
+    searchTerm,
+    historyItemsPerPage
+  ]);
 
   // Print Mode State
   const [printLog, setPrintLog] = useState<ClassLog | null>(null);
@@ -1048,6 +1064,16 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
     currentUser
   ]);
 
+  // Pagination Math
+  const totalHistoryItems = filteredLogs.length;
+  const totalHistoryPages = Math.max(1, Math.ceil(totalHistoryItems / historyItemsPerPage));
+  const safeHistoryCurrentPage = Math.min(historyCurrentPage, totalHistoryPages);
+
+  const paginatedLogsHistory = useMemo(() => {
+    const start = (safeHistoryCurrentPage - 1) * historyItemsPerPage;
+    return filteredLogs.slice(start, start + historyItemsPerPage);
+  }, [filteredLogs, safeHistoryCurrentPage, historyItemsPerPage]);
+
   const handlePrint = (log: ClassLog) => {
     setPrintLog(log);
     setTimeout(() => {
@@ -1719,7 +1745,7 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
                     </td>
                   </tr>
                 ) : (
-                  filteredLogs.map(log => (
+                  paginatedLogsHistory.map(log => (
                     <tr key={log.id} className="hover:bg-slate-50/50 transition-colors group">
                       <td className="px-6 py-3">
                         <div className="font-bold text-slate-800">
@@ -1788,6 +1814,66 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
               </tbody>
             </table>
           </div>
+
+          {/* Pagination Bar Footer */}
+          {totalHistoryItems > 0 && (
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-semibold text-slate-600">
+              <div>
+                Mostrando{' '}
+                <span className="font-bold text-slate-800">
+                  {Math.min((safeHistoryCurrentPage - 1) * historyItemsPerPage + 1, totalHistoryItems)}
+                </span>{' '}
+                a{' '}
+                <span className="font-bold text-slate-800">
+                  {Math.min(safeHistoryCurrentPage * historyItemsPerPage, totalHistoryItems)}
+                </span>{' '}
+                de <span className="font-bold text-slate-800">{totalHistoryItems}</span> aulas ministradas registradas
+              </div>
+
+              <div className="flex items-center gap-4">
+                {/* Items per page selector */}
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500">Exibir:</span>
+                  <select
+                    value={historyItemsPerPage}
+                    onChange={e => setHistoryItemsPerPage(Number(e.target.value))}
+                    className="px-2 py-1 border border-slate-200 rounded-lg bg-white outline-none text-xs font-bold text-slate-700 focus:border-brand-orange transition-all"
+                  >
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={30}>30</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
+
+                {/* Page Navigation Buttons */}
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setHistoryCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={safeHistoryCurrentPage === 1}
+                    className="p-1.5 border border-slate-200 rounded-lg hover:bg-white disabled:opacity-40 disabled:hover:bg-transparent text-slate-600 transition-all cursor-pointer disabled:cursor-not-allowed"
+                    title="Página Anterior"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+
+                  <span className="px-2 text-xs font-bold text-slate-700">
+                    {safeHistoryCurrentPage} / {totalHistoryPages}
+                  </span>
+
+                  <button
+                    onClick={() => setHistoryCurrentPage(prev => Math.min(totalHistoryPages, prev + 1))}
+                    disabled={safeHistoryCurrentPage === totalHistoryPages}
+                    className="p-1.5 border border-slate-200 rounded-lg hover:bg-white disabled:opacity-40 disabled:hover:bg-transparent text-slate-600 transition-all cursor-pointer disabled:cursor-not-allowed"
+                    title="Próxima Página"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </Card>
       </div>
     </div>

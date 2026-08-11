@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { PageHeader } from './ui/PageHeader';
 import { AcompanhamentoSalaDashboard } from './AcompanhamentoSalaDashboard';
 import { CalendarioInterno } from './CalendarioInterno';
-import { FileStack, Users, BookOpen, Target, FileText, Presentation, Upload, Clock, Edit, Trash2, Calendar, Settings, Plus, Check, X, Printer, FileDown, Eye } from 'lucide-react';
+import { FileStack, Users, BookOpen, Target, FileText, Presentation, Upload, Clock, Edit, Trash2, Calendar, Settings, Plus, Check, X, Printer, FileDown, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Escola, Coordenador } from '../types';
 import { generateAtaDocx } from '../utils/docxUtils';
 import { PrintableAta } from './PrintableAta';
@@ -30,6 +30,26 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [selectedEscolaId, setSelectedEscolaId] = useState<string>(escolas.length > 1 ? 'all' : (escolas[0]?.id || ''));
+
+    // Pagination States per Tab
+    const [itemsPerPageReunioes, setItemsPerPageReunioes] = useState(10);
+    const [currentPageReunioes, setCurrentPageReunioes] = useState(1);
+
+    const [itemsPerPageFormacao, setItemsPerPageFormacao] = useState(10);
+    const [currentPageFormacao, setCurrentPageFormacao] = useState(1);
+
+    const [itemsPerPageAcao, setItemsPerPageAcao] = useState(10);
+    const [currentPageAcao, setCurrentPageAcao] = useState(1);
+
+    const [itemsPerPagePedagogica, setItemsPerPagePedagogica] = useState(10);
+    const [currentPagePedagogica, setCurrentPagePedagogica] = useState(1);
+
+    React.useEffect(() => {
+        setCurrentPageReunioes(1);
+        setCurrentPageFormacao(1);
+        setCurrentPageAcao(1);
+        setCurrentPagePedagogica(1);
+    }, [selectedEscolaId, activeTab]);
 
     const currentEscolaId = React.useMemo(() => {
         if (selectedEscolaId === 'all') return escolas[0]?.id || '';
@@ -791,49 +811,120 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({
                         )}
 
                         <div className="space-y-4">
-                            {mockReunioes.map(reuniao => (
-                                <div key={reuniao.id} className="p-6 border border-slate-100 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row justify-between items-center gap-6 group">
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-3 mb-2">
-                                            <span className={`px-3 py-1 text-xs font-bold uppercase rounded-full ${reuniao.status === 'Realizada' ? 'bg-emerald-100 text-emerald-700' :
-                                                reuniao.status === 'Agendada' ? 'bg-blue-100 text-blue-700' :
-                                                    'bg-slate-100 text-slate-600'
-                                                }`}>
-                                                {reuniao.status}
-                                            </span>
-                                            <span className={`px-3 py-1 text-xs font-bold rounded-full border border-slate-200 text-slate-500`}>
-                                                {reuniao.tipo}
-                                            </span>
-                                            <span className="text-xs font-medium text-slate-400 flex items-center gap-1">
-                                                <Calendar size={12} /> {reuniao.dataReuniao} {reuniao.horaInicio && `às ${reuniao.horaInicio}`} {reuniao.horaFim && `- ${reuniao.horaFim}`}
-                                            </span>
-                                        </div>
-                                        <h4 className="text-lg font-bold text-slate-900 leading-tight">{reuniao.pauta}</h4>
-                                        <div className="flex items-center gap-4 mt-2">
-                                            <p className="text-xs font-medium text-blue-600 tracking-wide">Responsável: {reuniao.responsavel}</p>
-                                            <p className="text-xs font-medium text-slate-400 tracking-wide flex items-center gap-1 border-l border-slate-200 pl-4">
-                                                <FileStack size={12} /> {getEscolaNome(reuniao.escola_id)}
-                                            </p>
-                                            {reuniao.participantes && reuniao.participantes.length > 0 && (
-                                                <p className="text-xs font-medium text-slate-500 tracking-wide flex items-center gap-1">
-                                                    <Users size={12} /> {reuniao.participantes.length} Participante{reuniao.participantes.length > 1 ? 's' : ''}
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button title="Gerar Ata da Reunião" onClick={() => handleGerarAta(reuniao)} className="w-10 h-10 border border-emerald-200 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 hover:bg-emerald-100 hover:border-emerald-300 transition-all flex-shrink-0">
-                                            <Printer size={16} />
-                                        </button>
-                                        <button title="Editar Reunião" onClick={() => handleEditReuniao(reuniao)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-blue-50 hover:text-blue-600 transition-all flex-shrink-0">
-                                            <Edit size={16} />
-                                        </button>
-                                        <button title="Excluir Reunião" onClick={() => handleDeleteReuniao(reuniao.id)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-600 transition-all flex-shrink-0">
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
+                            {(() => {
+                                const totalReunioes = mockReunioes.length;
+                                const totalPagesReunioes = Math.max(1, Math.ceil(totalReunioes / itemsPerPageReunioes));
+                                const safePageReunioes = Math.min(currentPageReunioes, totalPagesReunioes);
+                                const paginatedReunioes = mockReunioes.slice((safePageReunioes - 1) * itemsPerPageReunioes, safePageReunioes * itemsPerPageReunioes);
+
+                                return (
+                                    <>
+                                        {paginatedReunioes.map(reuniao => (
+                                            <div key={reuniao.id} className="p-6 border border-slate-100 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row justify-between items-center gap-6 group">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-3 mb-2">
+                                                        <span className={`px-3 py-1 text-xs font-bold uppercase rounded-full ${reuniao.status === 'Realizada' ? 'bg-emerald-100 text-emerald-700' :
+                                                            reuniao.status === 'Agendada' ? 'bg-blue-100 text-blue-700' :
+                                                                'bg-slate-100 text-slate-600'
+                                                            }`}>
+                                                            {reuniao.status}
+                                                        </span>
+                                                        <span className={`px-3 py-1 text-xs font-bold rounded-full border border-slate-200 text-slate-500`}>
+                                                            {reuniao.tipo}
+                                                        </span>
+                                                        <span className="text-xs font-medium text-slate-400 flex items-center gap-1">
+                                                            <Calendar size={12} /> {reuniao.dataReuniao} {reuniao.horaInicio && `às ${reuniao.horaInicio}`} {reuniao.horaFim && `- ${reuniao.horaFim}`}
+                                                        </span>
+                                                    </div>
+                                                    <h4 className="text-lg font-bold text-slate-900 leading-tight">{reuniao.pauta}</h4>
+                                                    <div className="flex items-center gap-4 mt-2">
+                                                        <p className="text-xs font-medium text-blue-600 tracking-wide">Responsável: {reuniao.responsavel}</p>
+                                                        <p className="text-xs font-medium text-slate-400 tracking-wide flex items-center gap-1 border-l border-slate-200 pl-4">
+                                                            <FileStack size={12} /> {getEscolaNome(reuniao.escola_id)}
+                                                        </p>
+                                                        {reuniao.participantes && reuniao.participantes.length > 0 && (
+                                                            <p className="text-xs font-medium text-slate-500 tracking-wide flex items-center gap-1">
+                                                                <Users size={12} /> {reuniao.participantes.length} Participante{reuniao.participantes.length > 1 ? 's' : ''}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button title="Gerar Ata da Reunião" onClick={() => handleGerarAta(reuniao)} className="w-10 h-10 border border-emerald-200 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 hover:bg-emerald-100 hover:border-emerald-300 transition-all flex-shrink-0">
+                                                        <Printer size={16} />
+                                                    </button>
+                                                    <button title="Editar Reunião" onClick={() => handleEditReuniao(reuniao)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-blue-50 hover:text-blue-600 transition-all flex-shrink-0">
+                                                        <Edit size={16} />
+                                                    </button>
+                                                    <button title="Excluir Reunião" onClick={() => handleDeleteReuniao(reuniao.id)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-600 transition-all flex-shrink-0">
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        {totalReunioes > 0 && (
+                                            <div className="px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-semibold text-slate-600 mt-4">
+                                                <div>
+                                                    Mostrando{' '}
+                                                    <span className="font-bold text-slate-800">
+                                                        {Math.min((safePageReunioes - 1) * itemsPerPageReunioes + 1, totalReunioes)}
+                                                    </span>{' '}
+                                                    a{' '}
+                                                    <span className="font-bold text-slate-800">
+                                                        {Math.min(safePageReunioes * itemsPerPageReunioes, totalReunioes)}
+                                                    </span>{' '}
+                                                    de <span className="font-bold text-slate-800">{totalReunioes}</span> reuniões registradas
+                                                </div>
+
+                                                <div className="flex items-center gap-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-slate-500">Exibir:</span>
+                                                        <select
+                                                            value={itemsPerPageReunioes}
+                                                            onChange={e => {
+                                                                setItemsPerPageReunioes(Number(e.target.value));
+                                                                setCurrentPageReunioes(1);
+                                                            }}
+                                                            className="px-2 py-1 border border-slate-200 rounded-lg bg-white outline-none text-xs font-bold text-slate-700 focus:border-blue-500 transition-all cursor-pointer"
+                                                        >
+                                                            <option value={10}>10</option>
+                                                            <option value={20}>20</option>
+                                                            <option value={30}>30</option>
+                                                            <option value={50}>50</option>
+                                                            <option value={100}>100</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-1.5">
+                                                        <button
+                                                            onClick={() => setCurrentPageReunioes(prev => Math.max(1, prev - 1))}
+                                                            disabled={safePageReunioes === 1}
+                                                            className="p-1.5 border border-slate-200 rounded-lg hover:bg-white disabled:opacity-40 disabled:hover:bg-transparent text-slate-600 transition-all cursor-pointer disabled:cursor-not-allowed"
+                                                            title="Página Anterior"
+                                                        >
+                                                            <ChevronLeft size={16} />
+                                                        </button>
+
+                                                        <span className="px-2 text-xs font-bold text-slate-700">
+                                                            {safePageReunioes} / {totalPagesReunioes}
+                                                        </span>
+
+                                                        <button
+                                                            onClick={() => setCurrentPageReunioes(prev => Math.min(totalPagesReunioes, prev + 1))}
+                                                            disabled={safePageReunioes === totalPagesReunioes}
+                                                            className="p-1.5 border border-slate-200 rounded-lg hover:bg-white disabled:opacity-40 disabled:hover:bg-transparent text-slate-600 transition-all cursor-pointer disabled:cursor-not-allowed"
+                                                            title="Próxima Página"
+                                                        >
+                                                            <ChevronRight size={16} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                );
+                            })()}
                         </div>
                     </div>
                 );
@@ -932,50 +1023,122 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({
                         )}
 
                         <div className="space-y-4">
-                            {mockFormacoes.map(formacao => (
-                                <div key={formacao.id} className="p-6 border border-slate-100 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row justify-between items-center gap-6 group">
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-3 mb-2">
-                                            <span className="px-3 py-1 text-xs font-bold uppercase rounded-full bg-purple-100 text-purple-700">
-                                                Formação
-                                            </span>
-                                            <span className="text-xs font-medium text-slate-400 flex items-center gap-1">
-                                                <Calendar size={12} /> {formacao.data}
-                                            </span>
-                                            {formacao.custo && (
-                                                <span className="text-xs font-medium text-amber-600 flex items-center gap-1 border-l border-slate-200 pl-3">
-                                                    Custo: {formacao.custo}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <h4 className="text-lg font-bold text-slate-900 leading-tight mb-1">{formacao.especificacao}</h4>
-                                        <p className="text-sm text-slate-500 mb-3">{formacao.objetivo}</p>
-                                        <div className="flex items-center gap-4 mt-2">
-                                            <p className="text-xs font-medium text-blue-600 tracking-wide">Responsável: {formacao.responsavel}</p>
-                                            <p className="text-xs font-medium text-slate-400 tracking-wide flex items-center gap-1 border-l border-slate-200 pl-4">
-                                                <FileStack size={12} /> {getEscolaNome(formacao.escola_id)}
-                                            </p>
-                                            <p className="text-xs font-medium text-slate-500 tracking-wide flex items-center gap-1 border-l border-slate-200 pl-4">
-                                                <Users size={12} /> Público: {formacao.publicoAlvo}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button title="Editar Formação" onClick={() => handleEditFormacao(formacao)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-purple-50 hover:text-purple-600 transition-all flex-shrink-0">
-                                            <Edit size={16} />
-                                        </button>
-                                        <button title="Excluir Formação" onClick={() => handleDeleteFormacao(formacao.id)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-600 transition-all flex-shrink-0">
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                            {mockFormacoes.length === 0 && !isEditingFormacao && (
-                                <div className="text-center p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                                    <BookOpen className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                                    <p className="text-slate-500">Nenhum plano de formação cadastrado.</p>
-                                </div>
-                            )}
+                            {(() => {
+                                const totalFormacoes = mockFormacoes.length;
+                                const totalPagesFormacao = Math.max(1, Math.ceil(totalFormacoes / itemsPerPageFormacao));
+                                const safePageFormacao = Math.min(currentPageFormacao, totalPagesFormacao);
+                                const paginatedFormacoes = mockFormacoes.slice((safePageFormacao - 1) * itemsPerPageFormacao, safePageFormacao * itemsPerPageFormacao);
+
+                                return (
+                                    <>
+                                        {paginatedFormacoes.map(formacao => (
+                                            <div key={formacao.id} className="p-6 border border-slate-100 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row justify-between items-center gap-6 group">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-3 mb-2">
+                                                        <span className="px-3 py-1 text-xs font-bold uppercase rounded-full bg-purple-100 text-purple-700">
+                                                            Formação
+                                                        </span>
+                                                        <span className="text-xs font-medium text-slate-400 flex items-center gap-1">
+                                                            <Calendar size={12} /> {formacao.data}
+                                                        </span>
+                                                        {formacao.custo && (
+                                                            <span className="text-xs font-medium text-amber-600 flex items-center gap-1 border-l border-slate-200 pl-3">
+                                                                Custo: {formacao.custo}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <h4 className="text-lg font-bold text-slate-900 leading-tight mb-1">{formacao.especificacao}</h4>
+                                                    <p className="text-sm text-slate-500 mb-3">{formacao.objetivo}</p>
+                                                    <div className="flex items-center gap-4 mt-2">
+                                                        <p className="text-xs font-medium text-blue-600 tracking-wide">Responsável: {formacao.responsavel}</p>
+                                                        <p className="text-xs font-medium text-slate-400 tracking-wide flex items-center gap-1 border-l border-slate-200 pl-4">
+                                                            <FileStack size={12} /> {getEscolaNome(formacao.escola_id)}
+                                                        </p>
+                                                        <p className="text-xs font-medium text-slate-500 tracking-wide flex items-center gap-1 border-l border-slate-200 pl-4">
+                                                            <Users size={12} /> Público: {formacao.publicoAlvo}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button title="Editar Formação" onClick={() => handleEditFormacao(formacao)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-purple-50 hover:text-purple-600 transition-all flex-shrink-0">
+                                                        <Edit size={16} />
+                                                    </button>
+                                                    <button title="Excluir Formação" onClick={() => handleDeleteFormacao(formacao.id)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-600 transition-all flex-shrink-0">
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        {mockFormacoes.length === 0 && !isEditingFormacao && (
+                                            <div className="text-center p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                                                <BookOpen className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                                                <p className="text-slate-500">Nenhum plano de formação cadastrado.</p>
+                                            </div>
+                                        )}
+
+                                        {totalFormacoes > 0 && (
+                                            <div className="px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-semibold text-slate-600 mt-4">
+                                                <div>
+                                                    Mostrando{' '}
+                                                    <span className="font-bold text-slate-800">
+                                                        {Math.min((safePageFormacao - 1) * itemsPerPageFormacao + 1, totalFormacoes)}
+                                                    </span>{' '}
+                                                    a{' '}
+                                                    <span className="font-bold text-slate-800">
+                                                        {Math.min(safePageFormacao * itemsPerPageFormacao, totalFormacoes)}
+                                                    </span>{' '}
+                                                    de <span className="font-bold text-slate-800">{totalFormacoes}</span> formações registradas
+                                                </div>
+
+                                                <div className="flex items-center gap-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-slate-500">Exibir:</span>
+                                                        <select
+                                                            value={itemsPerPageFormacao}
+                                                            onChange={e => {
+                                                                setItemsPerPageFormacao(Number(e.target.value));
+                                                                setCurrentPageFormacao(1);
+                                                            }}
+                                                            className="px-2 py-1 border border-slate-200 rounded-lg bg-white outline-none text-xs font-bold text-slate-700 focus:border-blue-500 transition-all cursor-pointer"
+                                                        >
+                                                            <option value={10}>10</option>
+                                                            <option value={20}>20</option>
+                                                            <option value={30}>30</option>
+                                                            <option value={50}>50</option>
+                                                            <option value={100}>100</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-1.5">
+                                                        <button
+                                                            onClick={() => setCurrentPageFormacao(prev => Math.max(1, prev - 1))}
+                                                            disabled={safePageFormacao === 1}
+                                                            className="p-1.5 border border-slate-200 rounded-lg hover:bg-white disabled:opacity-40 disabled:hover:bg-transparent text-slate-600 transition-all cursor-pointer disabled:cursor-not-allowed"
+                                                            title="Página Anterior"
+                                                        >
+                                                            <ChevronLeft size={16} />
+                                                        </button>
+
+                                                        <span className="px-2 text-xs font-bold text-slate-700">
+                                                            {safePageFormacao} / {totalPagesFormacao}
+                                                        </span>
+
+                                                        <button
+                                                            onClick={() => setCurrentPageFormacao(prev => Math.min(totalPagesFormacao, prev + 1))}
+                                                            disabled={safePageFormacao === totalPagesFormacao}
+                                                            className="p-1.5 border border-slate-200 rounded-lg hover:bg-white disabled:opacity-40 disabled:hover:bg-transparent text-slate-600 transition-all cursor-pointer disabled:cursor-not-allowed"
+                                                            title="Próxima Página"
+                                                        >
+                                                            <ChevronRight size={16} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                );
+                            })()}
                         </div>
                     </div>
                 );
@@ -1058,42 +1221,113 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({
                         )}
 
                         <div className="space-y-4">
-                            {mockMetas.map(meta => (
-                                <div key={meta.id} className="p-6 border border-slate-100 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row justify-between items-center gap-6 group relative overflow-hidden">
-                                    <div className={`absolute left-0 top-0 bottom-0 w-1 ${meta.status === 'Concluído' ? 'bg-emerald-500' :
-                                        meta.status === 'Atrasado' ? 'bg-rose-500' :
-                                            meta.status === 'Em Andamento' ? 'bg-blue-500' : 'bg-slate-300'
-                                        }`} />
-                                    <div className="flex-1 pl-4 text-left">
-                                        <div className="flex items-center gap-3 mb-2">
-                                            <span className={`px-2.5 py-1 text-xs font-bold uppercase rounded-md ${meta.status === 'Concluído' ? 'bg-emerald-100 text-emerald-700' :
-                                                meta.status === 'Atrasado' ? 'bg-rose-100 text-rose-700' :
-                                                    meta.status === 'Em Andamento' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
-                                                }`}>
-                                                {meta.status}
-                                            </span>
-                                            <span className="text-xs font-medium text-slate-400 flex items-center gap-1">
-                                                <Calendar size={12} /> Prazo: {meta.prazo}
-                                            </span>
-                                        </div>
-                                        <h4 className="text-lg font-bold text-slate-900 leading-tight mb-2">{meta.descricao}</h4>
-                                        <div className="flex items-center gap-4 mt-2">
-                                            <p className="text-xs font-medium text-blue-600 tracking-wide">Responsável: {meta.responsavel}</p>
-                                            <p className="text-xs font-medium text-slate-400 tracking-wide flex items-center gap-1 border-l border-slate-200 pl-4">
-                                                <FileStack size={12} /> {getEscolaNome(meta.escola_id)}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => handleEditMeta(meta)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-blue-50 hover:text-blue-600 transition-all flex-shrink-0">
-                                            <Edit size={16} />
-                                        </button>
-                                        <button onClick={() => handleDeleteMeta(meta.id)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-600 transition-all flex-shrink-0">
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
+                            {(() => {
+                                const totalMetas = mockMetas.length;
+                                const totalPagesAcao = Math.max(1, Math.ceil(totalMetas / itemsPerPageAcao));
+                                const safePageAcao = Math.min(currentPageAcao, totalPagesAcao);
+                                const paginatedMetas = mockMetas.slice((safePageAcao - 1) * itemsPerPageAcao, safePageAcao * itemsPerPageAcao);
+
+                                return (
+                                    <>
+                                        {paginatedMetas.map(meta => (
+                                            <div key={meta.id} className="p-6 border border-slate-100 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row justify-between items-center gap-6 group relative overflow-hidden">
+                                                <div className={`absolute left-0 top-0 bottom-0 w-1 ${meta.status === 'Concluído' ? 'bg-emerald-500' :
+                                                    meta.status === 'Atrasado' ? 'bg-rose-500' :
+                                                        meta.status === 'Em Andamento' ? 'bg-blue-500' : 'bg-slate-300'
+                                                    }`} />
+                                                <div className="flex-1 pl-4 text-left">
+                                                    <div className="flex items-center gap-3 mb-2">
+                                                        <span className={`px-2.5 py-1 text-xs font-bold uppercase rounded-md ${meta.status === 'Concluído' ? 'bg-emerald-100 text-emerald-700' :
+                                                            meta.status === 'Atrasado' ? 'bg-rose-100 text-rose-700' :
+                                                                meta.status === 'Em Andamento' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
+                                                            }`}>
+                                                            {meta.status}
+                                                        </span>
+                                                        <span className="text-xs font-medium text-slate-400 flex items-center gap-1">
+                                                            <Calendar size={12} /> Prazo: {meta.prazo}
+                                                        </span>
+                                                    </div>
+                                                    <h4 className="text-lg font-bold text-slate-900 leading-tight mb-2">{meta.descricao}</h4>
+                                                    <div className="flex items-center gap-4 mt-2">
+                                                        <p className="text-xs font-medium text-blue-600 tracking-wide">Responsável: {meta.responsavel}</p>
+                                                        <p className="text-xs font-medium text-slate-400 tracking-wide flex items-center gap-1 border-l border-slate-200 pl-4">
+                                                            <FileStack size={12} /> {getEscolaNome(meta.escola_id)}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => handleEditMeta(meta)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-blue-50 hover:text-blue-600 transition-all flex-shrink-0">
+                                                        <Edit size={16} />
+                                                    </button>
+                                                    <button onClick={() => handleDeleteMeta(meta.id)} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-600 transition-all flex-shrink-0">
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        {totalMetas > 0 && (
+                                            <div className="px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-semibold text-slate-600 mt-4">
+                                                <div>
+                                                    Mostrando{' '}
+                                                    <span className="font-bold text-slate-800">
+                                                        {Math.min((safePageAcao - 1) * itemsPerPageAcao + 1, totalMetas)}
+                                                    </span>{' '}
+                                                    a{' '}
+                                                    <span className="font-bold text-slate-800">
+                                                        {Math.min(safePageAcao * itemsPerPageAcao, totalMetas)}
+                                                    </span>{' '}
+                                                    de <span className="font-bold text-slate-800">{totalMetas}</span> metas registradas
+                                                </div>
+
+                                                <div className="flex items-center gap-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-slate-500">Exibir:</span>
+                                                        <select
+                                                            value={itemsPerPageAcao}
+                                                            onChange={e => {
+                                                                setItemsPerPageAcao(Number(e.target.value));
+                                                                setCurrentPageAcao(1);
+                                                            }}
+                                                            className="px-2 py-1 border border-slate-200 rounded-lg bg-white outline-none text-xs font-bold text-slate-700 focus:border-blue-500 transition-all cursor-pointer"
+                                                        >
+                                                            <option value={10}>10</option>
+                                                            <option value={20}>20</option>
+                                                            <option value={30}>30</option>
+                                                            <option value={50}>50</option>
+                                                            <option value={100}>100</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-1.5">
+                                                        <button
+                                                            onClick={() => setCurrentPageAcao(prev => Math.max(1, prev - 1))}
+                                                            disabled={safePageAcao === 1}
+                                                            className="p-1.5 border border-slate-200 rounded-lg hover:bg-white disabled:opacity-40 disabled:hover:bg-transparent text-slate-600 transition-all cursor-pointer disabled:cursor-not-allowed"
+                                                            title="Página Anterior"
+                                                        >
+                                                            <ChevronLeft size={16} />
+                                                        </button>
+
+                                                        <span className="px-2 text-xs font-bold text-slate-700">
+                                                            {safePageAcao} / {totalPagesAcao}
+                                                        </span>
+
+                                                        <button
+                                                            onClick={() => setCurrentPageAcao(prev => Math.min(totalPagesAcao, prev + 1))}
+                                                            disabled={safePageAcao === totalPagesAcao}
+                                                            className="p-1.5 border border-slate-200 rounded-lg hover:bg-white disabled:opacity-40 disabled:hover:bg-transparent text-slate-600 transition-all cursor-pointer disabled:cursor-not-allowed"
+                                                            title="Próxima Página"
+                                                        >
+                                                            <ChevronRight size={16} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                );
+                            })()}
                         </div>
                     </div>
                 );
@@ -1121,58 +1355,129 @@ export const InstrumentaisGestao: React.FC<InstrumentaisGestaoProps> = ({
                                 </button>
                             </div>
                         </div>
-                        <div className="overflow-x-auto border border-slate-200 rounded-xl">
-                            <table className="w-full text-left border-collapse min-w-[800px]">
-                                <thead>
-                                    <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                        <th className="p-4 py-3">Arquivo Enviado</th>
-                                        <th className="p-4 py-3">Tamanho</th>
-                                        <th className="p-4 py-3">Data do Envio</th>
-                                        <th className="p-4 py-3">Responsável</th>
-                                        <th className="p-4 py-3">Coordenador Regional</th>
-                                        <th className="p-4 py-3">Status</th>
-                                        <th className="p-4 py-3 text-center">Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {pppHistory.map((item) => (
-                                        <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                                            <td
-                                                className="p-4 text-sm font-bold text-blue-600 hover:text-blue-700 cursor-pointer underline decoration-blue-200 underline-offset-4"
-                                                onClick={() => handleDownloadArquivo(item)}
-                                            >
-                                                {item.arquivo}
-                                            </td>
-                                            <td className="p-4 text-sm font-medium text-slate-500">{item.tamanho}</td>
-                                            <td className="p-4 text-sm font-bold text-slate-700">{item.dataEnvio}</td>
-                                            <td className="p-4 text-sm font-medium text-slate-600">{item.usuario}</td>
-                                            <td className="p-4 text-sm font-medium text-slate-600">{item.coordenadorRegional}</td>
-                                            <td className="p-4">
-                                                <span
-                                                    onClick={() => toggleStatus(item.id, item.status)}
-                                                    className={`px-2.5 py-1 rounded-md text-xs font-bold cursor-pointer transition-colors active:scale-95 inline-block select-none ${item.status === 'Aprovado' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' :
-                                                        item.status === 'Aguardando Análise' ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' :
-                                                            item.status === 'Em Análise' ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' :
-                                                                'bg-slate-100 text-slate-700'
-                                                        }`}
-                                                >
-                                                    {item.status}
-                                                </span>
-                                            </td>
-                                            <td className="p-4 text-center">
-                                                <button
-                                                    onClick={() => handleDeletePpp(item.id)}
-                                                    title="Excluir arquivo"
-                                                    className="w-9 h-9 border border-slate-200 rounded-xl flex items-center justify-center text-slate-400 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all mx-auto"
-                                                >
-                                                    <Trash2 size={15} />
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                        {(() => {
+                            const totalPpps = pppHistory.length;
+                            const totalPagesPedagogica = Math.max(1, Math.ceil(totalPpps / itemsPerPagePedagogica));
+                            const safePagePedagogica = Math.min(currentPagePedagogica, totalPagesPedagogica);
+                            const paginatedPpps = pppHistory.slice((safePagePedagogica - 1) * itemsPerPagePedagogica, safePagePedagogica * itemsPerPagePedagogica);
+
+                            return (
+                                <>
+                                    <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                                        <table className="w-full text-left border-collapse min-w-[800px]">
+                                            <thead>
+                                                <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                                    <th className="p-4 py-3">Arquivo Enviado</th>
+                                                    <th className="p-4 py-3">Tamanho</th>
+                                                    <th className="p-4 py-3">Data do Envio</th>
+                                                    <th className="p-4 py-3">Responsável</th>
+                                                    <th className="p-4 py-3">Coordenador Regional</th>
+                                                    <th className="p-4 py-3">Status</th>
+                                                    <th className="p-4 py-3 text-center">Ações</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {paginatedPpps.map((item) => (
+                                                    <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                                                        <td
+                                                            className="p-4 text-sm font-bold text-blue-600 hover:text-blue-700 cursor-pointer underline decoration-blue-200 underline-offset-4"
+                                                            onClick={() => handleDownloadArquivo(item)}
+                                                        >
+                                                            {item.arquivo}
+                                                        </td>
+                                                        <td className="p-4 text-sm font-medium text-slate-500">{item.tamanho}</td>
+                                                        <td className="p-4 text-sm font-bold text-slate-700">{item.dataEnvio}</td>
+                                                        <td className="p-4 text-sm font-medium text-slate-600">{item.usuario}</td>
+                                                        <td className="p-4 text-sm font-medium text-slate-600">{item.coordenadorRegional}</td>
+                                                        <td className="p-4">
+                                                            <span
+                                                                onClick={() => toggleStatus(item.id, item.status)}
+                                                                className={`px-2.5 py-1 rounded-md text-xs font-bold cursor-pointer transition-colors active:scale-95 inline-block select-none ${item.status === 'Aprovado' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' :
+                                                                    item.status === 'Aguardando Análise' ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' :
+                                                                        item.status === 'Em Análise' ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' :
+                                                                            'bg-slate-100 text-slate-700'
+                                                                    }`}
+                                                            >
+                                                                {item.status}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-4 text-center">
+                                                            <button
+                                                                onClick={() => handleDeletePpp(item.id)}
+                                                                title="Excluir arquivo"
+                                                                className="w-9 h-9 border border-slate-200 rounded-xl flex items-center justify-center text-slate-400 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all mx-auto"
+                                                            >
+                                                                <Trash2 size={15} />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    {totalPpps > 0 && (
+                                        <div className="px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-semibold text-slate-600 mt-4">
+                                            <div>
+                                                Mostrando{' '}
+                                                <span className="font-bold text-slate-800">
+                                                    {Math.min((safePagePedagogica - 1) * itemsPerPagePedagogica + 1, totalPpps)}
+                                                </span>{' '}
+                                                a{' '}
+                                                <span className="font-bold text-slate-800">
+                                                    {Math.min(safePagePedagogica * itemsPerPagePedagogica, totalPpps)}
+                                                </span>{' '}
+                                                de <span className="font-bold text-slate-800">{totalPpps}</span> propostas pedagógicas registradas
+                                            </div>
+
+                                            <div className="flex items-center gap-4">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-slate-500">Exibir:</span>
+                                                    <select
+                                                        value={itemsPerPagePedagogica}
+                                                        onChange={e => {
+                                                            setItemsPerPagePedagogica(Number(e.target.value));
+                                                            setCurrentPagePedagogica(1);
+                                                        }}
+                                                        className="px-2 py-1 border border-slate-200 rounded-lg bg-white outline-none text-xs font-bold text-slate-700 focus:border-blue-500 transition-all cursor-pointer"
+                                                    >
+                                                        <option value={10}>10</option>
+                                                        <option value={20}>20</option>
+                                                        <option value={30}>30</option>
+                                                        <option value={50}>50</option>
+                                                        <option value={100}>100</option>
+                                                    </select>
+                                                </div>
+
+                                                <div className="flex items-center gap-1.5">
+                                                    <button
+                                                        onClick={() => setCurrentPagePedagogica(prev => Math.max(1, prev - 1))}
+                                                        disabled={safePagePedagogica === 1}
+                                                        className="p-1.5 border border-slate-200 rounded-lg hover:bg-white disabled:opacity-40 disabled:hover:bg-transparent text-slate-600 transition-all cursor-pointer disabled:cursor-not-allowed"
+                                                        title="Página Anterior"
+                                                    >
+                                                        <ChevronLeft size={16} />
+                                                    </button>
+
+                                                    <span className="px-2 text-xs font-bold text-slate-700">
+                                                        {safePagePedagogica} / {totalPagesPedagogica}
+                                                    </span>
+
+                                                    <button
+                                                        onClick={() => setCurrentPagePedagogica(prev => Math.min(totalPagesPedagogica, prev + 1))}
+                                                        disabled={safePagePedagogica === totalPagesPedagogica}
+                                                        className="p-1.5 border border-slate-200 rounded-lg hover:bg-white disabled:opacity-40 disabled:hover:bg-transparent text-slate-600 transition-all cursor-pointer disabled:cursor-not-allowed"
+                                                        title="Próxima Página"
+                                                    >
+                                                        <ChevronRight size={16} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            );
+                        })()}
                     </div>
                 );
             case 'sala':

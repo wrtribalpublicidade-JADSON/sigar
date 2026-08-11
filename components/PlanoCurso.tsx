@@ -6,7 +6,7 @@ import { Button } from './ui/Button';
 import { 
   ClipboardList, Plus, Search, Edit2, Trash2, Printer, 
   X, Calendar, Bookmark, Save, Layers,
-  Link2, Check, Download, Upload
+  Link2, Check, Download, Upload, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Escola, Coordenador } from '../types';
@@ -1183,6 +1183,17 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
     setItens([createDefaultItem()]);
   };
 
+  const [historyItemsPerPage, setHistoryItemsPerPage] = useState(10);
+  const [historyCurrentPage, setHistoryCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setHistoryCurrentPage(1);
+  }, [
+    searchTerm,
+    gradeFilter,
+    historyItemsPerPage
+  ]);
+
   const filteredPlans = plans.filter(p => {
     const matchesSearch = searchTerm === '' || 
                           p.componente.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1190,6 +1201,16 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
     const matchesGrade = gradeFilter === 'ALL' || p.anoSerie === gradeFilter;
     return matchesSearch && matchesGrade;
   });
+
+  // Pagination Math
+  const totalHistoryItems = filteredPlans.length;
+  const totalHistoryPages = Math.max(1, Math.ceil(totalHistoryItems / historyItemsPerPage));
+  const safeHistoryCurrentPage = Math.min(historyCurrentPage, totalHistoryPages);
+
+  const paginatedPlansHistory = useMemo(() => {
+    const start = (safeHistoryCurrentPage - 1) * historyItemsPerPage;
+    return filteredPlans.slice(start, start + historyItemsPerPage);
+  }, [filteredPlans, safeHistoryCurrentPage, historyItemsPerPage]);
 
   const handlePrint = (plan: CoursePlan) => {
     setPrintPlan(plan);
@@ -2071,7 +2092,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
                     </td>
                   </tr>
                 ) : (
-                  filteredPlans.map(plan => (
+                  paginatedPlansHistory.map(plan => (
                     <tr key={plan.id} className="hover:bg-slate-50/50 transition-colors group">
                       <td className="px-6 py-3 text-slate-800 font-bold">
                         {plan.bimestre} ({plan.anoReferencia})
@@ -2125,6 +2146,66 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
               </tbody>
             </table>
           </div>
+
+          {/* Pagination Bar Footer */}
+          {totalHistoryItems > 0 && (
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-semibold text-slate-600">
+              <div>
+                Mostrando{' '}
+                <span className="font-bold text-slate-800">
+                  {Math.min((safeHistoryCurrentPage - 1) * historyItemsPerPage + 1, totalHistoryItems)}
+                </span>{' '}
+                a{' '}
+                <span className="font-bold text-slate-800">
+                  {Math.min(safeHistoryCurrentPage * historyItemsPerPage, totalHistoryItems)}
+                </span>{' '}
+                de <span className="font-bold text-slate-800">{totalHistoryItems}</span> planos de curso registrados
+              </div>
+
+              <div className="flex items-center gap-4">
+                {/* Items per page selector */}
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500">Exibir:</span>
+                  <select
+                    value={historyItemsPerPage}
+                    onChange={e => setHistoryItemsPerPage(Number(e.target.value))}
+                    className="px-2 py-1 border border-slate-200 rounded-lg bg-white outline-none text-xs font-bold text-slate-700 focus:border-brand-orange transition-all"
+                  >
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={30}>30</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
+
+                {/* Page Navigation Buttons */}
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setHistoryCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={safeHistoryCurrentPage === 1}
+                    className="p-1.5 border border-slate-200 rounded-lg hover:bg-white disabled:opacity-40 disabled:hover:bg-transparent text-slate-600 transition-all cursor-pointer disabled:cursor-not-allowed"
+                    title="Página Anterior"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+
+                  <span className="px-2 text-xs font-bold text-slate-700">
+                    {safeHistoryCurrentPage} / {totalHistoryPages}
+                  </span>
+
+                  <button
+                    onClick={() => setHistoryCurrentPage(prev => Math.min(totalHistoryPages, prev + 1))}
+                    disabled={safeHistoryCurrentPage === totalHistoryPages}
+                    className="p-1.5 border border-slate-200 rounded-lg hover:bg-white disabled:opacity-40 disabled:hover:bg-transparent text-slate-600 transition-all cursor-pointer disabled:cursor-not-allowed"
+                    title="Próxima Página"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </Card>
       </div>
     </div>
