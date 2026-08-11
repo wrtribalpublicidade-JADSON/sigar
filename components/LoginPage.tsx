@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, Mail, ArrowRight, User, AlertCircle, Eye, Target, FileText } from 'lucide-react';
+import { Lock, Mail, ArrowRight, User, AlertCircle, Eye, Target, FileText, X } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { formatCpf, validateCpf } from '../utils';
 
@@ -18,11 +18,37 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onDemoLogin }) =>
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
+  // Demo Password Protection State
+  const [isDemoModalOpen, setIsDemoModalOpen] = useState(false);
+  const [demoPasswordInput, setDemoPasswordInput] = useState('');
+  const [demoError, setDemoError] = useState('');
+
   const toggleMode = () => {
     setIsSignUp(!isSignUp);
     setError('');
     setSuccessMessage('');
     setCpf('');
+  };
+
+  const handleDemoAccess = () => {
+    setError('');
+    if (password === 'semed4893' || password.trim() === 'semed4893') {
+      onDemoLogin();
+    } else {
+      setDemoPasswordInput('');
+      setDemoError('');
+      setIsDemoModalOpen(true);
+    }
+  };
+
+  const handleConfirmDemoPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (demoPasswordInput === 'semed4893') {
+      setIsDemoModalOpen(false);
+      onDemoLogin();
+    } else {
+      setDemoError('Senha de demonstração incorreta.');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -58,14 +84,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onDemoLogin }) =>
           if (!checkError && existingUser) {
             throw new Error('Este CPF já está cadastrado no sistema.');
           }
-          // If checkError occurs (e.g. RLS blocking unauthenticated access), we skip
-          // the duplicate check and let the unique index handle it at insert time.
         } catch (cpfCheckErr: any) {
-          // Re-throw only if it's our own "already registered" error
           if (cpfCheckErr?.message?.includes('já está cadastrado')) {
             throw cpfCheckErr;
           }
-          // Otherwise, silently skip — the DB unique constraint will catch duplicates
           console.warn('CPF duplicate check skipped (likely RLS):', cpfCheckErr?.message);
         }
 
@@ -242,14 +264,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onDemoLogin }) =>
               <div className="mt-4">
                 <button
                   type="button"
-                  onClick={onDemoLogin}
+                  onClick={handleDemoAccess}
                   className="w-full border-2 border-slate-200 bg-slate-50 text-slate-700 font-semibold py-3 px-4 rounded-xl hover:bg-slate-100 hover:border-slate-300 transition flex items-center justify-center gap-2"
                 >
-                  <Eye className="w-5 h-5" />
+                  <Eye className="w-5 h-5 text-orange-500" />
                   Entrar em modo de demonstração
                 </button>
                 <p className="text-[10px] text-slate-400 text-center mt-2">
-                  Use o modo demo para testar os recursos sem credenciais.
+                  Senha necessária para acessar o modo de demonstração.
                 </p>
               </div>
             )}
@@ -282,9 +304,79 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onDemoLogin }) =>
             © {new Date().getFullYear()} Secretaria Municipal de Educação. Todos os direitos reservados.
           </div>
           <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">
-            SIGAR • Versão 1.0.6
+            SIGAR • Versão 1.0.7
           </div>
         </div>
+
+        {/* Demo Mode Password Modal */}
+        {isDemoModalOpen && (
+          <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-sm w-full p-6 animate-scale-up space-y-4 text-left">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <Eye className="w-5 h-5 text-orange-500" />
+                  <h3 className="text-base font-bold text-slate-800">
+                    Modo Demonstração
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setIsDemoModalOpen(false)}
+                  className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <p className="text-xs text-slate-500 font-medium">
+                Digite a senha de acesso para entrar no modo de demonstração:
+              </p>
+
+              <form onSubmit={handleConfirmDemoPassword} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
+                    Senha de Acesso
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Lock className="h-4 w-4 text-slate-400" />
+                    </div>
+                    <input
+                      type="password"
+                      autoFocus
+                      value={demoPasswordInput}
+                      onChange={(e) => setDemoPasswordInput(e.target.value)}
+                      placeholder="Informe a senha"
+                      className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl text-slate-800 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500 font-medium"
+                    />
+                  </div>
+                </div>
+
+                {demoError && (
+                  <div className="text-red-600 text-xs bg-red-50 p-2.5 rounded-xl flex items-center gap-2 border border-red-100 font-medium animate-pulse">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{demoError}</span>
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsDemoModalOpen(false)}
+                    className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 text-xs font-bold text-white bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 rounded-xl shadow-md transition"
+                  >
+                    Acessar Modo Demo
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
