@@ -49,7 +49,8 @@ const CAMPOS_EXPERIENCIA = [
   'Corpo, gestos e movimentos',
   'Traços, sons, cores e formas',
   'Escuta, fala, pensamento e imaginação',
-  'Espaços, tempos, quantidades, relações e transformações'
+  'Espaços, tempos, quantidades, relações e transformações',
+  'Interdisciplinar'
 ];
 
 const PERIODOS = ['1º Bimestre', '2º Bimestre', '3º Bimestre', '4º Bimestre'];
@@ -276,18 +277,24 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
     }
   }, [isDemoMode]);
 
-  // Match course plan unificado
-  const activeCoursePlan = useMemo(() => {
-    return coursePlans.find((p: any) => 
-      p.componente === campoExperiencia && 
-      p.anoSerie === anoSerie && 
-      p.bimestre === periodo
-    );
-  }, [coursePlans, campoExperiencia, anoSerie, periodo]);
-
-  // Aggregate ECE Course Plan items
+  // Aggregate ECE Course Plan items (single component or Interdisciplinar all components)
   const planData = useMemo(() => {
-    if (!activeCoursePlan || !activeCoursePlan.itens) {
+    let matchingPlans: any[] = [];
+    if (campoExperiencia === 'Interdisciplinar') {
+      matchingPlans = coursePlans.filter((p: any) => 
+        p.anoSerie === anoSerie && 
+        p.bimestre === periodo
+      );
+    } else {
+      const match = coursePlans.find((p: any) => 
+        p.componente === campoExperiencia && 
+        p.anoSerie === anoSerie && 
+        p.bimestre === periodo
+      );
+      if (match) matchingPlans = [match];
+    }
+
+    if (matchingPlans.length === 0) {
       return { objetos: [], habilidades: [], links: [] };
     }
     
@@ -295,20 +302,24 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
     const habilidadesMap = new Map<string, any>();
     const links: { objetoId: string; habilidadeId: string }[] = [];
     
-    activeCoursePlan.itens.forEach((item: any) => {
-      if (item.objetos) {
-        item.objetos.forEach((obj: any) => {
-          objetosMap.set(obj.id, obj);
-        });
-      }
-      if (item.habilidades) {
-        item.habilidades.forEach((hab: any) => {
-          habilidadesMap.set(hab.id, hab);
-        });
-      }
-      if (item.links) {
-        item.links.forEach((link: any) => {
-          links.push(link);
+    matchingPlans.forEach((plan: any) => {
+      if (plan.itens) {
+        plan.itens.forEach((item: any) => {
+          if (item.objetos) {
+            item.objetos.forEach((obj: any) => {
+              objetosMap.set(obj.id, obj);
+            });
+          }
+          if (item.habilidades) {
+            item.habilidades.forEach((hab: any) => {
+              habilidadesMap.set(hab.id, hab);
+            });
+          }
+          if (item.links) {
+            item.links.forEach((link: any) => {
+              links.push(link);
+            });
+          }
         });
       }
     });
@@ -318,7 +329,7 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
       habilidades: Array.from(habilidadesMap.values()),
       links
     };
-  }, [activeCoursePlan]);
+  }, [coursePlans, campoExperiencia, anoSerie, periodo]);
 
   // Reset linkage selections when parameters change
   useEffect(() => {
@@ -421,7 +432,7 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
 
   // Pre-populate selections when editing existing plan
   useEffect(() => {
-    if (editingId && activeCoursePlan) {
+    if (editingId && planData.objetos.length > 0) {
       const matchedObjIds = planData.objetos
         .filter((o: any) => objetivos.includes(o.descricao))
         .map((o: any) => o.id);
@@ -433,7 +444,7 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
       setSelectedObjetoIds(matchedObjIds);
       setSelectedHabilidadeIds(matchedHabIds);
     }
-  }, [editingId, activeCoursePlan]);
+  }, [editingId, planData]);
 
   const handleHabilidadesTextChange = (value: string) => {
     setHabilidadesText(value);

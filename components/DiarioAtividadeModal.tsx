@@ -2,11 +2,18 @@ import React, { useState } from 'react';
 import { 
     X, Users, Calendar, BookOpen, CheckCircle2, XCircle, 
     Plus, Search, UserPlus, Filter, ClipboardList, TrendingUp,
-    Pencil, Trash2, Printer
+    Pencil, Trash2, Printer, Bookmark
 } from 'lucide-react';
 import { activitiesService, Atividade, AtividadeLog, AtividadePresenca } from '../services/activitiesService';
 import { supabase } from '../services/supabase';
 import { PrintableAtividadePlanejamentoReport } from './PrintableAtividadePlanejamentoReport';
+
+const PERIODOS_LETIVOS = [
+    '1º Bimestre',
+    '2º Bimestre',
+    '3º Bimestre',
+    '4º Bimestre'
+];
 
 interface Student {
     id: number;
@@ -25,6 +32,7 @@ export const DiarioAtividadeModal: React.FC<{
 }> = ({ isOpen, onClose, atividade }) => {
     const [activeTab, setActiveTab] = useState<'chamada' | 'alunos' | 'conteudo'>('chamada');
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+    const [selectedPeriod, setSelectedPeriod] = useState(PERIODOS_LETIVOS[0]);
     const [attendance, setAttendance] = useState<Record<number, boolean>>({});
     const [students, setStudents] = useState<Student[]>([]);
     const [studentFrequency, setStudentFrequency] = useState<Record<number, number>>({});
@@ -201,19 +209,22 @@ export const DiarioAtividadeModal: React.FC<{
             if (editingLog) {
                 const logPayload = {
                     data: selectedDate,
-                    conteudo: newLog
+                    conteudo: newLog,
+                    periodo: selectedPeriod
                 };
                 const updated = await activitiesService.updateLog(editingLog.id, logPayload);
                 setLogs(logs.map(l => l.id === editingLog.id ? updated : l));
                 setEditingLog(null);
                 setNewLog('');
                 setSelectedDate(new Date().toISOString().split('T')[0]);
+                setSelectedPeriod(PERIODOS_LETIVOS[0]);
             } else {
                 const logPayload = {
                     atividade_id: atividade.id,
                     data: selectedDate,
                     conteudo: newLog,
-                    instrutor: atividade.instrutor || 'Instrutor'
+                    instrutor: atividade.instrutor || 'Instrutor',
+                    periodo: selectedPeriod
                 };
                 const saved = await activitiesService.saveLog(logPayload);
                 setLogs([saved, ...logs]);
@@ -229,12 +240,14 @@ export const DiarioAtividadeModal: React.FC<{
         setEditingLog(log);
         setNewLog(log.conteudo);
         setSelectedDate(log.data);
+        setSelectedPeriod(log.periodo || PERIODOS_LETIVOS[0]);
     };
 
     const handleCancelEdit = () => {
         setEditingLog(null);
         setNewLog('');
         setSelectedDate(new Date().toISOString().split('T')[0]);
+        setSelectedPeriod(PERIODOS_LETIVOS[0]);
     };
 
     const handleDeleteLog = async (id: string) => {
@@ -579,14 +592,28 @@ export const DiarioAtividadeModal: React.FC<{
                                             {editingLog ? 'Editar Registro de Conteúdo' : 'Novo Registro de Conteúdo'}
                                         </h4>
                                     </div>
-                                    <div className="flex items-center gap-2 border border-slate-100 bg-slate-50 px-4 py-2 rounded-xl">
-                                        <Calendar size={16} className="text-indigo-600" />
-                                        <input 
-                                            type="date" 
-                                            value={selectedDate}
-                                            onChange={e => setSelectedDate(e.target.value)}
-                                            className="font-bold text-slate-700 bg-transparent border-none p-0 outline-none focus:ring-0 text-xs"
-                                        />
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <div className="flex items-center gap-2 border border-slate-100 bg-slate-50 px-4 py-2 rounded-xl">
+                                            <Bookmark size={16} className="text-indigo-600" />
+                                            <select 
+                                                value={selectedPeriod}
+                                                onChange={e => setSelectedPeriod(e.target.value)}
+                                                className="font-bold text-slate-700 bg-transparent border-none p-0 outline-none focus:ring-0 text-xs cursor-pointer"
+                                            >
+                                                {PERIODOS_LETIVOS.map(p => (
+                                                    <option key={p} value={p}>{p}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="flex items-center gap-2 border border-slate-100 bg-slate-50 px-4 py-2 rounded-xl">
+                                            <Calendar size={16} className="text-indigo-600" />
+                                            <input 
+                                                type="date" 
+                                                value={selectedDate}
+                                                onChange={e => setSelectedDate(e.target.value)}
+                                                className="font-bold text-slate-700 bg-transparent border-none p-0 outline-none focus:ring-0 text-xs"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                                 <textarea 
@@ -638,6 +665,11 @@ export const DiarioAtividadeModal: React.FC<{
                                                 <span className="font-black text-slate-800 text-sm">
                                                     {new Date(log.data + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
                                                 </span>
+                                                {log.periodo && (
+                                                    <span className="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider">
+                                                        {log.periodo}
+                                                    </span>
+                                                )}
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1.5 rounded-full">{log.instrutor}</span>

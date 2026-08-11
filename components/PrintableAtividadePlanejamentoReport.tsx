@@ -175,6 +175,11 @@ export const PrintableAtividadePlanejamentoReport: React.FC<PrintableAtividadePl
                                     <td style={{ ...tdStyle, textAlign: 'center', color: '#94a3b8', fontSize: '8pt', fontWeight: 700 }}>{idx + 1}</td>
                                     <td style={{ ...tdStyle, fontWeight: 700, color: '#0f172a' }}>
                                         {new Date(log.data).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                        {log.periodo && (
+                                            <div style={{ fontSize: '7pt', color: '#4f46e5', fontWeight: 800, marginTop: '2pt' }}>
+                                                {log.periodo}
+                                            </div>
+                                        )}
                                     </td>
                                     <td style={{ ...tdStyle, whiteSpace: 'pre-line' }}>{log.conteudo}</td>
                                     <td style={{ ...tdStyle, textAlign: 'center', borderRight: '0.5pt solid #cbd5e1' }}>

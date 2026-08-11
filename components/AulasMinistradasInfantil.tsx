@@ -47,7 +47,8 @@ const CAMPOS_EXPERIENCIA = [
   'Corpo, gestos e movimentos',
   'Traços, sons, cores e formas',
   'Escuta, fala, pensamento e imaginação',
-  'Espaços, tempos, quantidades, relações e transformações'
+  'Espaços, tempos, quantidades, relações e transformações',
+  'Interdisciplinar'
 ];
 
 const PERIODOS = ['1º Bimestre', '2º Bimestre', '3º Bimestre', '4º Bimestre'];
@@ -379,18 +380,24 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
     }
   }, [availableTurmas, selectedTurmaId, selectedEscolaId, turmas, isDemoMode]);
 
-  // Get active Course Plan unificado matching selections
-  const activeCoursePlan = useMemo(() => {
-    return coursePlans.find((p: any) => 
-      p.componente === campoExperiencia && 
-      p.anoSerie === anoSerie && 
-      p.bimestre === periodo
-    );
-  }, [coursePlans, campoExperiencia, anoSerie, periodo]);
-
-  // Aggregate objects and skills from active Course Plan items
+  // Aggregate objects and skills from active Course Plan items (single component or Interdisciplinar all components)
   const planData = useMemo(() => {
-    if (!activeCoursePlan || !activeCoursePlan.itens) {
+    let matchingPlans: any[] = [];
+    if (campoExperiencia === 'Interdisciplinar') {
+      matchingPlans = coursePlans.filter((p: any) => 
+        p.anoSerie === anoSerie && 
+        p.bimestre === periodo
+      );
+    } else {
+      const match = coursePlans.find((p: any) => 
+        p.componente === campoExperiencia && 
+        p.anoSerie === anoSerie && 
+        p.bimestre === periodo
+      );
+      if (match) matchingPlans = [match];
+    }
+
+    if (matchingPlans.length === 0) {
       return { objetos: [], habilidades: [], links: [] };
     }
     
@@ -398,20 +405,24 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
     const habilidadesMap = new Map<string, any>();
     const links: { objetoId: string; habilidadeId: string }[] = [];
     
-    activeCoursePlan.itens.forEach((item: any) => {
-      if (item.objetos) {
-        item.objetos.forEach((obj: any) => {
-          objetosMap.set(obj.id, obj);
-        });
-      }
-      if (item.habilidades) {
-        item.habilidades.forEach((hab: any) => {
-          habilidadesMap.set(hab.id, hab);
-        });
-      }
-      if (item.links) {
-        item.links.forEach((link: any) => {
-          links.push(link);
+    matchingPlans.forEach((plan: any) => {
+      if (plan.itens) {
+        plan.itens.forEach((item: any) => {
+          if (item.objetos) {
+            item.objetos.forEach((obj: any) => {
+              objetosMap.set(obj.id, obj);
+            });
+          }
+          if (item.habilidades) {
+            item.habilidades.forEach((hab: any) => {
+              habilidadesMap.set(hab.id, hab);
+            });
+          }
+          if (item.links) {
+            item.links.forEach((link: any) => {
+              links.push(link);
+            });
+          }
         });
       }
     });
@@ -421,7 +432,7 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
       habilidades: Array.from(habilidadesMap.values()),
       links
     };
-  }, [activeCoursePlan]);
+  }, [coursePlans, campoExperiencia, anoSerie, periodo]);
 
   // Reset selection when parameters change
   useEffect(() => {
@@ -537,10 +548,11 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
     const usedHabilidades = new Set<string>();
     
     logs.forEach(log => {
+      const matchesCampo = campoExperiencia === 'Interdisciplinar' || log.campoExperiencia === campoExperiencia;
       if (
         log.id !== editingId &&
         log.turmaId === selectedTurmaId &&
-        log.campoExperiencia === campoExperiencia &&
+        matchesCampo &&
         log.anoSerie === anoSerie &&
         log.periodo === periodo
       ) {
@@ -564,9 +576,10 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
     const uniqueWorkedHabilidadeIds = new Set<string>();
     
     logs.forEach(log => {
+      const matchesCampo = campoExperiencia === 'Interdisciplinar' || log.campoExperiencia === campoExperiencia;
       if (
         log.turmaId === selectedTurmaId &&
-        log.campoExperiencia === campoExperiencia &&
+        matchesCampo &&
         log.anoSerie === anoSerie &&
         log.periodo === periodo
       ) {

@@ -28,6 +28,7 @@ export interface AtividadeLog {
     data: string;
     conteudo: string;
     instrutor: string;
+    periodo?: string;
 }
 
 export interface AtividadePresenca {
