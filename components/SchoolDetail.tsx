@@ -320,6 +320,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
 
   const [schoolTurmas, setSchoolTurmas] = useState<any[]>([]);
   const [isLoadingTurmas, setIsLoadingTurmas] = useState(false);
+  const [selectedTurmaForEdit, setSelectedTurmaForEdit] = useState<any | null>(null);
 
   const sortTurmas = (turmasList: any[]): any[] => {
     const getStageScore = (stage: string = ''): number => {
@@ -414,8 +415,21 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
   const handleSaveTurma = async (turmaData: any) => {
     try {
       if (isDemoMode) {
-        alert('Turma salva (Simulado).');
+        if (turmaData.id) {
+          setSchoolTurmas(prev => prev.map(t => t.id === turmaData.id ? {
+            ...t,
+            name: turmaData.identificacao,
+            stage: turmaData.etapa,
+            year: turmaData.anoSerie,
+            shift: turmaData.turno,
+            modality: turmaData.tipo
+          } : t));
+          alert('Turma editada com sucesso (Simulado).');
+        } else {
+          alert('Turma salva (Simulado).');
+        }
         setIsTurmaModalOpen(false);
+        setSelectedTurmaForEdit(null);
         return;
       }
 
@@ -439,6 +453,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
       }
 
       setIsTurmaModalOpen(false);
+      setSelectedTurmaForEdit(null);
       loadSchoolTurmas();
     } catch (error) {
       console.error(error);
@@ -1110,14 +1125,26 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                   <div>
                     <h3 className="text-2xl font-bold text-slate-800">Detalhamento de Turmas</h3>
                     <p className="text-slate-500 text-sm mt-1">
-                      Relação de todas as turmas vinculadas à unidade escolar por etapa, ano/série e turno.
+                      Relação de todas as turmas vinculadas à unidade escolar por etapa, ano/série e turno. Clique sobre a turma para editar suas informações.
                     </p>
                   </div>
-                  <div className="flex items-center gap-2 px-4 py-2.5 bg-orange-50 border border-orange-100 rounded-xl shrink-0">
-                    <GraduationCap className="w-4 h-4 text-orange-500" />
-                    <span className="text-xs font-black text-orange-600 uppercase tracking-wider whitespace-nowrap">
-                      {schoolTurmas.length} {schoolTurmas.length === 1 ? 'turma ativa' : 'turmas ativas'}
-                    </span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => {
+                        setSelectedTurmaForEdit(null);
+                        setIsTurmaModalOpen(true);
+                      }}
+                      className="flex items-center gap-1.5 px-3.5 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Cadastrar Turma
+                    </button>
+                    <div className="flex items-center gap-2 px-4 py-2 bg-orange-50 border border-orange-100 rounded-xl shrink-0">
+                      <GraduationCap className="w-4 h-4 text-orange-500" />
+                      <span className="text-xs font-black text-orange-600 uppercase tracking-wider whitespace-nowrap">
+                        {schoolTurmas.length} {schoolTurmas.length === 1 ? 'turma ativa' : 'turmas ativas'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -1183,11 +1210,19 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                                       return (
                                         <div 
                                           key={turma.id} 
-                                          className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl p-3 shadow-sm hover:border-orange-300 transition-all min-w-[140px]"
+                                          onClick={() => {
+                                            setSelectedTurmaForEdit(turma);
+                                            setIsTurmaModalOpen(true);
+                                          }}
+                                          className="flex items-center justify-between gap-3 bg-white border border-slate-200 hover:border-orange-400 hover:shadow-md transition-all rounded-xl p-3 shadow-sm cursor-pointer min-w-[145px] group relative"
+                                          title="Clique para editar as informações desta turma"
                                         >
-                                          <div>
-                                            <div className="font-bold text-slate-800 uppercase text-xs">
-                                              {turma.name}
+                                          <div className="flex-1 min-w-0">
+                                            <div className="flex items-center justify-between gap-1">
+                                              <div className="font-bold text-slate-800 uppercase text-xs truncate">
+                                                {turma.name}
+                                              </div>
+                                              <Edit className="w-3 h-3 text-slate-300 group-hover:text-orange-500 transition-colors shrink-0" />
                                             </div>
                                             <div className="flex items-center gap-1.5 mt-1.5">
                                               <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border ${shiftColor}`}>
@@ -1241,11 +1276,19 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                               return (
                                 <div 
                                   key={turma.id} 
-                                  className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl p-3 shadow-sm hover:border-orange-300 transition-all min-w-[140px]"
+                                  onClick={() => {
+                                    setSelectedTurmaForEdit(turma);
+                                    setIsTurmaModalOpen(true);
+                                  }}
+                                  className="flex items-center justify-between gap-3 bg-white border border-slate-200 hover:border-orange-400 hover:shadow-md transition-all rounded-xl p-3 shadow-sm cursor-pointer min-w-[145px] group relative"
+                                  title="Clique para editar as informações desta turma"
                                 >
-                                  <div>
-                                    <div className="font-bold text-slate-800 uppercase text-xs">
-                                      {turma.name} {turma.year ? `(${turma.year})` : ''}
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between gap-1">
+                                      <div className="font-bold text-slate-800 uppercase text-xs truncate">
+                                        {turma.name} {turma.year ? `(${turma.year})` : ''}
+                                      </div>
+                                      <Edit className="w-3 h-3 text-slate-300 group-hover:text-orange-500 transition-colors shrink-0" />
                                     </div>
                                     <div className="flex items-center gap-1.5 mt-1.5">
                                       <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border ${shiftColor}`}>
@@ -2509,9 +2552,21 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
       {isTurmaModalOpen && (
         <CadastroTurmaModal 
           isOpen={isTurmaModalOpen}
-          onClose={() => setIsTurmaModalOpen(false)}
+          onClose={() => {
+            setIsTurmaModalOpen(false);
+            setSelectedTurmaForEdit(null);
+          }}
           onSave={handleSaveTurma}
           onDelete={handleDeleteTurma}
+          initialTurma={selectedTurmaForEdit ? {
+            id: selectedTurmaForEdit.id,
+            etapa: selectedTurmaForEdit.stage || (selectedTurmaForEdit.level === 'Infantil' ? 'Educação Infantil' : 'Anos Iniciais'),
+            anoSerie: selectedTurmaForEdit.year || selectedTurmaForEdit.anoSerie || selectedTurmaForEdit.name,
+            identificacao: selectedTurmaForEdit.name,
+            turno: selectedTurmaForEdit.shift || 'MANHÃ',
+            tipo: selectedTurmaForEdit.modality || 'REGULAR',
+            escolaId: selectedTurmaForEdit.school_id || escola.id
+          } : null}
           turmasExistentes={schoolTurmas.map(t => ({
             id: t.id,
             etapa: t.stage || (t.level === 'Infantil' ? 'Educação Infantil' : 'Anos Iniciais'),

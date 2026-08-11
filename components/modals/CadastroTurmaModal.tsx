@@ -10,6 +10,7 @@ interface CadastroTurmaModalProps {
     onDelete: (id: string) => void;
     turmasExistentes: TurmaData[];
     escolas?: Escola[];
+    initialTurma?: TurmaData | null;
 }
 
 export interface TurmaData {
@@ -28,7 +29,8 @@ export const CadastroTurmaModal: React.FC<CadastroTurmaModalProps> = ({
     onSave,
     onDelete,
     turmasExistentes,
-    escolas
+    escolas,
+    initialTurma
 }) => {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [etapa, setEtapa] = useState('');
@@ -50,10 +52,15 @@ export const CadastroTurmaModal: React.FC<CadastroTurmaModalProps> = ({
     const turnos = ['MANHÃ', 'TARDE', 'INTEGRAL', 'NOITE'];
     const tipos = ['REGULAR', 'MULTISSERIADA', 'MULTIETAPA'];
 
-    // Reset ano/série when etapa changes
     useEffect(() => {
-        setAnoSerie('');
-    }, [etapa]);
+        if (isOpen) {
+            if (initialTurma) {
+                handleEdit(initialTurma);
+            } else {
+                handleReset();
+            }
+        }
+    }, [isOpen, initialTurma]);
 
     const isFormValid = etapa !== '' && anoSerie !== '' && identificacao !== '' && turno !== '' && tipo !== '' && (!escolas || escolas.length === 0 || escolaId !== '');
 
@@ -64,7 +71,7 @@ export const CadastroTurmaModal: React.FC<CadastroTurmaModalProps> = ({
         if (!isFormValid) return;
 
         const isDuplicate = turmasExistentes.some(
-            (t) => t.etapa === etapa && t.anoSerie === anoSerie && t.identificacao === identificacao && t.turno === turno && t.escolaId === escolaId
+            (t) => t.id !== editingId && t.etapa === etapa && t.anoSerie === anoSerie && t.identificacao === identificacao && t.turno === turno && (t.escolaId === escolaId || !escolaId)
         );
 
         if (isDuplicate) {
