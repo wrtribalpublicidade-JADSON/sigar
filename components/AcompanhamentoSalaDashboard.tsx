@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import {
     Eye, Edit3, CheckCircle2, Search, Filter, Plus, Bell,
-    ChevronLeft, ChevronRight, FileText, Presentation, TrendingUp
+    ChevronLeft, ChevronRight, FileText, Presentation, TrendingUp,
+    School, GraduationCap, RotateCcw, X
 } from 'lucide-react';
 
 import { Escola, RecursoHumano } from '../types';
@@ -16,6 +17,9 @@ interface Observacao {
     data: string;
     status: 'Concluído' | 'Rascunho' | 'Não Iniciado';
     cor: string;
+    escolaId?: string;
+    escolaNome?: string;
+    anoSerie?: string;
 }
 
 const getInitials = (name: string) => {
@@ -42,6 +46,10 @@ interface AcompanhamentoSalaDashboardProps {
 export const AcompanhamentoSalaDashboard: React.FC<AcompanhamentoSalaDashboardProps> = ({ escolas = [], selectedEscolaId = 'all' }) => {
     const [activeFilterTab, setActiveFilterTab] = useState('todas');
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedEscolaFilter, setSelectedEscolaFilter] = useState('ALL');
+    const [selectedAnoSerieFilter, setSelectedAnoSerieFilter] = useState('ALL');
+    const [selectedStatusFilter, setSelectedStatusFilter] = useState('ALL');
+    const [showFilterPanel, setShowFilterPanel] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedProfessor, setSelectedProfessor] = useState<{ id: string; nome: string; etapa: string; escolasVinculadas: { id: string; nome: string }[] } | null>(null);
     const [acompanhamentos, setAcompanhamentos] = useState<any[]>([]);
@@ -87,6 +95,9 @@ export const AcompanhamentoSalaDashboard: React.FC<AcompanhamentoSalaDashboardPr
                         data: '-',
                         status: 'Não Iniciado',
                         cor: getColors(index++),
+                        escolaId: escola.id,
+                        escolaNome: escola.nome,
+                        anoSerie: prof.etapaAtuacao || ''
                     });
                 });
             }
@@ -108,20 +119,47 @@ export const AcompanhamentoSalaDashboard: React.FC<AcompanhamentoSalaDashboardPr
                     ...obs,
                     status: latest.status as any,
                     data: latest.data_observacao ? new Date(latest.data_observacao).toLocaleDateString('pt-BR') : '-',
+                    escolaId: latest.escola_id || obs.escolaId,
+                    escolaNome: escolas.find(e => e.id === (latest.escola_id || obs.escolaId))?.nome || obs.escolaNome,
+                    anoSerie: latest.ano_serie || latest.turma_nome || obs.etapa
                 };
             }
             return obs;
         });
 
         return obsList;
-    }, [escolas, acompanhamentos]);
+    }, [escolas, acompanhamentos, selectedEscolaId]);
+
+    const availableAnoSerieOptions = React.useMemo(() => {
+        const optionsSet = new Set<string>();
+        const defaults = [
+            'Creche II', 'Creche III', 'Pré I', 'Pré II',
+            '1º ANO', '2º ANO', '3º ANO', '4º ANO', '5º ANO',
+            '6º ANO', '7º ANO', '8º ANO', '9º ANO',
+            'Anos Iniciais', 'Anos Finais', 'Educação Infantil', 'EJA'
+        ];
+        defaults.forEach(d => optionsSet.add(d));
+
+        allObservacoes.forEach(o => {
+            if (o.etapa && o.etapa !== 'Não definida') optionsSet.add(o.etapa);
+            if (o.anoSerie) optionsSet.add(o.anoSerie);
+        });
+
+        return Array.from(optionsSet).sort();
+    }, [allObservacoes]);
 
     const filteredObservacoes = React.useMemo(() => {
         return allObservacoes.filter(obs => {
             // Apply text search
-            if (searchTerm && !obs.professor.toLowerCase().includes(searchTerm.toLowerCase()) &&
-                !obs.etapa.toLowerCase().includes(searchTerm.toLowerCase())) {
-                return false;
+            if (searchTerm) {
+                const term = searchTerm.toLowerCase().trim();
+                const matchesProf = obs.professor.toLowerCase().includes(term);
+                const matchesEtapa = obs.etapa.toLowerCase().includes(term);
+                const matchesEscola = (obs.escolaNome || '').toLowerCase().includes(term);
+                const matchesAno = (obs.anoSerie || '').toLowerCase().includes(term);
+                if (!matchesProf && !matchesEtapa && !matchesEscola && !matchesAno) {
+                    return false;
+                }
             }
 
             // Apply tab filter
@@ -136,16 +174,45 @@ export const AcompanhamentoSalaDashboard: React.FC<AcompanhamentoSalaDashboardPr
                 return false;
             }
 
+            // Apply Unidade Escolar filter
+            if (selectedEscolaFilter !== 'ALL' && obs.escolaId !== selectedEscolaFilter) {
+                return false;
+            }
+
+            // Apply Status filter
+            if (selectedStatusFilter !== 'ALL' && obs.status !== selectedStatusFilter) {
+                return false;
+            }
+
+            // Apply Ano/Série/Grupo/Faixa filter
+            if (selectedAnoSerieFilter !== 'ALL') {
+                const target = selectedAnoSerieFilter.toLowerCase();
+                const etapaVal = (obs.etapa || '').toLowerCase();
+                const anoVal = (obs.anoSerie || '').toLowerCase();
+                if (!etapaVal.includes(target) && !anoVal.includes(target)) {
+                    return false;
+                }
+            }
+
             return true;
         });
-    }, [allObservacoes, activeFilterTab, searchTerm]);
+    }, [allObservacoes, activeFilterTab, searchTerm, selectedEscolaFilter, selectedStatusFilter, selectedAnoSerieFilter]);
+
+    const hasActiveFilters = selectedEscolaFilter !== 'ALL' || selectedAnoSerieFilter !== 'ALL' || selectedStatusFilter !== 'ALL';
+
+    const handleClearFilters = () => {
+        setSelectedEscolaFilter('ALL');
+        setSelectedAnoSerieFilter('ALL');
+        setSelectedStatusFilter('ALL');
+        setSearchTerm('');
+    };
 
     const [itemsPerPage, setItemsPerPage] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
 
     React.useEffect(() => {
         setCurrentPage(1);
-    }, [activeFilterTab, searchTerm, selectedEscolaId, itemsPerPage]);
+    }, [activeFilterTab, searchTerm, selectedEscolaId, selectedEscolaFilter, selectedAnoSerieFilter, selectedStatusFilter, itemsPerPage]);
 
     const totalCount = filteredObservacoes.length;
     const totalPages = Math.max(1, Math.ceil(totalCount / itemsPerPage));
@@ -228,21 +295,102 @@ export const AcompanhamentoSalaDashboard: React.FC<AcompanhamentoSalaDashboardPr
                     </div>
 
                     {/* Busca e filtros */}
-                    <div className="flex flex-col sm:flex-row gap-3">
-                        <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                            <input
-                                type="text"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                placeholder="Pesquisar professor ou etapa..."
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-sm font-medium text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
-                            />
+                    <div className="space-y-3">
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <div className="relative flex-1">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                <input
+                                    type="text"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    placeholder="Pesquisar professor, escola, etapa ou ano/série..."
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-sm font-medium text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                                />
+                            </div>
+                            <button
+                                onClick={() => setShowFilterPanel(!showFilterPanel)}
+                                className={`flex items-center justify-center gap-2 px-5 py-2.5 border rounded-xl text-sm font-bold transition-all cursor-pointer ${
+                                    showFilterPanel || hasActiveFilters
+                                        ? 'bg-blue-50 border-blue-300 text-blue-700 shadow-sm'
+                                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                                }`}
+                            >
+                                <Filter className="w-4 h-4 text-blue-600" />
+                                <span>Mais Filtros</span>
+                                {hasActiveFilters && (
+                                    <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse ml-0.5" />
+                                )}
+                            </button>
+                            {hasActiveFilters && (
+                                <button
+                                    onClick={handleClearFilters}
+                                    className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                                    title="Limpar todos os filtros"
+                                >
+                                    <RotateCcw className="w-3.5 h-3.5" />
+                                    <span>Limpar</span>
+                                </button>
+                            )}
                         </div>
-                        <button className="flex items-center justify-center gap-2 px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all">
-                            <Filter className="w-4 h-4" />
-                            Mais Filtros
-                        </button>
+
+                        {/* Filtros expandidos */}
+                        {(showFilterPanel || hasActiveFilters) && (
+                            <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl grid grid-cols-1 sm:grid-cols-3 gap-4 animate-fade-in">
+                                {/* Unidade Escolar */}
+                                <div>
+                                    <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                                        <School className="w-3.5 h-3.5 text-blue-500" />
+                                        Unidade Escolar
+                                    </label>
+                                    <select
+                                        value={selectedEscolaFilter}
+                                        onChange={(e) => setSelectedEscolaFilter(e.target.value)}
+                                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all cursor-pointer"
+                                    >
+                                        <option value="ALL">Todas as Unidades Escolares</option>
+                                        {escolas.map(e => (
+                                            <option key={e.id} value={e.id}>{e.nome}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Ano/Série/Grupo/Faixa */}
+                                <div>
+                                    <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                                        <GraduationCap className="w-3.5 h-3.5 text-blue-500" />
+                                        Ano / Série / Grupo / Faixa
+                                    </label>
+                                    <select
+                                        value={selectedAnoSerieFilter}
+                                        onChange={(e) => setSelectedAnoSerieFilter(e.target.value)}
+                                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all cursor-pointer"
+                                    >
+                                        <option value="ALL">Todos os Anos / Séries / Grupos</option>
+                                        {availableAnoSerieOptions.map(opt => (
+                                            <option key={opt} value={opt}>{opt}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Status */}
+                                <div>
+                                    <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-blue-500" />
+                                        Status da Observação
+                                    </label>
+                                    <select
+                                        value={selectedStatusFilter}
+                                        onChange={(e) => setSelectedStatusFilter(e.target.value)}
+                                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all cursor-pointer"
+                                    >
+                                        <option value="ALL">Todos os Status</option>
+                                        <option value="Concluído">Concluído</option>
+                                        <option value="Rascunho">Rascunho</option>
+                                        <option value="Não Iniciado">Não Iniciado</option>
+                                    </select>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -271,7 +419,14 @@ export const AcompanhamentoSalaDashboard: React.FC<AcompanhamentoSalaDashboardPr
                                             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${obs.cor}`}>
                                                 {obs.iniciais}
                                             </div>
-                                            <span className="font-bold text-slate-800">{obs.professor}</span>
+                                            <div>
+                                                <span className="font-bold text-slate-800 block">{obs.professor}</span>
+                                                {obs.escolaNome && (
+                                                    <span className="text-[11px] text-slate-400 font-medium block truncate max-w-[220px]">
+                                                        {obs.escolaNome}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 font-medium text-slate-600 text-sm">{obs.etapa}</td>
