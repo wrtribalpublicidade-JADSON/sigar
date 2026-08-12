@@ -230,9 +230,9 @@ export const DiarioAtividadeModal: React.FC<{
                 setLogs([saved, ...logs]);
                 setNewLog('');
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error('Error saving log:', err);
-            alert('Erro ao salvar registro.');
+            alert(`Erro ao salvar registro: ${err?.message || 'Verifique a conexão ou tente novamente.'}`);
         }
     };
 
