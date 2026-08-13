@@ -32,6 +32,7 @@ const VIEW_TO_MODULE: Record<string, string> = {
     'DIARIO_FUNDAMENTAL': 'diario_fundamental',
     'DIARIO_INFANTIL': 'diario_infantil',
     'GESTAO_REDE': 'gestao_rede',
+    'SUPORTE_TECNICO': 'suporte',
 };
 
 // Sidebar label → moduleId mapping
@@ -60,6 +61,7 @@ const SIDEBAR_LABEL_TO_MODULE: Record<string, string> = {
     'Ensino Fundamental': 'diario_fundamental',
     'Educação Infantil': 'diario_infantil',
     'Configurações da Rede': 'gestao_rede',
+    'Suporte Técnico': 'suporte',
 };
 
 export const ALL_MODULES = [
@@ -120,6 +122,7 @@ export const ALL_MODULES = [
             { id: 'encaminhamentos', name: 'Encaminhamentos e Intervenções' }
         ]
     },
+    { id: 'suporte', name: 'Suporte Técnico', group: 'Gestão' },
     { id: 'notificacoes', name: 'Notificações', group: 'Sistema' },
     { id: 'auditoria', name: 'Auditoria', group: 'Sistema' },
     { id: 'registrar_visita', name: 'Registrar Visita', group: 'Sistema' },
@@ -178,7 +181,7 @@ export const DEFAULT_PERMISSIONS: Record<string, Record<string, AccessLevel>> = 
     'Técnico Pedagógico': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['equipe', 'auditoria', 'gestao_rede'].includes(m.id) ? 'none' : 'full'])),
     'Professor': Object.fromEntries(ALL_MODULES.map(m => [
         m.id,
-        ['diario_fundamental', 'diario_infantil'].includes(m.id) ? 'full' : ['dashboard', 'conselho_fundamental', 'conselho_infantil', 'notificacoes', 'atividades_comp', 'estudantes'].includes(m.id) ? 'readonly' : 'none'
+        ['diario_fundamental', 'diario_infantil', 'suporte'].includes(m.id) ? 'full' : ['dashboard', 'conselho_fundamental', 'conselho_infantil', 'notificacoes', 'atividades_comp', 'estudantes'].includes(m.id) ? 'readonly' : 'none'
     ])),
     'Coordenador Pedagógico': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['auditoria', 'equipe', 'gestao_rede'].includes(m.id) ? 'none' : 'full'])),
     'Gestor Geral': Object.fromEntries(ALL_MODULES.map(m => [m.id, m.id === 'auditoria' ? 'readonly' : m.id === 'gestao_rede' ? 'none' : 'full'])),
@@ -186,7 +189,7 @@ export const DEFAULT_PERMISSIONS: Record<string, Record<string, AccessLevel>> = 
     'Auxiliar Administrativo': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['auditoria', 'equipe', 'indicadores', 'gestao_rede'].includes(m.id) ? 'none' : 'full'])),
     'Monitor de Atividade Complementar': Object.fromEntries(ALL_MODULES.map(m => [
         m.id,
-        m.id === 'atividades_comp' ? 'full' : ['dashboard', 'estudantes'].includes(m.id) ? 'readonly' : 'none'
+        ['atividades_comp', 'suporte'].includes(m.id) ? 'full' : ['dashboard', 'estudantes'].includes(m.id) ? 'readonly' : 'none'
     ])),
 };
 

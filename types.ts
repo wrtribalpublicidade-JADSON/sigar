@@ -411,7 +411,7 @@ export interface Visita {
   status: 'Planejada' | 'Realizada' | 'Relatório Pendente';
 }
 
-export type ViewState = 'DASHBOARD' | 'LISTA_ESCOLAS' | 'DETALHE_ESCOLA' | 'NOVA_VISITA' | 'COORDENADORES' | 'RELATORIOS' | 'INDICADORES' | 'NOTIFICACOES' | 'AUDIT_LOGS' | 'GESTAO_USUARIOS' | 'INSTRUMENTAIS_GESTAO' | 'CONSELHO_CLASSE' | 'CONSELHO_CLASSE_FUNDAMENTAL' | 'CONSELHO_CLASSE_INFANTIL' | 'PERMISSOES' | 'ATIVIDADES_COMPLEMENTARES' | 'GESTAO_ESTUDANTES' | 'MERENDA_ESCOLAR' | 'PLANO_AULA' | 'AULAS_MINISTRADAS' | 'FREQUENCIA' | 'NOTAS' | 'PLANO_CURSO' | 'DIARIO_FUNDAMENTAL' | 'DIARIO_INFANTIL' | 'GESTAO_REDE';
+export type ViewState = 'DASHBOARD' | 'LISTA_ESCOLAS' | 'DETALHE_ESCOLA' | 'NOVA_VISITA' | 'COORDENADORES' | 'RELATORIOS' | 'INDICADORES' | 'NOTIFICACOES' | 'AUDIT_LOGS' | 'GESTAO_USUARIOS' | 'INSTRUMENTAIS_GESTAO' | 'CONSELHO_CLASSE' | 'CONSELHO_CLASSE_FUNDAMENTAL' | 'CONSELHO_CLASSE_INFANTIL' | 'PERMISSOES' | 'ATIVIDADES_COMPLEMENTARES' | 'GESTAO_ESTUDANTES' | 'MERENDA_ESCOLAR' | 'PLANO_AULA' | 'AULAS_MINISTRADAS' | 'FREQUENCIA' | 'NOTAS' | 'PLANO_CURSO' | 'DIARIO_FUNDAMENTAL' | 'DIARIO_INFANTIL' | 'GESTAO_REDE' | 'SUPORTE_TECNICO';
 
 export type PendencyType = 'MATRICULA' | 'TURMAS' | 'RH' | 'MONITORAMENTO' | 'PLANO_ACAO' | 'VISITA';
 
@@ -439,3 +439,49 @@ export interface AuditLog {
   details?: any;
   created_at: string;
 }
+
+// Interfaces para o Módulo de Suporte Técnico
+export type StatusSuporte = 'Aberto' | 'Em Atendimento' | 'Resolvido' | 'Cancelado';
+export type PrioridadeSuporte = 'Baixa' | 'Média' | 'Alta' | 'Urgente';
+export type CategoriaSuporte = 
+  | 'Erro / Falha no Sistema'
+  | 'Dúvidas de Uso'
+  | 'Cadastro e Permissões'
+  | 'Diário de Classe'
+  | 'Matrículas e Alunos'
+  | 'Sugestão / Melhoria'
+  | 'Outros';
+
+export interface MensagemSuporte {
+  id: string;
+  autor_nome: string;
+  autor_email: string;
+  autor_tipo: 'USUARIO' | 'ADMIN';
+  mensagem: string;
+  anexo_url?: string;
+  created_at: string;
+}
+
+export interface ChamadoSuporte {
+  id: string;
+  protocolo: string;
+  usuario_id?: string;
+  usuario_nome: string;
+  usuario_email: string;
+  usuario_funcao?: string;
+  usuario_contato?: string;
+  escola_id?: string;
+  escola_nome?: string;
+  categoria: CategoriaSuporte;
+  prioridade: PrioridadeSuporte;
+  assunto: string;
+  descricao: string;
+  status: StatusSuporte;
+  atendente_nome?: string;
+  resposta_admin?: string;
+  mensagens: MensagemSuporte[];
+  created_at: string;
+  updated_at: string;
+  resolvido_em?: string;
+}
+

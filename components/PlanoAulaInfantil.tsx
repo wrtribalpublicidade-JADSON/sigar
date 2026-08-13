@@ -6,7 +6,7 @@ import { Button } from './ui/Button';
 import { 
   BookOpen, Plus, Search, Edit2, Trash2, Printer, 
   X, Calendar, School as SchoolIcon, Bookmark, Save,
-  Check, Info, Layers, CheckCircle2, AlertCircle, Clock, MessageSquare
+  Check, Info, Layers, CheckCircle2, AlertCircle, Clock, MessageSquare, Eye, FileText
 } from 'lucide-react';
 import { Escola, Coordenador, Segmento } from '../types';
 import { supabase } from '../services/supabase';
@@ -26,6 +26,9 @@ interface PlanoAulaInfantilProps {
 interface LessonPlanInfantil {
   id: string;
   data: string;
+  dataInicio?: string;
+  dataTermino?: string;
+  dataCriacao?: string;
   escolaId: string;
   escolaNome: string;
   turmaId: string;
@@ -73,7 +76,10 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
   
   // Form State
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [viewingPlan, setViewingPlan] = useState<LessonPlanInfantil | null>(null);
   const [dataPlan, setDataPlan] = useState(new Date().toISOString().split('T')[0]);
+  const [dataInicio, setDataInicio] = useState('');
+  const [dataTermino, setDataTermino] = useState('');
   const [selectedEscolaId, setSelectedEscolaId] = useState('');
   const [selectedTurmaId, setSelectedTurmaId] = useState('');
   const [campoExperiencia, setCampoExperiencia] = useState('O eu, o outro e o nós');
@@ -503,28 +509,34 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
             filteredPlansData = filteredPlansData.filter((d: any) => assignedIds.includes(d.turma_id));
           }
 
-          const formatted: LessonPlanInfantil[] = filteredPlansData.map(d => ({
-            id: d.id,
-            data: d.data,
-            escolaId: d.escola_id,
-            escolaNome: escolas.find(e => e.id === d.escola_id)?.nome || 'Unidade',
-            turmaId: d.turma_id,
-            turmaNome: d.ano_serie, // Placeholder or fetch
-            campoExperiencia: d.campo_experiencia,
-            titulo: d.titulo,
-            objetivos: d.objetivos,
-            habilidades: typeof d.habilidades === 'string' ? JSON.parse(d.habilidades) : (d.habilidades || []),
-            metodologia: d.metodologia,
-            recursos: d.recursos,
-            avaliacao: d.avaliacao,
-            anoSerie: d.ano_serie,
-            periodo: d.periodo,
-            criadoEm: d.created_at,
-            status: d.status || 'Em Análise',
-            observacaoCoordenacao: d.observacao_coordenacao || d.observacaoCoordenacao || '',
-            avaliadoPor: d.avaliado_por || d.avaliadoPor || '',
-            avaliadoEm: d.avaliado_em || d.avaliadoEm || ''
-          }));
+          const formatted: LessonPlanInfantil[] = filteredPlansData.map(d => {
+            const criacaoData = d.data_criacao || d.data || (d.created_at ? d.created_at.split('T')[0] : new Date().toISOString().split('T')[0]);
+            return {
+              id: d.id,
+              data: criacaoData,
+              dataCriacao: criacaoData,
+              dataInicio: d.data_inicio || '',
+              dataTermino: d.data_termino || '',
+              escolaId: d.escola_id,
+              escolaNome: escolas.find(e => e.id === d.escola_id)?.nome || 'Unidade',
+              turmaId: d.turma_id,
+              turmaNome: d.ano_serie, // Placeholder or fetch
+              campoExperiencia: d.campo_experiencia,
+              titulo: d.titulo,
+              objetivos: d.objetivos,
+              habilidades: typeof d.habilidades === 'string' ? JSON.parse(d.habilidades) : (d.habilidades || []),
+              metodologia: d.metodologia,
+              recursos: d.recursos,
+              avaliacao: d.avaliacao,
+              anoSerie: d.ano_serie,
+              periodo: d.periodo,
+              criadoEm: d.created_at,
+              status: d.status || 'Em Análise',
+              observacaoCoordenacao: d.observacao_coordenacao || d.observacaoCoordenacao || '',
+              avaliadoPor: d.avaliado_por || d.avaliadoPor || '',
+              avaliadoEm: d.avaliado_em || d.avaliadoEm || ''
+            };
+          });
           setPlans(formatted);
         } else {
           const saved = localStorage.getItem('sigar_guias_aprendizagem_infantil');
@@ -549,6 +561,16 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
       return;
     }
 
+    if (!dataInicio || !dataTermino) {
+      showNotification('warning', 'Informe a data de Início do Guia e Término do Guia.');
+      return;
+    }
+
+    if (dataTermino < dataInicio) {
+      showNotification('error', 'A data de Término do Guia não pode ser anterior à data de Início do Guia.');
+      return;
+    }
+
     const escolaNome = escolas.find(e => e.id === selectedEscolaId)?.nome || 'Unidade';
     const turmaObj = turmas.find(t => t.id === selectedTurmaId);
     const turmaNome = turmaObj ? `${turmaObj.name || turmaObj.anoSerie || turmaObj.year} • ${turmaObj.shift || turmaObj.turno || ''}` : 'Turma';
@@ -557,9 +579,16 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
     const extractedCodes = (habilidadesText.match(/EI\d{2}[A-Z]{2}\d{2}/g) || []).map(code => code.toUpperCase());
     const finalHabilidades = Array.from(new Set([...habilidades, ...extractedCodes]));
 
+    const criacaoDate = editingId
+      ? (plans.find(p => p.id === editingId)?.dataCriacao || plans.find(p => p.id === editingId)?.data || dataPlan)
+      : new Date().toISOString().split('T')[0];
+
     const payload: LessonPlanInfantil = {
       id: editingId || crypto.randomUUID(),
-      data: dataPlan,
+      data: criacaoDate,
+      dataCriacao: criacaoDate,
+      dataInicio,
+      dataTermino,
       escolaId: selectedEscolaId,
       escolaNome,
       turmaId: selectedTurmaId,
@@ -583,6 +612,9 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
         const dbPayload = {
           id: payload.id,
           data: payload.data,
+          data_criacao: payload.dataCriacao,
+          data_inicio: payload.dataInicio,
+          data_termino: payload.dataTermino,
           escola_id: payload.escolaId,
           turma_id: payload.turmaId,
           campo_experiencia: payload.campoExperiencia,
@@ -632,7 +664,9 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
 
   const handleEdit = (plan: LessonPlanInfantil) => {
     setEditingId(plan.id);
-    setDataPlan(plan.data);
+    setDataPlan(plan.dataCriacao || plan.data || new Date().toISOString().split('T')[0]);
+    setDataInicio(plan.dataInicio || '');
+    setDataTermino(plan.dataTermino || '');
     setSelectedEscolaId(plan.escolaId);
     setTimeout(() => {
       setSelectedTurmaId(plan.turmaId);
@@ -692,6 +726,9 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
 
   const resetForm = () => {
     setEditingId(null);
+    setDataPlan(new Date().toISOString().split('T')[0]);
+    setDataInicio('');
+    setDataTermino('');
     setTitulo('');
     setObjetivos('');
     setHabilidades([]);
@@ -896,16 +933,32 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
                 </tr>
                 <tr>
                   <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc' }}>
+                    Período de Utilização
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 700, color: '#0f172a' }}>
+                    {printPlan.dataInicio && printPlan.dataTermino
+                      ? `${new Date(printPlan.dataInicio + 'T12:00:00').toLocaleDateString('pt-BR')} a ${new Date(printPlan.dataTermino + 'T12:00:00').toLocaleDateString('pt-BR')}`
+                      : new Date(printPlan.data + 'T12:00:00').toLocaleDateString('pt-BR')}
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc' }}>
+                    Data de Elaboração / Criação
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 600, color: '#334155' }}>
+                    {new Date((printPlan.dataCriacao || printPlan.data) + 'T12:00:00').toLocaleDateString('pt-BR')}
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc' }}>
                     Bimestre / Período
                   </td>
                   <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 600, color: '#334155' }}>
                     {printPlan.periodo}
                   </td>
                   <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc' }}>
-                    Data de Referência
+                    Faixa Etária / Grupo
                   </td>
-                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 700, color: '#0f172a' }}>
-                    {new Date(printPlan.data + 'T12:00:00').toLocaleDateString('pt-BR')}
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 600, color: '#334155' }}>
+                    {printPlan.anoSerie}
                   </td>
                 </tr>
                 {printPlan.titulo && (
@@ -1050,23 +1103,82 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
               </div>
             </div>
           )}
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Data *</label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-12 gap-3 items-end">
+            {/* 1. DATA DE CRIAÇÃO (Automática e Travada) */}
+            <div className="col-span-12 sm:col-span-2 md:col-span-1 lg:col-span-1 min-w-[130px]">
+              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Data de Criação">
+                Data de Criação
+              </label>
               <div className="relative">
                 <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                 <input 
                   type="date" 
                   value={dataPlan}
-                  onChange={e => setDataPlan(e.target.value)}
-                  required
-                  className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
+                  disabled
+                  readOnly
+                  title="A data de criação é registrada automaticamente pelo sistema e não pode ser retroativa ou futura."
+                  className="w-full pl-9 pr-2 py-2 border border-slate-200 bg-slate-50/80 text-slate-600 font-bold rounded-xl outline-none text-xs cursor-not-allowed"
                 />
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Unidade Escolar *</label>
+            {/* 2. INÍCIO DO GUIA */}
+            <div className="col-span-12 sm:col-span-2 md:col-span-1 lg:col-span-1 min-w-[140px]">
+              <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 truncate" title="Início do Guia">
+                Início do Guia *
+              </label>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-orange w-4 h-4" />
+                <input 
+                  type="date" 
+                  value={dataInicio}
+                  onChange={e => setDataInicio(e.target.value)}
+                  required
+                  className="w-full pl-9 pr-2 py-2 border border-slate-200 bg-white rounded-xl outline-none text-xs font-semibold focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all"
+                />
+              </div>
+            </div>
+
+            {/* 3. TÉRMINO DO GUIA */}
+            <div className="col-span-12 sm:col-span-2 md:col-span-1 lg:col-span-1 min-w-[140px]">
+              <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 truncate" title="Término do Guia">
+                Término do Guia *
+              </label>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-orange w-4 h-4" />
+                <input 
+                  type="date" 
+                  value={dataTermino}
+                  min={dataInicio}
+                  onChange={e => setDataTermino(e.target.value)}
+                  required
+                  className="w-full pl-9 pr-2 py-2 border border-slate-200 bg-white rounded-xl outline-none text-xs font-semibold focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all"
+                />
+              </div>
+            </div>
+
+            {/* 4. BIMESTRE / ETAPA */}
+            <div className="col-span-12 sm:col-span-2 md:col-span-1 lg:col-span-1 min-w-[130px]">
+              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Bimestre / Etapa">
+                Bimestre / Etapa *
+              </label>
+              <select 
+                value={periodo}
+                onChange={e => setPeriodo(e.target.value)}
+                required
+                className="w-full px-3 py-2 border border-slate-200 bg-white rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
+              >
+                {PERIODOS.map(p => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* 5. UNIDADE ESCOLAR */}
+            <div className="col-span-12 sm:col-span-4 md:col-span-3 lg:col-span-3 min-w-[220px]">
+              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Unidade Escolar">
+                Unidade Escolar *
+              </label>
               <SearchableSchoolSelect
                 escolas={escolasInfantil}
                 selectedId={selectedEscolaId}
@@ -1076,31 +1188,33 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Grupo/Faixa Etária *</label>
+            {/* 6. GRUPO/FAIXA ETÁRIA */}
+            <div className="col-span-12 sm:col-span-2 md:col-span-1 lg:col-span-1 min-w-[120px]">
+              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Grupo/Faixa Etária">
+                Grupo/Faixa Etária *
+              </label>
               <select 
                 value={anoSerie}
                 onChange={e => setAnoSerie(e.target.value)}
                 required
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+                className="w-full px-3 py-2 border border-slate-200 bg-white rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
               >
-                {availableAnosSeries.length === 0 ? (
-                  <option value="">Nenhum grupo cadastrado</option>
-                ) : (
-                  availableAnosSeries.map(a => (
-                    <option key={a} value={a}>{a}</option>
-                  ))
-                )}
+                {availableAnosSeries.map(a => (
+                  <option key={a} value={a}>{a}</option>
+                ))}
               </select>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Turma *</label>
+            {/* 7. TURMA */}
+            <div className="col-span-12 sm:col-span-3 md:col-span-2 lg:col-span-2 min-w-[150px]">
+              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Turma">
+                Turma *
+              </label>
               <select 
                 value={selectedTurmaId}
                 onChange={e => setSelectedTurmaId(e.target.value)}
                 required
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+                className="w-full px-3 py-2 border border-slate-200 bg-white rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
               >
                 {availableTurmas.length === 0 ? (
                   <option value="">Nenhuma turma cadastrada</option>
@@ -1112,30 +1226,19 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
               </select>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Campo de Experiência *</label>
+            {/* 8. CAMPO DE EXPERIÊNCIA */}
+            <div className="col-span-12 sm:col-span-3 md:col-span-2 lg:col-span-2 min-w-[170px]">
+              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Campo de Experiência">
+                Campo de Experiência *
+              </label>
               <select 
                 value={campoExperiencia}
                 onChange={e => setCampoExperiencia(e.target.value)}
                 required
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+                className="w-full px-3 py-2 border border-slate-200 bg-white rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
               >
                 {CAMPOS_EXPERIENCIA.map(c => (
                   <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Período *</label>
-              <select 
-                value={periodo}
-                onChange={e => setPeriodo(e.target.value)}
-                required
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
-              >
-                {PERIODOS.map(p => (
-                  <option key={p} value={p}>{p}</option>
                 ))}
               </select>
             </div>
@@ -1381,7 +1484,7 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
             <table className="w-full text-left border-collapse text-xs">
               <thead className="bg-slate-50 border-b border-slate-100 uppercase text-[10px] font-black text-slate-500 tracking-wider">
                 <tr>
-                  <th className="px-6 py-4">Data / Escola</th>
+                  <th className="px-6 py-4">Data / Unidade Escolar</th>
                   <th className="px-6 py-4">Turma / Campo de Experiência</th>
                   <th className="px-6 py-4">Faixa Etária / Período</th>
                   <th className="px-6 py-4">Tema do Projeto / Vivência</th>
@@ -1400,10 +1503,17 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
                     <tr key={plan.id} className="hover:bg-slate-50/50 transition-colors group">
                       <td className="px-6 py-3">
                         <div className="font-bold text-slate-800">
-                          {new Date(plan.data + 'T12:00:00').toLocaleDateString('pt-BR')}
+                          {plan.dataInicio && plan.dataTermino ? (
+                            <span>{new Date(plan.dataInicio + 'T12:00:00').toLocaleDateString('pt-BR')} a {new Date(plan.dataTermino + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
+                          ) : (
+                            <span>{new Date(plan.data + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
+                          )}
                         </div>
                         <div className="text-[10px] text-slate-400 font-bold uppercase mt-0.5 tracking-tight truncate max-w-[200px]">
                           {plan.escolaNome}
+                        </div>
+                        <div className="text-[9px] text-slate-400 mt-0.5">
+                          Criado em: {new Date((plan.dataCriacao || plan.data) + 'T12:00:00').toLocaleDateString('pt-BR')}
                         </div>
                       </td>
                       <td className="px-6 py-3">
@@ -1455,6 +1565,13 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
                               </button>
                             </>
                           )}
+                          <button 
+                            onClick={() => setViewingPlan(plan)} 
+                            className="p-1.5 text-slate-400 hover:text-brand-orange hover:bg-orange-50 rounded-lg transition-all" 
+                            title="Visualizar Guia e Aulas Ministradas"
+                          >
+                            <Eye size={15} />
+                          </button>
                           <button 
                             onClick={() => handlePrint(plan)} 
                             className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" 
@@ -1510,6 +1627,17 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
               <div><span className="font-bold text-slate-500 uppercase text-[10px]">Guia / Tema:</span> <span className="font-bold text-slate-800">{evaluatingPlan.titulo}</span></div>
               <div><span className="font-bold text-slate-500 uppercase text-[10px]">Escola / Turma:</span> {evaluatingPlan.escolaNome} — {evaluatingPlan.turmaNome} ({evaluatingPlan.anoSerie})</div>
               <div><span className="font-bold text-slate-500 uppercase text-[10px]">Campo de Experiência:</span> {evaluatingPlan.campoExperiencia} ({evaluatingPlan.periodo})</div>
+              <div>
+                <span className="font-bold text-slate-500 uppercase text-[10px]">Período de Utilização:</span>{' '}
+                <span className="font-bold text-brand-orange">
+                  {evaluatingPlan.dataInicio && evaluatingPlan.dataTermino
+                    ? `${new Date(evaluatingPlan.dataInicio + 'T12:00:00').toLocaleDateString('pt-BR')} a ${new Date(evaluatingPlan.dataTermino + 'T12:00:00').toLocaleDateString('pt-BR')}`
+                    : new Date(evaluatingPlan.data + 'T12:00:00').toLocaleDateString('pt-BR')}
+                </span>
+                {' '}&bull;{' '}
+                <span className="font-bold text-slate-500 uppercase text-[10px]">Criado em:</span>{' '}
+                {new Date((evaluatingPlan.dataCriacao || evaluatingPlan.data) + 'T12:00:00').toLocaleDateString('pt-BR')}
+              </div>
             </div>
 
             <div className="space-y-3">
@@ -1570,6 +1698,236 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
               >
                 {evalTargetStatus === 'Aprovado' ? 'Confirmar Aprovação' : 'Confirmar Devolução'}
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Document Sheet Viewer Modal (Style of Atas Finais de Resultados) */}
+      {viewingPlan && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fade-in">
+          <div className="bg-slate-100 rounded-3xl border border-slate-200 shadow-2xl max-w-5xl w-full max-h-[94vh] flex flex-col overflow-hidden">
+            
+            {/* Top Toolbar */}
+            <div className="bg-white px-6 py-4 border-b border-slate-200 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-orange-50 text-brand-orange rounded-2xl border border-orange-100 shadow-sm">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">
+                    Visualizador da Guia de Aprendizagem e Aulas Ministradas
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    Documento oficial de planejamento pedagógico da Educação Infantil e registro das vivências
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="primary"
+                  onClick={() => handlePrint(viewingPlan)}
+                  className="flex items-center gap-2 text-xs py-2 px-4 shadow-sm bg-brand-orange hover:bg-brand-orange/90"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>Imprimir Guia</span>
+                </Button>
+                <button
+                  onClick={() => setViewingPlan(null)}
+                  className="p-2 text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-100 transition-all cursor-pointer"
+                  title="Fechar Visualização"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Document Sheet Area */}
+            <div className="p-4 sm:p-8 overflow-y-auto flex-1 bg-slate-200/80">
+              <div className="bg-white shadow-2xl max-w-4xl mx-auto p-8 sm:p-14 text-slate-800 font-serif border border-slate-300 rounded-sm">
+                
+                {/* Official Header */}
+                <div className="text-center border-b-2 border-slate-800 pb-4 mb-6">
+                  <h4 className="text-[10px] font-black tracking-widest text-slate-500 uppercase">ESTADO DO MARANHÃO</h4>
+                  <h2 className="text-sm font-black tracking-wider text-slate-800 mt-1 uppercase">PREFEITURA MUNICIPAL DE HUMBERTO DE CAMPOS</h2>
+                  <h5 className="text-[9px] font-black tracking-widest text-slate-500 mt-0.5 uppercase">SECRETARIA MUNICIPAL DE EDUCAÇÃO</h5>
+                  <div className="w-24 h-0.5 bg-brand-orange mx-auto my-3" />
+                  <h1 className="text-lg font-black text-slate-900 tracking-tight uppercase">
+                    GUIA DE APRENDIZAGEM DOCENTE E AULAS MINISTRADAS
+                  </h1>
+                  <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1">
+                    EDUCAÇÃO INFANTIL
+                  </p>
+                </div>
+
+                {/* Protocol Bar */}
+                <div className="flex justify-between items-center bg-slate-50 border border-slate-200 p-3 rounded-lg text-xs mb-6 font-sans">
+                  <div>
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider block">Identificação do Documento</span>
+                    <span className="font-black text-slate-800 text-sm">
+                      GUIA ECE Nº {viewingPlan.id.split('-')[0].toUpperCase()}/{new Date().getFullYear()}
+                    </span>
+                  </div>
+                  <div className="text-right flex items-center gap-3">
+                    <div>
+                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider block">Status Pedagógico</span>
+                      <div className="mt-0.5">{renderStatusBadge(viewingPlan.status)}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Identification Grid Block */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs mb-6 border border-slate-200 p-4 bg-slate-50/70 rounded-lg font-sans">
+                  <div className="col-span-2">
+                    <span className="font-bold text-slate-400 uppercase text-[9px] block">Unidade Escolar</span>
+                    <span className="font-black text-slate-800 uppercase text-xs">{viewingPlan.escolaNome}</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-400 uppercase text-[9px] block">Faixa Etária / Grupo</span>
+                    <span className="font-bold text-slate-800">{viewingPlan.anoSerie}</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-400 uppercase text-[9px] block">Campo de Experiência</span>
+                    <span className="font-black text-brand-orange">{viewingPlan.campoExperiencia}</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-400 uppercase text-[9px] block">Início do Guia</span>
+                    <span className="font-bold text-slate-800">
+                      {viewingPlan.dataInicio ? new Date(viewingPlan.dataInicio + 'T12:00:00').toLocaleDateString('pt-BR') : '---'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-400 uppercase text-[9px] block">Término do Guia</span>
+                    <span className="font-bold text-slate-800">
+                      {viewingPlan.dataTermino ? new Date(viewingPlan.dataTermino + 'T12:00:00').toLocaleDateString('pt-BR') : '---'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-400 uppercase text-[9px] block">Bimestre / Etapa</span>
+                    <span className="font-bold text-slate-800">{viewingPlan.periodo}</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-400 uppercase text-[9px] block">Data de Criação</span>
+                    <span className="font-bold text-slate-800">
+                      {new Date((viewingPlan.dataCriacao || viewingPlan.data) + 'T12:00:00').toLocaleDateString('pt-BR')}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Content Sections */}
+                <div className="space-y-4 font-sans text-xs">
+                  {/* 1. Projeto / Tema */}
+                  <div className="border border-slate-200 rounded-lg overflow-hidden">
+                    <div className="bg-slate-900 text-white px-4 py-2 font-black uppercase text-[10px] tracking-wider">
+                      1. Projeto / Tema Central / Vivência
+                    </div>
+                    <div className="p-4 bg-white font-bold text-slate-900 text-sm">
+                      {viewingPlan.titulo}
+                    </div>
+                  </div>
+
+                  {/* 2. Objetivos Principais */}
+                  <div className="border border-slate-200 rounded-lg overflow-hidden">
+                    <div className="bg-slate-900 text-white px-4 py-2 font-black uppercase text-[10px] tracking-wider">
+                      2. Contexto do Campo de Experiência e Objetivos
+                    </div>
+                    <div className="p-4 bg-white text-slate-700 leading-relaxed whitespace-pre-line">
+                      {viewingPlan.objetivos || 'Nenhum objetivo especificado.'}
+                    </div>
+                  </div>
+
+                  {/* 3. Objetivos BNCC ECE */}
+                  {viewingPlan.habilidades && viewingPlan.habilidades.length > 0 && (
+                    <div className="border border-slate-200 rounded-lg overflow-hidden">
+                      <div className="bg-slate-900 text-white px-4 py-2 font-black uppercase text-[10px] tracking-wider">
+                        3. Objetivos de Aprendizagem e Desenvolvimento (BNCC Infantil)
+                      </div>
+                      <div className="p-4 bg-white space-y-2">
+                        {viewingPlan.habilidades.map((code: string, idx: number) => {
+                          const desc = getObjectiveDescription(code);
+                          return (
+                            <div key={idx} className="p-2.5 bg-slate-50 border border-slate-100 rounded-lg">
+                              <span className="font-black text-brand-orange font-mono mr-2">{code}</span>
+                              <span className="text-slate-700">{desc || 'Objetivo de aprendizagem associado'}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 4. Metodologia / Situações de Exploração e Vivências Ministradas */}
+                  <div className="border border-slate-200 rounded-lg overflow-hidden">
+                    <div className="bg-slate-900 text-white px-4 py-2 font-black uppercase text-[10px] tracking-wider">
+                      4. Procedimentos Metodológicos / Situações de Exploração e Vivências Ministradas
+                    </div>
+                    <div className="p-4 bg-white text-slate-700 leading-relaxed whitespace-pre-line">
+                      {viewingPlan.metodologia || 'Não informado.'}
+                    </div>
+                  </div>
+
+                  {/* 5. Recursos */}
+                  <div className="border border-slate-200 rounded-lg overflow-hidden">
+                    <div className="bg-slate-900 text-white px-4 py-2 font-black uppercase text-[10px] tracking-wider">
+                      5. Recursos Didáticos e Materiais Concretos
+                    </div>
+                    <div className="p-4 bg-white text-slate-700 leading-relaxed whitespace-pre-line">
+                      {viewingPlan.recursos || 'Não informado.'}
+                    </div>
+                  </div>
+
+                  {/* 6. Avaliação */}
+                  <div className="border border-slate-200 rounded-lg overflow-hidden">
+                    <div className="bg-slate-900 text-white px-4 py-2 font-black uppercase text-[10px] tracking-wider">
+                      6. Instrumentos de Acompanhamento e Registro da Aprendizagem
+                    </div>
+                    <div className="p-4 bg-white text-slate-700 leading-relaxed whitespace-pre-line">
+                      {viewingPlan.avaliacao || 'Não informado.'}
+                    </div>
+                  </div>
+
+                  {/* 7. Parecer da Coordenação */}
+                  {viewingPlan.observacaoCoordenacao && (
+                    <div className="border border-amber-200 bg-amber-50/60 rounded-lg overflow-hidden">
+                      <div className="bg-amber-600 text-white px-4 py-2 font-black uppercase text-[10px] tracking-wider flex items-center gap-1.5">
+                        <AlertCircle className="w-3.5 h-3.5" />
+                        <span>Parecer e Orientações da Coordenação Pedagógica</span>
+                      </div>
+                      <div className="p-4 text-amber-950 leading-relaxed">
+                        <p className="font-medium">{viewingPlan.observacaoCoordenacao}</p>
+                        {viewingPlan.avaliadoPor && (
+                          <div className="mt-2 text-[10px] font-bold text-amber-800">
+                            Avaliador(a): {viewingPlan.avaliadoPor} {viewingPlan.avaliadoEm ? `• em ${new Date(viewingPlan.avaliadoEm).toLocaleDateString('pt-BR')}` : ''}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Signatures Block */}
+                  <div className="grid grid-cols-2 gap-8 pt-8 mt-8 border-t border-slate-200 text-center font-sans">
+                    <div>
+                      <div className="border-t border-slate-800 w-4/5 mx-auto mb-2" />
+                      <p className="font-black text-slate-800 uppercase text-[10px]">Professor(a) de Educação Infantil</p>
+                      <p className="text-[9px] text-slate-500 uppercase font-medium">Assinatura do(a) Docente</p>
+                    </div>
+                    <div>
+                      <div className="border-t border-slate-800 w-4/5 mx-auto mb-2" />
+                      <p className="font-black text-slate-800 uppercase text-[10px]">{viewingPlan.avaliadoPor || 'Coordenação Pedagógica'}</p>
+                      <p className="text-[9px] text-slate-500 uppercase font-medium">Equipe Gestora / Visto</p>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Footer */}
+                <div className="mt-8 pt-4 border-t border-slate-200 flex justify-between items-center text-[8px] text-slate-400 font-sans uppercase font-bold tracking-wider">
+                  <span>SIGAR • Sistema Integrado de Gestão de Aprendizagem</span>
+                  <span>Secretaria Municipal de Educação • Humberto de Campos/MA</span>
+                </div>
+
+              </div>
             </div>
           </div>
         </div>

@@ -37,6 +37,7 @@ import { Notas } from './components/Notas';
 import { DiarioFundamental } from './components/DiarioFundamental';
 import { DiarioInfantil } from './components/DiarioInfantil';
 import { GestaoRede } from './components/GestaoRede';
+import { SuporteTecnico } from './components/SuporteTecnico';
 import { ViewState, Escola, Visita, Coordenador, Segmento } from './types';
 import { supabase } from './services/supabase';
 import { useNotification } from './context/NotificationContext';
@@ -1322,6 +1323,16 @@ export default function App() {
         return <DiarioInfantil escolas={escolas} isDemoMode={isDemoMode} isAdmin={isAdmin} userEmail={userEmail} currentUser={effectiveUser || null} />;
       case 'GESTAO_REDE':
         return <GestaoRede />;
+      case 'SUPORTE_TECNICO':
+        return (
+          <SuporteTecnico
+            currentUser={effectiveUser || null}
+            isAdmin={isAdmin}
+            userEmail={userEmail}
+            escolas={escolas}
+            isDemoMode={isDemoMode}
+          />
+        );
       default:
         return <div>Página não encontrada</div>;
     }
