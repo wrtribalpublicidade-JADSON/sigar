@@ -18,6 +18,7 @@ interface PageHeaderProps {
     onBack?: () => void;
     backgroundImage?: string;
     rightContent?: React.ReactNode;
+    children?: React.ReactNode;
 }
 
 export const PageHeader: React.FC<PageHeaderProps> = ({
@@ -29,6 +30,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
     actions = [],
     onBack,
     rightContent,
+    children,
 }) => {
     return (
         <div className="relative overflow-hidden bg-slate-900 rounded-2xl p-4 md:p-5 shadow-2xl animate-fade-in mb-6 max-w-full">
@@ -88,6 +90,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
                     </div>
                 )}
                 {rightContent}
+                {children}
             </div>
         </div>
 

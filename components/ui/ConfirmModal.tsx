@@ -1,18 +1,18 @@
-import React from 'react';
-import { Button } from './Button';
-import { LucideIcon, X } from 'lucide-react';
+import { LucideIcon, X, AlertCircle } from 'lucide-react';
 
 interface ConfirmModalProps {
     isOpen: boolean;
-    onClose: () => void;
+    onClose?: () => void;
+    onCancel?: () => void;
     onConfirm: () => void;
     title: string;
     message: string;
-    icon: LucideIcon;
+    icon?: LucideIcon;
     iconColor?: string; // Kept for API compatibility but mapping to variants
     confirmText?: string;
     cancelText?: string;
     variant?: 'danger' | 'info' | 'warning' | 'success';
+    confirmVariant?: 'danger' | 'info' | 'warning' | 'success';
     children?: React.ReactNode;
     showCancel?: boolean;
 }
@@ -20,20 +20,25 @@ interface ConfirmModalProps {
 export const ConfirmModal: React.FC<ConfirmModalProps> = ({
     isOpen,
     onClose,
+    onCancel,
     onConfirm,
     title,
     message,
-    icon: Icon,
+    icon: Icon = AlertCircle,
     confirmText = 'Confirmar',
     cancelText = 'Cancelar',
-    variant = 'info',
+    variant,
+    confirmVariant,
     children,
     showCancel = true
 }) => {
     if (!isOpen) return null;
 
+    const handleClose = onClose || onCancel || (() => {});
+    const activeVariant = variant || confirmVariant || 'info';
+
     const getVariantStyles = () => {
-        switch (variant) {
+        switch (activeVariant) {
             case 'danger': return {
                 iconBg: 'bg-red-100', iconText: 'text-red-600',
                 btnClass: 'bg-red-600 hover:bg-red-700 focus:ring-red-500/20 shadow-red-500/20 text-white'
@@ -59,12 +64,12 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div
                 className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity"
-                onClick={onClose}
+                onClick={handleClose}
             />
 
             <div className="relative bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-100 overflow-hidden transform transition-all animate-slide-up sm:max-w-lg">
                 <button
-                    onClick={onClose}
+                    onClick={handleClose}
                     className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full p-2 transition-all"
                     aria-label="Fechar"
                 >
@@ -94,7 +99,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
                 <div className="bg-slate-50 border-t border-slate-100 p-6 flex flex-col-reverse sm:flex-row justify-end gap-3 rounded-b-2xl">
                     {showCancel && (
                         <button
-                            onClick={onClose}
+                            onClick={handleClose}
                             className="w-full sm:w-auto px-6 py-2.5 text-slate-600 font-bold bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-200 transition-all shadow-sm"
                         >
                             {cancelText}

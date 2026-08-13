@@ -1354,9 +1354,10 @@ export const SuporteTecnico: React.FC<SuporteTecnicoProps> = ({
                 message={`Deseja realmente excluir o chamado protocolo ${chamadoToDelete?.protocolo}? Esta ação não pode ser desfeita.`}
                 confirmText="Excluir"
                 cancelText="Cancelar"
-                confirmVariant="danger"
+                variant="danger"
+                icon={Trash2}
                 onConfirm={handleDelete}
-                onCancel={() => setChamadoToDelete(null)}
+                onClose={() => setChamadoToDelete(null)}
             />
         </div>
     );
