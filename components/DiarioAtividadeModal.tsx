@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
     X, Users, Calendar, BookOpen, CheckCircle2, XCircle, 
     Plus, Search, UserPlus, Filter, ClipboardList, TrendingUp,
-    Pencil, Trash2, Printer, Bookmark
+    Pencil, Trash2, Printer, Bookmark, CheckCheck, RotateCcw, MapPin
 } from 'lucide-react';
 import { activitiesService, Atividade, AtividadeLog, AtividadePresenca } from '../services/activitiesService';
 import { supabase } from '../services/supabase';
@@ -168,6 +168,24 @@ export const DiarioAtividadeModal: React.FC<{
         }
     };
 
+    const handleMarkAll = async (presente: boolean) => {
+        if (students.length === 0) return;
+        try {
+            const newAttendance: Record<number, boolean> = {};
+            students.forEach(s => { newAttendance[s.id] = presente; });
+            setAttendance(newAttendance);
+            
+            const records = students.map(s => ({
+                aluno_id: s.id,
+                presente
+            }));
+            if (!atividade?.id) return;
+            await activitiesService.saveAttendance(atividade.id, selectedDate, records);
+        } catch (err) {
+            console.error('Error saving attendance:', err);
+        }
+    };
+
     const handleAddStudent = async (student: Student) => {
         if (students.find(s => s.id === student.id)) {
             alert('Este aluno já está vinculado a esta atividade.');
@@ -317,7 +335,7 @@ export const DiarioAtividadeModal: React.FC<{
                                         placeholder="Buscar por nome ou turma..." 
                                         value={studentSearch}
                                         onChange={e => setStudentSearch(e.target.value)}
-                                        className="w-full bg-slate-50 border-none rounded-2xl pl-12 pr-4 py-4 text-sm font-black focus:ring-2 focus:ring-indigo-500/10 transition-all outline-none"
+                                        className="w-full bg-slate-50 border-none rounded-2xl pl-12 pr-4 py-4 text-sm font-black focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none"
                                     />
                                 </div>
                             </div>
@@ -335,12 +353,12 @@ export const DiarioAtividadeModal: React.FC<{
                                                 className={`w-full flex items-center justify-between p-4 border rounded-2xl transition-all group ${
                                                     enrolled
                                                         ? 'bg-emerald-50 border-emerald-200 cursor-default'
-                                                        : 'bg-white border-slate-50 hover:border-indigo-100 hover:bg-slate-50 cursor-pointer'
+                                                        : 'bg-white border-slate-50 hover:border-orange-200 hover:bg-slate-50 cursor-pointer'
                                                 }`}
                                             >
                                                 <div className="flex items-center gap-4 text-left">
                                                     <div className={`w-12 h-12 rounded-xl shadow-sm flex items-center justify-center font-black transition-all ${
-                                                        enrolled ? 'bg-emerald-500 text-white' : 'bg-white text-slate-400 group-hover:bg-indigo-600 group-hover:text-white'
+                                                        enrolled ? 'bg-emerald-500 text-white' : 'bg-white text-slate-400 group-hover:bg-brand-orange group-hover:text-white'
                                                     }`}>
                                                         {s.nome?.charAt(0) || '?'}
                                                     </div>
@@ -351,14 +369,14 @@ export const DiarioAtividadeModal: React.FC<{
                                                         <div className="flex gap-2 items-center flex-wrap">
                                                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{s.escola}</span>
                                                             <span className="w-1 h-1 bg-slate-200 rounded-full" />
-                                                            <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">{s.anoSerie} • {s.etapa}</span>
+                                                            <span className="text-[10px] font-bold text-brand-orange uppercase tracking-widest">{s.anoSerie} • {s.etapa}</span>
                                                         </div>
                                                     </div>
                                                 </div>
                                                 <div className={`p-2 rounded-lg transition-all ${
                                                     enrolled
                                                         ? 'bg-emerald-100 text-emerald-600'
-                                                        : 'bg-slate-100 text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600'
+                                                        : 'bg-slate-100 text-slate-400 group-hover:bg-orange-50 group-hover:text-brand-orange'
                                                 }`}>
                                                     {enrolled ? <CheckCircle2 size={18} /> : <Plus size={18} />}
                                                 </div>
@@ -376,40 +394,54 @@ export const DiarioAtividadeModal: React.FC<{
                 )}
 
                 {/* Header Section */}
-                <div className="bg-white px-10 py-8 border-b border-slate-100 relative">
-                    <div className="flex justify-between items-start">
-                        <div className="flex gap-6">
-                            <div className="w-16 h-16 bg-indigo-600 rounded-3xl flex items-center justify-center text-white shadow-xl shadow-indigo-100">
-                                <ClipboardList size={32} />
+                <div className="bg-white px-8 sm:px-10 py-6 sm:py-8 border-b border-slate-100 relative">
+                    <div className="flex justify-between items-start gap-4">
+                        <div className="flex gap-4 sm:gap-6 items-start flex-1 min-w-0">
+                            <div className="w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl sm:rounded-3xl flex items-center justify-center text-white shadow-lg shadow-orange-500/20 shrink-0 mt-0.5">
+                                <ClipboardList className="w-7 h-7 sm:w-8 sm:h-8" />
                             </div>
-                            <div>
-                                <div className="flex items-center gap-3 mb-1">
-                                    <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">{atividade?.nome}</h2>
-                                    <span className="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">{atividade?.categoria}</span>
+                            <div className="flex-1 min-w-0 space-y-1.5">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <h2 className="text-xl sm:text-2xl font-black text-slate-900 uppercase tracking-tight leading-snug">
+                                        {atividade?.nome}
+                                    </h2>
+                                    {atividade?.categoria && (
+                                        <span className="bg-orange-50 text-brand-orange border border-orange-100 px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0">
+                                            {atividade.categoria}
+                                        </span>
+                                    )}
                                 </div>
-                                <div className="flex items-center gap-4 text-slate-500 font-bold text-sm">
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-slate-500 font-bold text-xs sm:text-sm">
+                                    {atividade?.instrutor && (
+                                        <div className="flex items-center gap-1.5">
+                                            <Users size={15} className="text-brand-orange" />
+                                            <span>{atividade.instrutor}</span>
+                                        </div>
+                                    )}
+                                    {atividade?.sala && (
+                                        <div className="flex items-center gap-1.5">
+                                            <MapPin size={15} className="text-brand-orange" />
+                                            <span>{atividade.sala}</span>
+                                        </div>
+                                    )}
                                     <div className="flex items-center gap-1.5">
-                                        <Users size={16} className="text-indigo-400" />
-                                        <span>{atividade?.instrutor}</span>
-                                    </div>
-                                    <div className="flex items-center gap-1.5">
-                                        <Calendar size={16} className="text-indigo-400" />
-                                        <span>{atividade?.sala}</span>
-                                    </div>
-                                    <div className="flex items-center gap-1.5">
-                                        <TrendingUp size={16} className="text-emerald-400" />
-                                        <span className="text-emerald-600">{students.length}/{atividade?.vagas} Inscritos</span>
+                                        <TrendingUp size={15} className="text-emerald-500" />
+                                        <span className="text-emerald-700 font-bold">{students.length}/{atividade?.vagas || 0} Inscritos</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-3 hover:bg-slate-50 rounded-2xl transition-all">
-                            <X size={28} />
+                        <button 
+                            onClick={onClose} 
+                            className="text-slate-400 hover:text-slate-700 p-2.5 hover:bg-slate-100 rounded-2xl transition-all shrink-0 cursor-pointer"
+                            title="Fechar Painel"
+                        >
+                            <X size={24} />
                         </button>
                     </div>
 
                     {/* Navigation Tabs */}
-                    <div className="flex gap-2 mt-8">
+                    <div className="flex gap-2 mt-6 sm:mt-8 overflow-x-auto pb-1">
                         {[
                             { id: 'chamada', label: 'Chamada Diária', icon: CheckCircle2 },
                             { id: 'alunos', label: 'Gestão de Alunos', icon: Users },
@@ -418,9 +450,9 @@ export const DiarioAtividadeModal: React.FC<{
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id as any)}
-                                className={`flex items-center gap-2.5 px-6 py-3.5 rounded-2xl text-sm font-black transition-all border-2 ${
+                                className={`flex items-center gap-2.5 px-6 py-3.5 rounded-2xl text-sm font-black transition-all border-2 whitespace-nowrap cursor-pointer ${
                                     activeTab === tab.id 
-                                    ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-100' 
+                                    ? 'bg-brand-orange border-brand-orange text-white shadow-lg shadow-orange-500/20' 
                                     : 'bg-white border-transparent text-slate-400 hover:bg-slate-50 hover:text-slate-600'
                                 }`}
                             >
@@ -432,44 +464,93 @@ export const DiarioAtividadeModal: React.FC<{
                 </div>
 
                 {/* Content Section */}
-                <div className="flex-1 overflow-y-auto p-10 bg-slate-50/50">
+                <div className="flex-1 overflow-y-auto p-6 sm:p-10 bg-slate-50/50">
                     
                     {/* Tab: Chamada */}
                     {activeTab === 'chamada' && (
                         <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
-                            <div className="flex justify-between items-center bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
-                                <div className="mb-2">
-                                <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${atividade?.status === 'Ativa' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
-                                    {atividade?.status || 'Planejada'}
-                                </span>
-                            </div>
-                            <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">{atividade?.nome || 'Atividade'}</h2>
-                                <div className="flex items-center gap-4">
-                                    <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
-                                        <Calendar size={20} />
-                                    </div>
+                            
+                            {/* Chamada Toolbar Card */}
+                            <div className="bg-white p-5 sm:p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-6">
+                                
+                                {/* Left: Status & Quick Attendance Controls */}
+                                <div className="flex flex-col justify-center gap-3">
                                     <div>
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data da Aula</p>
-                                        <input 
-                                            type="date" 
-                                            value={selectedDate}
-                                            onChange={e => setSelectedDate(e.target.value)}
-                                            className="font-black text-slate-800 bg-transparent border-none p-0 outline-none focus:ring-0 text-lg"
-                                        />
+                                        <div className="flex items-center gap-2">
+                                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                                atividade?.status === 'Ativa' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-amber-50 text-amber-600 border border-amber-100'
+                                            }`}>
+                                                {atividade?.status || 'Ativa'}
+                                            </span>
+                                            <span className="text-xs font-black text-slate-800 uppercase tracking-tight">
+                                                Frequência da Oficina
+                                            </span>
+                                        </div>
+                                        <p className="text-[11px] text-slate-400 font-medium mt-1">
+                                            Marque a presença dos estudantes para o dia selecionado
+                                        </p>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 pt-0.5">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleMarkAll(true)}
+                                            className="px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 border border-emerald-200/60 active:scale-95 cursor-pointer shadow-sm"
+                                            title="Marcar todos como presentes"
+                                        >
+                                            <CheckCheck size={15} />
+                                            <span>Todos Presentes</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleMarkAll(false)}
+                                            className="px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 border border-slate-200/80 active:scale-95 cursor-pointer"
+                                            title="Marcar todos como faltantes"
+                                        >
+                                            <RotateCcw size={14} />
+                                            <span>Limpar</span>
+                                        </button>
                                     </div>
                                 </div>
-                                <div className="flex gap-4">
-                                    <div className="text-center px-6 border-r border-slate-100">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Presentes</p>
-                                        <p className="text-2xl font-black text-emerald-600">
-                                            {Object.values(attendance).filter(v => v === true).length}
-                                        </p>
+
+                                {/* Right: Date Picker Box aligned perfectly to span from Total to Faltas */}
+                                <div className="flex flex-col gap-2.5 w-full sm:w-80 shrink-0">
+                                    {/* Date Selector Box spanning full width from Total to Faltas */}
+                                    <div className="flex items-center justify-between gap-3 bg-slate-50 border border-slate-200/80 px-4 py-2.5 rounded-2xl shadow-inner w-full">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-orange-50 text-brand-orange rounded-xl border border-orange-100 shrink-0">
+                                                <Calendar size={18} />
+                                            </div>
+                                            <div>
+                                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Data da Aula</span>
+                                                <input 
+                                                    type="date" 
+                                                    value={selectedDate}
+                                                    onChange={e => setSelectedDate(e.target.value)}
+                                                    className="font-black text-slate-800 bg-transparent border-none p-0 outline-none focus:ring-0 text-sm cursor-pointer"
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="text-center px-6">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Faltas</p>
-                                        <p className="text-2xl font-black text-rose-600">
-                                            {students.length - Object.values(attendance).filter(v => v === true).length}
-                                        </p>
+
+                                    {/* Metrics KPI Badges (Grid of 3 equal columns spanning exact width of Date Box) */}
+                                    <div className="grid grid-cols-3 gap-2 w-full">
+                                        <div className="bg-slate-50 border border-slate-100 py-2 px-2 rounded-2xl text-center">
+                                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Total</span>
+                                            <span className="text-base sm:text-lg font-black text-slate-800">{students.length}</span>
+                                        </div>
+                                        <div className="bg-emerald-50 border border-emerald-100 py-2 px-2 rounded-2xl text-center">
+                                            <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest block">Presentes</span>
+                                            <span className="text-base sm:text-lg font-black text-emerald-700">
+                                                {Object.values(attendance).filter(v => v === true).length}
+                                            </span>
+                                        </div>
+                                        <div className="bg-rose-50 border border-rose-100 py-2 px-2 rounded-2xl text-center">
+                                            <span className="text-[9px] font-black text-rose-600 uppercase tracking-widest block">Faltas</span>
+                                            <span className="text-base sm:text-lg font-black text-rose-700">
+                                                {students.length - Object.values(attendance).filter(v => v === true).length}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -490,7 +571,7 @@ export const DiarioAtividadeModal: React.FC<{
                                                 <tr key={student.id} className="hover:bg-slate-50 transition-colors">
                                                     <td className="px-8 py-5">
                                                         <div className="flex items-center gap-3">
-                                                            <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center font-black text-slate-400 text-sm italic">
+                                                            <div className="w-10 h-10 bg-orange-50 text-brand-orange rounded-xl flex items-center justify-center font-black text-sm italic">
                                                                 {student.nome?.charAt(0) || '?'}
                                                             </div>
                                                             <span className="font-bold text-slate-800">{student.nome || 'Sem nome'}</span>
@@ -499,7 +580,7 @@ export const DiarioAtividadeModal: React.FC<{
                                                     <td className="px-8 py-5">
                                                         <div className="flex flex-col">
                                                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">{student.escola}</span>
-                                                            <span className="bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider w-fit">{student.anoSerie} • {student.etapa}</span>
+                                                            <span className="bg-orange-50/80 text-brand-orange px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider w-fit">{student.anoSerie} • {student.etapa}</span>
                                                         </div>
                                                     </td>
                                                     <td className="px-8 py-5">
@@ -536,12 +617,12 @@ export const DiarioAtividadeModal: React.FC<{
                                     <input 
                                         type="text" 
                                         placeholder="Buscar aluno na oficina..." 
-                                        className="w-full bg-white border border-slate-200 rounded-2xl pl-12 pr-4 py-4 text-sm focus:ring-2 focus:ring-indigo-500/20 transition-all font-medium outline-none"
+                                        className="w-full bg-white border border-slate-200 rounded-2xl pl-12 pr-4 py-4 text-sm focus:ring-2 focus:ring-brand-orange/20 transition-all font-medium outline-none"
                                     />
                                 </div>
                                 <button 
                                     onClick={() => setIsAddingStudent(true)}
-                                    className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 active:scale-95"
+                                    className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 transition-all shadow-xl shadow-orange-500/20 active:scale-95"
                                 >
                                     <UserPlus size={18} /> Vincular Aluno
                                 </button>
@@ -557,13 +638,13 @@ export const DiarioAtividadeModal: React.FC<{
                                             <XCircle size={20} />
                                         </button>
                                         <div className="flex items-center gap-4 mb-4">
-                                            <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center font-black text-xl italic uppercase tracking-tighter">
+                                            <div className="w-14 h-14 bg-orange-50 text-brand-orange rounded-2xl flex items-center justify-center font-black text-xl italic uppercase tracking-tighter">
                                                 {student.nome?.split(' ').map(n=>n[0]).join('').substring(0,2) || '?'}
                                             </div>
                                             <div>
                                                 <h4 className="font-black text-slate-800 text-lg tracking-tight leading-tight">{student.nome || 'Sem nome'}</h4>
                                                 <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-1">{student.escola}</p>
-                                                <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded-md">{student.anoSerie} • {student.etapa}</span>
+                                                <span className="text-[10px] font-black text-brand-orange uppercase tracking-widest bg-orange-50 px-2 py-0.5 rounded-md">{student.anoSerie} • {student.etapa}</span>
                                             </div>
                                         </div>
                                         <div className="flex justify-between items-center pt-4 border-t border-slate-50">
@@ -585,7 +666,7 @@ export const DiarioAtividadeModal: React.FC<{
                             <div className="bg-white rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/20 p-8 space-y-4">
                                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                     <div className="flex items-center gap-2 text-slate-800">
-                                        <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                                        <div className="p-2 bg-orange-50 text-brand-orange rounded-lg">
                                             <BookOpen size={18} />
                                         </div>
                                         <h4 className="font-black text-sm uppercase tracking-wider">
@@ -594,7 +675,7 @@ export const DiarioAtividadeModal: React.FC<{
                                     </div>
                                     <div className="flex flex-wrap items-center gap-2">
                                         <div className="flex items-center gap-2 border border-slate-100 bg-slate-50 px-4 py-2 rounded-xl">
-                                            <Bookmark size={16} className="text-indigo-600" />
+                                            <Bookmark size={16} className="text-brand-orange" />
                                             <select 
                                                 value={selectedPeriod}
                                                 onChange={e => setSelectedPeriod(e.target.value)}
@@ -606,7 +687,7 @@ export const DiarioAtividadeModal: React.FC<{
                                             </select>
                                         </div>
                                         <div className="flex items-center gap-2 border border-slate-100 bg-slate-50 px-4 py-2 rounded-xl">
-                                            <Calendar size={16} className="text-indigo-600" />
+                                            <Calendar size={16} className="text-brand-orange" />
                                             <input 
                                                 type="date" 
                                                 value={selectedDate}
@@ -621,7 +702,7 @@ export const DiarioAtividadeModal: React.FC<{
                                     placeholder="Descreva o que foi desenvolvido na aula de hoje..."
                                     value={newLog}
                                     onChange={e => setNewLog(e.target.value)}
-                                    className="w-full bg-slate-50 border-none rounded-[1.5rem] px-6 py-4 text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 transition-all outline-none resize-none"
+                                    className="w-full bg-slate-50 border-none rounded-[1.5rem] px-6 py-4 text-sm font-medium focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none resize-none"
                                 />
                                 <div className="flex justify-end gap-3">
                                     {editingLog && (
@@ -634,7 +715,7 @@ export const DiarioAtividadeModal: React.FC<{
                                     )}
                                     <button 
                                         onClick={handleAddLog}
-                                        className="bg-indigo-600 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 active:scale-95"
+                                        className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 transition-all shadow-xl shadow-orange-500/20 active:scale-95"
                                     >
                                         {editingLog ? 'Salvar Alterações' : 'Postar Registro'}
                                     </button>
@@ -648,7 +729,7 @@ export const DiarioAtividadeModal: React.FC<{
                                     {logs.length > 0 && (
                                         <button 
                                             onClick={handlePrintAllLogs}
-                                            className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest flex items-center gap-1.5 bg-white px-4 py-2 rounded-xl border border-slate-100 hover:border-slate-200 transition-all shadow-sm"
+                                            className="text-[10px] font-black text-brand-orange hover:text-orange-700 uppercase tracking-widest flex items-center gap-1.5 bg-white px-4 py-2 rounded-xl border border-slate-100 hover:border-slate-200 transition-all shadow-sm"
                                         >
                                             <Printer size={14} /> Imprimir Planejamento
                                         </button>
@@ -656,7 +737,7 @@ export const DiarioAtividadeModal: React.FC<{
                                 </div>
                                 {logs.map(log => (
                                     <div key={log.id} className="bg-white rounded-[2rem] border border-slate-100 p-8 shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
-                                        <div className="absolute top-0 left-0 w-2 h-full bg-indigo-500" />
+                                        <div className="absolute top-0 left-0 w-2 h-full bg-brand-orange" />
                                         <div className="flex justify-between items-start mb-4">
                                             <div className="flex items-center gap-3">
                                                 <div className="p-2 bg-slate-50 text-slate-500 rounded-lg">
@@ -666,7 +747,7 @@ export const DiarioAtividadeModal: React.FC<{
                                                     {new Date(log.data + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
                                                 </span>
                                                 {log.periodo && (
-                                                    <span className="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider">
+                                                    <span className="bg-orange-50 text-brand-orange border border-orange-100 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider">
                                                         {log.periodo}
                                                     </span>
                                                 )}
@@ -677,7 +758,7 @@ export const DiarioAtividadeModal: React.FC<{
                                                     <button 
                                                         onClick={() => handlePrintSingleLog(log)}
                                                         title="Imprimir registro"
-                                                        className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 rounded-lg transition-colors"
+                                                        className="p-1.5 text-slate-400 hover:text-brand-orange hover:bg-slate-50 rounded-lg transition-colors"
                                                     >
                                                         <Printer size={16} />
                                                     </button>

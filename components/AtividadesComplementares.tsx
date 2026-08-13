@@ -39,7 +39,7 @@ const CATEGORIAS = [
     { id: '2. Esporte e Lazer', name: 'Esporte e Lazer', icon: Trophy, color: 'text-orange-500', bg: 'bg-orange-50' },
     { id: '3. Acompanhamento pedagógico', name: 'Acompanhamento Pedagógico', icon: BookOpen, color: 'text-emerald-500', bg: 'bg-emerald-50' },
     { id: '7. Promoção da Saúde', name: 'Promoção da Saúde', icon: Heart, color: 'text-rose-500', bg: 'bg-rose-50' },
-    { id: '10. Iniciação Cientifica', name: 'Iniciação Científica', icon: Brain, color: 'text-indigo-500', bg: 'bg-indigo-50' },
+    { id: '10. Iniciação Cientifica', name: 'Iniciação Científica', icon: Brain, color: 'text-amber-500', bg: 'bg-amber-50' },
     { id: '13. Educação Ambiental e Desenvolvimento Sustentável', name: 'Educação Ambiental', icon: Leaf, color: 'text-teal-500', bg: 'bg-teal-50' },
     { id: '14. Comunicação, uso de mídias e cultura Digital e Tecnológica', name: 'Tecnologia e Mídia', icon: Code, color: 'text-blue-500', bg: 'bg-blue-50' },
     { id: '15. Educação para Valorização do Multiculturalismo nas Matrizes Históricas e Culturais Brasileiras', name: 'Multiculturalismo', icon: Users, color: 'text-purple-500', bg: 'bg-purple-50' },
@@ -542,7 +542,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                     placeholder="Buscar por nome ou turma..." 
                                     value={studentSearch}
                                     onChange={e => setStudentSearch(e.target.value)}
-                                    className="w-full bg-slate-50 border-none rounded-2xl pl-12 pr-4 py-4 text-sm font-black focus:ring-2 focus:ring-indigo-500/10 transition-all outline-none"
+                                    className="w-full bg-slate-50 border-none rounded-2xl pl-12 pr-4 py-4 text-sm font-black focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none"
                                 />
                             </div>
                         </div>
@@ -560,12 +560,12 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                             className={`w-full flex items-center justify-between p-4 border rounded-2xl transition-all group ${
                                                 enrolled
                                                     ? 'bg-emerald-50 border-emerald-200 cursor-default'
-                                                    : 'bg-white border-slate-50 hover:border-indigo-100 hover:bg-slate-50 cursor-pointer'
+                                                    : 'bg-white border-slate-50 hover:border-orange-200 hover:bg-slate-50 cursor-pointer'
                                             }`}
                                         >
                                             <div className="flex items-center gap-4 text-left">
                                                 <div className={`w-12 h-12 rounded-xl shadow-sm flex items-center justify-center font-black transition-all ${
-                                                    enrolled ? 'bg-emerald-500 text-white' : 'bg-white text-slate-400 group-hover:bg-indigo-600 group-hover:text-white'
+                                                    enrolled ? 'bg-emerald-500 text-white' : 'bg-white text-slate-400 group-hover:bg-brand-orange group-hover:text-white'
                                                 }`}>
                                                     {s.nome?.charAt(0) || '?'}
                                                 </div>
@@ -576,14 +576,14 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                                     <div className="flex gap-2 items-center flex-wrap">
                                                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{s.escola}</span>
                                                         <span className="w-1 h-1 bg-slate-200 rounded-full" />
-                                                        <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">{s.anoSerie} • {s.etapa}</span>
+                                                        <span className="text-[10px] font-bold text-brand-orange uppercase tracking-widest">{s.anoSerie} • {s.etapa}</span>
                                                     </div>
                                                 </div>
                                             </div>
                                             <div className={`p-2 rounded-lg transition-all ${
                                                 enrolled
                                                     ? 'bg-emerald-100 text-emerald-600'
-                                                    : 'bg-slate-100 text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600'
+                                                    : 'bg-slate-100 text-slate-400 group-hover:bg-orange-50 group-hover:text-brand-orange'
                                             }`}>
                                                 {enrolled ? <CheckCircle2 size={18} /> : <Plus size={18} />}
                                             </div>
@@ -627,7 +627,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                     onChange={e => setNewTurmaNome(e.target.value)}
                                     className={`w-full border-none rounded-xl px-4 py-3 text-sm font-bold outline-none ${
                                         editingTurma && !/^EDUCA \+AÇÃO - TURMA \d+/i.test(newTurmaNome)
-                                            ? 'bg-slate-50 focus:ring-2 focus:ring-indigo-500/10 text-slate-800' 
+                                            ? 'bg-slate-50 focus:ring-2 focus:ring-brand-orange/20 text-slate-800' 
                                             : 'bg-slate-100 cursor-not-allowed text-slate-500'
                                     }`}
                                     readOnly={!editingTurma || /^EDUCA \+AÇÃO - TURMA \d+/i.test(newTurmaNome)}
@@ -643,7 +643,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                         <button
                                             type="button"
                                             onClick={handleRequestPadronizar}
-                                            className="text-xs font-black uppercase text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5 transition-colors"
+                                            className="text-xs font-black uppercase text-brand-orange hover:text-orange-700 flex items-center gap-1.5 transition-colors"
                                         >
                                             <Sparkles size={14} />
                                             Padronizar Nome
@@ -651,10 +651,10 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                     </div>
                                 )}
                                 {isConfirmingPadronizar && (
-                                    <div className="bg-indigo-50 border-2 border-indigo-100 rounded-2xl p-4 mt-3 space-y-3">
+                                    <div className="bg-orange-50 border-2 border-orange-100 rounded-2xl p-4 mt-3 space-y-3">
                                         <p className="text-xs font-bold text-slate-700 leading-relaxed">
                                             Deseja padronizar o nome desta turma? O nome será alterado para:
-                                            <span className="block font-black text-indigo-700 mt-1.5 p-2 bg-white rounded-lg border border-indigo-100/50 break-words">
+                                            <span className="block font-black text-orange-950 mt-1.5 p-2 bg-white rounded-lg border border-orange-100/50 break-words">
                                                 {standardizedNamePreview}
                                             </span>
                                         </p>
@@ -669,7 +669,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                             <button
                                                 type="button"
                                                 onClick={handleConfirmPadronizar}
-                                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all"
+                                                className="bg-brand-orange hover:bg-orange-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all shadow-sm"
                                             >
                                                 Confirmar Nome
                                             </button>
@@ -682,7 +682,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                 <select 
                                     value={selectedSchoolIdForNewTurma}
                                     onChange={e => handleSchoolChange(e.target.value)}
-                                    className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-indigo-500/10 transition-all outline-none text-slate-700 cursor-pointer"
+                                    className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none text-slate-700 cursor-pointer"
                                     required
                                 >
                                     <option value="" disabled>Selecione a unidade escolar</option>
@@ -699,7 +699,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                 <select 
                                     value={turno}
                                     onChange={e => setTurno(e.target.value as any)}
-                                    className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-indigo-500/10 transition-all outline-none text-slate-700 cursor-pointer"
+                                    className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none text-slate-700 cursor-pointer"
                                     required
                                 >
                                     <option value="MATUTINO">MATUTINO</option>
@@ -718,7 +718,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                             </button>
                             <button 
                                 type="submit"
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-indigo-100 transition-all"
+                                className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-orange-500/20 transition-all"
                             >
                                 {editingTurma ? 'Salvar Alterações' : 'Cadastrar Turma'}
                             </button>
@@ -744,7 +744,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                             </button>
                         </div>
                         <div className="p-6 overflow-y-auto space-y-4">
-                            <div className="flex justify-between items-center bg-indigo-50/50 text-indigo-700 p-4 rounded-xl text-xs font-black uppercase tracking-wider mb-2">
+                            <div className="flex justify-between items-center bg-orange-50/70 text-orange-900 p-4 rounded-xl text-xs font-black uppercase tracking-wider mb-2 border border-orange-100">
                                 <span>Atividades selecionadas</span>
                                 <span className={selectedActivitiesForTurma.length > 5 ? 'text-rose-600 font-black text-sm animate-pulse' : ''}>
                                     {selectedActivitiesForTurma.length} / 5
@@ -770,7 +770,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                             disabled={isDisabled}
                                             className={`w-full flex items-center justify-between p-4 border rounded-2xl text-left transition-all ${
                                                 isChecked
-                                                    ? 'bg-indigo-50/40 border-indigo-200 text-indigo-900 font-bold'
+                                                    ? 'bg-orange-50/60 border-orange-300 text-orange-950 font-bold'
                                                     : isDisabled
                                                         ? 'bg-slate-50 border-slate-50 text-slate-300 cursor-not-allowed'
                                                         : 'bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50'
@@ -782,7 +782,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                             </div>
                                             <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${
                                                 isChecked 
-                                                    ? 'bg-indigo-600 border-indigo-600 text-white' 
+                                                    ? 'bg-brand-orange border-brand-orange text-white' 
                                                     : 'border-slate-300'
                                             }`}>
                                                 {isChecked && <CheckCircle2 size={12} />}
@@ -801,7 +801,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                             </button>
                             <button 
                                 onClick={handleSaveActivitiesForTurma}
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-indigo-100 transition-all"
+                                className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-orange-500/20 transition-all"
                             >
                                 Salvar Vínculos
                             </button>
@@ -814,7 +814,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h2 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
-                        <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-200">
+                        <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-orange-500/20">
                             <BookOpen size={24} />
                         </div>
                         Atividades Complementares
@@ -824,7 +824,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                 {activeTab === 'cadastro' && (
                     <button 
                         onClick={openNewModal}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 transition-all shadow-lg shadow-indigo-200 active:scale-95 self-start md:self-center"
+                        className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 transition-all shadow-lg shadow-orange-500/20 active:scale-95 self-start md:self-center"
                     >
                         <Plus size={20} /> Nova Atividade
                     </button>
@@ -837,7 +837,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                     onClick={() => setActiveTab('cadastro')}
                     className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl text-sm font-black transition-all border-2 ${
                         activeTab === 'cadastro' 
-                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-100' 
+                        ? 'bg-brand-orange border-brand-orange text-white shadow-lg shadow-orange-500/20' 
                         : 'bg-white border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-700'
                     }`}
                 >
@@ -848,7 +848,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                     onClick={() => setActiveTab('formacao')}
                     className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl text-sm font-black transition-all border-2 ${
                         activeTab === 'formacao' 
-                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-100' 
+                        ? 'bg-brand-orange border-brand-orange text-white shadow-lg shadow-orange-500/20' 
                         : 'bg-white border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-700'
                     }`}
                 >
@@ -863,7 +863,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                     {/* Stats Summary */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
-                            <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">
+                            <div className="w-12 h-12 bg-orange-50 text-brand-orange rounded-2xl flex items-center justify-center">
                                 <Users size={24} />
                             </div>
                             <div>
@@ -881,7 +881,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                             </div>
                         </div>
                         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
-                            <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center shrink-0">
+                            <div className="w-12 h-12 bg-slate-100 text-slate-700 rounded-2xl flex items-center justify-center shrink-0">
                                 <MapPin size={24} />
                             </div>
                             <div className="flex-1 min-w-0">
@@ -889,7 +889,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                 <select
                                     value={selectedSchoolId}
                                     onChange={e => setSelectedSchoolId(e.target.value)}
-                                    className="w-full bg-transparent border-none p-0 text-xl font-black text-slate-800 uppercase outline-none focus:ring-0 cursor-pointer hover:text-indigo-600 transition-colors truncate"
+                                    className="w-full bg-transparent border-none p-0 text-xl font-black text-slate-800 uppercase outline-none focus:ring-0 cursor-pointer hover:text-brand-orange transition-colors truncate"
                                 >
                                     <option value="todas">
                                         {userEscolaIds && userEscolaIds.length > 0 ? 'Múltiplas Unidades' : 'Todas as Unidades'}
@@ -912,13 +912,13 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                     placeholder="Buscar por atividade ou instrutor..." 
                                     value={searchTerm}
                                     onChange={e => setSearchTerm(e.target.value)}
-                                    className="w-full bg-slate-50 border-none rounded-2xl pl-12 pr-4 py-3.5 text-sm focus:ring-2 focus:ring-indigo-500/20 transition-all font-medium"
+                                    className="w-full bg-slate-50 border-none rounded-2xl pl-12 pr-4 py-3.5 text-sm focus:ring-2 focus:ring-brand-orange/20 transition-all font-medium"
                                 />
                             </div>
                             <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-hide">
                                 <button 
                                     onClick={() => setSelectedCat('todas')}
-                                    className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${selectedCat === 'todas' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-100'}`}
+                                    className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${selectedCat === 'todas' ? 'bg-brand-orange text-white shadow-lg shadow-orange-500/20' : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-100'}`}
                                 >
                                     Todas
                                 </button>
@@ -926,7 +926,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                     <button 
                                         key={cat.id}
                                         onClick={() => setSelectedCat(cat.id)}
-                                        className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${selectedCat === cat.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-100'}`}
+                                        className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${selectedCat === cat.id ? 'bg-brand-orange text-white shadow-lg shadow-orange-500/20' : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-100'}`}
                                     >
                                         <cat.icon size={14} />
                                         {cat.name}
@@ -944,7 +944,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                             const percentInscritos = (atv.inscritos / atv.vagas) * 100;
                             
                             return (
-                                <div key={atv.id} className="group bg-white rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-300 overflow-hidden flex flex-col relative">
+                                <div key={atv.id} className="group bg-white rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-orange-500/10 hover:border-orange-200 transition-all duration-300 overflow-hidden flex flex-col relative">
                                     {/* Actions overlay */}
                                     <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                                         <button 
@@ -952,7 +952,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                                 e.stopPropagation();
                                                 openEditModal(atv);
                                             }}
-                                            className="p-2 bg-white text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all shadow-sm border border-slate-100"
+                                            className="p-2 bg-white text-slate-400 hover:text-brand-orange hover:bg-orange-50 rounded-xl transition-all shadow-sm border border-slate-100"
                                             title="Editar Atividade"
                                         >
                                             <Pencil size={16} />
@@ -987,7 +987,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                             </span>
                                         </div>
                                         
-                                        <h3 className="text-xl font-black text-slate-800 mb-1 group-hover:text-indigo-600 transition-colors uppercase tracking-tight">{atv.nome}</h3>
+                                        <h3 className="text-xl font-black text-slate-800 mb-1 group-hover:text-brand-orange transition-colors uppercase tracking-tight">{atv.nome}</h3>
                                         <div className="flex items-center gap-2 text-slate-400 font-bold text-xs mb-4">
                                             <Users size={14} />
                                             <span>{atv.instrutor}</span>
@@ -995,11 +995,11 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
 
                                         <div className="space-y-3 mb-6">
                                             <div className="flex items-center gap-2 text-slate-500">
-                                                <Clock size={16} className="text-indigo-400" />
+                                                <Clock size={16} className="text-brand-orange" />
                                                 <span className="text-xs font-bold">{atv.diasSemana?.join('/')} {atv.horarioInicio}</span>
                                             </div>
                                             <div className="flex items-center gap-2 text-slate-500">
-                                                <MapPin size={16} className="text-indigo-400" />
+                                                <MapPin size={16} className="text-brand-orange" />
                                                 <span className="text-xs font-bold">{atv.sala}</span>
                                             </div>
                                         </div>
@@ -1007,11 +1007,11 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                         <div className="mt-auto">
                                             <div className="flex justify-between items-end mb-2">
                                                 <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Ocupação</span>
-                                                <span className="text-sm font-black text-indigo-600">{atv.inscritos}/{atv.vagas}</span>
+                                                <span className="text-sm font-black text-brand-orange">{atv.inscritos}/{atv.vagas}</span>
                                             </div>
                                             <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
                                                 <div 
-                                                    className={`h-full rounded-full transition-all duration-1000 ${percentInscritos > 90 ? 'bg-rose-500' : percentInscritos > 50 ? 'bg-indigo-500' : 'bg-emerald-500'}`}
+                                                    className={`h-full rounded-full transition-all duration-1000 ${percentInscritos > 90 ? 'bg-rose-500' : percentInscritos > 50 ? 'bg-brand-orange' : 'bg-emerald-500'}`}
                                                     style={{ width: `${percentInscritos}%` }}
                                                 />
                                             </div>
@@ -1020,7 +1020,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                     
                                     <button 
                                         onClick={() => openDiario(atv)}
-                                        className="mt-auto w-full py-4 bg-slate-50 group-hover:bg-indigo-600 transition-colors text-slate-400 group-hover:text-white font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 border-t border-slate-100/50"
+                                        className="mt-auto w-full py-4 bg-slate-50 group-hover:bg-brand-orange transition-colors text-slate-400 group-hover:text-white font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 border-t border-slate-100/50"
                                     >
                                         Visualizar Diário <ChevronRight size={16} />
                                     </button>
@@ -1050,7 +1050,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                             <h3 className="font-black text-slate-800 text-base uppercase tracking-tight">Turmas Complementares</h3>
                             <button 
                                 onClick={openNewTurmaModal}
-                                className="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 p-1.5 rounded-lg transition-all"
+                                className="bg-orange-50 hover:bg-orange-100 text-brand-orange p-1.5 rounded-lg transition-all"
                                 title="Cadastrar Nova Turma"
                             >
                                 <Plus size={16} />
@@ -1064,7 +1064,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                 placeholder="Filtrar turmas..." 
                                 value={searchTurmaTerm}
                                 onChange={e => setSearchTurmaTerm(e.target.value)}
-                                className="w-full bg-slate-50 border-none rounded-xl pl-9 pr-3 py-2.5 text-xs font-bold focus:ring-2 focus:ring-indigo-500/10 transition-all outline-none"
+                                className="w-full bg-slate-50 border-none rounded-xl pl-9 pr-3 py-2.5 text-xs font-bold focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none"
                             />
                         </div>
 
@@ -1072,7 +1072,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                             <select
                                 value={selectedSchoolIdForTurmaFilter}
                                 onChange={e => setSelectedSchoolIdForTurmaFilter(e.target.value)}
-                                className="w-full bg-slate-50 border-none rounded-xl px-3 py-2.5 text-xs font-bold focus:ring-2 focus:ring-indigo-500/10 transition-all outline-none text-slate-600 cursor-pointer"
+                                className="w-full bg-slate-50 border-none rounded-xl px-3 py-2.5 text-xs font-bold focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none text-slate-600 cursor-pointer"
                             >
                                 <option value="todas">Todas as Unidades Escolares</option>
                                 {escolasComplementares.map(esc => (
@@ -1089,20 +1089,20 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                         key={t.id}
                                         className={`group w-full rounded-2xl border transition-all flex flex-col p-4 gap-2 relative ${
                                             isSelected 
-                                            ? 'bg-indigo-50/50 border-indigo-200' 
-                                            : 'bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50/50'
+                                            ? 'bg-orange-50/50 border-orange-200' 
+                                            : 'bg-white border-slate-100 hover:border-orange-200 hover:bg-slate-50/50'
                                         }`}
                                     >
                                         <button
                                             onClick={() => handleSelectTurma(t.id)}
                                             className="w-full text-left flex flex-col gap-1 pr-8"
                                         >
-                                            <h4 className={`font-black text-sm uppercase tracking-tight truncate ${isSelected ? 'text-indigo-900' : 'text-slate-800'}`}>
+                                            <h4 className={`font-black text-sm uppercase tracking-tight truncate ${isSelected ? 'text-orange-950' : 'text-slate-800'}`}>
                                                 {t.nome}
                                             </h4>
                                             <div className="flex justify-between items-center w-full text-[10px] text-slate-400 font-bold">
                                                 <span>{t.alunos_count} alunos • {t.turno ? t.turno.toUpperCase() : 'MATUTINO'}</span>
-                                                <span className={isSelected ? 'text-indigo-600 font-black' : 'text-slate-500'}>
+                                                <span className={isSelected ? 'text-brand-orange font-black' : 'text-slate-500'}>
                                                     {t.atividades_count} atividades
                                                 </span>
                                             </div>
@@ -1113,7 +1113,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                                     e.stopPropagation();
                                                     openEditTurmaModal(t);
                                                 }}
-                                                className="p-1 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                                                className="p-1 text-slate-300 hover:text-brand-orange hover:bg-orange-50 rounded-lg transition-all"
                                                 title="Editar Turma"
                                             >
                                                 <Pencil size={14} />
@@ -1148,7 +1148,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                 <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 flex flex-col md:flex-row justify-between gap-6 items-start md:items-center">
                                     <div className="space-y-2">
                                         <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider">
+                                            <span className="bg-orange-50 text-brand-orange border border-orange-100 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider">
                                                 Turma Complementar
                                             </span>
                                             <span className="text-slate-400 font-bold text-xs">
@@ -1177,7 +1177,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                                     setSelectedActivitiesForTurma(turmaDetails.activitiesIds);
                                                     setIsManageActivitiesOpen(true);
                                                 }}
-                                                className="text-xs text-indigo-600 hover:text-indigo-800 font-black ml-2 uppercase tracking-widest"
+                                                className="text-xs text-brand-orange hover:text-orange-700 font-black ml-2 uppercase tracking-widest"
                                             >
                                                 [ Gerenciar ]
                                             </button>
@@ -1193,7 +1193,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                         </button>
                                         <button
                                             onClick={handleVincularAlunoClick}
-                                            className="bg-indigo-600 text-white px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 active:scale-95 self-stretch sm:self-auto text-center justify-center animate-in fade-in"
+                                            className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 transition-all shadow-xl shadow-orange-500/20 active:scale-95 self-stretch sm:self-auto text-center justify-center animate-in fade-in"
                                         >
                                             <UserPlus size={16} /> Vincular Aluno
                                         </button>
@@ -1216,15 +1216,15 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                                 placeholder="Buscar na turma..." 
                                                 value={turmaStudentSearch}
                                                 onChange={e => setTurmaStudentSearch(e.target.value)}
-                                                className="w-full bg-slate-50 border-none rounded-xl pl-9 pr-3 py-2.5 text-xs font-bold focus:ring-2 focus:ring-indigo-500/10 transition-all outline-none"
+                                                className="w-full bg-slate-50 border-none rounded-xl pl-9 pr-3 py-2.5 text-xs font-bold focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none"
                                             />
                                         </div>
                                     </div>
 
                                     {linkedActivities.length > 0 && (
-                                        <div className="flex items-center gap-3 p-4 bg-indigo-50/30 rounded-2xl border border-indigo-100/50 flex-wrap">
-                                            <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-1.5">
-                                                <Calendar size={14} className="text-indigo-500" />
+                                        <div className="flex items-center gap-3 p-4 bg-orange-50/40 rounded-2xl border border-orange-100/70 flex-wrap">
+                                            <span className="text-[10px] font-black text-brand-orange uppercase tracking-widest flex items-center gap-1.5">
+                                                <Calendar size={14} className="text-brand-orange" />
                                                 Visualizar Diário de Classe:
                                             </span>
                                             <div className="flex gap-2 flex-wrap">
@@ -1232,7 +1232,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                                     <button
                                                         key={atv.id}
                                                         onClick={() => openDiario(atv)}
-                                                        className="bg-white hover:bg-indigo-600 text-indigo-600 hover:text-white px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border border-indigo-100/60 hover:border-indigo-600 transition-all flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
+                                                        className="bg-white hover:bg-brand-orange text-brand-orange hover:text-white px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border border-orange-100 hover:border-brand-orange transition-all flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
                                                     >
                                                         <BookOpen size={12} />
                                                         {atv.nome}
@@ -1262,14 +1262,14 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                                         <tr key={student.id} className="hover:bg-slate-50/50 transition-colors group">
                                                             <td className="py-4 pl-2">
                                                                 <div className="flex items-center gap-3">
-                                                                    <div className="w-9 h-9 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center font-black text-sm italic uppercase">
+                                                                    <div className="w-9 h-9 bg-orange-50 text-brand-orange rounded-lg flex items-center justify-center font-black text-sm italic uppercase">
                                                                         {student.nome?.charAt(0) || '?'}
                                                                     </div>
                                                                     <span className="font-bold text-slate-800 text-sm">{student.nome}</span>
                                                                 </div>
                                                             </td>
                                                             <td className="py-4">
-                                                                <span className="bg-indigo-50/70 text-indigo-600 px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider">
+                                                                <span className="bg-orange-50/80 text-brand-orange px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider">
                                                                     {student.anoSerie}
                                                                 </span>
                                                             </td>
