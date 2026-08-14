@@ -6,7 +6,8 @@ import { Button } from './ui/Button';
 import { 
   FileText, Plus, Search, Edit2, Trash2, Printer, 
   X, Calendar, School as SchoolIcon, BookOpen, Save, ClipboardList,
-  Layers, Check, AlertTriangle, ListFilter, RotateCcw, ChevronLeft, ChevronRight
+  Layers, Check, AlertTriangle, ListFilter, RotateCcw, ChevronLeft, ChevronRight,
+  Eye, Bookmark
 } from 'lucide-react';
 import { Escola, Coordenador } from '../types';
 import { supabase } from '../services/supabase';
@@ -166,8 +167,10 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
     historyItemsPerPage
   ]);
 
-  // Print Mode State
+  // Print & View Mode States
   const [printLog, setPrintLog] = useState<ClassLog | null>(null);
+  const [viewingLog, setViewingLog] = useState<ClassLog | null>(null);
+  const [guiasAprendizagem, setGuiasAprendizagem] = useState<any[]>([]);
 
   // Fetch team / coordinators to resolve emails to names
   useEffect(() => {
@@ -370,6 +373,109 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
       fetchRealCoursePlans();
     }
   }, [isDemoMode]);
+
+  const fetchRealGuiasAprendizagem = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('guias_aprendizagem')
+        .select('*')
+        .eq('ativo', true);
+
+      if (error) throw error;
+      setGuiasAprendizagem(data || []);
+    } catch (err) {
+      console.error('Erro ao buscar guias de aprendizagem do Supabase para aulas:', err);
+    }
+  };
+
+  // Load guias de aprendizagem
+  useEffect(() => {
+    if (isDemoMode) {
+      const saved = localStorage.getItem('sigar_planos_aula');
+      if (saved) {
+        try {
+          setGuiasAprendizagem(JSON.parse(saved));
+        } catch (e) {
+          console.error(e);
+        }
+      } else {
+        setGuiasAprendizagem([]);
+      }
+    } else {
+      fetchRealGuiasAprendizagem();
+    }
+  }, [isDemoMode]);
+
+  // Helper to match a ClassLog to its corresponding Guia de Aprendizagem
+  const getMatchingGuia = (log: ClassLog | null) => {
+    if (!log || guiasAprendizagem.length === 0) return null;
+
+    const normalizedComp = normalizeSubjectName(log.componente);
+
+    // 1. Exact match: turma_id + componente + periodo
+    let matches = guiasAprendizagem.filter(g => 
+      g.turma_id === log.turmaId &&
+      normalizeSubjectName(g.componente) === normalizedComp &&
+      (g.periodo === log.periodo || g.bimestre === log.periodo)
+    );
+
+    // 2. Match by escola_id + ano_serie + componente + periodo
+    if (matches.length === 0) {
+      matches = guiasAprendizagem.filter(g => 
+        g.escola_id === log.escolaId &&
+        (g.ano_serie === log.anoSerie || g.anoSerie === log.anoSerie) &&
+        normalizeSubjectName(g.componente) === normalizedComp &&
+        (g.periodo === log.periodo || g.bimestre === log.periodo)
+      );
+    }
+
+    // 3. Match by ano_serie + componente + periodo
+    if (matches.length === 0) {
+      matches = guiasAprendizagem.filter(g => 
+        (g.ano_serie === log.anoSerie || g.anoSerie === log.anoSerie) &&
+        normalizeSubjectName(g.componente) === normalizedComp &&
+        (g.periodo === log.periodo || g.bimestre === log.periodo)
+      );
+    }
+
+    if (matches.length === 0) return null;
+
+    // Check if log.data falls between data_inicio and data_termino
+    const logDate = log.data;
+    if (logDate) {
+      const dateMatched = matches.find(g => {
+        if (g.data_inicio && g.data_termino) {
+          return logDate >= g.data_inicio && logDate <= g.data_termino;
+        }
+        if (g.data) {
+          return g.data === logDate;
+        }
+        return false;
+      });
+      if (dateMatched) return dateMatched;
+    }
+
+    return matches[0];
+  };
+
+  const activeFormGuia = useMemo(() => {
+    return getMatchingGuia({
+      id: 'current-form',
+      data: dataAula,
+      escolaId: selectedEscolaId,
+      escolaNome: '',
+      turmaId: selectedTurmaId,
+      turmaNome: '',
+      componente,
+      aulas,
+      conteudo,
+      atividades,
+      observacoes,
+      anoSerie,
+      periodo,
+      criadoEm: ''
+    });
+  }, [guiasAprendizagem, dataAula, selectedEscolaId, selectedTurmaId, componente, anoSerie, periodo]);
 
   // Get active Course Plan unificado matching selections
   const activeCoursePlan = useMemo(() => {
@@ -1204,20 +1310,54 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
             <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', background: '#0f172a', color: '#fff', padding: '5pt 10pt' }}>
               Conteúdo Ministrado
             </div>
-            <div style={{ padding: '10pt 12pt', border: '0.5pt solid #e2e8f0', borderTop: 'none', fontSize: '9pt', color: '#334155', lineHeight: '1.6', minHeight: '40pt' }}>
+            <div style={{ padding: '10pt 12pt', border: '0.5pt solid #e2e8f0', borderTop: 'none', fontSize: '9pt', color: '#334155', lineHeight: '1.6', minHeight: '35pt' }}>
               <p className="whitespace-pre-line">{printLog.conteudo}</p>
             </div>
           </div>
 
-          {/* ====== PROCEDIMENTOS E ATIVIDADES REALIZADAS ====== */}
-          <div className="print-avoid-break" style={{ marginBottom: '10pt' }}>
-            <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', background: '#0f172a', color: '#fff', padding: '5pt 10pt' }}>
-              Procedimentos e Atividades Realizadas
-            </div>
-            <div style={{ padding: '10pt 12pt', border: '0.5pt solid #e2e8f0', borderTop: 'none', fontSize: '9pt', color: '#334155', lineHeight: '1.6', minHeight: '40pt' }}>
-              <p className="whitespace-pre-line">{printLog.atividades || '---'}</p>
-            </div>
-          </div>
+          {/* ====== PROCEDIMENTOS METODOLÓGICOS (GUIA DE APRENDIZAGEM) ====== */}
+          {(() => {
+            const matchedGuia = getMatchingGuia(printLog);
+            return (
+              <div className="print-avoid-break" style={{ marginBottom: '10pt' }}>
+                <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', background: '#0f172a', color: '#fff', padding: '5pt 10pt' }}>
+                  Procedimentos Metodológicos
+                </div>
+                <div style={{ padding: '10pt 12pt', border: '0.5pt solid #e2e8f0', borderTop: 'none', fontSize: '9pt', color: '#334155', lineHeight: '1.6', minHeight: '35pt' }}>
+                  {matchedGuia?.metodologia ? (
+                    <p className="whitespace-pre-line">{matchedGuia.metodologia}</p>
+                  ) : (
+                    <p className="whitespace-pre-line">{printLog.atividades || 'Procedimentos metodológicos desenvolvidos em conformidade com o planejamento curricular.'}</p>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ====== RECURSOS DIDÁTICOS & CRITÉRIOS DE AVALIAÇÃO (GUIA DE APRENDIZAGEM) ====== */}
+          {(() => {
+            const matchedGuia = getMatchingGuia(printLog);
+            return (
+              <div className="print-avoid-break" style={{ marginBottom: '10pt', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8pt' }}>
+                <div>
+                  <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', background: '#0f172a', color: '#fff', padding: '5pt 10pt' }}>
+                    Recursos Didáticos
+                  </div>
+                  <div style={{ padding: '8pt 10pt', border: '0.5pt solid #e2e8f0', borderTop: 'none', fontSize: '9pt', color: '#334155', lineHeight: '1.5', minHeight: '35pt' }}>
+                    <p className="whitespace-pre-line">{matchedGuia?.recursos || 'Quadro branco, livros didáticos, caderno e materiais pedagógicos complementares.'}</p>
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', background: '#0f172a', color: '#fff', padding: '5pt 10pt' }}>
+                    Critérios de Avaliação
+                  </div>
+                  <div style={{ padding: '8pt 10pt', border: '0.5pt solid #e2e8f0', borderTop: 'none', fontSize: '9pt', color: '#334155', lineHeight: '1.5', minHeight: '35pt' }}>
+                    <p className="whitespace-pre-line">{matchedGuia?.avaliacao || 'Acompanhamento contínuo, participação e resolução das atividades propostas.'}</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* ====== OBSERVAÇÕES / OCORRÊNCIAS ====== */}
           <div className="print-avoid-break" style={{ marginBottom: '10pt' }}>
@@ -1237,7 +1377,7 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
                 Assinatura do Docente
               </p>
               <p style={{ fontSize: '7pt', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#64748b', fontFamily: "'JetBrains Mono', monospace", marginBottom: '2pt' }}>
-                DOCENTE RESPONSÁVEL
+                {printLog.professor || 'DOCENTE RESPONSÁVEL'}
               </p>
               <p style={{ fontSize: '7pt', color: '#94a3b8', fontStyle: 'italic' }}>
                 Assinatura e Carimbo
@@ -1264,6 +1404,175 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
           </div>
         </div>,
         document.body
+      )}
+
+      {/* Document Sheet Viewer Modal (Style of Atas Finais & Guia de Aprendizagem) */}
+      {viewingLog && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fade-in">
+          <div className="bg-slate-100 rounded-3xl border border-slate-200 shadow-2xl max-w-4xl w-full max-h-[94vh] flex flex-col overflow-hidden">
+            
+            {/* Top Toolbar */}
+            <div className="bg-white px-6 py-4 border-b border-slate-200 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-orange-50 text-brand-orange flex items-center justify-center border border-orange-100 shadow-sm">
+                  <ClipboardList className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-800 tracking-tight uppercase">
+                    Registro de Aula Ministrada
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    {viewingLog.escolaNome} • {viewingLog.turmaNome} • {viewingLog.componente}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="primary" 
+                  onClick={() => handlePrint(viewingLog)}
+                  className="bg-brand-orange hover:bg-orange-600 text-white rounded-xl text-xs font-black shadow-md flex items-center gap-1.5 py-2 px-4 cursor-pointer"
+                >
+                  <Printer className="w-4 h-4" />
+                  Imprimir Documento
+                </Button>
+                <button
+                  onClick={() => setViewingLog(null)}
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+                  title="Fechar visualizador"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Document Sheet Body Preview */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-8 custom-scrollbar">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-10 max-w-3xl mx-auto space-y-6 text-slate-900">
+                
+                {/* Header */}
+                <div className="text-center pb-4 border-b-2 border-slate-900 space-y-1">
+                  <p className="text-[10px] font-bold tracking-[0.25em] text-slate-500 uppercase">ESTADO DO MARANHÃO</p>
+                  <p className="text-xs font-black tracking-[0.15em] text-slate-900 uppercase">PREFEITURA MUNICIPAL DE HUMBERTO DE CAMPOS</p>
+                  <p className="text-[10px] font-bold tracking-[0.2em] text-slate-500 uppercase">SECRETARIA MUNICIPAL DE EDUCAÇÃO</p>
+                  <div className="w-16 h-0.5 bg-brand-orange mx-auto my-2" />
+                  <h2 className="text-lg font-black text-slate-900 uppercase tracking-tight">REGISTRO DIÁRIO DE AULAS MINISTRADAS</h2>
+                  <p className="text-[10px] font-bold tracking-widest text-slate-500 uppercase">DIÁRIO DE CLASSE • ENSINO FUNDAMENTAL</p>
+                </div>
+
+                {/* Identification Table */}
+                <div className="space-y-1">
+                  <div className="text-[10px] font-black uppercase tracking-widest bg-slate-900 text-white px-3 py-1.5 rounded-t-lg">
+                    Dados de Identificação
+                  </div>
+                  <div className="border border-slate-200 rounded-b-lg overflow-hidden text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-4 border-b border-slate-100">
+                      <span className="p-2.5 bg-slate-50 font-bold text-slate-500 uppercase text-[10px] border-r border-slate-100">Unidade Escolar</span>
+                      <span className="p-2.5 font-bold text-slate-800 sm:col-span-3">{viewingLog.escolaNome}</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 border-b border-slate-100">
+                      <span className="p-2.5 bg-slate-50 font-bold text-slate-500 uppercase text-[10px] border-r border-slate-100">Turma / Turno</span>
+                      <span className="p-2.5 font-semibold text-slate-700 sm:border-r border-slate-100">{viewingLog.turmaNome}</span>
+                      <span className="p-2.5 bg-slate-50 font-bold text-slate-500 uppercase text-[10px] border-r border-slate-100">Componente</span>
+                      <span className="p-2.5 font-bold text-slate-800">{viewingLog.componente}</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 border-b border-slate-100">
+                      <span className="p-2.5 bg-slate-50 font-bold text-slate-500 uppercase text-[10px] border-r border-slate-100">Ano / Série</span>
+                      <span className="p-2.5 font-semibold text-slate-700 sm:border-r border-slate-100">{viewingLog.anoSerie || '---'}</span>
+                      <span className="p-2.5 bg-slate-50 font-bold text-slate-500 uppercase text-[10px] border-r border-slate-100">Bimestre</span>
+                      <span className="p-2.5 font-semibold text-slate-700">{viewingLog.periodo || '---'}</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4">
+                      <span className="p-2.5 bg-slate-50 font-bold text-slate-500 uppercase text-[10px] border-r border-slate-100">Data da Aula</span>
+                      <span className="p-2.5 font-bold text-slate-800 sm:border-r border-slate-100">{new Date(viewingLog.data + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
+                      <span className="p-2.5 bg-slate-50 font-bold text-slate-500 uppercase text-[10px] border-r border-slate-100">Quantidade</span>
+                      <span className="p-2.5 font-semibold text-slate-700">{viewingLog.aulas} {viewingLog.aulas === 1 ? 'aula' : 'aulas'} {logSequences[viewingLog.id]?.lessonRange ? `(${logSequences[viewingLog.id]?.lessonRange})` : ''}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Conteúdo Ministrado */}
+                <div className="space-y-1">
+                  <div className="text-[10px] font-black uppercase tracking-widest bg-slate-900 text-white px-3 py-1.5 rounded-t-lg">
+                    Conteúdo Ministrado
+                  </div>
+                  <div className="border border-slate-200 rounded-b-lg p-3.5 text-xs font-medium text-slate-700 leading-relaxed whitespace-pre-line">
+                    {viewingLog.conteudo}
+                  </div>
+                </div>
+
+                {/* Procedimentos Metodológicos */}
+                {(() => {
+                  const matchedGuia = getMatchingGuia(viewingLog);
+                  return (
+                    <div className="space-y-1">
+                      <div className="text-[10px] font-black uppercase tracking-widest bg-slate-900 text-white px-3 py-1.5 rounded-t-lg flex items-center justify-between">
+                        <span>Procedimentos Metodológicos</span>
+                        {matchedGuia && <span className="text-[9px] text-orange-200 font-bold">Integrado ao Guia de Aprendizagem</span>}
+                      </div>
+                      <div className="border border-slate-200 rounded-b-lg p-3.5 text-xs font-medium text-slate-700 leading-relaxed space-y-2">
+                        {matchedGuia?.metodologia ? (
+                          <p className="whitespace-pre-line">{matchedGuia.metodologia}</p>
+                        ) : (
+                          <p className="whitespace-pre-line">{viewingLog.atividades || 'Procedimentos metodológicos desenvolvidos em conformidade com o planejamento curricular.'}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Recursos Didáticos & Critérios de Avaliação */}
+                {(() => {
+                  const matchedGuia = getMatchingGuia(viewingLog);
+                  return (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <div className="text-[10px] font-black uppercase tracking-widest bg-slate-900 text-white px-3 py-1.5 rounded-t-lg">
+                          Recursos Didáticos
+                        </div>
+                        <div className="border border-slate-200 rounded-b-lg p-3 text-xs font-medium text-slate-700 leading-relaxed whitespace-pre-line min-h-[50px]">
+                          {matchedGuia?.recursos || 'Quadro branco, livros didáticos, caderno e materiais pedagógicos complementares.'}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-[10px] font-black uppercase tracking-widest bg-slate-900 text-white px-3 py-1.5 rounded-t-lg">
+                          Critérios de Avaliação
+                        </div>
+                        <div className="border border-slate-200 rounded-b-lg p-3 text-xs font-medium text-slate-700 leading-relaxed whitespace-pre-line min-h-[50px]">
+                          {matchedGuia?.avaliacao || 'Acompanhamento contínuo, participação e resolução das atividades propostas.'}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Observações / Ocorrências */}
+                <div className="space-y-1">
+                  <div className="text-[10px] font-black uppercase tracking-widest bg-slate-900 text-white px-3 py-1.5 rounded-t-lg">
+                    Observações / Ocorrências
+                  </div>
+                  <div className="border border-slate-200 rounded-b-lg p-3.5 text-xs font-medium text-slate-700 leading-relaxed whitespace-pre-line">
+                    {viewingLog.observacoes || 'Sem observações registradas.'}
+                  </div>
+                </div>
+
+                {/* Assinaturas */}
+                <div className="grid grid-cols-2 gap-10 pt-8 mt-6 border-t border-slate-200 text-center">
+                  <div>
+                    <div className="border-t-2 border-slate-800 w-full mb-2" />
+                    <p className="text-xs font-black uppercase text-slate-900">Assinatura do Docente</p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase">{viewingLog.professor || 'DOCENTE RESPONSÁVEL'}</p>
+                  </div>
+                  <div>
+                    <div className="border-t-2 border-slate-800 w-full mb-2" />
+                    <p className="text-xs font-black uppercase text-slate-900">Direção / Coordenação</p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase">EQUIPE GESTORA</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Form Card */}
@@ -1539,45 +1848,56 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
             </div>
           )}
 
-          {planData.objetos.length === 0 && (
-            <>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Conteúdo Letivo Ministrado *</label>
-                <textarea 
-                  value={conteudo}
-                  onChange={e => setConteudo(e.target.value)}
-                  placeholder="Descreva o conteúdo desenvolvido nesta aula..."
-                  required
-                  rows={3}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
-                />
-              </div>
+          {/* Conteúdo Letivo Ministrado (Always visible and editable) */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
+                Conteúdo Letivo Ministrado *
+              </label>
+              {planData.objetos.length > 0 && (
+                <span className="text-[10px] text-brand-orange font-bold">
+                  {selectedObjetoIds.length > 0 || selectedHabilidadeIds.length > 0 
+                    ? '✓ Preenchido a partir das seleções da BNCC (editável)' 
+                    : 'Selecione os itens acima ou digite livremente'}
+                </span>
+              )}
+            </div>
+            <textarea 
+              value={conteudo}
+              onChange={e => setConteudo(e.target.value)}
+              placeholder="Descreva o conteúdo desenvolvido nesta aula..."
+              required
+              rows={3}
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
+            />
+          </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Atividades e Procedimentos Realizados</label>
-                  <textarea 
-                    value={atividades}
-                    onChange={e => setAtividades(e.target.value)}
-                    placeholder="Ex: Leitura dirigida, exercícios no caderno, dinâmicas de grupo..."
-                    rows={2}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Observações / Ocorrências Pedagógicas</label>
-                  <textarea 
-                    value={observacoes}
-                    onChange={e => setObservacoes(e.target.value)}
-                    placeholder="Ex: Aluno X apresentou dificuldades com a matéria, aula reduzia devido à chuva..."
-                    rows={2}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
-                  />
-                </div>
+          {/* Linked Guia de Aprendizagem Indicator */}
+          {activeFormGuia && (
+            <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-3.5 flex items-start gap-3 animate-fade-in shadow-sm">
+              <Bookmark className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <div className="text-xs text-emerald-950 leading-relaxed">
+                <span className="font-extrabold uppercase tracking-wider text-[10px] text-emerald-700 block mb-0.5">
+                  Guia de Aprendizagem Vinculado ({activeFormGuia.titulo || 'Ativo'})
+                </span>
+                Procedimentos Metodológicos, Recursos Didáticos e Critérios de Avaliação cadastrados na guia serão puxados automaticamente na impressão e na visualização oficial deste registro.
               </div>
-            </>
+            </div>
           )}
+
+          {/* Observações / Ocorrências Pedagógicas */}
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+              Observações / Ocorrências Pedagógicas
+            </label>
+            <textarea 
+              value={observacoes}
+              onChange={e => setObservacoes(e.target.value)}
+              placeholder="Ex: Aluno X apresentou dificuldades conceituais, aula remanejada, registro de faltas ou ocorrências pedagógicas/disciplinares..."
+              rows={3}
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all resize-none"
+            />
+          </div>
 
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
             {editingId && (
@@ -1786,22 +2106,29 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
                       <td className="px-6 py-3 text-right">
                         <div className="flex items-center justify-end gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
                           <button 
+                            onClick={() => setViewingLog(log)} 
+                            className="p-1.5 text-slate-400 hover:text-brand-orange hover:bg-orange-50 rounded-lg transition-all cursor-pointer" 
+                            title="Visualizar Registro de Aula"
+                          >
+                            <Eye size={15} />
+                          </button>
+                          <button 
                             onClick={() => handlePrint(log)} 
-                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" 
+                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all cursor-pointer" 
                             title="Imprimir Relatório"
                           >
                             <Printer size={15} />
                           </button>
                           <button 
                             onClick={() => handleEdit(log)} 
-                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" 
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all cursor-pointer" 
                             title="Editar"
                           >
                             <Edit2 size={15} />
                           </button>
                           <button 
                             onClick={() => handleDelete(log.id)} 
-                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" 
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all cursor-pointer" 
                             title="Excluir"
                           >
                             <Trash2 size={15} />
