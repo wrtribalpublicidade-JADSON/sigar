@@ -1327,6 +1327,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                 isOpen={isDiarioOpen}
                 onClose={() => setIsDiarioOpen(false)}
                 atividade={activityForDiario}
+                currentUser={currentUser}
             />
 
             {isPrintingTurma && selectedTurma && (

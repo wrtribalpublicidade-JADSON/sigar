@@ -97,7 +97,7 @@ export const PrintableAtividadePlanejamentoReport: React.FC<PrintableAtividadePl
                 <p style={{ fontSize: '7pt', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#64748b', marginBottom: '8pt' }}>
                     SECRETARIA MUNICIPAL DE EDUCAÇÃO
                 </p>
-                <div style={{ width: '60pt', height: '1.5pt', background: '#4f46e5', margin: '0 auto 6pt' }} />
+                <div style={{ width: '60pt', height: '1.5pt', background: '#f97316', margin: '0 auto 6pt' }} />
                 <h1 style={{ fontSize: '14pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#0f172a', margin: '0 0 3pt' }}>
                     Diário de Bordo — Conteúdo Pedagógico
                 </h1>
@@ -121,7 +121,7 @@ export const PrintableAtividadePlanejamentoReport: React.FC<PrintableAtividadePl
                 <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <div>
                         <span style={{ fontSize: '6.5pt', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Professor / Instrutor</span>
-                        <p style={{ fontSize: '10pt', fontWeight: 900, color: '#4f46e5', margin: 0 }}>{atividade.instrutor || 'Não informado'}</p>
+                        <p style={{ fontSize: '10pt', fontWeight: 900, color: '#ea580c', margin: 0 }}>{atividade.instrutor || 'Não informado'}</p>
                     </div>
                     <div>
                         <span style={{ fontSize: '6pt', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Emissão</span>
@@ -163,30 +163,54 @@ export const PrintableAtividadePlanejamentoReport: React.FC<PrintableAtividadePl
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
                             <tr>
-                                <th style={{ ...thStyle, width: '6%', textAlign: 'center' }}>Nº</th>
-                                <th style={{ ...thStyle, width: '18%' }}>Data da Aula</th>
-                                <th style={{ ...thStyle, width: '56%' }}>Conteúdo Desenvolvido / Planejamento</th>
-                                <th style={{ ...thStyle, width: '20%' }}>Visto / Assinatura</th>
+                                <th style={{ ...thStyle, width: '5%', textAlign: 'center' }}>Nº</th>
+                                <th style={{ ...thStyle, width: '16%' }}>Data da Aula</th>
+                                <th style={{ ...thStyle, width: '55%' }}>Conteúdo Desenvolvido / Planejamento</th>
+                                <th style={{ ...thStyle, width: '24%' }}>Status / Avaliação da Coordenação</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {sortedLogs.map((log, idx) => (
-                                <tr key={log.id || idx} style={{ background: idx % 2 === 0 ? '#fff' : '#f8fafc' }}>
-                                    <td style={{ ...tdStyle, textAlign: 'center', color: '#94a3b8', fontSize: '8pt', fontWeight: 700 }}>{idx + 1}</td>
-                                    <td style={{ ...tdStyle, fontWeight: 700, color: '#0f172a' }}>
-                                        {new Date(log.data).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                        {log.periodo && (
-                                            <div style={{ fontSize: '7pt', color: '#4f46e5', fontWeight: 800, marginTop: '2pt' }}>
-                                                {log.periodo}
+                            {sortedLogs.map((log, idx) => {
+                                const status = log.status || 'Em Análise';
+                                const isApproved = status === 'Aprovado';
+                                const isReturned = status === 'Devolvido para Correção';
+
+                                return (
+                                    <tr key={log.id || idx} style={{ background: idx % 2 === 0 ? '#fff' : '#f8fafc' }}>
+                                        <td style={{ ...tdStyle, textAlign: 'center', color: '#94a3b8', fontSize: '8pt', fontWeight: 700 }}>{idx + 1}</td>
+                                        <td style={{ ...tdStyle, fontWeight: 700, color: '#0f172a' }}>
+                                            {new Date(log.data + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                            {log.periodo && (
+                                                <div style={{ fontSize: '7pt', color: '#ea580c', fontWeight: 800, marginTop: '2pt' }}>
+                                                    {log.periodo}
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td style={{ ...tdStyle, whiteSpace: 'pre-line' }}>{log.conteudo}</td>
+                                        <td style={{ ...tdStyle, textAlign: 'center', borderRight: '0.5pt solid #cbd5e1' }}>
+                                            <div style={{ 
+                                                display: 'inline-block',
+                                                fontSize: '7pt', 
+                                                fontWeight: 800, 
+                                                textTransform: 'uppercase',
+                                                padding: '2pt 6pt',
+                                                borderRadius: '3px',
+                                                background: isApproved ? '#ecfdf5' : isReturned ? '#fff1f2' : '#fffbeb',
+                                                color: isApproved ? '#047857' : isReturned ? '#be123c' : '#b45309',
+                                                border: `0.5pt solid ${isApproved ? '#a7f3d0' : isReturned ? '#fecdd3' : '#fde68a'}`
+                                            }}>
+                                                {status}
                                             </div>
-                                        )}
-                                    </td>
-                                    <td style={{ ...tdStyle, whiteSpace: 'pre-line' }}>{log.conteudo}</td>
-                                    <td style={{ ...tdStyle, textAlign: 'center', borderRight: '0.5pt solid #cbd5e1' }}>
-                                        <div style={{ borderBottom: '0.5pt dashed #cbd5e1', marginTop: '12pt', width: '100%', height: '1px' }} />
-                                    </td>
-                                </tr>
-                            ))}
+                                            {log.avaliado_por && (
+                                                <div style={{ fontSize: '6.5pt', color: '#64748b', marginTop: '3pt' }}>
+                                                    Visto: <strong>{log.avaliado_por}</strong>
+                                                </div>
+                                            )}
+                                            <div style={{ borderBottom: '0.5pt dashed #cbd5e1', marginTop: '8pt', width: '100%', height: '1px' }} />
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 ) : (

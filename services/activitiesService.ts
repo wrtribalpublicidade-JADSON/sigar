@@ -29,6 +29,13 @@ export interface AtividadeLog {
     conteudo: string;
     instrutor: string;
     periodo?: string;
+    status?: 'Em Análise' | 'Aprovado' | 'Devolvido para Correção';
+    observacao_coordenacao?: string;
+    avaliado_por?: string;
+    avaliado_em?: string;
+    updated_at?: string;
+    updated_by?: string;
+    created_at?: string;
 }
 
 export interface AtividadePresenca {

@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { 
     X, Users, Calendar, BookOpen, CheckCircle2, XCircle, 
     Plus, Search, UserPlus, Filter, ClipboardList, TrendingUp,
-    Pencil, Trash2, Printer, Bookmark, CheckCheck, RotateCcw, MapPin
+    Pencil, Trash2, Printer, Bookmark, CheckCheck, RotateCcw, MapPin,
+    Clock, AlertCircle, AlertTriangle, ShieldCheck
 } from 'lucide-react';
 import { activitiesService, Atividade, AtividadeLog, AtividadePresenca } from '../services/activitiesService';
 import { supabase } from '../services/supabase';
 import { PrintableAtividadePlanejamentoReport } from './PrintableAtividadePlanejamentoReport';
+import { Coordenador } from '../types';
 
 const PERIODOS_LETIVOS = [
     '1º Bimestre',
@@ -29,7 +31,10 @@ export const DiarioAtividadeModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
     atividade: Atividade | null;
-}> = ({ isOpen, onClose, atividade }) => {
+    currentUser?: Coordenador | null;
+    userEmail?: string | null;
+    isAdmin?: boolean;
+}> = ({ isOpen, onClose, atividade, currentUser, userEmail, isAdmin }) => {
     const [activeTab, setActiveTab] = useState<'chamada' | 'alunos' | 'conteudo'>('chamada');
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
     const [selectedPeriod, setSelectedPeriod] = useState(PERIODOS_LETIVOS[0]);
@@ -46,6 +51,23 @@ export const DiarioAtividadeModal: React.FC<{
     const [editingLog, setEditingLog] = useState<AtividadeLog | null>(null);
     const [isPrinting, setIsPrinting] = useState(false);
     const [logsToPrint, setLogsToPrint] = useState<AtividadeLog[]>([]);
+
+    // Coordinator Evaluation State
+    const [evaluatingLog, setEvaluatingLog] = useState<AtividadeLog | null>(null);
+    const [evalTargetStatus, setEvalTargetStatus] = useState<'Aprovado' | 'Devolvido para Correção'>('Aprovado');
+    const [evalObsText, setEvalObsText] = useState('');
+    const [isSavingEval, setIsSavingEval] = useState(false);
+
+    const isCoordenador = isAdmin || 
+        currentUser?.funcao === 'Administrador' || 
+        currentUser?.funcao === 'Coordenador Pedagógico' || 
+        currentUser?.funcao === 'Coordenador Regional' || 
+        currentUser?.funcao === 'Gestor' || 
+        currentUser?.funcao === 'Gestor Pedagógico' || 
+        currentUser?.funcao === 'Gestor Geral' || 
+        currentUser?.funcao === 'Técnico Pedagógico' || 
+        !currentUser?.funcao || 
+        (currentUser?.funcao !== 'Professor' && currentUser?.funcao !== 'Monitor de Atividade Complementar');
 
     const loadData = async () => {
         if (!atividade?.id) return;
@@ -222,27 +244,30 @@ export const DiarioAtividadeModal: React.FC<{
 
     const handleAddLog = async () => {
         if (!newLog.trim()) return;
-        if (!atividade?.id) return; // Added optional chaining check
+        if (!atividade?.id) return;
         try {
             if (editingLog) {
-                const logPayload = {
+                const logPayload: Partial<AtividadeLog> = {
                     data: selectedDate,
-                    conteudo: newLog,
-                    periodo: selectedPeriod
+                    conteudo: newLog.trim(),
+                    periodo: selectedPeriod,
+                    status: 'Em Análise',
+                    updated_at: new Date().toISOString()
                 };
                 const updated = await activitiesService.updateLog(editingLog.id, logPayload);
-                setLogs(logs.map(l => l.id === editingLog.id ? updated : l));
+                setLogs(logs.map(l => l.id === editingLog.id ? { ...l, ...updated } : l));
                 setEditingLog(null);
                 setNewLog('');
                 setSelectedDate(new Date().toISOString().split('T')[0]);
                 setSelectedPeriod(PERIODOS_LETIVOS[0]);
             } else {
-                const logPayload = {
+                const logPayload: Omit<AtividadeLog, 'id'> = {
                     atividade_id: atividade.id,
                     data: selectedDate,
-                    conteudo: newLog,
-                    instrutor: atividade.instrutor || 'Instrutor',
-                    periodo: selectedPeriod
+                    conteudo: newLog.trim(),
+                    instrutor: atividade.instrutor || currentUser?.nome || userEmail || 'Instrutor',
+                    periodo: selectedPeriod,
+                    status: 'Em Análise'
                 };
                 const saved = await activitiesService.saveLog(logPayload);
                 setLogs([saved, ...logs]);
@@ -252,6 +277,70 @@ export const DiarioAtividadeModal: React.FC<{
             console.error('Error saving log:', err);
             alert(`Erro ao salvar registro: ${err?.message || 'Verifique a conexão ou tente novamente.'}`);
         }
+    };
+
+    const openEvaluationModal = (log: AtividadeLog, initialStatus: 'Aprovado' | 'Devolvido para Correção') => {
+        setEvaluatingLog(log);
+        setEvalTargetStatus(initialStatus);
+        setEvalObsText(log.observacao_coordenacao || '');
+    };
+
+    const handleSaveEvaluation = async () => {
+        if (!evaluatingLog) return;
+
+        if (evalTargetStatus === 'Devolvido para Correção' && !evalObsText.trim()) {
+            alert('Por favor, informe a observação do que deve ser ajustado pelo instrutor/professor.');
+            return;
+        }
+
+        setIsSavingEval(true);
+        try {
+            const avaliadorNome = currentUser?.nome || userEmail || 'Coordenador Pedagógico';
+            const nowIso = new Date().toISOString();
+
+            const updatedPayload: Partial<AtividadeLog> = {
+                status: evalTargetStatus,
+                observacao_coordenacao: evalObsText.trim(),
+                avaliado_por: avaliadorNome,
+                avaliado_em: nowIso,
+                updated_at: nowIso,
+                updated_by: avaliadorNome
+            };
+
+            await activitiesService.updateLog(evaluatingLog.id, updatedPayload);
+
+            setLogs(logs.map(l => l.id === evaluatingLog.id ? { ...l, ...updatedPayload } : l));
+            setEvaluatingLog(null);
+            setEvalObsText('');
+        } catch (err: any) {
+            console.error('Error saving evaluation:', err);
+            alert(`Erro ao salvar avaliação: ${err?.message || 'Tente novamente.'}`);
+        } finally {
+            setIsSavingEval(false);
+        }
+    };
+
+    const renderStatusBadge = (status?: string) => {
+        const currentStatus = status || 'Em Análise';
+        if (currentStatus === 'Aprovado') {
+            return (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0 shadow-sm">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Aprovado
+                </span>
+            );
+        }
+        if (currentStatus === 'Devolvido para Correção') {
+            return (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200 shrink-0 shadow-sm">
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-600" /> Devolvido para Correção
+                </span>
+            );
+        }
+        return (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200 shrink-0 shadow-sm">
+                <Clock className="w-3.5 h-3.5 text-amber-600" /> Em Análise
+            </span>
+        );
     };
 
     const handleStartEdit = (log: AtividadeLog) => {
@@ -735,53 +824,127 @@ export const DiarioAtividadeModal: React.FC<{
                                         </button>
                                     )}
                                 </div>
-                                {logs.map(log => (
-                                    <div key={log.id} className="bg-white rounded-[2rem] border border-slate-100 p-8 shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
-                                        <div className="absolute top-0 left-0 w-2 h-full bg-brand-orange" />
-                                        <div className="flex justify-between items-start mb-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="p-2 bg-slate-50 text-slate-500 rounded-lg">
-                                                    <Calendar size={16} />
-                                                </div>
-                                                <span className="font-black text-slate-800 text-sm">
-                                                    {new Date(log.data + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
-                                                </span>
-                                                {log.periodo && (
-                                                    <span className="bg-orange-50 text-brand-orange border border-orange-100 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider">
-                                                        {log.periodo}
+                                {logs.map(log => {
+                                    const isApproved = log.status === 'Aprovado';
+                                    const isReturned = log.status === 'Devolvido para Correção';
+
+                                    return (
+                                        <div key={log.id} className="bg-white rounded-[2rem] border border-slate-100 p-8 shadow-sm hover:shadow-md transition-all relative overflow-hidden group space-y-4">
+                                            <div className={`absolute top-0 left-0 w-2 h-full ${
+                                                isApproved ? 'bg-emerald-500' : isReturned ? 'bg-rose-500' : 'bg-brand-orange'
+                                            }`} />
+                                            
+                                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                                                <div className="flex flex-wrap items-center gap-3">
+                                                    <div className="p-2 bg-slate-50 text-slate-500 rounded-lg">
+                                                        <Calendar size={16} />
+                                                    </div>
+                                                    <span className="font-black text-slate-800 text-sm">
+                                                        {new Date(log.data + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
                                                     </span>
-                                                )}
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1.5 rounded-full">{log.instrutor}</span>
-                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button 
-                                                        onClick={() => handlePrintSingleLog(log)}
-                                                        title="Imprimir registro"
-                                                        className="p-1.5 text-slate-400 hover:text-brand-orange hover:bg-slate-50 rounded-lg transition-colors"
-                                                    >
-                                                        <Printer size={16} />
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => handleStartEdit(log)}
-                                                        title="Editar registro"
-                                                        className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-slate-50 rounded-lg transition-colors"
-                                                    >
-                                                        <Pencil size={16} />
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => handleDeleteLog(log.id)}
-                                                        title="Excluir registro"
-                                                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-slate-50 rounded-lg transition-colors"
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
+                                                    {log.periodo && (
+                                                        <span className="bg-orange-50 text-brand-orange border border-orange-100 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider">
+                                                            {log.periodo}
+                                                        </span>
+                                                    )}
+                                                    {renderStatusBadge(log.status)}
+                                                </div>
+
+                                                <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1.5 rounded-full">
+                                                        {log.instrutor}
+                                                    </span>
+
+                                                    {/* Coordinator Quick Action Buttons */}
+                                                    {isCoordenador && (
+                                                        <div className="flex items-center gap-1.5 bg-slate-50/80 p-1 rounded-xl border border-slate-200/60">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => openEvaluationModal(log, 'Aprovado')}
+                                                                className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1 transition-all cursor-pointer ${
+                                                                    isApproved 
+                                                                        ? 'bg-emerald-600 text-white shadow-sm' 
+                                                                        : 'text-emerald-700 hover:bg-emerald-100/70'
+                                                                }`}
+                                                                title="Aprovar registro pedagógico"
+                                                            >
+                                                                <CheckCircle2 size={13} />
+                                                                <span>Aprovar</span>
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => openEvaluationModal(log, 'Devolvido para Correção')}
+                                                                className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1 transition-all cursor-pointer ${
+                                                                    isReturned 
+                                                                        ? 'bg-rose-600 text-white shadow-sm' 
+                                                                        : 'text-rose-700 hover:bg-rose-100/70'
+                                                                }`}
+                                                                title="Devolver para correção"
+                                                            >
+                                                                <AlertCircle size={13} />
+                                                                <span>Devolver</span>
+                                                            </button>
+                                                        </div>
+                                                    )}
+
+                                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button 
+                                                            onClick={() => handlePrintSingleLog(log)}
+                                                            title="Imprimir registro"
+                                                            className="p-1.5 text-slate-400 hover:text-brand-orange hover:bg-slate-50 rounded-lg transition-colors cursor-pointer"
+                                                        >
+                                                            <Printer size={16} />
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => handleStartEdit(log)}
+                                                            title="Editar registro"
+                                                            className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer"
+                                                        >
+                                                            <Pencil size={16} />
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => handleDeleteLog(log.id)}
+                                                            title="Excluir registro"
+                                                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
+
+                                            <p className="text-slate-600 font-medium leading-relaxed whitespace-pre-line">
+                                                {log.conteudo}
+                                            </p>
+
+                                            {/* Coordination Feedback Alert if Devolvido */}
+                                            {isReturned && log.observacao_coordenacao && (
+                                                <div className="bg-rose-50/90 border-l-4 border-rose-500 rounded-r-2xl p-4 space-y-1 animate-fade-in shadow-sm">
+                                                    <div className="flex items-center gap-2 text-rose-800 font-black text-xs uppercase tracking-wide">
+                                                        <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                                                        <span>Orientações da Coordenação Pedagógica</span>
+                                                        {log.avaliado_por && (
+                                                            <span className="text-[10px] text-rose-600 font-bold normal-case">
+                                                                — por {log.avaliado_por}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-xs font-semibold text-rose-800 leading-relaxed whitespace-pre-line pl-6">
+                                                        {log.observacao_coordenacao}
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            {/* Approved Note */}
+                                            {isApproved && log.avaliado_por && (
+                                                <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 bg-emerald-50/60 px-3 py-1.5 rounded-xl w-fit border border-emerald-100/80">
+                                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                                    <span>Aprovado por <strong className="font-extrabold">{log.avaliado_por}</strong>{log.avaliado_em ? ` em ${new Date(log.avaliado_em).toLocaleDateString('pt-BR')}` : ''}</span>
+                                                </div>
+                                            )}
                                         </div>
-                                        <p className="text-slate-600 font-medium leading-relaxed whitespace-pre-line">{log.conteudo}</p>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
@@ -792,12 +955,124 @@ export const DiarioAtividadeModal: React.FC<{
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Diário Gerencial - Sistema Integrado de Gestão</p>
                     <button 
                         onClick={onClose}
-                        className="text-xs font-black uppercase tracking-widest text-slate-500 hover:text-slate-700 transition-colors"
+                        className="text-xs font-black uppercase tracking-widest text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
                     >
                         Fechar Painel
                     </button>
                 </div>
             </div>
+
+            {/* Coordinator Evaluation Modal */}
+            {evaluatingLog && (
+                <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+                    <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 animate-scale-up space-y-4">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <div className="flex items-center gap-2">
+                                <Bookmark className="w-5 h-5 text-brand-orange" />
+                                <h3 className="text-base font-black text-slate-800 uppercase tracking-tight">
+                                    Avaliar Conteúdo Pedagógico
+                                </h3>
+                            </div>
+                            <button
+                                onClick={() => setEvaluatingLog(null)}
+                                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3.5 space-y-1.5 text-xs text-slate-700">
+                            <div>
+                                <span className="font-bold text-slate-400 uppercase text-[10px] block">Atividade / Oficina</span>
+                                <span className="font-extrabold text-slate-800">{atividade?.nome}</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/50">
+                                <div>
+                                    <span className="font-bold text-slate-400 uppercase text-[10px] block">Data da Aula</span>
+                                    <span className="font-bold text-slate-700">{new Date(evaluatingLog.data + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
+                                </div>
+                                <div>
+                                    <span className="font-bold text-slate-400 uppercase text-[10px] block">Período</span>
+                                    <span className="font-bold text-slate-700">{evaluatingLog.periodo || '1º Bimestre'}</span>
+                                </div>
+                            </div>
+                            <div className="pt-1 border-t border-slate-200/50">
+                                <span className="font-bold text-slate-400 uppercase text-[10px] block">Conteúdo Registrado</span>
+                                <p className="text-slate-600 font-medium line-clamp-2 italic">"{evaluatingLog.conteudo}"</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider">
+                                Decisão da Coordenação
+                            </label>
+                            <div className="grid grid-cols-2 gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setEvalTargetStatus('Aprovado')}
+                                    className={`p-3 rounded-2xl border-2 flex items-center justify-center gap-2 font-black text-xs uppercase tracking-wider transition-all cursor-pointer ${
+                                        evalTargetStatus === 'Aprovado'
+                                            ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm'
+                                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                                    }`}
+                                >
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                    Aprovar
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setEvalTargetStatus('Devolvido para Correção')}
+                                    className={`p-3 rounded-2xl border-2 flex items-center justify-center gap-2 font-black text-xs uppercase tracking-wider transition-all cursor-pointer ${
+                                        evalTargetStatus === 'Devolvido para Correção'
+                                            ? 'border-rose-500 bg-rose-50 text-rose-700 shadow-sm'
+                                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                                    }`}
+                                >
+                                    <AlertCircle className="w-4 h-4 text-rose-600" />
+                                    Devolver p/ Correção
+                                </button>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
+                                    Observações da Coordenação {evalTargetStatus === 'Devolvido para Correção' ? <span className="text-rose-500">*</span> : <span className="text-slate-400 font-normal">(Opcional)</span>}
+                                </label>
+                                <textarea
+                                    value={evalObsText}
+                                    onChange={e => setEvalObsText(e.target.value)}
+                                    placeholder={evalTargetStatus === 'Devolvido para Correção' 
+                                        ? "Descreva detalhadamente o que o instrutor/professor deve ajustar no registro deste conteúdo..." 
+                                        : "Observações ou orientações pedagógicas complementares..."}
+                                    rows={4}
+                                    className="w-full p-3 border border-slate-200 rounded-2xl text-xs outline-none focus:border-brand-orange transition-all font-medium resize-none"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                            <button 
+                                type="button"
+                                onClick={() => setEvaluatingLog(null)}
+                                className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
+                            >
+                                Cancelar
+                            </button>
+                            <button 
+                                type="button"
+                                disabled={isSavingEval}
+                                onClick={handleSaveEvaluation}
+                                className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider text-white shadow-md transition-all active:scale-95 disabled:opacity-50 cursor-pointer ${
+                                    evalTargetStatus === 'Aprovado' 
+                                        ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20' 
+                                        : 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/20'
+                                }`}
+                            >
+                                {isSavingEval ? 'Salvando...' : (evalTargetStatus === 'Aprovado' ? 'Confirmar Aprovação' : 'Confirmar Devolução')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             {isPrinting && atividade && (
                 <PrintableAtividadePlanejamentoReport 
                     atividade={atividade}
