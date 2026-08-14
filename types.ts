@@ -165,11 +165,52 @@ export interface RecursoHumano {
    escola_id: string;
    class_id?: string;
    stage: string;
-   status: 'Ativo' | 'Inativo' | 'Transferido' | 'Desistente';
+   status: 'Ativo' | 'Inativo' | 'Transferido' | 'Desistente' | string;
    observations?: string;
    professor_responsavel?: string;
    ano_matricula?: number;
    created_at?: string;
+   list_number?: number;
+
+   // Identificação EducaCenso
+   nome_mae?: string;
+   nome_pai?: string;
+   certidao_nascimento?: string;
+   id_educacenso?: string;
+   nis?: string;
+   rg?: string;
+
+   // Características
+   cor_raca?: string;
+   nacionalidade?: string;
+   pais_nascimento?: string;
+   uf_nascimento?: string;
+   municipio_nascimento?: string;
+   estudante_estrangeiro?: string;
+
+   // Endereço
+   cep?: string;
+   endereco_uf?: string;
+   endereco_municipio?: string;
+   endereco_distrito?: string;
+   endereco_bairro?: string;
+   endereco_logradouro?: string;
+   endereco_numero?: string;
+   endereco_complemento?: string;
+   endereco_zona?: string;
+
+   // Educação Especial
+   possui_deficiencia?: string;
+   deficiencia_tipos?: string[];
+   recursos_sala_saeb?: string[];
+   recebe_aee?: string;
+
+   // Matrícula Escolar
+   turno?: string;
+   modalidade?: string;
+   data_matricula?: string;
+   situacao_vinculo?: string;
+   ano_serie?: string;
  }
  
  // Interface para Transferência de Estudante

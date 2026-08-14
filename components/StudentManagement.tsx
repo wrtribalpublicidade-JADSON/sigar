@@ -6,7 +6,7 @@ import {
   GraduationCap, X, RefreshCw, UserPlus, Upload, Printer, FileText,
   ArrowRightLeft, Bell
 } from 'lucide-react';
-import { CadastroEstudanteModal } from './modals/CadastroEstudanteModal';
+import { CadastroEstudanteModal, formatCPF, formatNIS } from './modals/CadastroEstudanteModal';
 import { CadastroTurmaModal, TurmaData } from './modals/CadastroTurmaModal';
 import { ImportEstudantesModal } from './modals/ImportEstudantesModal';
 import { TransferenciaEstudanteModal } from './modals/TransferenciaEstudanteModal';
@@ -474,9 +474,30 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
                                                 {student.name?.charAt(0)}
                                             </div>
                                             <div>
-                                                <div className="font-bold text-slate-800 text-sm uppercase">{student.name}</div>
-                                                <div className="text-[10px] text-slate-400 font-bold uppercase mt-0.5 tracking-tighter">
-                                                    CPF: {student.cpf || '---'} • MAT: {student.registration_number || '---'}
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-bold text-slate-800 text-sm uppercase">{student.name}</span>
+                                                    {student.possui_deficiencia === 'Sim' && (
+                                                        <span className="bg-purple-100 text-purple-700 text-[9px] font-black px-2 py-0.5 rounded-md border border-purple-200 uppercase tracking-wider">
+                                                            AEE / Especial
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="text-[10px] text-slate-400 font-bold uppercase mt-0.5 tracking-tight flex items-center gap-2 flex-wrap">
+                                                    <span>CPF: {student.cpf ? formatCPF(student.cpf) : '---'}</span>
+                                                    <span>•</span>
+                                                    <span>MAT: {student.registration_number || '---'}</span>
+                                                    {student.nis && (
+                                                        <>
+                                                            <span>•</span>
+                                                            <span className="text-brand-orange font-black">NIS: {formatNIS(student.nis)}</span>
+                                                        </>
+                                                    )}
+                                                    {student.id_educacenso && (
+                                                        <>
+                                                            <span>•</span>
+                                                            <span className="text-blue-600 font-black">INEP: {student.id_educacenso}</span>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -493,7 +514,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
                                     </td>
                                     <td className="px-6 py-4 text-center">
                                         <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black bg-indigo-50 text-indigo-600 border border-indigo-100 uppercase">
-                                            {student.stage}
+                                            {student.stage || student.ano_serie || '---'}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-center">
