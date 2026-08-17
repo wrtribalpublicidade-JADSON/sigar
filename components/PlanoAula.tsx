@@ -509,11 +509,11 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
         const escolaObj = escolas.find(esc => String(esc.id) === String(p.escola_id));
         const escolaNome = escolaObj ? escolaObj.nome : (p.escola_nome || 'Unidade');
         const turmaNome = turmaMap.get(String(p.turma_id)) || p.turma_nome || p.turmaNome || 'Turma';
-        const criacaoData = p.data_criacao || p.data || (p.created_at ? p.created_at.split('T')[0] : new Date().toISOString().split('T')[0]);
+        const criacaoData = p.data_criacao || (p.created_at ? p.created_at.split('T')[0] : (p.data || new Date().toISOString().split('T')[0]));
 
         return {
           id: p.id,
-          data: criacaoData,
+          data: p.data || p.data_inicio || criacaoData,
           dataCriacao: criacaoData,
           dataInicio: p.data_inicio || '',
           dataTermino: p.data_termino || '',
@@ -707,13 +707,14 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
     const turmaObj = turmas.find(t => t.id === selectedTurmaId);
     const turmaNome = turmaObj ? `${turmaObj.name || turmaObj.year} • ${turmaObj.shift || ''}` : 'Turma';
 
-    const criacaoDate = editingId
-      ? (plans.find(p => p.id === editingId)?.dataCriacao || plans.find(p => p.id === editingId)?.data || dataPlan)
+    const existingPlan = editingId ? plans.find(p => p.id === editingId) : null;
+    const criacaoDate = existingPlan
+      ? (existingPlan.dataCriacao || (existingPlan.criadoEm ? existingPlan.criadoEm.split('T')[0] : existingPlan.data))
       : new Date().toISOString().split('T')[0];
 
     const payload: LessonPlan = {
       id: editingId || crypto.randomUUID(),
-      data: criacaoDate,
+      data: dataInicio || dataPlan || criacaoDate,
       dataCriacao: criacaoDate,
       dataInicio,
       dataTermino,
@@ -798,7 +799,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
 
   const handleEdit = (plan: LessonPlan) => {
     setEditingId(plan.id);
-    setDataPlan(plan.dataCriacao || plan.data || new Date().toISOString().split('T')[0]);
+    setDataPlan(plan.dataCriacao || (plan.criadoEm ? plan.criadoEm.split('T')[0] : (plan.data || new Date().toISOString().split('T')[0])));
     setDataInicio(plan.dataInicio || '');
     setDataTermino(plan.dataTermino || '');
     setSelectedEscolaId(plan.escolaId);
@@ -1283,7 +1284,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
                     Data de Elaboração / Criação
                   </td>
                   <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 600, color: '#334155' }}>
-                    {new Date((printPlan.dataCriacao || printPlan.data) + 'T12:00:00').toLocaleDateString('pt-BR')}
+                    {new Date((printPlan.dataCriacao || (printPlan.criadoEm ? printPlan.criadoEm.split('T')[0] : printPlan.data)) + 'T12:00:00').toLocaleDateString('pt-BR')}
                   </td>
                 </tr>
                 <tr>
@@ -2018,7 +2019,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
                           {plan.escolaNome}
                         </div>
                         <div className="text-[9px] text-slate-400 mt-0.5">
-                          Criado em: {new Date((plan.dataCriacao || plan.data) + 'T12:00:00').toLocaleDateString()}
+                          Criado em: {new Date((plan.dataCriacao || (plan.criadoEm ? plan.criadoEm.split('T')[0] : plan.data)) + 'T12:00:00').toLocaleDateString('pt-BR')}
                         </div>
                       </td>
                       <td className="px-6 py-3">
@@ -2201,7 +2202,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
                 </span>
                 {' '}&bull;{' '}
                 <span className="font-bold text-slate-500 uppercase text-[10px]">Criado em:</span>{' '}
-                {new Date((evaluatingPlan.dataCriacao || evaluatingPlan.data) + 'T12:00:00').toLocaleDateString()}
+                {new Date((evaluatingPlan.dataCriacao || (evaluatingPlan.criadoEm ? evaluatingPlan.criadoEm.split('T')[0] : evaluatingPlan.data)) + 'T12:00:00').toLocaleDateString('pt-BR')}
               </div>
             </div>
 
@@ -2375,7 +2376,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
                   <div>
                     <span className="font-bold text-slate-400 uppercase text-[9px] block">Data de Criação</span>
                     <span className="font-bold text-slate-800">
-                      {new Date((viewingPlan.dataCriacao || viewingPlan.data) + 'T12:00:00').toLocaleDateString('pt-BR')}
+                      {new Date((viewingPlan.dataCriacao || (viewingPlan.criadoEm ? viewingPlan.criadoEm.split('T')[0] : viewingPlan.data)) + 'T12:00:00').toLocaleDateString('pt-BR')}
                     </span>
                   </div>
                 </div>
