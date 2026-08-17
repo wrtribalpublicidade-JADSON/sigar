@@ -156,6 +156,8 @@ export async function fetchChamados(
             status: item.status as StatusSuporte,
             atendente_nome: item.atendente_nome,
             resposta_admin: item.resposta_admin,
+            anexo_url: item.anexo_url || (Array.isArray(item.mensagens) && item.mensagens[0]?.anexo_url) || undefined,
+            anexo_nome: item.anexo_nome || (Array.isArray(item.mensagens) && item.mensagens[0]?.anexo_nome) || undefined,
             mensagens: Array.isArray(item.mensagens) ? item.mensagens : [],
             created_at: item.created_at,
             updated_at: item.updated_at,
@@ -186,6 +188,8 @@ export async function createChamado(
         prioridade: PrioridadeSuporte;
         assunto: string;
         descricao: string;
+        anexo_url?: string;
+        anexo_nome?: string;
     },
     isDemoMode: boolean = false
 ): Promise<ChamadoSuporte> {
@@ -199,6 +203,8 @@ export async function createChamado(
         autor_email: dados.usuario_email,
         autor_tipo: 'USUARIO',
         mensagem: dados.descricao,
+        anexo_url: dados.anexo_url,
+        anexo_nome: dados.anexo_nome,
         created_at: now
     };
 
@@ -216,6 +222,8 @@ export async function createChamado(
         prioridade: dados.prioridade,
         assunto: dados.assunto,
         descricao: dados.descricao,
+        anexo_url: dados.anexo_url,
+        anexo_nome: dados.anexo_nome,
         status: 'Aberto',
         mensagens: [primeiraMensagem],
         created_at: now,
@@ -229,24 +237,31 @@ export async function createChamado(
     }
 
     try {
+        const insertPayload: any = {
+            protocolo,
+            usuario_id: dados.usuario_id,
+            usuario_nome: dados.usuario_nome,
+            usuario_email: dados.usuario_email,
+            usuario_funcao: dados.usuario_funcao,
+            usuario_contato: dados.usuario_contato,
+            escola_id: dados.escola_id,
+            escola_nome: dados.escola_nome,
+            categoria: dados.categoria,
+            prioridade: dados.prioridade,
+            assunto: dados.assunto,
+            descricao: dados.descricao,
+            status: 'Aberto',
+            mensagens: [primeiraMensagem]
+        };
+
+        if (dados.anexo_url) {
+            insertPayload.anexo_url = dados.anexo_url;
+            insertPayload.anexo_nome = dados.anexo_nome;
+        }
+
         const { data, error } = await supabase
             .from('suporte_chamados')
-            .insert({
-                protocolo,
-                usuario_id: dados.usuario_id,
-                usuario_nome: dados.usuario_nome,
-                usuario_email: dados.usuario_email,
-                usuario_funcao: dados.usuario_funcao,
-                usuario_contato: dados.usuario_contato,
-                escola_id: dados.escola_id,
-                escola_nome: dados.escola_nome,
-                categoria: dados.categoria,
-                prioridade: dados.prioridade,
-                assunto: dados.assunto,
-                descricao: dados.descricao,
-                status: 'Aberto',
-                mensagens: [primeiraMensagem]
-            })
+            .insert(insertPayload)
             .select()
             .single();
 
@@ -260,6 +275,8 @@ export async function createChamado(
         const created: ChamadoSuporte = {
             ...novoChamado,
             id: data.id,
+            anexo_url: data.anexo_url || dados.anexo_url,
+            anexo_nome: data.anexo_nome || dados.anexo_nome,
             created_at: data.created_at || now,
             updated_at: data.updated_at || now
         };
@@ -269,7 +286,7 @@ export async function createChamado(
             'CREATE',
             'SUPORTE',
             created.id,
-            { protocolo: created.protocolo, assunto: created.assunto, categoria: created.categoria },
+            { protocolo: created.protocolo, assunto: created.assunto, categoria: created.categoria, tem_anexo: !!dados.anexo_url },
             dados.usuario_id,
             dados.usuario_email,
             dados.usuario_nome
@@ -295,6 +312,8 @@ export async function addMensagemChamado(
     autorNome: string,
     autorEmail: string,
     autorTipo: 'USUARIO' | 'ADMIN',
+    anexoUrl?: string,
+    anexoNome?: string,
     isDemoMode: boolean = false
 ): Promise<ChamadoSuporte> {
     const now = new Date().toISOString();
@@ -304,6 +323,8 @@ export async function addMensagemChamado(
         autor_email: autorEmail,
         autor_tipo: autorTipo,
         mensagem: mensagemTexto,
+        anexo_url: anexoUrl,
+        anexo_nome: anexoNome,
         created_at: now
     };
 
@@ -355,7 +376,7 @@ export async function addMensagemChamado(
             'UPDATE',
             'SUPORTE_MENSAGEM',
             chamado.id,
-            { protocolo: chamado.protocolo, autor_tipo: autorTipo },
+            { protocolo: chamado.protocolo, autor_tipo: autorTipo, tem_anexo: !!anexoUrl },
             undefined,
             autorEmail,
             autorNome

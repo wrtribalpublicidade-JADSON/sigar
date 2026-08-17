@@ -440,54 +440,75 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
 
   const fetchRealPlans = async () => {
     try {
-      const { data, error } = await supabase
-        .from('guias_aprendizagem')
-        .select('*')
-        .eq('ativo', true)
-        .order('data', { ascending: false });
+      // Fetch all records with chunking to surpass Supabase 1000-row limit
+      let allPlansData: any[] = [];
+      let page = 0;
+      const pageSize = 1000;
+      let hasMore = true;
 
-      if (error) throw error;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('guias_aprendizagem')
+          .select('*')
+          .or('ativo.eq.true,ativo.is.null')
+          .order('data', { ascending: false })
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+
+        if (error) throw error;
+        if (data && data.length > 0) {
+          allPlansData = allPlansData.concat(data);
+          if (data.length < pageSize) {
+            hasMore = false;
+          } else {
+            page++;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
 
       // Also we need to get turmas for all schools to map their names properly
       const { data: allTurmas, error: turmasError } = await supabase
         .from('turmas')
-        .select('id, name, year, shift');
+        .select('id, name, year, shift')
+        .range(0, 4999);
       
       const turmaMap = new Map<string, string>();
       if (!turmasError && allTurmas) {
         allTurmas.forEach((t: any) => {
-          turmaMap.set(t.id, `${t.name || t.year} • ${t.shift || ''}`);
+          turmaMap.set(String(t.id), `${t.name || t.year} • ${t.shift || ''}`);
         });
       }
 
-      let filteredPlansData = data || [];
+      let filteredPlansData = allPlansData;
       if (!isAdmin && currentUser && currentUser.funcao !== 'Administrador') {
-        const userSchoolIds = currentUser?.escolasIds || [];
+        const userSchoolIds = (currentUser?.escolasIds || []).map(String);
         if (userSchoolIds.length > 0) {
-          filteredPlansData = filteredPlansData.filter((p: any) => userSchoolIds.includes(p.escola_id));
+          filteredPlansData = filteredPlansData.filter((p: any) => userSchoolIds.includes(String(p.escola_id)));
         }
       }
       if (currentUser && currentUser.funcao === 'Professor') {
-        const assignedIds = currentUser.turmasIds || [];
-        const currentEmail = (currentUser.contato || userEmail || '').toLowerCase().trim();
+        const assignedIds = (currentUser.turmasIds || []).map(String);
+        const currentEmail = (userEmail || currentUser?.contato || '').toLowerCase().trim();
 
         filteredPlansData = filteredPlansData.filter((p: any) => {
-          if (!assignedIds.includes(p.turma_id)) return false;
-          const assignedComps = currentUser.turmaComponentes?.[p.turma_id] || [];
           const authorEmail = (p.updated_by || p.created_by || '').toLowerCase().trim();
-
           if (authorEmail && currentEmail && authorEmail === currentEmail) return true;
+          if (assignedIds.length > 0 && !assignedIds.includes(String(p.turma_id))) return false;
+
+          const assignedComps = currentUser.turmaComponentes?.[p.turma_id] || currentUser.turmaComponentes?.[String(p.turma_id)] || [];
           if (assignedComps.length > 0) {
-            return assignedComps.includes(p.componente);
+            const normPComp = normalizeSubjectName(p.componente);
+            return assignedComps.some((c: string) => normalizeSubjectName(c) === normPComp);
           }
-          return false;
+          return true;
         });
       }
 
       const formattedPlans: LessonPlan[] = filteredPlansData.map((p: any) => {
-        const escolaObj = escolas.find(esc => esc.id === p.escola_id);
-        const escolaNome = escolaObj ? escolaObj.nome : 'Unidade';
-        const turmaNome = turmaMap.get(p.turma_id) || 'Turma';
+        const escolaObj = escolas.find(esc => String(esc.id) === String(p.escola_id));
+        const escolaNome = escolaObj ? escolaObj.nome : (p.escola_nome || 'Unidade');
+        const turmaNome = turmaMap.get(String(p.turma_id)) || p.turma_nome || p.turmaNome || 'Turma';
         const criacaoData = p.data_criacao || p.data || (p.created_at ? p.created_at.split('T')[0] : new Date().toISOString().split('T')[0]);
 
         return {
@@ -496,9 +517,9 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
           dataCriacao: criacaoData,
           dataInicio: p.data_inicio || '',
           dataTermino: p.data_termino || '',
-          escolaId: p.escola_id,
+          escolaId: String(p.escola_id),
           escolaNome,
-          turmaId: p.turma_id,
+          turmaId: String(p.turma_id),
           turmaNome,
           componente: normalizeSubjectName(p.componente),
           titulo: p.titulo,
@@ -736,6 +757,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
         observacao_coordenacao: payload.observacaoCoordenacao || '',
         avaliado_por: payload.avaliadoPor || null,
         avaliado_em: payload.avaliadoEm || null,
+        ativo: true,
         updated_at: new Date().toISOString(),
         updated_by: userEmail || currentUser?.contato || 'user'
       };
@@ -856,9 +878,9 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       const normComp = normalizeSubjectName(plan.componente);
       const profName = getTeacherName(plan.professor);
 
-      const matchEscola = !historyFilterEscola || plan.escolaId === historyFilterEscola;
+      const matchEscola = !historyFilterEscola || String(plan.escolaId) === String(historyFilterEscola);
       const matchAno = !historyFilterAnoSerie || plan.anoSerie === historyFilterAnoSerie;
-      const matchTurma = !historyFilterTurma || plan.turmaNome === historyFilterTurma;
+      const matchTurma = !historyFilterTurma || plan.turmaNome === historyFilterTurma || String(plan.turmaId) === String(historyFilterTurma);
       const matchComp = !historyFilterComponente || normComp === historyFilterComponente;
       const matchBimestre = !historyFilterBimestre || plan.periodo === historyFilterBimestre;
       const matchProf = !historyFilterProfessor || profName === historyFilterProfessor || plan.professor === historyFilterProfessor;
@@ -866,7 +888,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       // Escolas
       if (plan.escolaId && plan.escolaNome) {
         if (matchAno && matchTurma && matchComp && matchBimestre && matchProf) {
-          escolasMap.set(plan.escolaId, plan.escolaNome);
+          escolasMap.set(String(plan.escolaId), plan.escolaNome);
         }
       }
 
@@ -1028,9 +1050,9 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       const normComp = normalizeSubjectName(plan.componente);
       const profName = getTeacherName(plan.professor);
 
-      if (historyFilterEscola && plan.escolaId !== historyFilterEscola) return false;
+      if (historyFilterEscola && String(plan.escolaId) !== String(historyFilterEscola)) return false;
       if (historyFilterAnoSerie && plan.anoSerie !== historyFilterAnoSerie) return false;
-      if (historyFilterTurma && plan.turmaNome !== historyFilterTurma) return false;
+      if (historyFilterTurma && plan.turmaNome !== historyFilterTurma && String(plan.turmaId) !== String(historyFilterTurma)) return false;
       if (historyFilterComponente && normComp !== historyFilterComponente) return false;
       if (historyFilterBimestre && plan.periodo !== historyFilterBimestre) return false;
       if (historyFilterProfessor && profName !== historyFilterProfessor && plan.professor !== historyFilterProfessor) return false;
@@ -1049,6 +1071,11 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       return true;
     });
   }, [plans, historyFilterEscola, historyFilterAnoSerie, historyFilterTurma, historyFilterComponente, historyFilterBimestre, historyFilterProfessor, historyFilterStatus, searchTerm, coordMap]);
+
+  // Reset pagination to page 1 whenever any filter changes
+  useEffect(() => {
+    setHistoryCurrentPage(1);
+  }, [historyFilterEscola, historyFilterAnoSerie, historyFilterTurma, historyFilterComponente, historyFilterBimestre, historyFilterProfessor, historyFilterStatus, searchTerm]);
 
   // Pagination Math
   const totalHistoryItems = filteredPlans.length;

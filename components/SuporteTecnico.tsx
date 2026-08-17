@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { PageHeader } from './ui/PageHeader';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
@@ -8,7 +8,8 @@ import {
     LifeBuoy, Plus, Search, Filter, MessageSquare, Clock, CheckCircle2,
     AlertCircle, AlertTriangle, XCircle, Send, User, School, Phone, Mail,
     ExternalLink, RefreshCw, HelpCircle, ChevronDown, ChevronUp, ChevronRight,
-    Shield, Calendar, ArrowLeft, Trash2, Tag, Check, MessageCircle
+    Shield, Calendar, ArrowLeft, Trash2, Tag, Check, MessageCircle,
+    Image as ImageIcon, Paperclip, UploadCloud, Maximize2, Eye, Download, X
 } from 'lucide-react';
 import {
     ChamadoSuporte, MensagemSuporte, StatusSuporte,
@@ -18,6 +19,81 @@ import {
     fetchChamados, createChamado, addMensagemChamado,
     updateStatusChamado, updatePrioridadeChamado, deleteChamado
 } from '../services/suporteService';
+
+// Helper to format bytes
+function formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+// Image compression and base64 helper
+async function processAndCompressImage(file: File): Promise<{ dataUrl: string; name: string; sizeFormatted: string }> {
+    return new Promise((resolve, reject) => {
+        if (!file.type.startsWith('image/')) {
+            reject(new Error('O arquivo selecionado não é uma imagem válida.'));
+            return;
+        }
+
+        // 15MB limit check before processing
+        if (file.size > 15 * 1024 * 1024) {
+            reject(new Error('A imagem selecionada excede o limite de 15MB.'));
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const rawDataUrl = e.target?.result as string;
+            const img = new Image();
+            img.onload = () => {
+                const MAX_WIDTH = 1600;
+                const MAX_HEIGHT = 1600;
+                let width = img.width;
+                let height = img.height;
+
+                if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+                    if (width > height) {
+                        height = Math.round((height * MAX_WIDTH) / width);
+                        width = MAX_WIDTH;
+                    } else {
+                        width = Math.round((width * MAX_HEIGHT) / height);
+                        height = MAX_HEIGHT;
+                    }
+                }
+
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    // Draw white background in case of transparent png to save cleanly
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fillRect(0, 0, width, height);
+                    ctx.drawImage(img, 0, 0, width, height);
+                    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                    const approximateSize = Math.round((compressedDataUrl.length * 3) / 4);
+                    resolve({
+                        dataUrl: compressedDataUrl,
+                        name: file.name || `screenshot_${Date.now()}.jpg`,
+                        sizeFormatted: formatFileSize(approximateSize)
+                    });
+                } else {
+                    resolve({
+                        dataUrl: rawDataUrl,
+                        name: file.name || `screenshot_${Date.now()}.png`,
+                        sizeFormatted: formatFileSize(file.size)
+                    });
+                }
+            };
+            img.onerror = () => reject(new Error('Não foi possível processar a imagem.'));
+            img.src = rawDataUrl;
+        };
+        reader.onerror = () => reject(new Error('Erro ao ler arquivo do dispositivo.'));
+        reader.readAsDataURL(file);
+    });
+}
 
 interface SuporteTecnicoProps {
     currentUser?: Coordenador | null;
@@ -99,15 +175,38 @@ export const SuporteTecnico: React.FC<SuporteTecnicoProps> = ({
     const [formEscolaId, setFormEscolaId] = useState<string>('');
     const [formContato, setFormContato] = useState<string>(currentUser?.contato || '');
     const [formDescricao, setFormDescricao] = useState<string>('');
+    const [formAnexo, setFormAnexo] = useState<{ dataUrl: string; name: string; sizeFormatted: string } | null>(null);
+    const [isUploadingFormImg, setIsUploadingFormImg] = useState<boolean>(false);
+    const [isDraggingOverForm, setIsDraggingOverForm] = useState<boolean>(false);
     const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
     // Message reply in ticket details
     const [replyMessage, setReplyMessage] = useState<string>('');
+    const [replyAnexo, setReplyAnexo] = useState<{ dataUrl: string; name: string; sizeFormatted: string } | null>(null);
+    const [isUploadingReplyImg, setIsUploadingReplyImg] = useState<boolean>(false);
     const [isSendingReply, setIsSendingReply] = useState<boolean>(false);
+
+    // Lightbox Modal
+    const [previewImageModal, setPreviewImageModal] = useState<{ url: string; title: string; filename?: string } | null>(null);
+
+    // File input refs
+    const formFileInputRef = useRef<HTMLInputElement>(null);
+    const replyFileInputRef = useRef<HTMLInputElement>(null);
 
     // FAQ state
     const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
     const [faqSearch, setFaqSearch] = useState<string>('');
+
+    // Escape listener for image preview modal
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && previewImageModal) {
+                setPreviewImageModal(null);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [previewImageModal]);
 
     // Load data
     const loadChamados = async (showRefreshState = false) => {
@@ -203,6 +302,45 @@ export const SuporteTecnico: React.FC<SuporteTecnicoProps> = ({
         );
     }, [faqSearch]);
 
+    // Handle image file selection & compression
+    const handleImageFileSelect = async (file: File, target: 'FORM' | 'REPLY') => {
+        try {
+            if (target === 'FORM') setIsUploadingFormImg(true);
+            else setIsUploadingReplyImg(true);
+
+            const processed = await processAndCompressImage(file);
+            if (target === 'FORM') {
+                setFormAnexo(processed);
+                showNotification('success', 'Captura de tela anexada com sucesso!');
+            } else {
+                setReplyAnexo(processed);
+                showNotification('success', 'Captura de tela anexada à resposta!');
+            }
+        } catch (err: any) {
+            console.error('Erro ao processar imagem:', err);
+            showNotification('error', err?.message || 'Falha ao processar imagem.');
+        } finally {
+            if (target === 'FORM') setIsUploadingFormImg(false);
+            else setIsUploadingReplyImg(false);
+        }
+    };
+
+    // Handle Paste event for quick screenshot capture (Ctrl+V)
+    const handlePaste = (e: React.ClipboardEvent, target: 'FORM' | 'REPLY') => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1) {
+                const file = items[i].getAsFile();
+                if (file) {
+                    e.preventDefault();
+                    handleImageFileSelect(file, target);
+                    break;
+                }
+            }
+        }
+    };
+
     // Handle Create Ticket
     const handleCreateTicket = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -227,7 +365,9 @@ export const SuporteTecnico: React.FC<SuporteTecnicoProps> = ({
                     categoria: formCategoria,
                     prioridade: formPrioridade,
                     assunto: formAssunto,
-                    descricao: formDescricao
+                    descricao: formDescricao,
+                    anexo_url: formAnexo?.dataUrl,
+                    anexo_nome: formAnexo?.name
                 },
                 isDemoMode
             );
@@ -236,6 +376,7 @@ export const SuporteTecnico: React.FC<SuporteTecnicoProps> = ({
             setIsNewModalOpen(false);
             setFormAssunto('');
             setFormDescricao('');
+            setFormAnexo(null);
             await loadChamados();
             setSelectedChamado(novo);
         } catch (err) {
@@ -249,7 +390,7 @@ export const SuporteTecnico: React.FC<SuporteTecnicoProps> = ({
     // Handle Send Reply
     const handleSendReply = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedChamado || !replyMessage.trim()) return;
+        if (!selectedChamado || (!replyMessage.trim() && !replyAnexo)) return;
 
         setIsSendingReply(true);
         try {
@@ -259,15 +400,18 @@ export const SuporteTecnico: React.FC<SuporteTecnicoProps> = ({
 
             const atualizado = await addMensagemChamado(
                 selectedChamado,
-                replyMessage.trim(),
+                replyMessage.trim() || (replyAnexo ? 'Captura de tela anexada.' : ''),
                 autorNome,
                 autorEmail,
                 autorTipo,
+                replyAnexo?.dataUrl,
+                replyAnexo?.name,
                 isDemoMode
             );
 
             setSelectedChamado(atualizado);
             setReplyMessage('');
+            setReplyAnexo(null);
             showNotification('success', 'Resposta enviada com sucesso!');
             await loadChamados();
         } catch (err) {
@@ -767,7 +911,7 @@ export const SuporteTecnico: React.FC<SuporteTecnicoProps> = ({
                                                         <p className="text-xs text-slate-500 line-clamp-2 mt-1">
                                                             {c.descricao}
                                                         </p>
-                                                        <div className="flex items-center gap-2 mt-2">
+                                                        <div className="flex flex-wrap items-center gap-2 mt-2">
                                                             <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
                                                                 <Tag className="w-2.5 h-2.5" />
                                                                 {c.categoria}
@@ -776,6 +920,12 @@ export const SuporteTecnico: React.FC<SuporteTecnicoProps> = ({
                                                                 <MessageSquare className="w-2.5 h-2.5" />
                                                                 {msgCount} {msgCount === 1 ? 'mensagem' : 'mensagens'}
                                                             </span>
+                                                            {(c.anexo_url || (c.mensagens && c.mensagens.some(m => !!m.anexo_url))) && (
+                                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full" title="Possui captura de tela / print anexado">
+                                                                    <ImageIcon className="w-2.5 h-2.5 text-brand-orange" />
+                                                                    Print anexado
+                                                                </span>
+                                                            )}
                                                         </div>
                                                     </td>
 
@@ -950,7 +1100,11 @@ export const SuporteTecnico: React.FC<SuporteTecnicoProps> = ({
                         </div>
 
                         {/* Modal Body */}
-                        <form onSubmit={handleCreateTicket} className="p-6 space-y-4 overflow-y-auto flex-1">
+                        <form 
+                            onSubmit={handleCreateTicket} 
+                            onPaste={e => handlePaste(e, 'FORM')}
+                            className="p-6 space-y-4 overflow-y-auto flex-1"
+                        >
                             {/* Requester Info summary */}
                             <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
                                 <div>
@@ -980,7 +1134,7 @@ export const SuporteTecnico: React.FC<SuporteTecnicoProps> = ({
                                         required
                                     >
                                         {CATEGORIAS.map(cat => (
-                                            <option key={cat} value={cat}>{cat}</option>
+                                             <option key={cat} value={cat}>{cat}</option>
                                         ))}
                                     </select>
                                 </div>
@@ -1066,13 +1220,142 @@ export const SuporteTecnico: React.FC<SuporteTecnicoProps> = ({
                                 />
                             </div>
 
+                            {/* Row: Screenshot / Image Attachment Dropzone */}
+                            <div>
+                                <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center justify-between">
+                                    <span className="flex items-center gap-1.5">
+                                        <ImageIcon className="w-3.5 h-3.5 text-brand-orange" />
+                                        Anexar Captura de Tela ou Imagem do Erro (Opcional)
+                                    </span>
+                                    <span className="text-[10px] text-slate-400 font-normal">PNG, JPG ou WEBP até 15MB</span>
+                                </label>
+
+                                <input
+                                    type="file"
+                                    ref={formFileInputRef}
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={e => {
+                                        const file = e.target.files?.[0];
+                                        if (file) handleImageFileSelect(file, 'FORM');
+                                        e.target.value = '';
+                                    }}
+                                />
+
+                                {!formAnexo ? (
+                                    <div
+                                        onDragOver={e => { e.preventDefault(); setIsDraggingOverForm(true); }}
+                                        onDragLeave={() => setIsDraggingOverForm(false)}
+                                        onDrop={e => {
+                                            e.preventDefault();
+                                            setIsDraggingOverForm(false);
+                                            const file = e.dataTransfer.files?.[0];
+                                            if (file) handleImageFileSelect(file, 'FORM');
+                                        }}
+                                        onClick={() => formFileInputRef.current?.click()}
+                                        className={`border-2 border-dashed rounded-2xl p-4 text-center cursor-pointer transition-all ${
+                                            isDraggingOverForm
+                                                ? 'border-brand-orange bg-orange-50/70 scale-[1.01]'
+                                                : 'border-slate-300 hover:border-brand-orange/60 bg-slate-50/70 hover:bg-orange-50/30'
+                                        }`}
+                                    >
+                                        {isUploadingFormImg ? (
+                                            <div className="py-3 flex flex-col items-center justify-center text-slate-500">
+                                                <RefreshCw className="w-6 h-6 animate-spin text-brand-orange mb-2" />
+                                                <p className="text-xs font-bold">Otimizando e anexando imagem...</p>
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 py-1">
+                                                <div className="w-10 h-10 rounded-xl bg-orange-100/80 text-brand-orange flex items-center justify-center shrink-0">
+                                                    <UploadCloud className="w-5 h-5" />
+                                                </div>
+                                                <div className="text-center sm:text-left">
+                                                    <p className="text-xs font-bold text-slate-700">
+                                                        Clique para selecionar uma imagem ou arraste o arquivo aqui
+                                                    </p>
+                                                    <p className="text-[11px] text-slate-500 mt-0.5">
+                                                        Dica: Você também pode colar um print diretamente com <kbd className="px-1.5 py-0.5 bg-slate-200 text-slate-700 rounded font-mono text-[10px] font-bold">Ctrl + V</kbd>
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="p-3 bg-orange-50/60 border border-orange-200 rounded-2xl flex items-center justify-between gap-3 animate-fade-in">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div 
+                                                onClick={() => setPreviewImageModal({
+                                                    url: formAnexo.dataUrl,
+                                                    title: formAssunto || 'Print do Chamado',
+                                                    filename: formAnexo.name
+                                                })}
+                                                className="relative w-14 h-14 rounded-xl overflow-hidden border border-orange-300 bg-slate-100 shrink-0 cursor-pointer group shadow-sm"
+                                                title="Clique para ampliar a imagem"
+                                            >
+                                                <img
+                                                    src={formAnexo.dataUrl}
+                                                    alt="Anexo"
+                                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                                                />
+                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
+                                                    <Eye className="w-4 h-4" />
+                                                </div>
+                                            </div>
+
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-orange-200/80 text-orange-900">
+                                                        Print Anexado
+                                                    </span>
+                                                    <span className="text-[11px] text-slate-400 font-mono">{formAnexo.sizeFormatted}</span>
+                                                </div>
+                                                <p className="text-xs font-bold text-slate-800 truncate mt-0.5" title={formAnexo.name}>
+                                                    {formAnexo.name}
+                                                </p>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setPreviewImageModal({
+                                                        url: formAnexo.dataUrl,
+                                                        title: formAssunto || 'Print do Chamado',
+                                                        filename: formAnexo.name
+                                                    })}
+                                                    className="text-[11px] text-brand-orange hover:underline font-bold flex items-center gap-1 mt-0.5"
+                                                >
+                                                    <Eye className="w-3 h-3" />
+                                                    Visualizar em tamanho real
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <button
+                                                type="button"
+                                                onClick={() => formFileInputRef.current?.click()}
+                                                className="px-2.5 py-1.5 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 rounded-xl text-xs font-semibold transition"
+                                                title="Trocar imagem"
+                                            >
+                                                Trocar
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setFormAnexo(null)}
+                                                className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition"
+                                                title="Remover anexo"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
                             {/* Helpful Tips Alert */}
                             <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800 flex items-start gap-2.5">
                                 <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
                                 <div>
                                     <p className="font-bold">Dica para atendimento rápido:</p>
                                     <p className="text-[11px] text-amber-700 mt-0.5">
-                                        Ao abrir o chamado, você receberá um número de protocolo. O Administrador responderá diretamente na linha do tempo do chamado ou entrará em contato via WhatsApp caso necessário.
+                                        Ao abrir o chamado, você receberá um número de protocolo. Se houver prints de tela anexados, a equipe técnica poderá diagnosticar o problema com mais rapidez e assertividade.
                                     </p>
                                 </div>
                             </div>
@@ -1302,6 +1585,45 @@ export const SuporteTecnico: React.FC<SuporteTecnicoProps> = ({
                                                 <p className="text-slate-800 whitespace-pre-wrap leading-relaxed">
                                                     {msg.mensagem}
                                                 </p>
+
+                                                {msg.anexo_url && (
+                                                    <div className="mt-3">
+                                                        <div 
+                                                            onClick={() => setPreviewImageModal({
+                                                                url: msg.anexo_url!,
+                                                                title: `Captura de Tela - ${msg.autor_nome}`,
+                                                                filename: msg.anexo_nome || 'screenshot.jpg'
+                                                            })}
+                                                            className="inline-flex items-center gap-3 p-2.5 bg-white rounded-xl border border-slate-200 shadow-sm hover:border-brand-orange/50 hover:shadow-md transition-all cursor-pointer group max-w-sm"
+                                                            title="Clique para visualizar a imagem em tamanho real"
+                                                        >
+                                                            <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-slate-100 shrink-0 border border-slate-200">
+                                                                <img
+                                                                    src={msg.anexo_url}
+                                                                    alt={msg.anexo_nome || 'Captura de Tela Anexada'}
+                                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                                                />
+                                                                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
+                                                                    <Maximize2 className="w-3.5 h-3.5" />
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="min-w-0 pr-2">
+                                                                <span className="text-[10px] font-bold text-brand-orange uppercase flex items-center gap-1">
+                                                                    <ImageIcon className="w-3 h-3" />
+                                                                    Captura Anexada
+                                                                </span>
+                                                                <p className="text-xs font-bold text-slate-800 truncate mt-0.5" title={msg.anexo_nome || 'Captura de Tela'}>
+                                                                    {msg.anexo_nome || 'Visualizar Imagem'}
+                                                                </p>
+                                                                <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1 mt-0.5 group-hover:text-brand-orange">
+                                                                    <Eye className="w-3 h-3" />
+                                                                    Ampliar imagem
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         );
                                     })}
@@ -1311,21 +1633,88 @@ export const SuporteTecnico: React.FC<SuporteTecnicoProps> = ({
 
                         {/* Reply Form Footer */}
                         {selectedChamado.status !== 'Resolvido' && selectedChamado.status !== 'Cancelado' ? (
-                            <form onSubmit={handleSendReply} className="p-4 bg-slate-50 border-t border-slate-200">
-                                <div className="flex gap-2">
+                            <form onSubmit={handleSendReply} className="p-4 bg-slate-50 border-t border-slate-200 space-y-2.5">
+                                {/* Reply Attachment Chip if present */}
+                                {replyAnexo && (
+                                    <div className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-orange-200 shadow-sm animate-fade-in">
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                            <img
+                                                src={replyAnexo.dataUrl}
+                                                alt="Anexo Resposta"
+                                                onClick={() => setPreviewImageModal({
+                                                    url: replyAnexo.dataUrl,
+                                                    title: `Anexo de Resposta - ${selectedChamado.protocolo}`,
+                                                    filename: replyAnexo.name
+                                                })}
+                                                className="w-10 h-10 object-cover rounded-lg border border-slate-200 cursor-pointer hover:opacity-80 transition"
+                                            />
+                                            <div className="min-w-0">
+                                                <p className="text-xs font-bold text-slate-800 truncate" title={replyAnexo.name}>
+                                                    {replyAnexo.name}
+                                                </p>
+                                                <p className="text-[10px] text-slate-400 font-mono">
+                                                    {replyAnexo.sizeFormatted} • Captura pronta para envio
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setReplyAnexo(null)}
+                                            className="p-1 text-slate-400 hover:text-rose-600 rounded-lg transition"
+                                            title="Remover anexo da resposta"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                )}
+
+                                <div className="flex gap-2 items-center">
+                                    <input
+                                        type="file"
+                                        ref={replyFileInputRef}
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={e => {
+                                            const file = e.target.files?.[0];
+                                            if (file) handleImageFileSelect(file, 'REPLY');
+                                            e.target.value = '';
+                                        }}
+                                    />
+
+                                    <button
+                                        type="button"
+                                        onClick={() => replyFileInputRef.current?.click()}
+                                        disabled={isSendingReply || isUploadingReplyImg}
+                                        className={`p-3 rounded-xl border transition flex items-center justify-center shrink-0 ${
+                                            replyAnexo 
+                                                ? 'bg-orange-100 border-brand-orange text-brand-orange' 
+                                                : 'bg-white border-slate-200 text-slate-600 hover:text-brand-orange hover:border-brand-orange/40 hover:bg-orange-50/50'
+                                        }`}
+                                        title="Anexar captura de tela ou print do erro (ou cole com Ctrl+V)"
+                                    >
+                                        {isUploadingReplyImg ? (
+                                            <RefreshCw className="w-4 h-4 animate-spin text-brand-orange" />
+                                        ) : (
+                                            <ImageIcon className="w-4 h-4" />
+                                        )}
+                                    </button>
+
                                     <input
                                         type="text"
-                                        placeholder={isAdmin ? "Escreva uma resposta oficial ao usuário..." : "Adicione mais detalhes ou responda ao suporte..."}
+                                        placeholder={isAdmin ? "Escreva uma resposta oficial ao usuário (ou cole print com Ctrl+V)..." : "Adicione mais detalhes ou responda ao suporte (ou cole print com Ctrl+V)..."}
                                         value={replyMessage}
                                         onChange={e => setReplyMessage(e.target.value)}
+                                        onPaste={e => handlePaste(e, 'REPLY')}
                                         className="flex-1 px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 outline-none"
                                         disabled={isSendingReply}
                                     />
+
                                     <Button
                                         type="submit"
                                         variant="primary"
-                                        disabled={isSendingReply || !replyMessage.trim()}
-                                        className="bg-brand-orange text-white px-5"
+                                        disabled={isSendingReply || (!replyMessage.trim() && !replyAnexo)}
+                                        className="bg-brand-orange text-white px-5 shrink-0"
                                     >
                                         {isSendingReply ? (
                                             <RefreshCw className="w-4 h-4 animate-spin" />
@@ -1343,6 +1732,69 @@ export const SuporteTecnico: React.FC<SuporteTecnicoProps> = ({
                                 Este chamado está <strong className="text-slate-700">{selectedChamado.status.toLowerCase()}</strong>. Para novas solicitações, abra um novo chamado.
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* ========================================================================= */}
+            {/* MODAL: LIGHTBOX / VISUALIZADOR DE IMAGEM / PRINT EM TELA CHEIA */}
+            {/* ========================================================================= */}
+            {previewImageModal && (
+                <div 
+                    className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in"
+                    onClick={() => setPreviewImageModal(null)}
+                >
+                    <div 
+                        className="relative max-w-5xl max-h-[92vh] w-full flex flex-col bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border border-slate-700 animate-scale-in"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {/* Lightbox Header */}
+                        <div className="px-6 py-3.5 bg-slate-950/90 backdrop-blur text-white flex items-center justify-between border-b border-slate-800">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-8 h-8 rounded-lg bg-brand-orange/20 text-brand-orange flex items-center justify-center shrink-0">
+                                    <ImageIcon className="w-4 h-4" />
+                                </div>
+                                <div className="min-w-0">
+                                    <h4 className="text-sm font-bold text-white truncate">{previewImageModal.title}</h4>
+                                    {previewImageModal.filename && (
+                                        <p className="text-[11px] text-slate-400 font-mono truncate max-w-md">{previewImageModal.filename}</p>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                                <a
+                                    href={previewImageModal.url}
+                                    download={previewImageModal.filename || 'screenshot-suporte-sigar.jpg'}
+                                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition"
+                                    title="Baixar imagem original"
+                                >
+                                    <Download className="w-4 h-4" />
+                                    <span className="hidden sm:inline">Baixar</span>
+                                </a>
+                                <button
+                                    onClick={() => setPreviewImageModal(null)}
+                                    className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition"
+                                    title="Fechar (Esc)"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Lightbox Image Viewport */}
+                        <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-slate-950/60 min-h-[300px]">
+                            <img
+                                src={previewImageModal.url}
+                                alt={previewImageModal.title}
+                                className="max-w-full max-h-[75vh] object-contain rounded-lg shadow-2xl"
+                            />
+                        </div>
+
+                        {/* Lightbox Footer */}
+                        <div className="px-6 py-2.5 bg-slate-950 text-slate-400 text-xs flex items-center justify-between border-t border-slate-800">
+                            <span>Pressione <kbd className="px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded font-mono text-[10px]">Esc</kbd> ou clique fora da imagem para fechar.</span>
+                            <span className="font-medium text-slate-500">Visualizador de Capturas • Suporte SIGAR</span>
+                        </div>
                     </div>
                 </div>
             )}

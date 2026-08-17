@@ -376,13 +376,32 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
 
   const fetchRealGuiasAprendizagem = async () => {
     try {
-      const { data, error } = await supabase
-        .from('guias_aprendizagem')
-        .select('*')
-        .eq('ativo', true);
+      let allGuias: any[] = [];
+      let page = 0;
+      const pageSize = 1000;
+      let hasMore = true;
 
-      if (error) throw error;
-      setGuiasAprendizagem(data || []);
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('guias_aprendizagem')
+          .select('*')
+          .or('ativo.eq.true,ativo.is.null')
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+
+        if (error) throw error;
+        if (data && data.length > 0) {
+          allGuias = allGuias.concat(data);
+          if (data.length < pageSize) {
+            hasMore = false;
+          } else {
+            page++;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+
+      setGuiasAprendizagem(allGuias);
     } catch (err) {
       console.error('Erro ao buscar guias de aprendizagem do Supabase para aulas:', err);
     }
@@ -414,7 +433,7 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
 
     // 1. Exact match: turma_id + componente + periodo
     let matches = guiasAprendizagem.filter(g => 
-      g.turma_id === log.turmaId &&
+      String(g.turma_id) === String(log.turmaId) &&
       normalizeSubjectName(g.componente) === normalizedComp &&
       (g.periodo === log.periodo || g.bimestre === log.periodo)
     );
@@ -422,7 +441,7 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
     // 2. Match by escola_id + ano_serie + componente + periodo
     if (matches.length === 0) {
       matches = guiasAprendizagem.filter(g => 
-        g.escola_id === log.escolaId &&
+        String(g.escola_id) === String(log.escolaId) &&
         (g.ano_serie === log.anoSerie || g.anoSerie === log.anoSerie) &&
         normalizeSubjectName(g.componente) === normalizedComp &&
         (g.periodo === log.periodo || g.bimestre === log.periodo)

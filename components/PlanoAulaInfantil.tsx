@@ -495,32 +495,78 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
     const loadData = async () => {
       try {
         if (!isDemoMode) {
-          const { data, error } = await supabase
-            .from('guias_aprendizagem_infantil')
-            .select('*')
-            .eq('ativo', true)
-            .order('data', { ascending: false });
+          let allPlansData: any[] = [];
+          let page = 0;
+          const pageSize = 1000;
+          let hasMore = true;
 
-          if (error) throw error;
+          while (hasMore) {
+            const { data, error } = await supabase
+              .from('guias_aprendizagem_infantil')
+              .select('*')
+              .or('ativo.eq.true,ativo.is.null')
+              .order('data', { ascending: false })
+              .range(page * pageSize, (page + 1) * pageSize - 1);
 
-          let filteredPlansData = data || [];
+            if (error) throw error;
+            if (data && data.length > 0) {
+              allPlansData = allPlansData.concat(data);
+              if (data.length < pageSize) {
+                hasMore = false;
+              } else {
+                page++;
+              }
+            } else {
+              hasMore = false;
+            }
+          }
+
+          const { data: allTurmas } = await supabase
+            .from('turmas')
+            .select('id, name, year, shift')
+            .range(0, 4999);
+          
+          const turmaMap = new Map<string, string>();
+          if (allTurmas) {
+            allTurmas.forEach((t: any) => {
+              turmaMap.set(String(t.id), `${t.name || t.year} • ${t.shift || ''}`);
+            });
+          }
+
+          let filteredPlansData = allPlansData;
+          if (!isAdmin && currentUser && currentUser.funcao !== 'Administrador') {
+            const userSchoolIds = (currentUser?.escolasIds || []).map(String);
+            if (userSchoolIds.length > 0) {
+              filteredPlansData = filteredPlansData.filter((d: any) => userSchoolIds.includes(String(d.escola_id)));
+            }
+          }
           if (currentUser && currentUser.funcao === 'Professor') {
-            const assignedIds = currentUser.turmasIds || [];
-            filteredPlansData = filteredPlansData.filter((d: any) => assignedIds.includes(d.turma_id));
+            const assignedIds = (currentUser.turmasIds || []).map(String);
+            const currentEmail = (userEmail || currentUser?.contato || '').toLowerCase().trim();
+            filteredPlansData = filteredPlansData.filter((d: any) => {
+              const authorEmail = (d.updated_by || d.created_by || '').toLowerCase().trim();
+              if (authorEmail && currentEmail && authorEmail === currentEmail) return true;
+              if (assignedIds.length > 0 && !assignedIds.includes(String(d.turma_id))) return false;
+              return true;
+            });
           }
 
           const formatted: LessonPlanInfantil[] = filteredPlansData.map(d => {
             const criacaoData = d.data_criacao || d.data || (d.created_at ? d.created_at.split('T')[0] : new Date().toISOString().split('T')[0]);
+            const escolaObj = escolas.find(e => String(e.id) === String(d.escola_id));
+            const escolaNome = escolaObj ? escolaObj.nome : (d.escola_nome || 'Unidade');
+            const turmaNome = turmaMap.get(String(d.turma_id)) || d.turma_nome || d.ano_serie || 'Turma';
+
             return {
               id: d.id,
               data: criacaoData,
               dataCriacao: criacaoData,
               dataInicio: d.data_inicio || '',
               dataTermino: d.data_termino || '',
-              escolaId: d.escola_id,
-              escolaNome: escolas.find(e => e.id === d.escola_id)?.nome || 'Unidade',
-              turmaId: d.turma_id,
-              turmaNome: d.ano_serie, // Placeholder or fetch
+              escolaId: String(d.escola_id),
+              escolaNome,
+              turmaId: String(d.turma_id),
+              turmaNome,
               campoExperiencia: d.campo_experiencia,
               titulo: d.titulo,
               objetivos: d.objetivos,
@@ -630,6 +676,7 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
           observacao_coordenacao: payload.observacaoCoordenacao || '',
           avaliado_por: payload.avaliadoPor || null,
           avaliado_em: payload.avaliadoEm || null,
+          ativo: true,
           updated_at: new Date().toISOString(),
           updated_by: userEmail || currentUser?.contato || 'user'
         };

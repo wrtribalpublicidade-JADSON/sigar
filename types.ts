@@ -500,6 +500,7 @@ export interface MensagemSuporte {
   autor_tipo: 'USUARIO' | 'ADMIN';
   mensagem: string;
   anexo_url?: string;
+  anexo_nome?: string;
   created_at: string;
 }
 
@@ -517,6 +518,8 @@ export interface ChamadoSuporte {
   prioridade: PrioridadeSuporte;
   assunto: string;
   descricao: string;
+  anexo_url?: string;
+  anexo_nome?: string;
   status: StatusSuporte;
   atendente_nome?: string;
   resposta_admin?: string;
