@@ -46,8 +46,73 @@ import { hasAccess, hasFullAccess, normalizeRole } from './utils/permissions';
 import { loadPermissions as preloadPermissions } from './services/permissoesService';
 import { ESCOLAS_MOCK, VISITAS_MOCK, COORDENADORES_MOCK } from './constants';
 import { igPlanoAcaoService } from './services/gestaoConselhoService';
-import { logAccess, logAudit } from './services/logService';
+import { logAccess, logAudit, logNavigation } from './services/logService';
 const ADMIN_EMAIL = 'jadsoncsilv@gmail.com';
+
+const getMenuMetaForView = (view: ViewState): { group: string; label: string } => {
+  switch (view) {
+    case 'DASHBOARD':
+      return { group: 'MENU', label: 'Visão Geral' };
+    case 'LISTA_ESCOLAS':
+      return { group: 'MENU', label: 'Escolas' };
+    case 'GESTAO_ESTUDANTES':
+      return { group: 'MENU', label: 'Estudantes' };
+    case 'DETALHE_ESCOLA':
+      return { group: 'MENU', label: 'Detalhes da Escola' };
+
+    case 'DIARIO_FUNDAMENTAL':
+      return { group: 'DIÁRIO DE CLASSE', label: 'Ensino Fundamental' };
+    case 'DIARIO_INFANTIL':
+      return { group: 'DIÁRIO DE CLASSE', label: 'Educação Infantil' };
+    case 'ATIVIDADES_COMPLEMENTARES':
+      return { group: 'DIÁRIO DE CLASSE', label: 'Atividades Complementares' };
+    case 'PLANO_AULA':
+      return { group: 'DIÁRIO DE CLASSE', label: 'Guia de Aprendizagem' };
+    case 'AULAS_MINISTRADAS':
+      return { group: 'DIÁRIO DE CLASSE', label: 'Aulas Ministradas' };
+    case 'FREQUENCIA':
+      return { group: 'DIÁRIO DE CLASSE', label: 'Frequência Escolar' };
+    case 'NOTAS':
+      return { group: 'DIÁRIO DE CLASSE', label: 'Notas' };
+    case 'PLANO_CURSO':
+      return { group: 'DIÁRIO DE CLASSE', label: 'Plano de Curso' };
+
+    case 'COORDENADORES':
+      return { group: 'GESTÃO', label: 'Equipe' };
+    case 'RELATORIOS':
+      return { group: 'GESTÃO', label: 'Relatórios' };
+    case 'INDICADORES':
+      return { group: 'GESTÃO', label: 'Indicadores' };
+    case 'INSTRUMENTAIS_GESTAO':
+      return { group: 'GESTÃO', label: 'Instrumentais de Gestão' };
+    case 'CONSELHO_CLASSE_FUNDAMENTAL':
+      return { group: 'GESTÃO', label: 'Conselho - Fundamental' };
+    case 'CONSELHO_CLASSE_INFANTIL':
+      return { group: 'GESTÃO', label: 'Conselho - Infantil' };
+    case 'CONSELHO_CLASSE':
+      return { group: 'GESTÃO', label: 'Conselho de Classe' };
+    case 'SUPORTE_TECNICO':
+      return { group: 'GESTÃO', label: 'Suporte Técnico' };
+    case 'NOTIFICACOES':
+      return { group: 'GESTÃO', label: 'Notificações' };
+    case 'AUDIT_LOGS':
+      return { group: 'GESTÃO', label: 'Auditoria' };
+    case 'PERMISSOES':
+      return { group: 'GESTÃO', label: 'Permissões' };
+    case 'MERENDA_ESCOLAR':
+      return { group: 'GESTÃO', label: 'Merenda Escolar' };
+    case 'GESTAO_REDE':
+      return { group: 'GESTÃO', label: 'Configurações da Rede' };
+    case 'GESTAO_USUARIOS':
+      return { group: 'GESTÃO', label: 'Gestão de Usuários' };
+
+    case 'NOVA_VISITA':
+      return { group: 'REGISTRAR VISITA', label: 'Registrar Visita' };
+
+    default:
+      return { group: 'SISTEMA', label: view };
+  }
+};
 
 export default function App() {
   const { showNotification } = useNotification();
@@ -453,11 +518,6 @@ export default function App() {
       setIsAdmin(false);
     }
     setCurrentView('DASHBOARD');
-  };
-
-  const handleSelectEscola = (id: string) => {
-    setSelectedEscolaId(id);
-    setCurrentView('DETALHE_ESCOLA');
   };
 
   const handleUpdateEscola = async (updatedEscola: Escola) => {
@@ -1020,6 +1080,37 @@ export default function App() {
     }
   };
 
+  const handleNavigate = (
+    view: ViewState,
+    group?: string,
+    label?: string,
+    extraDetails?: any
+  ) => {
+    setCurrentView(view);
+
+    if (!isDemoMode) {
+      const meta = getMenuMetaForView(view);
+      const finalGroup = group || meta.group;
+      const finalLabel = label || meta.label;
+
+      logNavigation(
+        finalGroup,
+        finalLabel,
+        view,
+        effectiveUser?.id,
+        userEmail || undefined,
+        userName || undefined,
+        extraDetails
+      );
+    }
+  };
+
+  const handleSelectEscola = (id: string) => {
+    const esc = escolas.find(e => e.id === id);
+    setSelectedEscolaId(id);
+    handleNavigate('DETALHE_ESCOLA', 'MENU', 'Detalhes da Escola', { escolaId: id, escolaNome: esc?.nome });
+  };
+
   const renderContent = () => {
     // Enforce permissions — admins bypass
     const effectiveRole = isAdmin ? undefined : effectiveUser?.funcao;
@@ -1033,7 +1124,7 @@ export default function App() {
           </div>
           <h2 className="text-2xl font-black text-slate-800 mb-2">Acesso Restrito</h2>
           <p className="text-slate-500 text-sm max-w-md text-center">Seu perfil (<strong>{effectiveRole}</strong>) não possui permissão para acessar este módulo. Solicite acesso ao administrador do sistema.</p>
-          <button onClick={() => setCurrentView('DASHBOARD')} className="mt-6 px-6 py-2.5 bg-brand-orange text-white rounded-xl font-bold hover:bg-orange-600 transition">Voltar ao Início</button>
+          <button onClick={() => handleNavigate('DASHBOARD', 'MENU', 'Visão Geral')} className="mt-6 px-6 py-2.5 bg-brand-orange text-white rounded-xl font-bold hover:bg-orange-600 transition">Voltar ao Início</button>
         </div>
       );
     }
@@ -1065,7 +1156,7 @@ export default function App() {
             escola={escola}
             coordenadores={coordenadores}
             historicoVisitas={visitas.filter(v => v.escolaId === escola.id)}
-            onBack={() => setCurrentView('LISTA_ESCOLAS')}
+            onBack={() => handleNavigate('LISTA_ESCOLAS', 'MENU', 'Escolas')}
             onUpdate={handleUpdateEscola}
             onUpdateVisitStatus={handleUpdateVisitStatus}
             isDemoMode={isDemoMode}
@@ -1081,7 +1172,7 @@ export default function App() {
               coordenadores={coordenadores}
               onSave={handleSaveVisit}
               onCancel={() => {
-                setCurrentView('DASHBOARD');
+                handleNavigate('DASHBOARD', 'MENU', 'Visão Geral');
                 setSelectedVisit(null);
               }}
               visitToEdit={selectedVisit}
@@ -1391,7 +1482,7 @@ export default function App() {
   return (
     <Layout
       currentView={currentView}
-      onChangeView={setCurrentView}
+      onChangeView={handleNavigate}
       onLogout={handleLogout}
       isAdmin={isAdmin}
       userName={userName}
@@ -1426,16 +1517,17 @@ export default function App() {
             visitas={visitas}
             coordenadores={coordenadores}
             currentUser={effectiveUser}
-            onNavigateToEscolas={() => setCurrentView('LISTA_ESCOLAS')}
+            onNavigateToEscolas={() => handleNavigate('LISTA_ESCOLAS', 'MENU', 'Escolas')}
             onNavigateToVisitas={() => {
-              setCurrentView('NOVA_VISITA');
               setSelectedVisit(null);
+              handleNavigate('NOVA_VISITA', 'REGISTRAR VISITA', 'Registrar Visita');
             }}
             onNavigateToDetail={(id) => {
+              const esc = escolas.find(e => e.id === id);
               setSelectedEscolaId(id);
-              setCurrentView('DETALHE_ESCOLA');
+              handleNavigate('DETALHE_ESCOLA', 'MENU', 'Detalhes da Escola', { escolaId: id, escolaNome: esc?.nome });
             }}
-            onNavigateToNotifications={() => setCurrentView('NOTIFICACOES')}
+            onNavigateToNotifications={() => handleNavigate('NOTIFICACOES', 'GESTÃO', 'Notificações')}
             notificationCount={notificationCount}
           />
         )

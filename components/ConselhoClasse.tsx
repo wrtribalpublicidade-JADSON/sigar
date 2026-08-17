@@ -13,6 +13,7 @@ import { PrintableAcompanhamentoDocente } from './PrintableAcompanhamentoDocente
 import { Escola, Segmento, Coordenador } from '../types';
 import { supabase } from '../services/supabase';
 import { hasTabAccess } from '../utils/permissions';
+import { logNavigation } from '../services/logService';
 
 
 export const BNCC_INFANTIL = {
@@ -4325,7 +4326,13 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                 {filteredTabs.map(t => (
                     <button
                         key={t.id}
-                        onClick={() => setActiveTab(t.id as Tab)}
+                        onClick={() => {
+                            setActiveTab(t.id as Tab);
+                            if (!isDemoMode) {
+                                const groupName = forcedEtapa === 'infantil' ? 'Conselho - Infantil' : 'Conselho - Fundamental';
+                                logNavigation('GESTÃO', `${groupName} > ${t.label}`, `CONSELHO_${forcedEtapa?.toUpperCase() || 'GERAL'}_${t.id.toUpperCase()}`, currentUser?.id, userEmail || undefined, currentUser?.nome || undefined, { escolaId: currentEscolaId, escolaNome: currentEscola?.nome });
+                            }
+                        }}
                         className={`px-6 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${activeTab === t.id ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}
                     >
                         <t.icon className={`w-4 h-4 ${activeTab === t.id ? 'text-orange-400' : ''}`} />

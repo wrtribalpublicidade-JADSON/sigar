@@ -474,7 +474,7 @@ export interface AuditLog {
   user_id?: string;
   user_email?: string;
   user_name?: string;
-  action: 'CREATE' | 'UPDATE' | 'DELETE';
+  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'ACCESS' | 'NAVIGATE' | string;
   module: string;
   record_id?: string;
   details?: any;

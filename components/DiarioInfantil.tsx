@@ -13,6 +13,7 @@ import { FrequenciaInfantil } from './FrequenciaInfantil';
 import { AvaliacaoDocenteInfantil } from './AvaliacaoDocenteInfantil';
 import { PainelResultadosInfantil } from './PainelResultadosInfantil';
 import { hasTabAccess } from '../utils/permissions';
+import { logNavigation } from '../services/logService';
 
 interface DiarioInfantilProps {
   escolas: Escola[];
@@ -50,6 +51,20 @@ export const DiarioInfantil: React.FC<DiarioInfantilProps> = ({
     return filteredTabs[0]?.id || 'plano_curso';
   });
 
+  const handleTabChange = (tab: { id: TabId; label: string }) => {
+    setActiveTab(tab.id);
+    if (!isDemoMode) {
+      logNavigation(
+        'DIÁRIO DE CLASSE',
+        `Educação Infantil > ${tab.label}`,
+        `DIARIO_INFANTIL_${tab.id.toUpperCase()}`,
+        currentUser?.id,
+        userEmail || undefined,
+        currentUser?.nome || undefined
+      );
+    }
+  };
+
   const tabsNode = (
     <div className="flex flex-wrap gap-2 p-1 bg-slate-100 rounded-xl print:hidden">
       {filteredTabs.map(tab => {
@@ -58,7 +73,7 @@ export const DiarioInfantil: React.FC<DiarioInfantilProps> = ({
         return (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => handleTabChange(tab)}
             className={`px-5 py-2.5 text-sm font-bold flex items-center gap-2 rounded-lg transition-all ${
               isActive
                 ? 'bg-white text-orange-600 shadow-sm'

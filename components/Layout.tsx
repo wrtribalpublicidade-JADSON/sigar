@@ -5,7 +5,7 @@ import { Sidebar } from './layout/Sidebar';
 interface LayoutProps {
   children: React.ReactNode;
   currentView: ViewState;
-  onChangeView: (view: ViewState) => void;
+  onChangeView: (view: ViewState, group?: string, label?: string, extraDetails?: any) => void;
   onLogout: () => void;
   isAdmin: boolean;
   userName: string | null;

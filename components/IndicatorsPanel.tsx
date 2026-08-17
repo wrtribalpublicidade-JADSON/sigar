@@ -50,6 +50,7 @@ import { SamahcIndicatorsModal } from './modals/SamahcIndicatorsModal';
 import { RelatorioEiModal } from './modals/RelatorioEiModal';
 import { FluenciaSamahcAgregadoModal } from './modals/FluenciaSamahcAgregadoModal';
 import { getEdicoesStatus, IndicadorEdicaoKey } from '../utils/edicoesHelper';
+import { logNavigation } from '../services/logService';
 
 interface IndicatorsPanelProps {
     escolas: Escola[];
@@ -1171,7 +1172,12 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
                                     return (
                                         <button
                                             key={tab.id}
-                                            onClick={() => setActiveTab(tab.id)}
+                                            onClick={() => {
+                                                setActiveTab(tab.id);
+                                                if (!isDemoMode) {
+                                                    logNavigation('GESTÃO', `Indicadores > ${tab.label}`, `INDICADORES_${tab.id}`);
+                                                }
+                                            }}
                                             className={`flex items-center gap-2 px-5 py-3 text-sm font-bold whitespace-nowrap transition-all border-b-2 ${isActive ? 'border-orange-500 text-orange-600 bg-orange-50/10' : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100'}`}
                                         >
                                             <Icon className={`w-4 h-4 ${isActive ? 'text-orange-500' : 'text-slate-400'}`} />
@@ -1200,7 +1206,12 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({ escolas, coord
                         ].map((analysis) => (
                             <button
                                 key={analysis.id}
-                                onClick={() => setActiveAnalysis(analysis.id as any)}
+                                onClick={() => {
+                                    setActiveAnalysis(analysis.id as any);
+                                    if (!isDemoMode) {
+                                        logNavigation('GESTÃO', `Indicadores > ${analysis.label}`, `INDICADORES_${analysis.id}`);
+                                    }
+                                }}
                                 className={`flex items-center gap-3 px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-wider transition-all border-2 ${activeAnalysis === analysis.id
                                         ? 'bg-slate-900 text-white border-brand-orange shadow-lg scale-[1.02]'
                                         : 'bg-white text-slate-400 border-slate-100 hover:border-brand-orange/30 hover:text-slate-600'

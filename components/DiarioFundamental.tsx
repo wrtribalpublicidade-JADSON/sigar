@@ -9,6 +9,7 @@ import { AulasMinistradas } from './AulasMinistradas';
 import { Frequencia } from './Frequencia';
 import { Notas } from './Notas';
 import { hasTabAccess } from '../utils/permissions';
+import { logNavigation } from '../services/logService';
 
 interface DiarioFundamentalProps {
   escolas: Escola[];
@@ -52,6 +53,20 @@ export const DiarioFundamental: React.FC<DiarioFundamentalProps> = ({
     return filteredTabs[0]?.id || 'plano_curso';
   });
 
+  const handleTabChange = (tab: { id: TabId; label: string }) => {
+    setActiveTab(tab.id);
+    if (!isDemoMode) {
+      logNavigation(
+        'DIÁRIO DE CLASSE',
+        `Ensino Fundamental > ${tab.label}`,
+        `DIARIO_FUNDAMENTAL_${tab.id.toUpperCase()}`,
+        currentUser?.id,
+        userEmail || undefined,
+        currentUser?.nome || undefined
+      );
+    }
+  };
+
   const tabsNode = (
     <div className="flex flex-wrap gap-2 p-1 bg-slate-100 rounded-xl print:hidden">
       {filteredTabs.map(tab => {
@@ -60,7 +75,7 @@ export const DiarioFundamental: React.FC<DiarioFundamentalProps> = ({
         return (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => handleTabChange(tab)}
             className={`px-5 py-2.5 text-sm font-bold flex items-center gap-2 rounded-lg transition-all ${
               isActive
                 ? 'bg-white text-orange-600 shadow-sm'

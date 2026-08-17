@@ -2,6 +2,11 @@
 import { supabase } from './supabase';
 import { AccessLog, AuditLog } from '../types';
 
+const isValidUUID = (str?: string | null): boolean => {
+    if (!str) return false;
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+};
+
 export const logAccess = async (
     action: 'LOGIN' | 'LOGOUT',
     status: 'SUCCESS' | 'FAILURE',
@@ -12,21 +17,24 @@ export const logAccess = async (
     try {
         // Get basic user agent info
         const userAgent = navigator.userAgent;
-
-        // Attempt to get IP (optional, might block on some clients/adblockers, so we keep it simple or skip)
         const ipAddress = null;
 
         let uname = userName;
-        if (!uname) {
+        let uid = userId;
+        let uemail = userEmail;
+
+        if (!uid || !uemail || !uname) {
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
-                uname = session.user.user_metadata?.full_name || session.user.email?.split('@')[0];
+                uid = uid || session.user.id;
+                uemail = uemail || session.user.email;
+                uname = uname || session.user.user_metadata?.full_name || session.user.email?.split('@')[0];
             }
         }
 
         await supabase.from('access_logs').insert({
-            user_id: userId,
-            user_email: userEmail,
+            user_id: isValidUUID(uid) ? uid : null,
+            user_email: uemail,
             user_name: uname,
             action,
             status,
@@ -39,7 +47,7 @@ export const logAccess = async (
 };
 
 export const logAudit = async (
-    action: 'CREATE' | 'UPDATE' | 'DELETE',
+    action: 'CREATE' | 'UPDATE' | 'DELETE' | 'ACCESS' | 'NAVIGATE' | string,
     module: string,
     recordId: string | undefined,
     details: any,
@@ -63,16 +71,49 @@ export const logAudit = async (
         }
 
         await supabase.from('audit_logs').insert({
-            user_id: uid,
+            user_id: isValidUUID(uid) ? uid : null,
             user_email: uemail,
             user_name: uname,
             action,
             module,
-            record_id: recordId,
+            record_id: recordId ? String(recordId) : null,
             details,
         });
     } catch (error) {
         console.error('Error logging audit:', error);
+    }
+};
+
+export const logNavigation = async (
+    menuGroup: 'MENU' | 'DIÁRIO DE CLASSE' | 'GESTÃO' | 'REGISTRAR VISITA' | string,
+    menuLabel: string,
+    view: string,
+    userId?: string,
+    userEmail?: string,
+    userName?: string,
+    extraDetails?: any
+) => {
+    try {
+        const cleanGroup = (menuGroup || 'MENU').toUpperCase().trim();
+        const moduleName = `NAVEGACAO_${cleanGroup.replace(/[\s\-\/]/g, '_')}`;
+
+        await logAudit(
+            'ACCESS',
+            moduleName,
+            view,
+            {
+                grupo: menuGroup,
+                menu: menuLabel,
+                view,
+                timestamp: new Date().toISOString(),
+                ...extraDetails
+            },
+            userId,
+            userEmail,
+            userName
+        );
+    } catch (error) {
+        console.error('Error logging navigation:', error);
     }
 };
 
@@ -116,7 +157,7 @@ export const fetchAccessLogs = async (filters?: {
 
     const { data, error } = await query
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(500);
 
     if (error) {
         console.error('Error fetching access logs:', error);
@@ -141,7 +182,11 @@ export const fetchAuditLogs = async (filters?: {
         }
 
         if (filters.module) {
-            query = query.eq('module', filters.module);
+            if (filters.module === 'NAVEGACAO') {
+                query = query.ilike('module', 'NAVEGACAO%');
+            } else {
+                query = query.eq('module', filters.module);
+            }
         }
 
         if (filters.year || filters.month || filters.day) {
@@ -170,7 +215,7 @@ export const fetchAuditLogs = async (filters?: {
 
     const { data, error } = await query
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(500);
 
     if (error) {
         console.error('Error fetching audit logs:', error);

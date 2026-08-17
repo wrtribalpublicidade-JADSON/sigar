@@ -368,6 +368,7 @@ export const PlanoCursoInfantil: React.FC<PlanoCursoInfantilProps> = ({
               bimestre: payload.bimestre,
               ano_serie: payload.anoSerie,
               itens: payload.itens,
+              ativo: true,
               updated_at: new Date().toISOString(),
               updated_by: userEmail || currentUser?.contato || 'user'
             };
@@ -440,7 +441,7 @@ export const PlanoCursoInfantil: React.FC<PlanoCursoInfantilProps> = ({
       const { data: plansData, error: plansError } = await supabase
         .from('planos_curso_infantil')
         .select('*')
-        .eq('ativo', true)
+        .or('ativo.is.null,ativo.eq.true')
         .order('created_at', { ascending: false });
 
       if (plansError) throw plansError;
@@ -1093,6 +1094,7 @@ export const PlanoCursoInfantil: React.FC<PlanoCursoInfantilProps> = ({
         bimestre: payload.bimestre,
         ano_serie: payload.anoSerie,
         itens: payload.itens,
+        ativo: true,
         updated_at: new Date().toISOString(),
         updated_by: userEmail || currentUser?.contato || 'user'
       };

@@ -8,7 +8,7 @@ import { getAccessForSidebarItem } from '../../utils/permissions';
 
 interface SidebarProps {
     currentView: ViewState;
-    onNavigate: (view: ViewState) => void;
+    onNavigate: (view: ViewState, group?: string, label?: string) => void;
     onLogout: () => void;
     userName: string | null;
     userEmail: string | null;
@@ -149,7 +149,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
                                 label={item.label}
                                 isActive={currentView === item.view}
                                 isCollapsed={isCollapsed}
-                                onClick={() => { onNavigate(item.view); setIsMobileOpen(false); }}
+                                onClick={() => { onNavigate(item.view, 'MENU', item.label); setIsMobileOpen(false); }}
                             />
                         ))}
                     </div>
@@ -166,7 +166,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
                                     label={item.label}
                                     isActive={currentView === item.view}
                                     isCollapsed={isCollapsed}
-                                    onClick={() => { onNavigate(item.view); setIsMobileOpen(false); }}
+                                    onClick={() => { onNavigate(item.view, 'DIÁRIO DE CLASSE', item.label); setIsMobileOpen(false); }}
                                 />
                             ))}
                         </div>
@@ -183,7 +183,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
                                 label={item.label}
                                 isActive={currentView === item.view}
                                 isCollapsed={isCollapsed}
-                                onClick={() => { onNavigate(item.view); setIsMobileOpen(false); }}
+                                onClick={() => { onNavigate(item.view, 'GESTÃO', item.label); setIsMobileOpen(false); }}
                                 hasNotification={(item as any).hasNotification}
                             />
                         ))}
@@ -198,7 +198,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLog
                             label="Registrar Visita"
                             isActive={currentView === 'NOVA_VISITA'}
                             isCollapsed={isCollapsed}
-                            onClick={() => { onNavigate('NOVA_VISITA'); setIsMobileOpen(false); }}
+                            onClick={() => { onNavigate('NOVA_VISITA', 'REGISTRAR VISITA', 'Registrar Visita'); setIsMobileOpen(false); }}
                             isHighlighted={true}
                         />
                     </div>

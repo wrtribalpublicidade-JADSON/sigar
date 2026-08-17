@@ -164,7 +164,7 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
       const { data, error } = await supabase
         .from('planos_curso_infantil')
         .select('*')
-        .eq('ativo', true);
+        .or('ativo.is.null,ativo.eq.true');
 
       if (error) throw error;
 
