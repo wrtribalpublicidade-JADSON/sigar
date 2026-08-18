@@ -10,6 +10,7 @@ interface ReuniaoEstudantilFormProps {
     currentUser?: Coordenador | null;
     initialEscolaId?: string;
     initialTurmaId?: string;
+    forcedEtapa?: 'fundamental' | 'infantil';
 }
 
 export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({ 
@@ -17,7 +18,8 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({
     escolas = [], 
     currentUser,
     initialEscolaId,
-    initialTurmaId
+    initialTurmaId,
+    forcedEtapa
 }) => {
     const [currentStep, setCurrentStep] = useState(1);
     const [autoAvaliacao, setAutoAvaliacao] = useState<{ [key: number]: string }>({});
@@ -37,7 +39,13 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({
         return turmas.find(t => t.id === selectedTurmaId);
     }, [turmas, selectedTurmaId]);
 
-    const isInfantil = activeTurma?.etapa === 'Educação Infantil';
+    const isInfantil = forcedEtapa ? forcedEtapa === 'infantil' : (
+        activeTurma?.etapa === 'Educação Infantil' || 
+        (activeTurma?.stage || '').toLowerCase().includes('infantil') ||
+        (activeTurma?.anoSerie || '').toLowerCase().includes('creche') ||
+        (activeTurma?.anoSerie || '').toLowerCase().includes('pré-escola') ||
+        (activeTurma?.anoSerie || '').toLowerCase().includes('pre-escola')
+    );
 
     // History States
     const [reunioesRealizadas, setReunioesRealizadas] = useState<any[]>([]);
@@ -112,6 +120,20 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({
         'Espaços, Tempos, Quantidades, Relações e Transformações'
     ];
 
+    // Helper to identify infantil turmas
+    const isTurmaInfantil = (t: any): boolean => {
+        if (!t) return false;
+        const etapa = (t.etapa || t.stage || '').toLowerCase();
+        const anoSerie = (t.anoSerie || t.year || '').toLowerCase();
+        return etapa.includes('infantil') || 
+               anoSerie.includes('creche') || 
+               anoSerie.includes('pré-escola') || 
+               anoSerie.includes('pre-escola') ||
+               anoSerie.includes('maternal') ||
+               anoSerie.includes('berçario') ||
+               anoSerie.includes('bercario');
+    };
+
     // Fetch Turmas when School changes
     useEffect(() => {
         const loadTurmas = async () => {
@@ -122,10 +144,18 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({
             setIsLoadingTurmas(true);
             try {
                 const data = await ccTurmaService.getBySchool(selectedEscolaId);
-                setTurmas(data || []);
-                // If initialTurmaId matches one of the new turmas, keep it, otherwise clear it
-                if (initialTurmaId && data.some((t: any) => t.id === initialTurmaId)) {
+                let filtered = data || [];
+                if (forcedEtapa === 'infantil') {
+                    filtered = filtered.filter(isTurmaInfantil);
+                } else if (forcedEtapa === 'fundamental') {
+                    filtered = filtered.filter(t => !isTurmaInfantil(t));
+                }
+                setTurmas(filtered);
+                // If initialTurmaId matches one of the new turmas, keep it, otherwise select first or clear
+                if (initialTurmaId && filtered.some((t: any) => t.id === initialTurmaId)) {
                     setSelectedTurmaId(initialTurmaId);
+                } else if (filtered.length > 0) {
+                    setSelectedTurmaId(filtered[0].id);
                 } else {
                     setSelectedTurmaId('');
                 }
@@ -136,7 +166,7 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({
             }
         };
         loadTurmas();
-    }, [selectedEscolaId, initialTurmaId]);
+    }, [selectedEscolaId, initialTurmaId, forcedEtapa]);
 
     // Fetch Students when Turma changes
     useEffect(() => {

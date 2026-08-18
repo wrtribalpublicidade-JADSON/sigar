@@ -15,6 +15,22 @@ import { supabase } from '../services/supabase';
 import { hasTabAccess } from '../utils/permissions';
 import { logNavigation } from '../services/logService';
 
+export const isTurmaInfantil = (t: any): boolean => {
+    if (!t) return false;
+    const etapa = (t.etapa || t.stage || '').toLowerCase();
+    const anoSerie = (t.anoSerie || t.year || '').toLowerCase();
+    return etapa.includes('infantil') || 
+           anoSerie.includes('creche') || 
+           anoSerie.includes('pré-escola') || 
+           anoSerie.includes('pre-escola') ||
+           anoSerie.includes('maternal') ||
+           anoSerie.includes('berçario') ||
+           anoSerie.includes('bercario');
+};
+
+export const isTurmaFundamental = (t: any): boolean => {
+    return !isTurmaInfantil(t);
+};
 
 export const BNCC_INFANTIL = {
     'O EU, O OUTRO E O NÓS': {
@@ -203,6 +219,9 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         return { hasInfantil, hasFundamental, hasBoth: hasInfantil && hasFundamental };
     }, [currentEscola]);
 
+    const isInfantilAllowed = forcedEtapa ? forcedEtapa === 'infantil' : (schoolLevels.hasInfantil || isAdmin);
+    const isFundamentalAllowed = forcedEtapa ? forcedEtapa === 'fundamental' : (schoolLevels.hasFundamental || isAdmin);
+
     const defaultEtapa = forcedEtapa || (schoolLevels.hasInfantil && !schoolLevels.hasFundamental ? 'infantil' : 'fundamental');
     const [acompEtapa, setAcompEtapa] = useState<'fundamental' | 'infantil'>(defaultEtapa);
     const [encEtapa, setEncEtapa] = useState<'fundamental' | 'infantil'>(defaultEtapa);
@@ -229,6 +248,17 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             'Ensino Religioso',
             'Língua Inglesa'
         ];
+
+    const CAMPOS_EXPERIENCIA_BNCC = configuracao?.campos_experiencia?.length > 0
+        ? configuracao.campos_experiencia
+        : [
+            'O eu, o outro e o nós',
+            'Corpo, gestos e movimentos',
+            'Traços, sons, cores e formas',
+            'Escuta, fala, pensamento e imaginação',
+            'Espaços, tempos, quantidades, relações e transformações'
+        ];
+
     const [isTurmaModalOpen, setIsTurmaModalOpen] = useState(false);
     const [isStudentReportOpen, setIsStudentReportOpen] = useState(false);
     const [activeStudentReport, setActiveStudentReport] = useState<any>(null);
@@ -256,6 +286,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     };
 
     const renderContextSelectorHeader = (stage: 'fundamental' | 'infantil') => {
+        const effectiveStage = forcedEtapa || stage;
         return (
             <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm mb-8 flex flex-col md:flex-row md:items-center justify-between gap-6 animate-fade-in text-left">
                 <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 w-full">
@@ -299,12 +330,12 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                         </select>
                     </div>
 
-                    {/* COMPONENTE CURRICULAR */}
+                    {/* COMPONENTE CURRICULAR / CAMPO DE EXPERIÊNCIA */}
                     <div className="flex flex-col justify-center pt-4 sm:pt-0 sm:px-4">
                         <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase mb-1">
-                            {stage === 'infantil' ? 'CAMPO DE EXPERIÊNCIA' : 'COMPONENTE CURRICULAR'}
+                            {effectiveStage === 'infantil' ? 'CAMPO DE EXPERIÊNCIA' : 'COMPONENTE CURRICULAR'}
                         </span>
-                        {stage === 'infantil' ? (
+                        {effectiveStage === 'infantil' ? (
                             <select
                                 value={selectedCampoExperiencia}
                                 onChange={(e) => setSelectedCampoExperiencia(e.target.value)}
@@ -327,9 +358,11 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                         )}
                     </div>
 
-                    {/* TURMA / ANO */}
+                    {/* TURMA / ANO ou AGRUPAMENTO / TURMA */}
                     <div className="flex flex-col justify-center pt-4 sm:pt-0 sm:px-4">
-                        <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase mb-1">TURMA / ANO</span>
+                        <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase mb-1">
+                            {effectiveStage === 'infantil' ? 'AGRUPAMENTO / TURMA' : 'TURMA / ANO'}
+                        </span>
                         {turmasCadastradas.length > 0 || selectedEscolaId === 'ALL' ? (
                             <select
                                 value={activeTurma?.id || 'ALL'}
@@ -447,12 +480,22 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                 if (selectedEscolaId === 'ALL') {
                     const promises = escolas.map(e => ccTurmaService.getBySchool(e.id));
                     const results = await Promise.all(promises);
-                    const allTurmas = results.flat();
+                    let allTurmas = results.flat();
+                    if (forcedEtapa === 'infantil') {
+                        allTurmas = allTurmas.filter(isTurmaInfantil);
+                    } else if (forcedEtapa === 'fundamental') {
+                        allTurmas = allTurmas.filter(isTurmaFundamental);
+                    }
                     setTurmasCadastradas(allTurmas);
                     setActiveTurma(null);
                 } else {
                     if (!currentEscolaId) return;
-                    const turmas = await ccTurmaService.getBySchool(currentEscolaId);
+                    let turmas = await ccTurmaService.getBySchool(currentEscolaId);
+                    if (forcedEtapa === 'infantil') {
+                        turmas = turmas.filter(isTurmaInfantil);
+                    } else if (forcedEtapa === 'fundamental') {
+                        turmas = turmas.filter(isTurmaFundamental);
+                    }
                     setTurmasCadastradas(turmas);
                     if (turmas.length > 0) {
                         setActiveTurma(turmas[0]);
@@ -467,7 +510,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             }
         };
         loadTurmas();
-    }, [selectedEscolaId, currentEscolaId, escolas]);
+    }, [selectedEscolaId, currentEscolaId, escolas, forcedEtapa]);
     const [showSuccessToast, setShowSuccessToast] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isCadastroEstudanteOpen, setIsCadastroEstudanteOpen] = useState(false);
@@ -477,7 +520,13 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
 
     // Sync active tabs based on selected class stage
     useEffect(() => {
-        if (activeTurma?.etapa === 'Educação Infantil') {
+        if (forcedEtapa) {
+            setAvaliacaoEtapa(forcedEtapa);
+            setAcompEtapa(forcedEtapa);
+            setEncEtapa(forcedEtapa);
+            return;
+        }
+        if (activeTurma && isTurmaInfantil(activeTurma)) {
             setAvaliacaoEtapa('infantil');
             setAcompEtapa('infantil');
             setEncEtapa('infantil');
@@ -486,7 +535,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             setAcompEtapa('fundamental');
             setEncEtapa('fundamental');
         }
-    }, [activeTurma]);
+    }, [activeTurma, forcedEtapa]);
 
     const loadStudents = async () => {
         if (!activeTurma?.id) return [];
@@ -914,9 +963,6 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         return 'INSUFICIENTE';
     };
 
-    const isInfantilAllowed = !activeTurma || activeTurma.etapa === 'Educação Infantil';
-    const isFundamentalAllowed = !activeTurma || activeTurma.etapa !== 'Educação Infantil';
-
     const handleSalvarTurma = async (novaTurma: TurmaData) => {
         try {
             if (novaTurma.id) {
@@ -1335,16 +1381,6 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     // ============================================
     // ESTADOS: ACOMPANHAMENTO DOCENTE - ED. INFANTIL
     // ============================================
-    const CAMPOS_EXPERIENCIA_BNCC = configuracao?.campos_experiencia?.length > 0
-        ? configuracao.campos_experiencia
-        : [
-            'O eu, o outro e o nós',
-            'Corpo, gestos e movimentos',
-            'Traços, sons, cores e formas',
-            'Escuta, fala, pensamento e imaginação',
-            'Espaços, tempos, quantidades, relações e transformações'
-        ];
-
     const [acompInfantilForm, setAcompInfantilForm] = useState({
         id: '',
         professor: '',
@@ -2059,8 +2095,6 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         }
     };
 
-    
-
     React.useEffect(() => {
         const loadDocs = async () => {
             setIsLoading(true);
@@ -2070,10 +2104,10 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                     : selectedEscolaId;
 
                 const [acomp, acompInfantil, encs, encsInfantil] = await Promise.all([
-                    ccAcompanhamentoDocenteService.getAll(fetchEscolaId, 'fundamental'),
-                    ccAcompanhamentoDocenteService.getAll(fetchEscolaId, 'infantil'),
-                    ccEncaminhamentosService.getAll(fetchEscolaId, 'fundamental'),
-                    ccEncaminhamentosService.getAll(fetchEscolaId, 'infantil')
+                    forcedEtapa === 'infantil' ? Promise.resolve([]) : ccAcompanhamentoDocenteService.getAll(fetchEscolaId, 'fundamental'),
+                    forcedEtapa === 'fundamental' ? Promise.resolve([]) : ccAcompanhamentoDocenteService.getAll(fetchEscolaId, 'infantil'),
+                    forcedEtapa === 'infantil' ? Promise.resolve([]) : ccEncaminhamentosService.getAll(fetchEscolaId, 'fundamental'),
+                    forcedEtapa === 'fundamental' ? Promise.resolve([]) : ccEncaminhamentosService.getAll(fetchEscolaId, 'infantil')
                 ]);
 
                 if (acomp) {
@@ -2146,7 +2180,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         };
 
         loadDocs();
-    }, [selectedEscolaId, currentEscolaId, escolas, isAdmin]);
+    }, [selectedEscolaId, currentEscolaId, escolas, isAdmin, forcedEtapa]);
 
     const renderTabContent = () => {
         if (filteredTabs.length === 0) {
@@ -2169,6 +2203,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                             currentUser={currentUser}
                             initialEscolaId={currentEscolaId}
                             initialTurmaId={activeTurma?.id}
+                            forcedEtapa={forcedEtapa}
                         />
                     </div>
                 );
@@ -2185,7 +2220,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                     <div>
                                         <h3 className="font-bold text-sm tracking-wide">ETAPA CONCLUÍDA E ENVIADA</h3>
                                         <p className="text-xs text-slate-400">
-                                            RELATÓRIO ENVIADO À COORDENAÇÃO EM {etapaDoc.enviada_em ? new Date(etapaDoc.enviada_em).toLocaleString() : '14/10/2024 ÀS 10:42'}
+                                             RELATÓRIO ENVIADO À COORDENAÇÃO EM {etapaDoc.enviada_em ? new Date(etapaDoc.enviada_em).toLocaleString() : '14/10/2024 ÀS 10:42'}
                                         </p>
                                     </div>
                                 </div>
@@ -2197,7 +2232,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
 
                         {/* Seletor de Etapas para Avaliação Docente */}
                         {
-                            schoolLevels.hasBoth && !activeTurma && (
+                            schoolLevels.hasBoth && !activeTurma && !forcedEtapa && (
                                 <div className="bg-slate-100 p-1.5 rounded-2xl flex gap-2 w-fit">
                                     <button
                                         onClick={() => isFundamentalAllowed && setAvaliacaoEtapa('fundamental')}
@@ -3360,7 +3395,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
 
                             {/* Seletor de Etapa */}
                             {
-                                (schoolLevels.hasBoth || (!schoolLevels.hasInfantil && !schoolLevels.hasFundamental)) && !activeTurma && (
+                                (schoolLevels.hasBoth || (!schoolLevels.hasInfantil && !schoolLevels.hasFundamental)) && !activeTurma && !forcedEtapa && (
                                     <div className="flex gap-2 mb-6 bg-slate-100 p-1.5 rounded-2xl w-fit">
                                         <button
                                             onClick={() => isFundamentalAllowed && setAcompEtapa('fundamental')}
@@ -3818,7 +3853,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                             </div>
 
                             {/* Seletor de Etapa */}
-                            {(schoolLevels.hasBoth || (!schoolLevels.hasInfantil && !schoolLevels.hasFundamental)) && !activeTurma && (
+                            {(schoolLevels.hasBoth || (!schoolLevels.hasInfantil && !schoolLevels.hasFundamental)) && !activeTurma && !forcedEtapa && (
                                 <div className="flex gap-2 mb-6 bg-slate-100 p-1.5 rounded-2xl w-fit">
                                     <button
                                         onClick={() => isFundamentalAllowed && setEncEtapa('fundamental')}
@@ -4315,10 +4350,10 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             {renderAdminRequestsPanel()}
             {renderUnlockModal()}
             <PageHeader
-                title="Conselho de Classe"
-                subtitle="Análise coletiva sobre o processo de ensino e aprendizagem"
-                icon={GraduationCap}
-                badgeText="GESTÃO"
+                title={forcedEtapa === 'infantil' ? "Conselho de Classe — Educação Infantil" : forcedEtapa === 'fundamental' ? "Conselho de Classe — Ensino Fundamental" : "Conselho de Classe"}
+                subtitle={forcedEtapa === 'infantil' ? "Acompanhamento do desenvolvimento integral, campos de experiência e intervenções pedagógicas" : "Análise coletiva sobre o processo de ensino e aprendizagem"}
+                icon={forcedEtapa === 'infantil' ? Baby : GraduationCap}
+                badgeText={forcedEtapa === 'infantil' ? "EDUCAÇÃO INFANTIL" : forcedEtapa === 'fundamental' ? "ENSINO FUNDAMENTAL" : "GESTÃO"}
                 actions={[]}
             />
 
