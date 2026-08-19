@@ -529,3 +529,77 @@ export interface ChamadoSuporte {
   resolvido_em?: string;
 }
 
+// ====== CENTRAL DE ALERTAS E PENDÊNCIAS ======
+export type TipoPendenciaAlerta =
+  | 'GUIA_APRENDIZAGEM'
+  | 'AULAS_MINISTRADAS'
+  | 'FREQUENCIA'
+  | 'NOTAS'
+  | 'APROVACAO_GUIAS'
+  | 'CONSELHO_CLASSE_FUNDAMENTAL'
+  | 'CONSELHO_CLASSE_INFANTIL';
+
+export type StatusPendenciaAlerta =
+  | 'PENDENTE'
+  | 'EM_ALERTA'
+  | 'RESOLVIDA'
+  | 'VENCIDA'
+  | 'ESCALONADA';
+
+export type PrioridadePendenciaAlerta = 'ALTA' | 'MEDIA' | 'BAIXA';
+
+export interface AlertaPendencia {
+  id: string;
+  usuario_id?: string;
+  usuario_nome?: string;
+  usuario_perfil?: string;
+  usuario_email?: string;
+  tipo_pendencia: TipoPendenciaAlerta;
+  modulo: string;
+  view_destino?: ViewState;
+  titulo: string;
+  descricao: string;
+  entidade_id?: string;
+  escola_id?: string;
+  escola_nome?: string;
+  turma_id?: string;
+  turma_nome?: string;
+  componente?: string;
+  periodo?: string;
+  bimestre?: string;
+  etapa_ensino?: string;
+  data_identificacao: string;
+  prazo?: string;
+  status: StatusPendenciaAlerta;
+  prioridade: PrioridadePendenciaAlerta;
+  nivel_escalonamento: number;
+  gerado_por?: string;
+  gerado_em?: string;
+  observacao_alerta?: string;
+  resolvido_em?: string;
+  resolvido_por?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AlertaPendenciaHistorico {
+  id: string;
+  pendencia_id: string;
+  acao: 'CRIACAO' | 'ENVIO_ALERTA' | 'VISUALIZACAO' | 'LEMBRETE' | 'VENCIMENTO' | 'ESCALONAMENTO' | 'RESOLUCAO' | 'OBSERVACAO';
+  descricao: string;
+  usuario_id?: string;
+  executado_por?: string;
+  dados_extras?: any;
+  created_at: string;
+}
+
+export interface AlertasConfiguracao {
+  id?: string;
+  prazo_padrao_dias: number;
+  dias_para_lembrete: number;
+  dias_para_escalonamento: number;
+  escalonar_para_perfil: string;
+  notificar_por_email: boolean;
+}
+
+

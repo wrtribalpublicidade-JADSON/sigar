@@ -38,7 +38,7 @@ import { DiarioFundamental } from './components/DiarioFundamental';
 import { DiarioInfantil } from './components/DiarioInfantil';
 import { GestaoRede } from './components/GestaoRede';
 import { SuporteTecnico } from './components/SuporteTecnico';
-import { ViewState, Escola, Visita, Coordenador, Segmento } from './types';
+import { ViewState, Escola, Visita, Coordenador, Segmento, AlertaPendencia } from './types';
 import { supabase } from './services/supabase';
 import { useNotification } from './context/NotificationContext';
 import { generateUUID, checkSchoolPendencies } from './utils';
@@ -47,6 +47,8 @@ import { loadPermissions as preloadPermissions } from './services/permissoesServ
 import { ESCOLAS_MOCK, VISITAS_MOCK, COORDENADORES_MOCK } from './constants';
 import { igPlanoAcaoService } from './services/gestaoConselhoService';
 import { logAccess, logAudit, logNavigation } from './services/logService';
+import { pendenciasEngineService } from './services/pendenciasEngineService';
+import { AlertaObrigatorioPopup } from './components/modals/AlertaObrigatorioPopup';
 const ADMIN_EMAIL = 'jadsoncsilv@gmail.com';
 
 const getMenuMetaForView = (view: ViewState): { group: string; label: string } => {
@@ -132,6 +134,10 @@ export default function App() {
   const [ccInfantilEscolaId, setCcInfantilEscolaId] = useState<string>('');
   const [selectedVisit, setSelectedVisit] = useState<Visita | null>(null);
   const [selectedVisitForPrint, setSelectedVisitForPrint] = useState<Visita | null>(null);
+
+  // Active Alerts Popup State (Mandatory on Access)
+  const [userActiveAlerts, setUserActiveAlerts] = useState<AlertaPendencia[]>([]);
+  const [isMandatoryAlertOpen, setIsMandatoryAlertOpen] = useState(false);
 
   // App Data State
   const [escolas, setEscolas] = useState<Escola[]>([]);
@@ -1080,6 +1086,22 @@ export default function App() {
     }
   };
 
+  // Determine the effective user context for the dashboard
+  const effectiveUser = useMemo(() => {
+    if (isAdmin) {
+      return {
+        id: 'admin',
+        nome: userName || 'Administrador',
+        contato: userEmail || ADMIN_EMAIL,
+        funcao: 'Administrador',
+        regiao: 'Geral',
+        escolasIds: escolas.map(e => e.id),
+        status: 'Ativo'
+      } as Coordenador;
+    }
+    return coordenadores.find(c => c.contato === userEmail);
+  }, [coordenadores, userEmail, isAdmin, userName, escolas]);
+
   const handleNavigate = (
     view: ViewState,
     group?: string,
@@ -1103,6 +1125,55 @@ export default function App() {
         extraDetails
       );
     }
+  };
+
+  // Check active alerts for the logged in user
+  useEffect(() => {
+    const checkActiveAlerts = async () => {
+      if (!isAuthenticated || isDemoMode) return;
+      try {
+        const alerts = await pendenciasEngineService.getUserActiveAlerts(
+          userEmail, 
+          loggedInCoordId, 
+          effectiveUser?.escolasIds || []
+        );
+        if (alerts.length > 0) {
+          setUserActiveAlerts(alerts);
+          const wasDismissed = sessionStorage.getItem('sigar_alert_popup_dismissed_session');
+          if (!wasDismissed) {
+            setIsMandatoryAlertOpen(true);
+          }
+        } else {
+          setUserActiveAlerts([]);
+          setIsMandatoryAlertOpen(false);
+        }
+      } catch (err) {
+        console.error('Erro ao verificar alertas ativos:', err);
+      }
+    };
+
+    checkActiveAlerts();
+  }, [isAuthenticated, userEmail, loggedInCoordId, isDemoMode, effectiveUser]);
+
+  const handleNavigateFromAlert = (alert: AlertaPendencia) => {
+    if (alert.view_destino) {
+      if (alert.escola_id) {
+        setSelectedEscolaId(alert.escola_id);
+        if (alert.view_destino === 'CONSELHO_CLASSE_FUNDAMENTAL') {
+          setCcFundamentalEscolaId(alert.escola_id);
+        } else if (alert.view_destino === 'CONSELHO_CLASSE_INFANTIL') {
+          setCcInfantilEscolaId(alert.escola_id);
+        }
+      }
+      handleNavigate(alert.view_destino, alert.modulo || 'MENU', alert.titulo);
+    } else {
+      handleNavigate('DASHBOARD', 'MENU', 'Visão Geral');
+    }
+  };
+
+  const handleCloseMandatoryAlert = () => {
+    sessionStorage.setItem('sigar_alert_popup_dismissed_session', 'true');
+    setIsMandatoryAlertOpen(false);
   };
 
   const handleSelectEscola = (id: string) => {
@@ -1356,7 +1427,18 @@ export default function App() {
             coordenadores={coordenadores}
             onNavigateToSchool={(id) => {
               setSelectedEscolaId(id);
-              setCurrentView('DETALHE_ESCOLA');
+              handleNavigate('DETALHE_ESCOLA', 'MENU', 'Detalhes da Escola', { escolaId: id });
+            }}
+            isDemoMode={isDemoMode}
+            isAdmin={isAdmin}
+            currentUser={effectiveUser || null}
+            onNavigateToModule={(view, params) => {
+              if (params?.escolaId) {
+                setSelectedEscolaId(params.escolaId);
+                if (view === 'CONSELHO_CLASSE_FUNDAMENTAL') setCcFundamentalEscolaId(params.escolaId);
+                if (view === 'CONSELHO_CLASSE_INFANTIL') setCcInfantilEscolaId(params.escolaId);
+              }
+              handleNavigate(view, 'DIÁRIO DE CLASSE', getMenuMetaForView(view).label, params);
             }}
           />
         );
@@ -1428,22 +1510,6 @@ export default function App() {
         return <div>Página não encontrada</div>;
     }
   };
-
-  // Determine the effective user context for the dashboard
-  const effectiveUser = useMemo(() => {
-    if (isAdmin) {
-      return {
-        id: 'admin',
-        nome: userName || 'Administrador',
-        contato: userEmail || ADMIN_EMAIL,
-        funcao: 'Administrador',
-        regiao: 'Geral',
-        escolasIds: escolas.map(e => e.id),
-        status: 'Ativo'
-      } as Coordenador;
-    }
-    return coordenadores.find(c => c.contato === userEmail);
-  }, [coordenadores, userEmail, isAdmin, userName, escolas]);
 
   // Calculate global notifications (pendencies) for the current user
   const notificationCount = useMemo(() => {
@@ -1533,6 +1599,16 @@ export default function App() {
         )
       ) : (
         renderContent()
+      )}
+
+      {/* MODAL / POPUP OBRIGATÓRIO DE ALERTAS ATIVOS */}
+      {isMandatoryAlertOpen && userActiveAlerts.length > 0 && (
+        <AlertaObrigatorioPopup
+          isOpen={isMandatoryAlertOpen}
+          onClose={handleCloseMandatoryAlert}
+          alerts={userActiveAlerts}
+          onNavigateToResolve={handleNavigateFromAlert}
+        />
       )}
     </Layout >
   );
