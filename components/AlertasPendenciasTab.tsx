@@ -64,6 +64,34 @@ export const AlertasPendenciasTab: React.FC<AlertasPendenciasTabProps> = ({
   const [historicoItem, setHistoricoItem] = useState<AlertaPendencia | null>(null);
   const [isHistoricoModalOpen, setIsHistoricoModalOpen] = useState(false);
 
+  // Escolas ordenadas em ordem alfabética
+  const sortedEscolas = useMemo(() => {
+    return [...escolas].sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'));
+  }, [escolas]);
+
+  // Servidores vinculados à unidade selecionada (ou todos), ordenados alfabeticamente
+  const filteredAndSortedResponsaveis = useMemo(() => {
+    let list = coordenadores;
+    if (filterEscola !== 'ALL') {
+      list = list.filter(c => c.escolasIds && c.escolasIds.includes(filterEscola));
+    }
+    return [...list].sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'));
+  }, [coordenadores, filterEscola]);
+
+  // Handler de alteração da unidade escolar (reseta o responsável caso não pertença à nova escola)
+  const handleEscolaChange = (newEscolaId: string) => {
+    setFilterEscola(newEscolaId);
+    setCurrentPage(1);
+    if (newEscolaId !== 'ALL' && filterResponsavel !== 'ALL') {
+      const isStillValid = coordenadores.some(
+        c => c.id === filterResponsavel && c.escolasIds && c.escolasIds.includes(newEscolaId)
+      );
+      if (!isStillValid) {
+        setFilterResponsavel('ALL');
+      }
+    }
+  };
+
   // Consultar / Carregar Registros por demanda (otimizado com filtros)
   const handleConsultar = async () => {
     setIsLoading(true);
@@ -449,14 +477,11 @@ export const AlertasPendenciasTab: React.FC<AlertasPendenciasTabProps> = ({
             <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Unidade Escolar</label>
             <select
               value={filterEscola}
-              onChange={e => {
-                setFilterEscola(e.target.value);
-                setCurrentPage(1);
-              }}
+              onChange={e => handleEscolaChange(e.target.value)}
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 truncate"
             >
               <option value="ALL">Todas as Escolas</option>
-              {escolas.map(esc => (
+              {sortedEscolas.map(esc => (
                 <option key={esc.id} value={esc.id}>{esc.nome}</option>
               ))}
             </select>
@@ -464,7 +489,9 @@ export const AlertasPendenciasTab: React.FC<AlertasPendenciasTabProps> = ({
 
           {/* Responsável */}
           <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Responsável</label>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
+              Responsável {filterEscola !== 'ALL' && `(${filteredAndSortedResponsaveis.length})`}
+            </label>
             <select
               value={filterResponsavel}
               onChange={e => {
@@ -473,8 +500,10 @@ export const AlertasPendenciasTab: React.FC<AlertasPendenciasTabProps> = ({
               }}
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 truncate"
             >
-              <option value="ALL">Todos os Usuários</option>
-              {coordenadores.map(c => (
+              <option value="ALL">
+                {filterEscola === 'ALL' ? 'Todos os Usuários' : 'Todos da Unidade'}
+              </option>
+              {filteredAndSortedResponsaveis.map(c => (
                 <option key={c.id} value={c.id}>{c.nome} ({c.funcao})</option>
               ))}
             </select>
