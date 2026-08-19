@@ -655,6 +655,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
             escolaOrigemId={transferStudent?.escola_id || ''}
             onSuccess={() => { loadStudents(); refreshPendentes(); }}
             currentUserName={currentUser?.nome || ''}
+            isDemoMode={isDemoMode}
         />
 
         <TransferenciasPendentesPopup

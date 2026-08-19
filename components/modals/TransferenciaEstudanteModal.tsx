@@ -3,6 +3,7 @@ import { X, ArrowRightLeft, Building2, MapPin, Clock, FileText, Send, AlertTrian
 import { Aluno, Escola, TransferenciaEstudante } from '../../types';
 import { supabase } from '../../services/supabase';
 import { logAudit } from '../../services/logService';
+import { ESCOLAS_MOCK } from '../../constants';
 
 interface TransferenciaEstudanteModalProps {
   isOpen: boolean;
@@ -12,6 +13,7 @@ interface TransferenciaEstudanteModalProps {
   escolaOrigemId: string;
   onSuccess: () => void;
   currentUserName?: string;
+  isDemoMode?: boolean;
 }
 
 interface TurmaOption {
@@ -29,12 +31,17 @@ export const TransferenciaEstudanteModal: React.FC<TransferenciaEstudanteModalPr
   escolas,
   escolaOrigemId,
   onSuccess,
-  currentUserName = ''
+  currentUserName = '',
+  isDemoMode = false
 }) => {
   const [activeTab, setActiveTab] = useState<'INTERNA' | 'EXTERNA'>('INTERNA');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  // Todas as escolas do município para destino
+  const [todasEscolas, setTodasEscolas] = useState<Escola[]>(escolas);
+  const [isLoadingEscolas, setIsLoadingEscolas] = useState(false);
 
   // Interna fields
   const [escolaDestinoId, setEscolaDestinoId] = useState('');
@@ -51,8 +58,36 @@ export const TransferenciaEstudanteModal: React.FC<TransferenciaEstudanteModalPr
   useEffect(() => {
     if (isOpen) {
       resetForm();
+      fetchTodasEscolas();
     }
   }, [isOpen]);
+
+  const fetchTodasEscolas = async () => {
+    if (isDemoMode) {
+      setTodasEscolas([...ESCOLAS_MOCK].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')));
+      return;
+    }
+    setIsLoadingEscolas(true);
+    try {
+      const { data, error } = await supabase
+        .from('escolas')
+        .select('id, nome, localizacao, segmentos, status')
+        .order('nome');
+
+      if (error) throw error;
+      if (data && data.length > 0) {
+        const sorted = (data as Escola[]).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+        setTodasEscolas(sorted);
+      } else {
+        setTodasEscolas(escolas);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar todas as escolas do município:', err);
+      setTodasEscolas(escolas);
+    } finally {
+      setIsLoadingEscolas(false);
+    }
+  };
 
   useEffect(() => {
     if (escolaDestinoId) {
@@ -103,8 +138,8 @@ export const TransferenciaEstudanteModal: React.FC<TransferenciaEstudanteModalPr
     }
   };
 
-  const escolaOrigem = escolas.find(e => String(e.id) === String(escolaOrigemId));
-  const escolasDestino = escolas.filter(e => String(e.id) !== String(escolaOrigemId));
+  const escolaOrigem = todasEscolas.find(e => String(e.id) === String(escolaOrigemId)) || escolas.find(e => String(e.id) === String(escolaOrigemId));
+  const escolasDestino = todasEscolas.filter(e => String(e.id) !== String(escolaOrigemId));
 
   const handleSubmitInterna = async () => {
     if (!student) return;
@@ -115,7 +150,7 @@ export const TransferenciaEstudanteModal: React.FC<TransferenciaEstudanteModalPr
     setIsSubmitting(true);
     setError(null);
 
-    const escolaDestinoObj = escolas.find(e => String(e.id) === String(escolaDestinoId));
+    const escolaDestinoObj = todasEscolas.find(e => String(e.id) === String(escolaDestinoId)) || escolas.find(e => String(e.id) === String(escolaDestinoId));
     const turmaDestinoObj = turmasDestino.find(t => t.id === turmaDestinoId);
 
     const payload = {
@@ -325,13 +360,25 @@ export const TransferenciaEstudanteModal: React.FC<TransferenciaEstudanteModalPr
 
               {/* Escola Destino */}
               <div>
-                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">
-                  Escola de Destino *
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                    Escola de Destino *
+                  </label>
+                  {isLoadingEscolas ? (
+                    <span className="text-[10px] text-orange-500 font-bold flex items-center gap-1">
+                      <RefreshCw className="w-3 h-3 animate-spin" /> Carregando escolas do município...
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-slate-400 font-semibold">
+                      {escolasDestino.length} {escolasDestino.length === 1 ? 'escola disponível' : 'escolas municipais'}
+                    </span>
+                  )}
+                </div>
                 <select
                   value={escolaDestinoId}
                   onChange={e => setEscolaDestinoId(e.target.value)}
-                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all"
+                  disabled={isLoadingEscolas}
+                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all disabled:opacity-50"
                 >
                   <option value="">Selecione a unidade escolar...</option>
                   {escolasDestino.map(e => (
