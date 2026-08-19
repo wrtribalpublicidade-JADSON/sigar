@@ -119,6 +119,13 @@ export const AlertasPendenciasTab: React.FC<AlertasPendenciasTabProps> = ({
     }
   };
 
+  // Helper para verificar se o servidor é Coordenador Pedagógico ou Gestor
+  const isGestorOuCoordenador = (c?: Coordenador) => {
+    if (!c) return false;
+    const f = (c.funcao || '').toLowerCase();
+    return f.includes('coordenador') || f.includes('gestor') || f.includes('diretor');
+  };
+
   // Filtered List
   const filteredList = useMemo(() => {
     return pendencias.filter(item => {
@@ -141,8 +148,17 @@ export const AlertasPendenciasTab: React.FC<AlertasPendenciasTabProps> = ({
       // Escola
       const matchesEscola = filterEscola === 'ALL' || item.escola_id === filterEscola;
 
-      // Responsavel
-      const matchesResponsavel = filterResponsavel === 'ALL' || item.usuario_id === filterResponsavel;
+      // Responsavel (Coordenador Pedagógico, Gestor Geral ou Gestor Pedagógico herdam todas as pendências da sua escola)
+      let matchesResponsavel = true;
+      if (filterResponsavel !== 'ALL') {
+        const selectedCoord = coordenadores.find(c => c.id === filterResponsavel);
+        if (selectedCoord && isGestorOuCoordenador(selectedCoord) && selectedCoord.escolasIds && selectedCoord.escolasIds.length > 0) {
+          matchesResponsavel = item.usuario_id === filterResponsavel || 
+            (!!item.escola_id && selectedCoord.escolasIds.includes(item.escola_id));
+        } else {
+          matchesResponsavel = item.usuario_id === filterResponsavel;
+        }
+      }
 
       // Perfil
       const matchesPerfil = filterPerfil === 'ALL' || item.usuario_perfil === filterPerfil;
@@ -156,7 +172,7 @@ export const AlertasPendenciasTab: React.FC<AlertasPendenciasTabProps> = ({
       return matchesSearch && matchesTipo && matchesStatus && matchesEscola && 
              matchesResponsavel && matchesPerfil && matchesPeriodo && matchesPrioridade;
     });
-  }, [pendencias, searchTerm, filterTipo, filterStatus, filterEscola, filterResponsavel, filterPerfil, filterPeriodo, filterPrioridade]);
+  }, [pendencias, searchTerm, filterTipo, filterStatus, filterEscola, filterResponsavel, filterPerfil, filterPeriodo, filterPrioridade, coordenadores]);
 
   // Pagination Calculations
   const totalItems = filteredList.length;
@@ -170,18 +186,19 @@ export const AlertasPendenciasTab: React.FC<AlertasPendenciasTabProps> = ({
 
   // Statistics Summary
   const stats = useMemo(() => {
-    const total = pendencias.length;
-    const emAlerta = pendencias.filter(p => p.status === 'EM_ALERTA').length;
-    const vencidas = pendencias.filter(p => p.status === 'VENCIDA').length;
-    const escalonadas = pendencias.filter(p => p.status === 'ESCALONADA').length;
-    const resolvidas = pendencias.filter(p => p.status === 'RESOLVIDA').length;
-    const pendentes = pendencias.filter(p => p.status === 'PENDENTE').length;
+    const list = filteredList;
+    const total = list.length;
+    const emAlerta = list.filter(p => p.status === 'EM_ALERTA').length;
+    const vencidas = list.filter(p => p.status === 'VENCIDA').length;
+    const escalonadas = list.filter(p => p.status === 'ESCALONADA').length;
+    const resolvidas = list.filter(p => p.status === 'RESOLVIDA').length;
+    const pendentes = list.filter(p => p.status === 'PENDENTE').length;
 
     const totalAtivas = total - resolvidas;
     const taxaRegularizacao = total > 0 ? Math.round((resolvidas / total) * 100) : 100;
 
     return { total, emAlerta, vencidas, escalonadas, resolvidas, pendentes, totalAtivas, taxaRegularizacao };
-  }, [pendencias]);
+  }, [filteredList]);
 
   // Selection Helpers
   const handleToggleSelectAll = () => {

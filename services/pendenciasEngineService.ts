@@ -119,12 +119,16 @@ export const pendenciasEngineService = {
         .select('*')
         .in('status', ['EM_ALERTA', 'VENCIDA', 'ESCALONADA']);
 
-      if (userEmail) {
+      if (escolasIds && escolasIds.length > 0) {
+        if (userEmail || coordenadorId) {
+          query = query.or(`usuario_email.eq.${userEmail || 'none'},usuario_id.eq.${coordenadorId || 'none'},escola_id.in.(${escolasIds.join(',')})`);
+        } else {
+          query = query.in('escola_id', escolasIds);
+        }
+      } else if (userEmail) {
         query = query.or(`usuario_email.eq.${userEmail},usuario_id.eq.${coordenadorId || ''}`);
       } else if (coordenadorId) {
         query = query.eq('usuario_id', coordenadorId);
-      } else if (escolasIds && escolasIds.length > 0) {
-        query = query.in('escola_id', escolasIds);
       } else {
         return [];
       }
@@ -292,7 +296,24 @@ export const pendenciasEngineService = {
 
       // Filtrar escopo de escolas e coordenadores
       const targetEscolas = targetEscolaId ? escolas.filter(e => e.id === targetEscolaId) : escolas;
-      let targetCoordenadores = targetUsuarioId ? coordenadores.filter(c => c.id === targetUsuarioId) : coordenadores;
+      let targetCoordenadores = coordenadores;
+
+      if (targetUsuarioId) {
+        const selectedUser = coordenadores.find(c => c.id === targetUsuarioId);
+        const f = (selectedUser?.funcao || '').toLowerCase();
+        const isGestorOuCoord = f.includes('coordenador') || f.includes('gestor') || f.includes('diretor');
+
+        if (isGestorOuCoord && selectedUser?.escolasIds && selectedUser.escolasIds.length > 0) {
+          // Se for Coordenador Pedagógico / Gestor Geral / Gestor Pedagógico,
+          // inclui todos os professores das escolas vinculadas a esse gestor/coordenador
+          targetCoordenadores = coordenadores.filter(c => 
+            c.id === targetUsuarioId || c.escolasIds?.some(eid => selectedUser.escolasIds.includes(eid))
+          );
+        } else {
+          targetCoordenadores = coordenadores.filter(c => c.id === targetUsuarioId);
+        }
+      }
+
       if (targetEscolaId) {
         targetCoordenadores = targetCoordenadores.filter(c => c.escolasIds.includes(targetEscolaId));
       }
