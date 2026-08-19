@@ -119,6 +119,7 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({
                     isDemoMode={isDemoMode}
                     isAdmin={isAdmin}
                     currentUserName={currentUser?.nome || 'Administrador'}
+                    currentUserRole={currentUser?.funcao || 'Coordenador Regional'}
                     onNavigateToModule={onNavigateToModule}
                 />
             )}

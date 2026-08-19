@@ -162,17 +162,19 @@ export const pendenciasEngineService = {
   },
 
   /**
-   * Gera um alerta individual com prazo e observação
+   * Gera um alerta individual com prazo, observação e fluxo hierárquico
    */
   gerarAlertaIndividual: async (
     pendenciaId: string,
     prazo: string,
     observacao: string,
     prioridade: PrioridadePendenciaAlerta = 'ALTA',
-    executadoPor: string = 'Administrador'
+    executadoPor: string = 'Administrador',
+    destinatario: 'RESPONSAVEL_DIRETO' | 'GESTAO_ESCOLAR' | 'AMBOS' = 'RESPONSAVEL_DIRETO'
   ): Promise<boolean> => {
     try {
       const now = new Date().toISOString();
+      const nivel = destinatario === 'GESTAO_ESCOLAR' ? 2 : (destinatario === 'AMBOS' ? 2 : 1);
       
       const { error: updateErr } = await supabase
         .from('alertas_pendencias')
@@ -181,19 +183,27 @@ export const pendenciasEngineService = {
           prazo,
           observacao_alerta: observacao,
           prioridade,
+          destinatario_alerta: destinatario,
           gerado_em: now,
           gerado_por: executadoPor,
-          nivel_escalonamento: 1,
+          nivel_escalonamento: nivel,
           updated_at: now
         })
         .eq('id', pendenciaId);
 
       if (updateErr) throw updateErr;
 
+      const dataFormatada = new Date(prazo + 'T00:00:00').toLocaleDateString('pt-BR');
+      const destinoDesc = destinatario === 'GESTAO_ESCOLAR' 
+        ? 'Gestão Escolar (Coordenadores Pedagógicos e Gestores)' 
+        : destinatario === 'RESPONSAVEL_DIRETO'
+          ? 'Professor / Servidor Responsável'
+          : 'Gestão Escolar e Docente';
+
       await supabase.from('alertas_pendencias_historico').insert([{
         pendencia_id: pendenciaId,
         acao: 'ALERTA_GERADO',
-        descricao: `Alerta emitido com prazo até ${new Date(prazo + 'T00:00:00').toLocaleDateString('pt-BR')}.${observacao ? ` Obs: ${observacao}` : ''}`,
+        descricao: `Alerta emitido para [${destinoDesc}] com prazo até ${dataFormatada}. Prioridade: ${prioridade}.${observacao ? ` Obs: ${observacao}` : ''}`,
         executado_por: executadoPor
       }]);
 
@@ -201,6 +211,7 @@ export const pendenciasEngineService = {
         prazo,
         prioridade,
         observacao,
+        destinatario,
         executadoPor
       });
 
@@ -219,13 +230,14 @@ export const pendenciasEngineService = {
     prazo: string,
     observacao: string,
     prioridade: PrioridadePendenciaAlerta = 'ALTA',
-    executadoPor: string = 'Administrador'
+    executadoPor: string = 'Administrador',
+    destinatario: 'RESPONSAVEL_DIRETO' | 'GESTAO_ESCOLAR' | 'AMBOS' = 'RESPONSAVEL_DIRETO'
   ): Promise<{ success: number; failed: number }> => {
     let success = 0;
     let failed = 0;
 
     for (const id of pendenciaIds) {
-      const ok = await pendenciasEngineService.gerarAlertaIndividual(id, prazo, observacao, prioridade, executadoPor);
+      const ok = await pendenciasEngineService.gerarAlertaIndividual(id, prazo, observacao, prioridade, executadoPor, destinatario);
       if (ok) success++;
       else failed++;
     }
@@ -440,6 +452,16 @@ export const pendenciasEngineService = {
           const escolaObj = targetEscolas.find(e => prof.escolasIds.includes(e.id) || (turmaObj && e.id === turmaObj.school_id));
           const comps = userTurmaComp[tId] || ['Língua Portuguesa', 'Matemática'];
 
+          // Co-responsáveis da escola (Coordenador Pedagógico, Gestor Geral, Gestor Pedagógico)
+          const gestoresEscola = coordenadores.filter(c => 
+            escolaObj?.id && c.escolasIds?.includes(escolaObj.id) && 
+            (c.funcao === 'Coordenador Pedagógico' || c.funcao === 'Gestor Geral' || c.funcao === 'Gestor Pedagógico' || 
+             (c.funcao as string)?.toLowerCase().includes('coordenador pedagógico') || 
+             (c.funcao as string)?.toLowerCase().includes('gestor'))
+          );
+          const coResponsaveisNomes = gestoresEscola.map(g => `${g.nome} (${g.funcao})`).join(', ') || undefined;
+          const coResponsaveisIds = gestoresEscola.map(g => g.id);
+
           const isInfantil = (turmaObj?.stage || '').toLowerCase().includes('infantil') || 
                              (turmaObj?.year || '').toLowerCase().includes('creche') ||
                              (turmaObj?.year || '').toLowerCase().includes('pré');
@@ -462,6 +484,8 @@ export const pendenciasEngineService = {
                       descricao: `Guia de Aprendizagem ausente para ${comp} na turma ${turmaObj?.name || 'Infantil'} (${bim}).`,
                       escola_id: escolaObj?.id,
                       escola_nome: escolaObj?.nome || 'Unidade Escolar',
+                      co_responsaveis_nomes: coResponsaveisNomes,
+                      co_responsaveis_ids: coResponsaveisIds,
                       turma_id: tId,
                       turma_nome: turmaObj ? `${turmaObj.year} - ${turmaObj.name}` : 'Turma',
                       componente: comp,
@@ -488,6 +512,8 @@ export const pendenciasEngineService = {
                       descricao: `Guia de Aprendizagem não lançado para ${comp} na turma ${turmaObj?.name || 'Fundamental'} (${bim}).`,
                       escola_id: escolaObj?.id,
                       escola_nome: escolaObj?.nome || 'Unidade Escolar',
+                      co_responsaveis_nomes: coResponsaveisNomes,
+                      co_responsaveis_ids: coResponsaveisIds,
                       turma_id: tId,
                       turma_nome: turmaObj ? `${turmaObj.year} - ${turmaObj.name}` : 'Turma',
                       componente: comp,
@@ -519,6 +545,8 @@ export const pendenciasEngineService = {
                       descricao: `Nenhuma aula ministrada registrada para ${comp} na turma ${turmaObj?.name || 'Infantil'} (${bim}).`,
                       escola_id: escolaObj?.id,
                       escola_nome: escolaObj?.nome || 'Unidade Escolar',
+                      co_responsaveis_nomes: coResponsaveisNomes,
+                      co_responsaveis_ids: coResponsaveisIds,
                       turma_id: tId,
                       turma_nome: turmaObj ? `${turmaObj.year} - ${turmaObj.name}` : 'Turma',
                       componente: comp,
@@ -545,6 +573,8 @@ export const pendenciasEngineService = {
                       descricao: `Nenhuma aula ministrada registrada para ${comp} na turma ${turmaObj?.name || 'Fundamental'} (${bim}).`,
                       escola_id: escolaObj?.id,
                       escola_nome: escolaObj?.nome || 'Unidade Escolar',
+                      co_responsaveis_nomes: coResponsaveisNomes,
+                      co_responsaveis_ids: coResponsaveisIds,
                       turma_id: tId,
                       turma_nome: turmaObj ? `${turmaObj.year} - ${turmaObj.name}` : 'Turma',
                       componente: comp,
@@ -576,6 +606,8 @@ export const pendenciasEngineService = {
                       descricao: `Lançamento de frequência pendente para ${comp} na turma ${turmaObj?.name || 'Fundamental'} (${bim}).`,
                       escola_id: escolaObj?.id,
                       escola_nome: escolaObj?.nome || 'Unidade Escolar',
+                      co_responsaveis_nomes: coResponsaveisNomes,
+                      co_responsaveis_ids: coResponsaveisIds,
                       turma_id: tId,
                       turma_nome: turmaObj ? `${turmaObj.year} - ${turmaObj.name}` : 'Turma',
                       componente: comp,
@@ -602,6 +634,8 @@ export const pendenciasEngineService = {
                       descricao: `Lançamento de frequência infantil pendente na turma ${turmaObj?.name || 'Infantil'} (${bim}).`,
                       escola_id: escolaObj?.id,
                       escola_nome: escolaObj?.nome || 'Unidade Escolar',
+                      co_responsaveis_nomes: coResponsaveisNomes,
+                      co_responsaveis_ids: coResponsaveisIds,
                       turma_id: tId,
                       turma_nome: turmaObj ? `${turmaObj.year} - ${turmaObj.name}` : 'Turma',
                       componente: comp,
@@ -633,6 +667,8 @@ export const pendenciasEngineService = {
                       descricao: `Lançamento de notas do ${bim} pendente para ${comp} na turma ${turmaObj?.name || 'Fundamental'}.`,
                       escola_id: escolaObj?.id,
                       escola_nome: escolaObj?.nome || 'Unidade Escolar',
+                      co_responsaveis_nomes: coResponsaveisNomes,
+                      co_responsaveis_ids: coResponsaveisIds,
                       turma_id: tId,
                       turma_nome: turmaObj ? `${turmaObj.year} - ${turmaObj.name}` : 'Turma',
                       componente: comp,
@@ -667,6 +703,10 @@ export const pendenciasEngineService = {
 
             if (totalAguardando > 0) {
               const coordResp = coordenadoresPedagogicos.find(c => c.escolasIds.includes(esc.id));
+              const regionalGestores = coordenadores.filter(c => c.funcao === 'Coordenador Regional' || c.funcao === 'Gestor Geral');
+              const coResponsaveisNomes = regionalGestores.map(g => `${g.nome} (${g.funcao})`).join(', ') || undefined;
+              const coResponsaveisIds = regionalGestores.map(g => g.id);
+
               detectedList.push({
                 usuario_id: coordResp?.id || undefined,
                 usuario_nome: coordResp?.nome || 'Coordenação Pedagógica',
@@ -679,6 +719,8 @@ export const pendenciasEngineService = {
                 descricao: `${totalAguardando} Guia(s) de Aprendizagem do ${bim} aguardando análise e validação pedagógica na unidade ${esc.nome}.`,
                 escola_id: esc.id,
                 escola_nome: esc.nome,
+                co_responsaveis_nomes: coResponsaveisNomes,
+                co_responsaveis_ids: coResponsaveisIds,
                 periodo: bim,
                 bimestre: bim,
                 etapa_ensino: guiasEscolaI.length > 0 && guiasEscolaF.length === 0 ? 'Infantil' : 'Fundamental',
@@ -727,6 +769,10 @@ export const pendenciasEngineService = {
               overdueToUpdate.push(existing.id);
             }
           }
+          // Garante campos de co-responsabilidade atualizados
+          existing.co_responsaveis_nomes = det.co_responsaveis_nomes;
+          existing.co_responsaveis_ids = det.co_responsaveis_ids;
+
           updatedList.push(existing);
           existingMap.delete(key);
         } else {
@@ -798,6 +844,7 @@ const getMockPendencias = (escolas: Escola[], coordenadores: Coordenador[]): Ale
       titulo: 'Guia de Aprendizagem Pendente',
       descricao: `Guia de Aprendizagem não lançado para Língua Portuguesa no 6º Ano A (1º Bimestre).`,
       escola_nome: escola1,
+      co_responsaveis_nomes: 'Jaide Nunes Pereira (Coordenador Pedagógico)',
       turma_nome: '6º ANO A',
       componente: 'Língua Portuguesa',
       periodo: '1º Bimestre',
@@ -822,6 +869,7 @@ const getMockPendencias = (escolas: Escola[], coordenadores: Coordenador[]): Ale
       titulo: 'Guias de Aprendizagem Aguardando Aprovação',
       descricao: '4 Guias de Aprendizagem aguardando análise e validação pedagógica.',
       escola_nome: escola2,
+      co_responsaveis_nomes: 'Coordenador Regional (Regional)',
       periodo: '1º Bimestre',
       bimestre: '1º Bimestre',
       etapa_ensino: 'Fundamental',
@@ -844,6 +892,7 @@ const getMockPendencias = (escolas: Escola[], coordenadores: Coordenador[]): Ale
       titulo: 'Lançamento de Notas Pendente',
       descricao: 'Lançamento de notas do 2º Bimestre pendente para Matemática no 5º Ano B.',
       escola_nome: escola1,
+      co_responsaveis_nomes: 'Jaide Nunes Pereira (Coordenador Pedagógico)',
       turma_nome: '5º ANO B',
       componente: 'Matemática',
       periodo: '2º Bimestre',
@@ -867,6 +916,7 @@ const getMockPendencias = (escolas: Escola[], coordenadores: Coordenador[]): Ale
       titulo: 'Frequência Escolar não Registrada',
       descricao: 'Lançamento de frequência do 3º Bimestre pendente para História no 7º Ano A.',
       escola_nome: escola1,
+      co_responsaveis_nomes: 'Jaide Nunes Pereira (Coordenador Pedagógico)',
       turma_nome: '7º ANO A',
       componente: 'História',
       periodo: '3º Bimestre',
@@ -891,6 +941,7 @@ const getMockPendencias = (escolas: Escola[], coordenadores: Coordenador[]): Ale
       titulo: 'Aulas Ministradas não Registradas',
       descricao: 'Nenhuma aula ministrada registrada para Geografia no 8º Ano A (4º Bimestre).',
       escola_nome: escola2,
+      co_responsaveis_nomes: 'Jaide Nunes Pereira (Coordenador Pedagógico)',
       turma_nome: '8º ANO A',
       componente: 'Geografia',
       periodo: '4º Bimestre',

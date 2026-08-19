@@ -573,6 +573,10 @@ export interface AlertaPendencia {
   status: StatusPendenciaAlerta;
   prioridade: PrioridadePendenciaAlerta;
   nivel_escalonamento: number;
+  co_responsaveis_nomes?: string;
+  co_responsaveis_ids?: string[];
+  destinatario_alerta?: 'RESPONSAVEL_DIRETO' | 'GESTAO_ESCOLAR' | 'AMBOS';
+  alerta_notificado_para?: string;
   gerado_por?: string;
   gerado_em?: string;
   observacao_alerta?: string;

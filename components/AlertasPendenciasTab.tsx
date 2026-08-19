@@ -25,6 +25,7 @@ interface AlertasPendenciasTabProps {
   isDemoMode?: boolean;
   isAdmin?: boolean;
   currentUserName?: string;
+  currentUserRole?: string;
   onNavigateToModule?: (view: ViewState, params?: any) => void;
 }
 
@@ -34,6 +35,7 @@ export const AlertasPendenciasTab: React.FC<AlertasPendenciasTabProps> = ({
   isDemoMode = false,
   isAdmin = false,
   currentUserName = 'Administrador',
+  currentUserRole = 'Coordenador Regional',
   onNavigateToModule
 }) => {
   const { showNotification } = useNotification();
@@ -235,10 +237,11 @@ export const AlertasPendenciasTab: React.FC<AlertasPendenciasTabProps> = ({
     ids: string[], 
     prazo: string, 
     observacao: string, 
-    prioridade: PrioridadePendenciaAlerta
+    prioridade: PrioridadePendenciaAlerta,
+    destinatario: 'RESPONSAVEL_DIRETO' | 'GESTAO_ESCOLAR' | 'AMBOS' = 'RESPONSAVEL_DIRETO'
   ) => {
     if (ids.length === 1) {
-      const ok = await pendenciasEngineService.gerarAlertaIndividual(ids[0], prazo, observacao, prioridade, currentUserName);
+      const ok = await pendenciasEngineService.gerarAlertaIndividual(ids[0], prazo, observacao, prioridade, currentUserName, destinatario);
       if (ok) {
         showNotification('success', 'Alerta emitido com sucesso!');
         await handleConsultar();
@@ -247,7 +250,7 @@ export const AlertasPendenciasTab: React.FC<AlertasPendenciasTabProps> = ({
       }
       return false;
     } else {
-      const res = await pendenciasEngineService.gerarAlertasEmMassa(ids, prazo, observacao, prioridade, currentUserName);
+      const res = await pendenciasEngineService.gerarAlertasEmMassa(ids, prazo, observacao, prioridade, currentUserName, destinatario);
       if (res.success > 0) {
         showNotification('success', `${res.success} alerta(s) emitido(s) com sucesso!`);
         await handleConsultar();
@@ -714,6 +717,26 @@ export const AlertasPendenciasTab: React.FC<AlertasPendenciasTabProps> = ({
                                 {item.periodo}
                               </span>
                             )}
+
+                            {/* Co-responsáveis Pedagógicos / Gestão */}
+                            {item.co_responsaveis_nomes && (
+                              <span className="flex items-center gap-1 text-orange-800 bg-orange-50 px-2 py-0.5 rounded-lg border border-orange-200 text-[10px] font-semibold">
+                                <School className="w-3 h-3 text-orange-500 shrink-0" />
+                                <strong>Co-resp:</strong> {item.co_responsaveis_nomes}
+                              </span>
+                            )}
+
+                            {/* Notificação / Destinatário */}
+                            {item.destinatario_alerta && (
+                              <span className="flex items-center gap-1 text-purple-700 bg-purple-50 px-2 py-0.5 rounded-lg border border-purple-200 text-[10px] font-bold uppercase tracking-wider">
+                                <ShieldAlert className="w-3 h-3 text-purple-500 shrink-0" />
+                                {item.destinatario_alerta === 'GESTAO_ESCOLAR' 
+                                  ? 'Notificado: Gestão Escolar' 
+                                  : item.destinatario_alerta === 'RESPONSAVEL_DIRETO' 
+                                    ? 'Notificado: Professor' 
+                                    : 'Notificado: Gestão + Professor'}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -862,6 +885,7 @@ export const AlertasPendenciasTab: React.FC<AlertasPendenciasTabProps> = ({
         onClose={() => setIsAlertaModalOpen(false)}
         items={modalAlertaItems}
         currentUserName={currentUserName}
+        currentUserRole={currentUserRole}
         onGenerate={handleGenerateAlerts}
         onSuccess={() => {}}
       />
