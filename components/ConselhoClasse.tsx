@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { PageHeader } from './ui/PageHeader';
 import { useConfiguracao } from '../context/ConfiguracaoContext';
-import { Users, BookOpen, UserCheck, AlertTriangle, GraduationCap, Edit, Trash2, Calendar, Hand, Book, CheckSquare, MessageCircle, Search, Printer, Lock, Send, CheckCircle2, FileText, LayoutDashboard, TrendingUp, TrendingDown, Minus, ArrowUpRight, ArrowDownRight, AlertCircle, FileDown, Download, Baby, School, ArrowRight, HelpCircle } from 'lucide-react';
+import { Users, BookOpen, UserCheck, AlertTriangle, GraduationCap, Edit, Trash2, Calendar, Hand, Book, CheckSquare, MessageCircle, Search, Printer, Lock, Send, CheckCircle2, FileText, LayoutDashboard, TrendingUp, TrendingDown, Minus, ArrowUpRight, ArrowDownRight, AlertCircle, FileDown, Download, Baby, School, ArrowRight, HelpCircle, RefreshCw } from 'lucide-react';
 import { CadastroTurmaModal, TurmaData } from './modals/CadastroTurmaModal';
 import { StudentReportModal } from './modals/StudentReportModal';
 import { CadastroEstudanteModal } from './modals/CadastroEstudanteModal';
@@ -271,8 +271,19 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
 
     const [coordenadoresList, setCoordenadoresList] = useState<Coordenador[]>([]);
     const [currentClassStudents, setCurrentClassStudents] = useState<any[]>([]);
-    const [selectedResponsavel, setSelectedResponsavel] = useState<string>('');
-    const [selectedCampoExperiencia, setSelectedCampoExperiencia] = useState<string>('O eu, o outro e o nós');
+    const [selectedResponsavel, setSelectedResponsavel] = useState<string>('ALL');
+    const [selectedCampoExperiencia, setSelectedCampoExperiencia] = useState<string>('ALL');
+    const [selectedComponenteFiltro, setSelectedComponenteFiltro] = useState<string>('ALL');
+
+    // Estados de Consulta Sob Demanda
+    const [hasConsultadoAcomp, setHasConsultadoAcomp] = useState(false);
+    const [isLoadingAcomp, setIsLoadingAcomp] = useState(false);
+    const [hasConsultadoEnc, setHasConsultadoEnc] = useState(false);
+    const [isLoadingEnc, setIsLoadingEnc] = useState(false);
+
+    // Filtros Adicionais para Acompanhamento e Encaminhamentos
+    const [selectedBimestreFiltro, setSelectedBimestreFiltro] = useState<string>('ALL');
+    const [selectedEtapaFiltro, setSelectedEtapaFiltro] = useState<string>(forcedEtapa || 'ALL');
 
     const [mockAcompanhamentos, setMockAcompanhamentos] = useState<any[]>([]);
     const [mockAcompInfantil, setMockAcompInfantil] = useState<any[]>([]);
@@ -285,42 +296,161 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         return `${t.anoSerie} ${ident} • ${t.turno}`.toUpperCase();
     };
 
-    const renderContextSelectorHeader = (stage: 'fundamental' | 'infantil') => {
-        const effectiveStage = forcedEtapa || stage;
+    const handleConsultarAcomp = async () => {
+        setIsLoadingAcomp(true);
+        try {
+            const fetchEscolaId = selectedEscolaId === 'ALL'
+                ? (isAdmin ? undefined : escolas.map(e => e.id))
+                : selectedEscolaId;
+
+            const shouldFetchFundamental = (forcedEtapa === 'fundamental') || (!forcedEtapa && (selectedEtapaFiltro === 'ALL' || selectedEtapaFiltro === 'fundamental'));
+            const shouldFetchInfantil = (forcedEtapa === 'infantil') || (!forcedEtapa && (selectedEtapaFiltro === 'ALL' || selectedEtapaFiltro === 'infantil'));
+
+            const [acomp, acompInfantil] = await Promise.all([
+                shouldFetchFundamental ? ccAcompanhamentoDocenteService.getAll(fetchEscolaId, 'fundamental') : Promise.resolve([]),
+                shouldFetchInfantil ? ccAcompanhamentoDocenteService.getAll(fetchEscolaId, 'infantil') : Promise.resolve([])
+            ]);
+
+            if (acomp) {
+                setMockAcompanhamentos(acomp.map((a: any) => ({
+                    id: a.id,
+                    escola_id: a.escola_id,
+                    professor: a.professor,
+                    componente: a.componente_curricular,
+                    turma: a.turma_nome,
+                    periodoLetivo: a.periodo_letivo,
+                    data: a.data_registro ? a.data_registro.substring(0, 10) : '',
+                    estudante: a.estudante_nome,
+                    lider: a.lider_turma || '',
+                    dificuldades: a.dificuldades || '',
+                    intervencao: a.intervencao_pedagogica || '',
+                    etapa: 'fundamental'
+                })));
+            }
+
+            if (acompInfantil) {
+                setMockAcompInfantil(acompInfantil.map((a: any) => ({
+                    id: a.id,
+                    escola_id: a.escola_id,
+                    professor: a.professor,
+                    agrupamento: a.turma_nome,
+                    periodoLetivo: a.periodo_letivo,
+                    data: a.data_registro ? a.data_registro.substring(0, 10) : '',
+                    campoExperiencia: a.componente_curricular,
+                    crianca: a.estudante_nome,
+                    tipoInteracao: a.lider_turma || '',
+                    evidencias: a.dificuldades || '',
+                    intencionalidade: a.intervencao_pedagogica || '',
+                    etapa: 'infantil'
+                })));
+            }
+            setHasConsultadoAcomp(true);
+        } catch (err) {
+            console.error('Erro ao consultar acompanhamentos docentes:', err);
+        } finally {
+            setIsLoadingAcomp(false);
+        }
+    };
+
+    const handleConsultarEnc = async () => {
+        setIsLoadingEnc(true);
+        try {
+            const fetchEscolaId = selectedEscolaId === 'ALL'
+                ? (isAdmin ? undefined : escolas.map(e => e.id))
+                : selectedEscolaId;
+
+            const shouldFetchFundamental = (forcedEtapa === 'fundamental') || (!forcedEtapa && (selectedEtapaFiltro === 'ALL' || selectedEtapaFiltro === 'fundamental'));
+            const shouldFetchInfantil = (forcedEtapa === 'infantil') || (!forcedEtapa && (selectedEtapaFiltro === 'ALL' || selectedEtapaFiltro === 'infantil'));
+
+            const [encs, encsInfantil] = await Promise.all([
+                shouldFetchFundamental ? ccEncaminhamentosService.getAll(fetchEscolaId, 'fundamental') : Promise.resolve([]),
+                shouldFetchInfantil ? ccEncaminhamentosService.getAll(fetchEscolaId, 'infantil') : Promise.resolve([])
+            ]);
+
+            if (encs) {
+                setMockEncaminhamentos(encs.map(e => ({
+                    id: e.id,
+                    escola_id: e.escola_id,
+                    estudante: e.estudante_nome,
+                    turma: e.turma,
+                    tipo: e.tipo_encaminhamento,
+                    descricao: e.descricao,
+                    encaminhamento: e.encaminhamento_realizado,
+                    data: e.data_registro ? e.data_registro.substring(0, 10) : '',
+                    periodoLetivo: e.periodo_letivo,
+                    status: e.status,
+                    responsavel: e.responsavel,
+                    etapa: 'fundamental'
+                })));
+            }
+
+            if (encsInfantil) {
+                setMockEncInfantil(encsInfantil.map(e => ({
+                    id: e.id,
+                    escola_id: e.escola_id,
+                    crianca: e.estudante_nome,
+                    agrupamento: e.turma,
+                    campoExperiencia: e.campo_experiencia,
+                    evidencias: e.evidencias,
+                    estrategia: e.estrategia,
+                    data: e.data_registro ? e.data_registro.substring(0, 10) : '',
+                    periodoLetivo: e.periodo_letivo,
+                    status: e.status,
+                    professor: e.responsavel,
+                    etapa: 'infantil'
+                })));
+            }
+            setHasConsultadoEnc(true);
+        } catch (err) {
+            console.error('Erro ao consultar encaminhamentos e intervenções:', err);
+        } finally {
+            setIsLoadingEnc(false);
+        }
+    };
+
+    const renderContextSelectorHeader = (stage: 'fundamental' | 'infantil', tabType?: 'acompanhamento' | 'encaminhamentos') => {
+        const effectiveStage = forcedEtapa || (selectedEtapaFiltro !== 'ALL' ? selectedEtapaFiltro : stage);
+        const isAcomp = tabType === 'acompanhamento';
+        const isEnc = tabType === 'encaminhamentos';
+        const isLoadingCurrent = isAcomp ? isLoadingAcomp : isEnc ? isLoadingEnc : false;
+        const handleConsultar = isAcomp ? handleConsultarAcomp : handleConsultarEnc;
+
         return (
-            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm mb-8 flex flex-col md:flex-row md:items-center justify-between gap-6 animate-fade-in text-left">
-                <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 w-full">
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm mb-6 animate-fade-in text-left">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                     
-                    {/* UNIDADE ESCOLAR */}
-                    <div className="flex flex-col justify-center sm:px-4">
+                    {/* 1. UNIDADE ESCOLAR */}
+                    <div className="flex flex-col justify-center bg-slate-50/70 p-3 rounded-xl border border-slate-200/80">
                         <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase mb-1">UNIDADE ESCOLAR</span>
                         {isAdmin || escolas.length > 1 ? (
                             <select
                                 value={selectedEscolaId}
-                                onChange={(e) => setSelectedEscolaId(e.target.value)}
-                                className="bg-transparent text-sm font-bold text-slate-800 border-none p-0 focus:ring-0 focus:outline-none cursor-pointer hover:text-orange-500 transition-colors uppercase outline-none appearance-none font-sans"
+                                onChange={(e) => {
+                                    setSelectedEscolaId(e.target.value);
+                                    if (isAcomp) setHasConsultadoAcomp(false);
+                                    if (isEnc) setHasConsultadoEnc(false);
+                                }}
+                                className="bg-transparent text-xs font-bold text-slate-800 border-none p-0 focus:ring-0 focus:outline-none cursor-pointer hover:text-orange-500 transition-colors uppercase outline-none appearance-none font-sans"
                             >
-                                { (isAdmin || escolas.length > 1) && (
-                                    <option value="ALL">TODAS AS UNIDADES</option>
-                                )}
+                                <option value="ALL">TODAS AS UNIDADES</option>
                                 {escolas.map(e => (
                                     <option key={e.id} value={e.id}>{e.nome}</option>
                                 ))}
                             </select>
                         ) : (
-                            <span className="text-sm font-bold text-slate-800 uppercase">{currentEscola?.nome || 'Nenhuma escola'}</span>
+                            <span className="text-xs font-bold text-slate-800 uppercase truncate">{currentEscola?.nome || 'Nenhuma escola'}</span>
                         )}
                     </div>
 
-                    {/* RESPONSÁVEL */}
-                    <div className="flex flex-col justify-center pt-4 sm:pt-0 sm:px-4">
+                    {/* 2. RESPONSÁVEL */}
+                    <div className="flex flex-col justify-center bg-slate-50/70 p-3 rounded-xl border border-slate-200/80">
                         <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase mb-1">RESPONSÁVEL</span>
                         <select
                             value={selectedResponsavel}
                             onChange={(e) => setSelectedResponsavel(e.target.value)}
-                            className="bg-transparent text-sm font-bold text-slate-800 border-none p-0 focus:ring-0 focus:outline-none cursor-pointer hover:text-orange-500 transition-colors uppercase outline-none appearance-none font-sans"
+                            className="bg-transparent text-xs font-bold text-slate-800 border-none p-0 focus:ring-0 focus:outline-none cursor-pointer hover:text-orange-500 transition-colors uppercase outline-none appearance-none font-sans"
                         >
-                            <option value="">Selecione o responsável</option>
+                            <option value="ALL">TODOS OS RESPONSÁVEIS</option>
                             {coordenadoresList.map(c => (
                                 <option key={c.id} value={c.nome}>{c.nome}</option>
                             ))}
@@ -330,8 +460,54 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                         </select>
                     </div>
 
-                    {/* COMPONENTE CURRICULAR / CAMPO DE EXPERIÊNCIA */}
-                    <div className="flex flex-col justify-center pt-4 sm:pt-0 sm:px-4">
+                    {/* 3. ETAPA */}
+                    <div className="flex flex-col justify-center bg-slate-50/70 p-3 rounded-xl border border-slate-200/80">
+                        <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase mb-1">ETAPA DE ENSINO</span>
+                        {forcedEtapa ? (
+                            <span className="text-xs font-bold text-orange-600 uppercase">
+                                {forcedEtapa === 'infantil' ? 'Educação Infantil' : 'Ensino Fundamental'}
+                            </span>
+                        ) : (
+                            <select
+                                value={selectedEtapaFiltro}
+                                onChange={(e) => {
+                                    setSelectedEtapaFiltro(e.target.value);
+                                    if (e.target.value === 'infantil') {
+                                        if (isAcomp) setAcompEtapa('infantil');
+                                        if (isEnc) setEncEtapa('infantil');
+                                    } else if (e.target.value === 'fundamental') {
+                                        if (isAcomp) setAcompEtapa('fundamental');
+                                        if (isEnc) setEncEtapa('fundamental');
+                                    }
+                                }}
+                                className="bg-transparent text-xs font-bold text-slate-800 border-none p-0 focus:ring-0 focus:outline-none cursor-pointer hover:text-orange-500 transition-colors uppercase outline-none appearance-none font-sans"
+                            >
+                                <option value="ALL">TODAS AS ETAPAS</option>
+                                <option value="fundamental">ENSINO FUNDAMENTAL</option>
+                                <option value="infantil">EDUCAÇÃO INFANTIL</option>
+                            </select>
+                        )}
+                    </div>
+
+                    {/* 4. BIMESTRE / PERÍODO */}
+                    <div className="flex flex-col justify-center bg-slate-50/70 p-3 rounded-xl border border-slate-200/80">
+                        <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase mb-1">BIMESTRE / PERÍODO</span>
+                        <select
+                            value={selectedBimestreFiltro}
+                            onChange={(e) => setSelectedBimestreFiltro(e.target.value)}
+                            className="bg-transparent text-xs font-bold text-slate-800 border-none p-0 focus:ring-0 focus:outline-none cursor-pointer hover:text-orange-500 transition-colors uppercase outline-none appearance-none font-sans"
+                        >
+                            <option value="ALL">TODOS OS BIMESTRES</option>
+                            <option value="1º Bimestre">1º BIMESTRE</option>
+                            <option value="2º Bimestre">2º BIMESTRE</option>
+                            <option value="3º Bimestre">3º BIMESTRE</option>
+                            <option value="4º Bimestre">4º BIMESTRE</option>
+                            <option value="Resultado Consolidado">RESULTADO CONSOLIDADO</option>
+                        </select>
+                    </div>
+
+                    {/* 5. COMPONENTE CURRICULAR / CAMPO DE EXPERIÊNCIA */}
+                    <div className="flex flex-col justify-center bg-slate-50/70 p-3 rounded-xl border border-slate-200/80">
                         <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase mb-1">
                             {effectiveStage === 'infantil' ? 'CAMPO DE EXPERIÊNCIA' : 'COMPONENTE CURRICULAR'}
                         </span>
@@ -339,18 +515,23 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                             <select
                                 value={selectedCampoExperiencia}
                                 onChange={(e) => setSelectedCampoExperiencia(e.target.value)}
-                                className="bg-transparent text-sm font-bold text-slate-800 border-none p-0 focus:ring-0 focus:outline-none cursor-pointer hover:text-orange-500 transition-colors outline-none appearance-none font-sans"
+                                className="bg-transparent text-xs font-bold text-slate-800 border-none p-0 focus:ring-0 focus:outline-none cursor-pointer hover:text-orange-500 transition-colors outline-none appearance-none font-sans"
                             >
+                                <option value="ALL">TODOS OS CAMPOS</option>
                                 {CAMPOS_EXPERIENCIA_BNCC.map(c => (
                                     <option key={c} value={c}>{c}</option>
                                 ))}
                             </select>
                         ) : (
                             <select
-                                value={selectedComponenteCurricular}
-                                onChange={(e) => setSelectedComponenteCurricular(e.target.value)}
-                                className="bg-transparent text-sm font-bold text-slate-800 border-none p-0 focus:ring-0 focus:outline-none cursor-pointer hover:text-orange-500 transition-colors outline-none appearance-none font-sans"
+                                value={selectedComponenteFiltro}
+                                onChange={(e) => {
+                                    setSelectedComponenteFiltro(e.target.value);
+                                    if (e.target.value !== 'ALL') setSelectedComponenteCurricular(e.target.value);
+                                }}
+                                className="bg-transparent text-xs font-bold text-slate-800 border-none p-0 focus:ring-0 focus:outline-none cursor-pointer hover:text-orange-500 transition-colors outline-none appearance-none font-sans"
                             >
+                                <option value="ALL">TODOS OS COMPONENTES</option>
                                 {COMPONENTES_CURRICULARES.map(c => (
                                     <option key={c} value={c}>{c}</option>
                                 ))}
@@ -358,8 +539,8 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                         )}
                     </div>
 
-                    {/* TURMA / ANO ou AGRUPAMENTO / TURMA */}
-                    <div className="flex flex-col justify-center pt-4 sm:pt-0 sm:px-4">
+                    {/* 6. TURMA / ANO ou AGRUPAMENTO / TURMA */}
+                    <div className="flex flex-col justify-center bg-slate-50/70 p-3 rounded-xl border border-slate-200/80">
                         <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase mb-1">
                             {effectiveStage === 'infantil' ? 'AGRUPAMENTO / TURMA' : 'TURMA / ANO'}
                         </span>
@@ -374,20 +555,37 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                         if (selected) setActiveTurma(selected);
                                     }
                                 }}
-                                className="bg-transparent text-sm font-bold text-slate-800 border-none p-0 focus:ring-0 focus:outline-none cursor-pointer hover:text-orange-500 transition-colors uppercase outline-none appearance-none font-sans"
+                                className="bg-transparent text-xs font-bold text-slate-800 border-none p-0 focus:ring-0 focus:outline-none cursor-pointer hover:text-orange-500 transition-colors uppercase outline-none appearance-none font-sans"
                             >
-                                {selectedEscolaId === 'ALL' && (
-                                    <option value="ALL">TODAS AS TURMAS</option>
-                                )}
+                                <option value="ALL">TODAS AS TURMAS</option>
                                 {turmasCadastradas.map(t => (
                                     <option key={t.id} value={t.id}>{getTurmaLabel(t)}</option>
                                 ))}
                             </select>
                         ) : (
-                            <span className="text-sm font-bold text-slate-500">Nenhuma turma</span>
+                            <span className="text-xs font-bold text-slate-500">Nenhuma turma</span>
                         )}
                     </div>
 
+                </div>
+
+                {/* BOTÃO CONSULTAR REGISTROS */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 mt-4 border-t border-slate-100">
+                    <p className="text-xs text-slate-400 font-medium">
+                        Filtre por escola, responsável, etapa, período, componente e turma.
+                    </p>
+                    <button
+                        onClick={handleConsultar}
+                        disabled={isLoadingCurrent}
+                        className="w-full sm:w-auto px-7 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl text-xs font-black shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2 uppercase tracking-wider transition-all hover:scale-105 active:scale-95 disabled:opacity-50 cursor-pointer"
+                    >
+                        {isLoadingCurrent ? (
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                        ) : (
+                            <Search className="w-4 h-4" />
+                        )}
+                        Consultar Registros
+                    </button>
                 </div>
             </div>
         );
@@ -404,11 +602,6 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                     .order('nome', { ascending: true });
                 if (error) throw error;
                 setCoordenadoresList(data || []);
-                if (currentUser) {
-                    setSelectedResponsavel(currentUser.nome);
-                } else if (data && data.length > 0) {
-                    setSelectedResponsavel(data[0].nome);
-                }
             } catch (error) {
                 console.error('Erro ao carregar coordenadores:', error);
             }
@@ -436,39 +629,47 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     const filteredAcompanhamentos = useMemo(() => {
         return mockAcompanhamentos.filter(a => {
             if (a.etapa === 'infantil') return false;
-            if (activeTurma && a.turma !== getTurmaLabel(activeTurma)) return false;
-            if (selectedComponenteCurricular && a.componente !== selectedComponenteCurricular) return false;
-            if (selectedResponsavel && a.professor !== selectedResponsavel) return false;
+            if (selectedEscolaId && selectedEscolaId !== 'ALL' && a.escola_id && a.escola_id !== selectedEscolaId) return false;
+            if (activeTurma && a.turma && a.turma !== getTurmaLabel(activeTurma) && !a.turma.toLowerCase().includes(activeTurma.anoSerie?.toLowerCase() || '')) return false;
+            if (selectedComponenteFiltro && selectedComponenteFiltro !== 'ALL' && a.componente !== selectedComponenteFiltro) return false;
+            if (selectedResponsavel && selectedResponsavel !== 'ALL' && a.professor !== selectedResponsavel) return false;
+            if (selectedBimestreFiltro && selectedBimestreFiltro !== 'ALL' && a.periodoLetivo !== selectedBimestreFiltro) return false;
             return true;
         });
-    }, [mockAcompanhamentos, activeTurma, selectedComponenteCurricular, selectedResponsavel]);
+    }, [mockAcompanhamentos, activeTurma, selectedEscolaId, selectedComponenteFiltro, selectedResponsavel, selectedBimestreFiltro]);
 
     const filteredAcompInfantil = useMemo(() => {
         return mockAcompInfantil.filter(a => {
-            if (activeTurma && a.agrupamento !== getTurmaLabel(activeTurma)) return false;
-            if (selectedCampoExperiencia && a.campoExperiencia !== selectedCampoExperiencia) return false;
-            if (selectedResponsavel && a.professor !== selectedResponsavel) return false;
+            if (selectedEscolaId && selectedEscolaId !== 'ALL' && a.escola_id && a.escola_id !== selectedEscolaId) return false;
+            if (activeTurma && a.agrupamento && a.agrupamento !== getTurmaLabel(activeTurma) && !a.agrupamento.toLowerCase().includes(activeTurma.anoSerie?.toLowerCase() || '')) return false;
+            if (selectedCampoExperiencia && selectedCampoExperiencia !== 'ALL' && a.campoExperiencia !== selectedCampoExperiencia) return false;
+            if (selectedResponsavel && selectedResponsavel !== 'ALL' && a.professor !== selectedResponsavel) return false;
+            if (selectedBimestreFiltro && selectedBimestreFiltro !== 'ALL' && a.periodoLetivo !== selectedBimestreFiltro) return false;
             return true;
         });
-    }, [mockAcompInfantil, activeTurma, selectedCampoExperiencia, selectedResponsavel]);
+    }, [mockAcompInfantil, activeTurma, selectedEscolaId, selectedCampoExperiencia, selectedResponsavel, selectedBimestreFiltro]);
 
     const filteredEncaminhamentos = useMemo(() => {
         return mockEncaminhamentos.filter(e => {
             if (e.etapa === 'infantil') return false;
-            if (activeTurma && e.turma !== getTurmaLabel(activeTurma)) return false;
-            if (selectedResponsavel && e.responsavel !== selectedResponsavel) return false;
+            if (selectedEscolaId && selectedEscolaId !== 'ALL' && e.escola_id && e.escola_id !== selectedEscolaId) return false;
+            if (activeTurma && e.turma && e.turma !== getTurmaLabel(activeTurma) && !e.turma.toLowerCase().includes(activeTurma.anoSerie?.toLowerCase() || '')) return false;
+            if (selectedResponsavel && selectedResponsavel !== 'ALL' && e.responsavel !== selectedResponsavel) return false;
+            if (selectedBimestreFiltro && selectedBimestreFiltro !== 'ALL' && e.periodoLetivo !== selectedBimestreFiltro) return false;
             return true;
         });
-    }, [mockEncaminhamentos, activeTurma, selectedResponsavel]);
+    }, [mockEncaminhamentos, activeTurma, selectedEscolaId, selectedResponsavel, selectedBimestreFiltro]);
 
     const filteredEncInfantil = useMemo(() => {
         return mockEncInfantil.filter(e => {
-            if (activeTurma && e.agrupamento !== getTurmaLabel(activeTurma)) return false;
-            if (selectedCampoExperiencia && e.campoExperiencia !== selectedCampoExperiencia) return false;
-            if (selectedResponsavel && e.professor !== selectedResponsavel) return false;
+            if (selectedEscolaId && selectedEscolaId !== 'ALL' && e.escola_id && e.escola_id !== selectedEscolaId) return false;
+            if (activeTurma && e.agrupamento && e.agrupamento !== getTurmaLabel(activeTurma) && !e.agrupamento.toLowerCase().includes(activeTurma.anoSerie?.toLowerCase() || '')) return false;
+            if (selectedCampoExperiencia && selectedCampoExperiencia !== 'ALL' && e.campoExperiencia !== selectedCampoExperiencia) return false;
+            if (selectedResponsavel && selectedResponsavel !== 'ALL' && e.professor !== selectedResponsavel) return false;
+            if (selectedBimestreFiltro && selectedBimestreFiltro !== 'ALL' && e.periodoLetivo !== selectedBimestreFiltro) return false;
             return true;
         });
-    }, [mockEncInfantil, activeTurma, selectedCampoExperiencia, selectedResponsavel]);
+    }, [mockEncInfantil, activeTurma, selectedEscolaId, selectedCampoExperiencia, selectedResponsavel, selectedBimestreFiltro]);
 
 
 
@@ -2095,92 +2296,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         }
     };
 
-    React.useEffect(() => {
-        const loadDocs = async () => {
-            setIsLoading(true);
-            try {
-                const fetchEscolaId = selectedEscolaId === 'ALL'
-                    ? (isAdmin ? undefined : escolas.map(e => e.id))
-                    : selectedEscolaId;
 
-                const [acomp, acompInfantil, encs, encsInfantil] = await Promise.all([
-                    forcedEtapa === 'infantil' ? Promise.resolve([]) : ccAcompanhamentoDocenteService.getAll(fetchEscolaId, 'fundamental'),
-                    forcedEtapa === 'fundamental' ? Promise.resolve([]) : ccAcompanhamentoDocenteService.getAll(fetchEscolaId, 'infantil'),
-                    forcedEtapa === 'infantil' ? Promise.resolve([]) : ccEncaminhamentosService.getAll(fetchEscolaId, 'fundamental'),
-                    forcedEtapa === 'fundamental' ? Promise.resolve([]) : ccEncaminhamentosService.getAll(fetchEscolaId, 'infantil')
-                ]);
-
-                if (acomp) {
-                    setMockAcompanhamentos(acomp.map((a: any) => ({
-                        id: a.id,
-                        professor: a.professor,
-                        componente: a.componente_curricular,
-                        turma: a.turma_nome,
-                        periodoLetivo: a.periodo_letivo,
-                        data: a.data_registro ? a.data_registro.substring(0, 10) : '',
-                        estudante: a.estudante_nome,
-                        lider: a.lider_turma || '',
-                        dificuldades: a.dificuldades || '',
-                        intervencao: a.intervencao_pedagogica || '',
-                        etapa: 'fundamental'
-                    })));
-                }
-
-                if (acompInfantil) {
-                    setMockAcompInfantil(acompInfantil.map((a: any) => ({
-                        id: a.id,
-                        professor: a.professor,
-                        agrupamento: a.turma_nome,
-                        periodoLetivo: a.periodo_letivo,
-                        data: a.data_registro ? a.data_registro.substring(0, 10) : '',
-                        campoExperiencia: a.componente_curricular,
-                        crianca: a.estudante_nome,
-                        tipoInteracao: a.lider_turma || '',
-                        evidencias: a.dificuldades || '',
-                        intencionalidade: a.intervencao_pedagogica || '',
-                        etapa: 'infantil'
-                    })));
-                }
-
-                if (encs) {
-                    setMockEncaminhamentos(encs.map(e => ({
-                        id: e.id,
-                        estudante: e.estudante_nome,
-                        turma: e.turma,
-                        tipo: e.tipo_encaminhamento,
-                        descricao: e.descricao,
-                        encaminhamento: e.encaminhamento_realizado,
-                        data: e.data_registro ? e.data_registro.substring(0, 10) : '',
-                        periodoLetivo: e.periodo_letivo,
-                        status: e.status,
-                        responsavel: e.responsavel
-                    })));
-                }
-
-                if (encsInfantil) {
-                    setMockEncInfantil(encsInfantil.map(e => ({
-                        id: e.id,
-                        crianca: e.estudante_nome,
-                        agrupamento: e.turma,
-                        campoExperiencia: e.campo_experiencia,
-                        evidencias: e.evidencias,
-                        estrategia: e.estrategia,
-                        data: e.data_registro ? e.data_registro.substring(0, 10) : '',
-                        periodoLetivo: e.periodo_letivo,
-                        status: e.status,
-                        professor: e.responsavel,
-                        etapa: 'infantil'
-                    })));
-                }
-            } catch (error) {
-                console.error("Erro ao carregar dados do Conselho de Classe:", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        loadDocs();
-    }, [selectedEscolaId, currentEscolaId, escolas, isAdmin, forcedEtapa]);
 
     const renderTabContent = () => {
         if (filteredTabs.length === 0) {
@@ -3360,7 +3476,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             case 'acompanhamento':
                 return (
                     <div className="space-y-6">
-                        {renderContextSelectorHeader(acompEtapa)}
+                        {renderContextSelectorHeader(acompEtapa, 'acompanhamento')}
                         <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm text-left">
                             <div className="flex justify-between items-start mb-8">
                                 <div>
@@ -3378,10 +3494,10 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                         <button
                                             onClick={() => {
                                                 if (acompEtapa === 'infantil') {
-                                                    setAcompInfantilForm({ id: '', professor: selectedResponsavel, agrupamento: activeTurma ? getTurmaLabel(activeTurma) : '', periodoLetivo: '1º Bimestre', data: new Date().toISOString().substring(0, 10), campoExperiencia: selectedCampoExperiencia, crianca: '', tipoInteracao: '', evidencias: '', intencionalidade: '' });
+                                                    setAcompInfantilForm({ id: '', professor: selectedResponsavel !== 'ALL' ? selectedResponsavel : '', agrupamento: activeTurma ? getTurmaLabel(activeTurma) : '', periodoLetivo: '1º Bimestre', data: new Date().toISOString().substring(0, 10), campoExperiencia: selectedCampoExperiencia !== 'ALL' ? selectedCampoExperiencia : '', crianca: '', tipoInteracao: '', evidencias: '', intencionalidade: '' });
                                                     setIsEditingAcompInfantil(true);
                                                 } else {
-                                                    setAcompForm({ id: '', professor: selectedResponsavel, componente: selectedComponenteCurricular, turma: activeTurma ? getTurmaLabel(activeTurma) : '', periodoLetivo: '1º Bimestre', data: new Date().toISOString().substring(0, 10), estudante: '', lider: '', dificuldades: '', intervencao: '' });
+                                                    setAcompForm({ id: '', professor: selectedResponsavel !== 'ALL' ? selectedResponsavel : '', componente: selectedComponenteCurricular, turma: activeTurma ? getTurmaLabel(activeTurma) : '', periodoLetivo: '1º Bimestre', data: new Date().toISOString().substring(0, 10), estudante: '', lider: '', dificuldades: '', intervencao: '' });
                                                     setIsEditingAcomp(true);
                                                 }
                                             }}
@@ -3449,7 +3565,6 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                     onChange={e => setAcompForm({ ...acompForm, componente: e.target.value })}
                                                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                                                 >
-                                                    <option value="">Selecione o componente</option>
                                                     {COMPONENTES_CURRICULARES.map(c => (
                                                         <option key={c} value={c}>{c}</option>
                                                     ))}
@@ -3482,21 +3597,6 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                 </select>
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Período Letivo</label>
-                                                <select value={acompForm.periodoLetivo || '1º Bimestre'} onChange={e => setAcompForm({ ...acompForm, periodoLetivo: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 appearance-none">
-                                                    <option>1º Bimestre</option><option>2º Bimestre</option><option>3º Bimestre</option><option>4º Bimestre</option>
-                                                    <option>1º Semestre</option><option>2º Semestre</option><option>Anual</option>
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Data</label>
-                                                <input type="date" value={acompForm.data} onChange={e => setAcompForm({ ...acompForm, data: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Líder de Turma</label>
-                                                <input type="text" value={acompForm.lider} onChange={e => setAcompForm({ ...acompForm, lider: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="Nome do líder da turma..." />
-                                            </div>
-                                            <div className="md:col-span-2">
                                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Estudante com Dificuldade</label>
                                                 <select
                                                     value={acompForm.estudante}
@@ -3509,13 +3609,55 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                     ))}
                                                 </select>
                                             </div>
-                                            <div className="md:col-span-2">
-                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Dificuldades Encontradas</label>
-                                                <textarea value={acompForm.dificuldades} onChange={e => setAcompForm({ ...acompForm, dificuldades: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 h-24 resize-none" placeholder="Descreva as dificuldades..." />
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Período Letivo</label>
+                                                <select
+                                                    value={acompForm.periodoLetivo || '1º Bimestre'}
+                                                    onChange={e => setAcompForm({ ...acompForm, periodoLetivo: e.target.value })}
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                                                >
+                                                    <option>1º Bimestre</option>
+                                                    <option>2º Bimestre</option>
+                                                    <option>3º Bimestre</option>
+                                                    <option>4º Bimestre</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Data do Registro</label>
+                                                <input
+                                                    type="date"
+                                                    value={acompForm.data}
+                                                    onChange={e => setAcompForm({ ...acompForm, data: e.target.value })}
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                                                />
                                             </div>
                                             <div className="md:col-span-2">
-                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Intervenção Pedagógica do Professor</label>
-                                                <textarea value={acompForm.intervencao} onChange={e => setAcompForm({ ...acompForm, intervencao: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 h-24 resize-none" placeholder="Descreva a intervenção aplicada..." />
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Líder / Monitor de Apoio (Opcional)</label>
+                                                <input
+                                                    type="text"
+                                                    value={acompForm.lider}
+                                                    onChange={e => setAcompForm({ ...acompForm, lider: e.target.value })}
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                                                    placeholder="Nome do estudante que auxiliará como monitor..."
+                                                />
+                                            </div>
+                                            <div className="md:col-span-2">
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Dificuldades Observadas</label>
+                                                <textarea
+                                                    value={acompForm.dificuldades}
+                                                    onChange={e => setAcompForm({ ...acompForm, dificuldades: e.target.value })}
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 h-24 resize-none"
+                                                    placeholder="Descreva as principais dificuldades de aprendizagem..."
+                                                />
+                                            </div>
+                                            <div className="md:col-span-2">
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Intervenção Pedagógica Sugerida</label>
+                                                <textarea
+                                                    value={acompForm.intervencao}
+                                                    onChange={e => setAcompForm({ ...acompForm, intervencao: e.target.value })}
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 h-24 resize-none"
+                                                    placeholder="Ações e estratégias que serão implementadas..."
+                                                />
                                             </div>
                                         </div>
                                         <div className="flex gap-3 pt-6 border-t border-slate-100 mt-6">
@@ -3530,7 +3672,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                             {
                                 acompEtapa === 'infantil' && isEditingAcompInfantil && (
                                     <div className="p-8 border border-slate-200 rounded-2xl bg-white shadow-sm mb-8 animate-fade-in">
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                             <div>
                                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Professor(a) Responsável</label>
                                                 <select
@@ -3548,7 +3690,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                 </select>
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Agrupamento/Turma</label>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Agrupamento / Turma</label>
                                                 <select
                                                     value={findTurmaMatch(turmasCadastradas, acompInfantilForm.agrupamento)?.id || ''}
                                                     onChange={async (e) => {
@@ -3574,26 +3716,6 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                 </select>
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Período Letivo</label>
-                                                <select value={acompInfantilForm.periodoLetivo} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, periodoLetivo: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20">
-                                                    <option>1º Bimestre</option><option>2º Bimestre</option><option>3º Bimestre</option><option>4º Bimestre</option>
-                                                    <option>1º Semestre</option><option>2º Semestre</option><option>Anual</option>
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Data</label>
-                                                <input type="date" value={acompInfantilForm.data} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, data: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20" />
-                                            </div>
-                                        </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                                            <div>
-                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Campo de Experiência (BNCC)</label>
-                                                <select value={acompInfantilForm.campoExperiencia} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, campoExperiencia: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20">
-                                                    <option value="">Selecione o campo principal</option>
-                                                    {CAMPOS_EXPERIENCIA_BNCC.map(c => <option key={c} value={c}>{c}</option>)}
-                                                </select>
-                                            </div>
-                                            <div>
                                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Criança em Observação</label>
                                                 <select
                                                     value={acompInfantilForm.crianca}
@@ -3606,31 +3728,69 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                     ))}
                                                 </select>
                                             </div>
-                                        </div>
-                                        <div className="mt-6">
-                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Tipo de Interação Predominante</label>
-                                            <div className="flex gap-4 flex-wrap">
-                                                {['Criança-Criança', 'Criança-Adulto', 'Criança-Ambiente'].map(tipo => (
-                                                    <label key={tipo} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border cursor-pointer transition-all text-sm font-medium ${acompInfantilForm.tipoInteracao === tipo
-                                                        ? 'bg-orange-50 border-orange-300 text-orange-700'
-                                                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300'
-                                                        }`}>
-                                                        <input type="radio" name="tipoInteracao" value={tipo} checked={acompInfantilForm.tipoInteracao === tipo} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, tipoInteracao: e.target.value })} className="sr-only" />
-                                                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${acompInfantilForm.tipoInteracao === tipo ? 'border-orange-500' : 'border-slate-300'}`}>
-                                                            {acompInfantilForm.tipoInteracao === tipo && <div className="w-2 h-2 rounded-full bg-orange-500" />}
-                                                        </div>
-                                                        {tipo}
-                                                    </label>
-                                                ))}
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Campo de Experiência (BNCC)</label>
+                                                <select
+                                                    value={acompInfantilForm.campoExperiencia}
+                                                    onChange={e => setAcompInfantilForm({ ...acompInfantilForm, campoExperiencia: e.target.value })}
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                                                >
+                                                    <option value="">Selecione o campo...</option>
+                                                    {CAMPOS_EXPERIENCIA_BNCC.map(c => (
+                                                        <option key={c} value={c}>{c}</option>
+                                                    ))}
+                                                </select>
                                             </div>
-                                        </div>
-                                        <div className="mt-6">
-                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Evidências de Aprendizagem e Desenvolvimento</label>
-                                            <textarea value={acompInfantilForm.evidencias} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, evidencias: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 h-28 resize-none" placeholder="Descreva os processos observados, as falas, as conquistas e as descobertas da criança durante a vivência..." />
-                                        </div>
-                                        <div className="mt-6">
-                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Intencionalidade Pedagógica / Mediação do Professor</label>
-                                            <textarea value={acompInfantilForm.intencionalidade} onChange={e => setAcompInfantilForm({ ...acompInfantilForm, intencionalidade: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 h-28 resize-none" placeholder="Descreva qual foi o seu papel como mediador, as intervenções feitas e como o ambiente foi preparado para potencializar a experiência..." />
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Período Letivo</label>
+                                                <select
+                                                    value={acompInfantilForm.periodoLetivo || '1º Bimestre'}
+                                                    onChange={e => setAcompInfantilForm({ ...acompInfantilForm, periodoLetivo: e.target.value })}
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                                                >
+                                                    <option>1º Bimestre</option>
+                                                    <option>2º Bimestre</option>
+                                                    <option>3º Bimestre</option>
+                                                    <option>4º Bimestre</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Data da Observação</label>
+                                                <input
+                                                    type="date"
+                                                    value={acompInfantilForm.data}
+                                                    onChange={e => setAcompInfantilForm({ ...acompInfantilForm, data: e.target.value })}
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                                                />
+                                            </div>
+                                            <div className="md:col-span-2">
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Tipo de Interação / Contexto</label>
+                                                <input
+                                                    type="text"
+                                                    value={acompInfantilForm.tipoInteracao}
+                                                    onChange={e => setAcompInfantilForm({ ...acompInfantilForm, tipoInteracao: e.target.value })}
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                                                    placeholder="Ex: Roda de conversa, brincadeira livre, atividade artística..."
+                                                />
+                                            </div>
+                                            <div className="md:col-span-2">
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Evidências de Aprendizagem / Observações</label>
+                                                <textarea
+                                                    value={acompInfantilForm.evidencias}
+                                                    onChange={e => setAcompInfantilForm({ ...acompInfantilForm, evidencias: e.target.value })}
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 h-24 resize-none"
+                                                    placeholder="Descreva as atitudes, falas, gestos e comportamentos observados na criança..."
+                                                />
+                                            </div>
+                                            <div className="md:col-span-2">
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Mediação Pedagógica / Intencionalidade Educativa</label>
+                                                <textarea
+                                                    value={acompInfantilForm.intencionalidade}
+                                                    onChange={e => setAcompInfantilForm({ ...acompInfantilForm, intencionalidade: e.target.value })}
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 h-24 resize-none"
+                                                    placeholder="Qual intervenção ou proposta será feita para apoiar o desenvolvimento da criança..."
+                                                />
+                                            </div>
                                         </div>
                                         <div className="flex gap-3 pt-6 border-t border-slate-100 mt-6">
                                             <button onClick={handleSaveAcompInfantil} className="bg-brand-orange hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-colors flex items-center gap-2">Salvar Registro</button>
@@ -3640,164 +3800,195 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                 )
                             }
 
-                            {/* List Fundamental */}
-                            {
-                                acompEtapa === 'fundamental' && (
-                                    <div className="overflow-x-auto mt-6">
-                                        <table className="w-full text-left border-collapse">
-                                            <thead>
-                                                <tr className="bg-slate-50 border-y border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                                    <th className="p-4">Professor(a) / Componente</th>
-                                                    <th className="p-4">Turma / Período</th>
-                                                    <th className="p-4">Estudante / Líder</th>
-                                                    <th className="p-4 max-w-xs">Dificuldades / Intervenção</th>
-                                                    <th className="p-4 text-center">Ações</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-100">
-                                                {filteredAcompanhamentos.map(acomp => (
-                                                    <tr key={acomp.id} className="hover:bg-slate-50 transition-colors group">
-                                                        <td className="p-4">
-                                                            <p className="font-bold text-slate-800">Prof. {acomp.professor}</p>
-                                                            <span className="inline-block px-2.5 py-0.5 text-[10px] font-bold uppercase rounded bg-emerald-50 text-emerald-600 border border-emerald-100 mt-1">{acomp.componente}</span>
-                                                        </td>
-                                                        <td className="p-4">
-                                                            <p className="text-sm font-semibold text-slate-700">{acomp.turma}</p>
-                                                            <p className="text-xs text-slate-500 mt-0.5">{acomp.periodoLetivo}</p>
-                                                            {acomp.data && <p className="text-[10px] text-slate-400 mt-0.5">{acomp.data}</p>}
-                                                        </td>
-                                                        <td className="p-4">
-                                                            <div>
-                                                                <p className="text-xs font-bold text-slate-400 uppercase">Estudante c/ Dificuldade</p>
-                                                                <p className="text-sm font-semibold text-slate-700">{acomp.estudante}</p>
-                                                            </div>
-                                                            {acomp.lider && (
-                                                                <div className="mt-1">
-                                                                    <p className="text-[10px] font-bold text-emerald-600 uppercase">Líder: {acomp.lider}</p>
-                                                                </div>
-                                                            )}
-                                                        </td>
-                                                        <td className="p-4 max-w-xs">
-                                                            <div className="mb-1.5">
-                                                                <span className="text-[10px] font-bold text-slate-400 uppercase">Dificuldades:</span>
-                                                                <p className="text-xs text-slate-600 line-clamp-2" title={acomp.dificuldades}>{acomp.dificuldades}</p>
-                                                            </div>
-                                                            <div>
-                                                                <span className="text-[10px] font-bold text-emerald-600 uppercase">Intervenção:</span>
-                                                                <p className="text-xs text-slate-700 line-clamp-2" title={acomp.intervencao}>{acomp.intervencao}</p>
-                                                            </div>
-                                                        </td>
-                                                        <td className="p-4 text-center">
-                                                            <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                <button title="Imprimir" onClick={() => setPrintingAcomp(acomp)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-brand-orange hover:border-brand-orange hover:bg-orange-50 flex items-center justify-center transition-colors shadow-sm">
-                                                                    <Printer size={14} />
-                                                                </button>
-                                                                <button title="Editar" onClick={() => handleEditAcomp(acomp)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 flex items-center justify-center transition-colors shadow-sm">
-                                                                    <Edit size={14} />
-                                                                </button>
-                                                                <button title="Excluir" onClick={() => handleDeleteAcomp(acomp.id)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50 flex items-center justify-center transition-colors shadow-sm">
-                                                                    <Trash2 size={14} />
-                                                                </button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                                {filteredAcompanhamentos.length === 0 && !isEditingAcomp && (
-                                                    <tr>
-                                                        <td colSpan={5} className="p-8 text-center bg-slate-50 border-b border-dashed border-slate-200">
-                                                            <UserCheck className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                                                            <p className="text-slate-500">Nenhum acompanhamento docente registrado.</p>
-                                                        </td>
-                                                    </tr>
-                                                )}
-                                            </tbody>
-                                        </table>
+                            {/* CONTROLE DE EXIBIÇÃO: SOB DEMANDA (ACOMPANHAMENTO) */}
+                            {!isEditingAcomp && !isEditingAcompInfantil && (
+                                !hasConsultadoAcomp && !isLoadingAcomp ? (
+                                    <div className="bg-slate-50/80 rounded-2xl border border-dashed border-slate-200 p-12 flex flex-col items-center justify-center text-center space-y-4 my-4 animate-fade-in">
+                                        <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-500 shadow-inner">
+                                            <Search className="w-8 h-8" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-base font-bold text-slate-800">Consulta de Acompanhamento Docente</h4>
+                                            <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
+                                                Utilize os filtros acima para especificar Unidade, Responsável, Etapa, Bimestre, Componente/Campo e Turma. Em seguida, clique no botão <strong>Consultar Registros</strong> para pesquisar no banco de dados.
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={handleConsultarAcomp}
+                                            className="px-6 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl text-xs font-black shadow-lg shadow-orange-500/25 flex items-center gap-2 uppercase tracking-wider transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                                        >
+                                            <Search className="w-4 h-4" />
+                                            Consultar Registros
+                                        </button>
                                     </div>
-                                )
-                            }
+                                ) : isLoadingAcomp ? (
+                                    <div className="p-16 flex flex-col items-center justify-center text-center space-y-3">
+                                        <RefreshCw className="w-8 h-8 text-orange-500 animate-spin" />
+                                        <p className="text-sm font-bold text-slate-700">Consultando registros de acompanhamento docente no banco de dados...</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        {/* List Fundamental */}
+                                        {
+                                            acompEtapa === 'fundamental' && (
+                                                <div className="overflow-x-auto mt-6">
+                                                    <table className="w-full text-left border-collapse">
+                                                        <thead>
+                                                            <tr className="bg-slate-50 border-y border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                                                <th className="p-4">Professor(a) / Componente</th>
+                                                                <th className="p-4">Turma / Período</th>
+                                                                <th className="p-4">Estudante / Líder</th>
+                                                                <th className="p-4 max-w-xs">Dificuldades / Intervenção</th>
+                                                                <th className="p-4 text-center">Ações</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-100">
+                                                            {filteredAcompanhamentos.map(acomp => (
+                                                                <tr key={acomp.id} className="hover:bg-slate-50 transition-colors group">
+                                                                    <td className="p-4">
+                                                                        <p className="font-bold text-slate-800">Prof. {acomp.professor}</p>
+                                                                        <span className="inline-block px-2.5 py-0.5 text-[10px] font-bold uppercase rounded bg-emerald-50 text-emerald-600 border border-emerald-100 mt-1">{acomp.componente}</span>
+                                                                    </td>
+                                                                    <td className="p-4">
+                                                                        <p className="text-sm font-semibold text-slate-700">{acomp.turma}</p>
+                                                                        <p className="text-xs text-slate-500 mt-0.5">{acomp.periodoLetivo}</p>
+                                                                        {acomp.data && <p className="text-[10px] text-slate-400 mt-0.5">{acomp.data}</p>}
+                                                                    </td>
+                                                                    <td className="p-4">
+                                                                        <div>
+                                                                            <p className="text-xs font-bold text-slate-400 uppercase">Estudante c/ Dificuldade</p>
+                                                                            <p className="text-sm font-semibold text-slate-700">{acomp.estudante}</p>
+                                                                        </div>
+                                                                        {acomp.lider && (
+                                                                            <div className="mt-1">
+                                                                                <p className="text-[10px] font-bold text-emerald-600 uppercase">Líder: {acomp.lider}</p>
+                                                                            </div>
+                                                                        )}
+                                                                    </td>
+                                                                    <td className="p-4 max-w-xs">
+                                                                        <div className="mb-1.5">
+                                                                            <span className="text-[10px] font-bold text-slate-400 uppercase">Dificuldades:</span>
+                                                                            <p className="text-xs text-slate-600 line-clamp-2" title={acomp.dificuldades}>{acomp.dificuldades}</p>
+                                                                        </div>
+                                                                        <div>
+                                                                            <span className="text-[10px] font-bold text-emerald-600 uppercase">Intervenção:</span>
+                                                                            <p className="text-xs text-slate-700 line-clamp-2" title={acomp.intervencao}>{acomp.intervencao}</p>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="p-4 text-center">
+                                                                        <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                            <button title="Imprimir" onClick={() => setPrintingAcomp(acomp)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-brand-orange hover:border-brand-orange hover:bg-orange-50 flex items-center justify-center transition-colors shadow-sm">
+                                                                                <Printer size={14} />
+                                                                            </button>
+                                                                            <button title="Editar" onClick={() => handleEditAcomp(acomp)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 flex items-center justify-center transition-colors shadow-sm">
+                                                                                <Edit size={14} />
+                                                                            </button>
+                                                                            <button title="Excluir" onClick={() => handleDeleteAcomp(acomp.id)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50 flex items-center justify-center transition-colors shadow-sm">
+                                                                                <Trash2 size={14} />
+                                                                            </button>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                            {filteredAcompanhamentos.length === 0 && (
+                                                                <tr>
+                                                                    <td colSpan={5} className="p-8 text-center bg-slate-50 border-b border-dashed border-slate-200">
+                                                                        <UserCheck className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                                                                        <p className="text-slate-500">Nenhum acompanhamento docente encontrado com os filtros selecionados.</p>
+                                                                    </td>
+                                                                </tr>
+                                                            )}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            )
+                                        }
 
-                            {/* List Infantil */}
-                            {
-                                acompEtapa === 'infantil' && (
-                                    <div className="overflow-x-auto mt-6">
-                                        <table className="w-full text-left border-collapse">
-                                            <thead>
-                                                <tr className="bg-slate-50 border-y border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                                    <th className="p-4">Professor(a) / Campo</th>
-                                                    <th className="p-4">Agrupamento / Período</th>
-                                                    <th className="p-4">Criança / Interação</th>
-                                                    <th className="p-4 max-w-xs">Evidências / Mediação</th>
-                                                    <th className="p-4 text-center">Ações</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-100">
-                                                {filteredAcompInfantil.map(acomp => (
-                                                    <tr key={acomp.id} className="hover:bg-slate-50 transition-colors group">
-                                                        <td className="p-4">
-                                                            <p className="font-bold text-slate-800">Prof. {acomp.professor}</p>
-                                                            <span className="inline-block px-2.5 py-0.5 text-[10px] font-bold uppercase rounded bg-purple-50 text-purple-600 border border-purple-100 mt-1">{acomp.campoExperiencia}</span>
-                                                        </td>
-                                                        <td className="p-4">
-                                                            <p className="text-sm font-semibold text-slate-700">{acomp.agrupamento}</p>
-                                                            <p className="text-xs text-slate-500 mt-0.5">{acomp.periodoLetivo}</p>
-                                                            {acomp.data && <p className="text-[10px] text-slate-400 mt-0.5">{acomp.data}</p>}
-                                                        </td>
-                                                        <td className="p-4">
-                                                            <div>
-                                                                <p className="text-xs font-bold text-slate-400 uppercase">Criança em Observação</p>
-                                                                <p className="text-sm font-semibold text-slate-700">{acomp.crianca}</p>
-                                                            </div>
-                                                            {acomp.tipoInteracao && (
-                                                                <div className="mt-1">
-                                                                    <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-orange-50 text-orange-600 border border-orange-100">{acomp.tipoInteracao}</span>
-                                                                </div>
+                                        {/* List Infantil */}
+                                        {
+                                            acompEtapa === 'infantil' && (
+                                                <div className="overflow-x-auto mt-6">
+                                                    <table className="w-full text-left border-collapse">
+                                                        <thead>
+                                                            <tr className="bg-slate-50 border-y border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                                                <th className="p-4">Professor(a) / Campo</th>
+                                                                <th className="p-4">Agrupamento / Período</th>
+                                                                <th className="p-4">Criança / Interação</th>
+                                                                <th className="p-4 max-w-xs">Evidências / Mediação</th>
+                                                                <th className="p-4 text-center">Ações</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-100">
+                                                            {filteredAcompInfantil.map(acomp => (
+                                                                <tr key={acomp.id} className="hover:bg-slate-50 transition-colors group">
+                                                                    <td className="p-4">
+                                                                        <p className="font-bold text-slate-800">Prof. {acomp.professor}</p>
+                                                                        <span className="inline-block px-2.5 py-0.5 text-[10px] font-bold uppercase rounded bg-purple-50 text-purple-600 border border-purple-100 mt-1">{acomp.campoExperiencia}</span>
+                                                                    </td>
+                                                                    <td className="p-4">
+                                                                        <p className="text-sm font-semibold text-slate-700">{acomp.agrupamento}</p>
+                                                                        <p className="text-xs text-slate-500 mt-0.5">{acomp.periodoLetivo}</p>
+                                                                        {acomp.data && <p className="text-[10px] text-slate-400 mt-0.5">{acomp.data}</p>}
+                                                                    </td>
+                                                                    <td className="p-4">
+                                                                        <div>
+                                                                            <p className="text-xs font-bold text-slate-400 uppercase">Criança em Observação</p>
+                                                                            <p className="text-sm font-semibold text-slate-700">{acomp.crianca}</p>
+                                                                        </div>
+                                                                        {acomp.tipoInteracao && (
+                                                                            <div className="mt-1">
+                                                                                <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-orange-50 text-orange-600 border border-orange-100">{acomp.tipoInteracao}</span>
+                                                                            </div>
+                                                                        )}
+                                                                    </td>
+                                                                    <td className="p-4 max-w-xs">
+                                                                        <div className="mb-1.5">
+                                                                            <span className="text-[10px] font-bold text-slate-400 uppercase">Evidências:</span>
+                                                                            <p className="text-xs text-slate-600 line-clamp-2" title={acomp.evidencias}>{acomp.evidencias}</p>
+                                                                        </div>
+                                                                        <div>
+                                                                            <span className="text-[10px] font-bold text-purple-600 uppercase">Mediação:</span>
+                                                                            <p className="text-xs text-slate-700 line-clamp-2" title={acomp.intencionalidade}>{acomp.intencionalidade}</p>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="p-4 text-center">
+                                                                        <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                            <button title="Imprimir" onClick={() => setPrintingAcomp(acomp)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-brand-orange hover:border-brand-orange hover:bg-orange-50 flex items-center justify-center transition-colors shadow-sm">
+                                                                                <Printer size={14} />
+                                                                            </button>
+                                                                            <button title="Editar" onClick={() => handleEditAcompInfantil(acomp)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 flex items-center justify-center transition-colors shadow-sm">
+                                                                                <Edit size={14} />
+                                                                            </button>
+                                                                            <button title="Excluir" onClick={() => handleDeleteAcompInfantil(acomp.id)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50 flex items-center justify-center transition-colors shadow-sm">
+                                                                                <Trash2 size={14} />
+                                                                            </button>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                            {filteredAcompInfantil.length === 0 && (
+                                                                <tr>
+                                                                    <td colSpan={5} className="p-8 text-center bg-slate-50 border-b border-dashed border-slate-200">
+                                                                        <Baby className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                                                                        <p className="text-slate-500">Nenhum registro de acompanhamento infantil encontrado com os filtros selecionados.</p>
+                                                                    </td>
+                                                                </tr>
                                                             )}
-                                                        </td>
-                                                        <td className="p-4 max-w-xs">
-                                                            <div className="mb-1.5">
-                                                                <span className="text-[10px] font-bold text-slate-400 uppercase">Evidências:</span>
-                                                                <p className="text-xs text-slate-600 line-clamp-2" title={acomp.evidencias}>{acomp.evidencias}</p>
-                                                            </div>
-                                                            <div>
-                                                                <span className="text-[10px] font-bold text-purple-600 uppercase">Mediação:</span>
-                                                                <p className="text-xs text-slate-700 line-clamp-2" title={acomp.intencionalidade}>{acomp.intencionalidade}</p>
-                                                            </div>
-                                                        </td>
-                                                        <td className="p-4 text-center">
-                                                            <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                <button title="Imprimir" onClick={() => setPrintingAcomp(acomp)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-brand-orange hover:border-brand-orange hover:bg-orange-50 flex items-center justify-center transition-colors shadow-sm">
-                                                                    <Printer size={14} />
-                                                                </button>
-                                                                <button title="Editar" onClick={() => handleEditAcompInfantil(acomp)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 flex items-center justify-center transition-colors shadow-sm">
-                                                                    <Edit size={14} />
-                                                                </button>
-                                                                <button title="Excluir" onClick={() => handleDeleteAcompInfantil(acomp.id)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50 flex items-center justify-center transition-colors shadow-sm">
-                                                                    <Trash2 size={14} />
-                                                                </button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                                {filteredAcompInfantil.length === 0 && !isEditingAcompInfantil && (
-                                                    <tr>
-                                                        <td colSpan={5} className="p-8 text-center bg-slate-50 border-b border-dashed border-slate-200">
-                                                            <Baby className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                                                            <p className="text-slate-500">Nenhum registro de acompanhamento infantil.</p>
-                                                        </td>
-                                                    </tr>
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            )
+                                        }
+                                    </>
                                 )
-                            }
+                            )}
                         </div>
                     </div>
                 );
             case 'encaminhamentos':
                 return (
                     <div className="space-y-6">
-                        {renderContextSelectorHeader(encEtapa)}
+                        {renderContextSelectorHeader(encEtapa, 'encaminhamentos')}
                         <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm text-left">
                             <div className="flex justify-between items-start mb-8">
                                 <div>
@@ -3819,12 +4010,12 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                         id: '',
                                                         crianca: '',
                                                         agrupamento: activeTurma ? getTurmaLabel(activeTurma) : '',
-                                                        campoExperiencia: selectedCampoExperiencia,
+                                                        campoExperiencia: selectedCampoExperiencia !== 'ALL' ? selectedCampoExperiencia : '',
                                                         periodoLetivo: '1º Bimestre',
                                                         data: new Date().toISOString().substring(0, 10),
                                                         evidencias: '',
                                                         estrategia: '',
-                                                        professor: selectedResponsavel,
+                                                        professor: selectedResponsavel !== 'ALL' ? selectedResponsavel : '',
                                                         status: 'Pendente'
                                                     });
                                                     setIsEditingEncInfantil(true);
@@ -3839,7 +4030,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                         data: new Date().toISOString().substring(0, 10),
                                                         periodoLetivo: '1º Bimestre',
                                                         status: 'Pendente',
-                                                        responsavel: selectedResponsavel
+                                                        responsavel: selectedResponsavel !== 'ALL' ? selectedResponsavel : ''
                                                     });
                                                     setIsEditingEnc(true);
                                                 }
@@ -3993,7 +4184,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                             const students = await ccEstudanteService.getByTurma(selected.id);
                                                             setEncInfantilFormStudents(students || []);
                                                             setCurrentClassStudents(students || []);
-                                                        } catch (err) {
+                                                        } catch (err) { 
                                                             console.error('Erro ao buscar alunos do agrupamento selecionado:', err);
                                                         }
                                                     }
@@ -4075,126 +4266,157 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                 </div>
                             )}
 
-                        {/* ===== LISTA DE REGISTROS FUNDAMENTAL ===== */}
-                        {encEtapa === 'fundamental' && (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr className="bg-slate-50 border-y border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                            <th className="p-4">Estudante</th>
-                                            <th className="p-4">Tipo / Status</th>
-                                            <th className="p-4">Período / Data</th>
-                                            <th className="p-4 max-w-xs">Motivo / Descrição</th>
-                                            <th className="p-4 text-center">Ações</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {filteredEncaminhamentos.map(enc => (
-                                            <tr key={enc.id} className="hover:bg-slate-50 transition-colors group">
-                                                <td className="p-4">
-                                                    <p className="font-bold text-slate-800">{enc.estudante}</p>
-                                                    <p className="text-xs text-slate-500">{enc.turma}</p>
-                                                    <p className="text-[10px] text-slate-400 mt-1 uppercase">Resp: {enc.responsavel}</p>
-                                                </td>
-                                                <td className="p-4">
-                                                    <span className="inline-block px-2 py-1 text-[10px] font-bold uppercase rounded bg-slate-100 text-slate-600 mb-1">{enc.tipo}</span><br />
-                                                    <span className={`inline-block px-2 py-1 text-[10px] font-bold uppercase rounded ${enc.status === 'Concluído' ? 'bg-emerald-100 text-emerald-700' : enc.status === 'Em Andamento' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>{enc.status}</span>
-                                                </td>
-                                                <td className="p-4">
-                                                    <p className="text-sm text-slate-700">{enc.periodoLetivo}</p>
-                                                    <p className="text-xs text-slate-500">{enc.data}</p>
-                                                </td>
-                                                <td className="p-4 max-w-xs">
-                                                    <p className="text-xs text-slate-600 line-clamp-2" title={enc.descricao}>{enc.descricao}</p>
-                                                </td>
-                                                <td className="p-4">
-                                                    <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <button title="Imprimir" onClick={() => setPrintingEncaminhamento(enc)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-brand-orange hover:border-brand-orange hover:bg-orange-50 flex items-center justify-center transition-colors shadow-sm">
-                                                            <Printer size={14} />
-                                                        </button>
-                                                        <button title="Editar" onClick={() => handleEditEnc(enc)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 flex items-center justify-center transition-colors shadow-sm">
-                                                            <Edit size={14} />
-                                                        </button>
-                                                        <button title="Excluir" onClick={() => handleDeleteEnc(enc.id)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50 flex items-center justify-center transition-colors shadow-sm">
-                                                            <Trash2 size={14} />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                        {filteredEncaminhamentos.length === 0 && !isEditingEnc && (
-                                            <tr>
-                                                <td colSpan={5} className="p-8 text-center bg-slate-50 border-b border-dashed border-slate-200">
-                                                    <AlertTriangle className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                                                    <p className="text-slate-500">Nenhum encaminhamento ou intervenção registrada.</p>
-                                                </td>
-                                            </tr>
+                            {/* CONTROLE DE EXIBIÇÃO: SOB DEMANDA (ENCAMINHAMENTOS) */}
+                            {!isEditingEnc && !isEditingEncInfantil && (
+                                !hasConsultadoEnc && !isLoadingEnc ? (
+                                    <div className="bg-slate-50/80 rounded-2xl border border-dashed border-slate-200 p-12 flex flex-col items-center justify-center text-center space-y-4 my-4 animate-fade-in">
+                                        <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-500 shadow-inner">
+                                            <Search className="w-8 h-8" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-base font-bold text-slate-800">Consulta de Encaminhamentos e Intervenções</h4>
+                                            <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
+                                                Utilize os filtros acima para especificar Unidade, Responsável, Etapa, Bimestre e Turma. Em seguida, clique no botão <strong>Consultar Registros</strong> para pesquisar no banco de dados.
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={handleConsultarEnc}
+                                            className="px-6 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl text-xs font-black shadow-lg shadow-orange-500/25 flex items-center gap-2 uppercase tracking-wider transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                                        >
+                                            <Search className="w-4 h-4" />
+                                            Consultar Registros
+                                        </button>
+                                    </div>
+                                ) : isLoadingEnc ? (
+                                    <div className="p-16 flex flex-col items-center justify-center text-center space-y-3">
+                                        <RefreshCw className="w-8 h-8 text-orange-500 animate-spin" />
+                                        <p className="text-sm font-bold text-slate-700">Consultando encaminhamentos e intervenções no banco de dados...</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        {/* ===== LISTA DE REGISTROS FUNDAMENTAL ===== */}
+                                        {encEtapa === 'fundamental' && (
+                                            <div className="overflow-x-auto mt-6">
+                                                <table className="w-full text-left border-collapse">
+                                                    <thead>
+                                                        <tr className="bg-slate-50 border-y border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                                            <th className="p-4">Estudante</th>
+                                                            <th className="p-4">Tipo / Status</th>
+                                                            <th className="p-4">Período / Data</th>
+                                                            <th className="p-4 max-w-xs">Motivo / Descrição</th>
+                                                            <th className="p-4 text-center">Ações</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100">
+                                                        {filteredEncaminhamentos.map(enc => (
+                                                            <tr key={enc.id} className="hover:bg-slate-50 transition-colors group">
+                                                                <td className="p-4">
+                                                                    <p className="font-bold text-slate-800">{enc.estudante}</p>
+                                                                    <p className="text-xs text-slate-500">{enc.turma}</p>
+                                                                    <p className="text-[10px] text-slate-400 mt-1 uppercase">Resp: {enc.responsavel}</p>
+                                                                </td>
+                                                                <td className="p-4">
+                                                                    <span className="inline-block px-2 py-1 text-[10px] font-bold uppercase rounded bg-slate-100 text-slate-600 mb-1">{enc.tipo}</span><br />
+                                                                    <span className={`inline-block px-2 py-1 text-[10px] font-bold uppercase rounded ${enc.status === 'Concluído' ? 'bg-emerald-100 text-emerald-700' : enc.status === 'Em Andamento' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>{enc.status}</span>
+                                                                </td>
+                                                                <td className="p-4">
+                                                                    <p className="text-sm text-slate-700">{enc.periodoLetivo}</p>
+                                                                    <p className="text-xs text-slate-500">{enc.data}</p>
+                                                                </td>
+                                                                <td className="p-4 max-w-xs">
+                                                                    <p className="text-xs text-slate-600 line-clamp-2" title={enc.descricao}>{enc.descricao}</p>
+                                                                </td>
+                                                                <td className="p-4">
+                                                                    <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                        <button title="Imprimir" onClick={() => setPrintingEncaminhamento(enc)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-brand-orange hover:border-brand-orange hover:bg-orange-50 flex items-center justify-center transition-colors shadow-sm">
+                                                                            <Printer size={14} />
+                                                                        </button>
+                                                                        <button title="Editar" onClick={() => handleEditEnc(enc)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 flex items-center justify-center transition-colors shadow-sm">
+                                                                            <Edit size={14} />
+                                                                        </button>
+                                                                        <button title="Excluir" onClick={() => handleDeleteEnc(enc.id)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50 flex items-center justify-center transition-colors shadow-sm">
+                                                                            <Trash2 size={14} />
+                                                                        </button>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                        {filteredEncaminhamentos.length === 0 && (
+                                                            <tr>
+                                                                <td colSpan={5} className="p-8 text-center bg-slate-50 border-b border-dashed border-slate-200">
+                                                                    <AlertTriangle className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                                                                    <p className="text-slate-500">Nenhum encaminhamento ou intervenção encontrada com os filtros selecionados.</p>
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                    </tbody>
+                                                </table>
+                                            </div>
                                         )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
 
-                        {/* ===== LISTA DE REGISTROS INFANTIL ===== */}
-                        {encEtapa === 'infantil' && (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr className="bg-slate-50 border-y border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                            <th className="p-4">Criança</th>
-                                            <th className="p-4">Campo / Status</th>
-                                            <th className="p-4">Período / Data</th>
-                                            <th className="p-4 max-w-xs">Evidências / Estratégia</th>
-                                            <th className="p-4 text-center">Ações</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {filteredEncInfantil.map(enc => (
-                                            <tr key={enc.id} className="hover:bg-slate-50 transition-colors group">
-                                                <td className="p-4">
-                                                    <p className="font-bold text-slate-800">{enc.crianca}</p>
-                                                    <p className="text-xs text-slate-500">{enc.agrupamento}</p>
-                                                    <p className="text-[10px] text-slate-400 mt-1 uppercase">Prof: {enc.professor}</p>
-                                                </td>
-                                                <td className="p-4">
-                                                    <span className="inline-block px-2 py-1 text-[10px] font-bold uppercase rounded bg-purple-50 text-purple-600 mb-1">{enc.campoExperiencia}</span><br />
-                                                    <span className={`inline-block px-2 py-1 text-[10px] font-bold uppercase rounded ${enc.status === 'Concluído' ? 'bg-emerald-100 text-emerald-700' : enc.status === 'Em Andamento' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>{enc.status}</span>
-                                                </td>
-                                                <td className="p-4">
-                                                    <p className="text-sm text-slate-700">{enc.periodoLetivo}</p>
-                                                    <p className="text-xs text-slate-500">{enc.data}</p>
-                                                </td>
-                                                <td className="p-4 max-w-xs">
-                                                    <p className="text-xs text-slate-600 line-clamp-1 mb-1" title={enc.evidencias}><strong className="text-slate-400">Evidência:</strong> {enc.evidencias}</p>
-                                                    <p className="text-xs text-slate-600 line-clamp-1" title={enc.estrategia}><strong className="text-slate-400">Estratégia:</strong> {enc.estrategia}</p>
-                                                </td>
-                                                <td className="p-4">
-                                                    <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <button title="Imprimir" onClick={() => setPrintingEncaminhamento(enc)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-brand-orange hover:border-brand-orange hover:bg-orange-50 flex items-center justify-center transition-colors shadow-sm">
-                                                            <Printer size={14} />
-                                                        </button>
-                                                        <button title="Editar" onClick={() => handleEditEncInfantil(enc)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 flex items-center justify-center transition-colors shadow-sm">
-                                                            <Edit size={14} />
-                                                        </button>
-                                                        <button title="Excluir" onClick={() => handleDeleteEncInfantil(enc.id)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50 flex items-center justify-center transition-colors shadow-sm">
-                                                            <Trash2 size={14} />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                        {filteredEncInfantil.length === 0 && !isEditingEncInfantil && (
-                                            <tr>
-                                                <td colSpan={5} className="p-8 text-center bg-slate-50 border-b border-dashed border-slate-200">
-                                                    <Baby className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                                                    <p className="text-slate-500">Nenhum encaminhamento ou intervenção da Educação Infantil registrada.</p>
-                                                </td>
-                                            </tr>
+                                        {/* ===== LISTA DE REGISTROS INFANTIL ===== */}
+                                        {encEtapa === 'infantil' && (
+                                            <div className="overflow-x-auto mt-6">
+                                                <table className="w-full text-left border-collapse">
+                                                    <thead>
+                                                        <tr className="bg-slate-50 border-y border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                                            <th className="p-4">Criança</th>
+                                                            <th className="p-4">Campo / Status</th>
+                                                            <th className="p-4">Período / Data</th>
+                                                            <th className="p-4 max-w-xs">Evidências / Estratégia</th>
+                                                            <th className="p-4 text-center">Ações</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100">
+                                                        {filteredEncInfantil.map(enc => (
+                                                            <tr key={enc.id} className="hover:bg-slate-50 transition-colors group">
+                                                                <td className="p-4">
+                                                                    <p className="font-bold text-slate-800">{enc.crianca}</p>
+                                                                    <p className="text-xs text-slate-500">{enc.agrupamento}</p>
+                                                                    <p className="text-[10px] text-slate-400 mt-1 uppercase">Prof: {enc.professor}</p>
+                                                                </td>
+                                                                <td className="p-4">
+                                                                    <span className="inline-block px-2 py-1 text-[10px] font-bold uppercase rounded bg-purple-50 text-purple-600 mb-1">{enc.campoExperiencia}</span><br />
+                                                                    <span className={`inline-block px-2 py-1 text-[10px] font-bold uppercase rounded ${enc.status === 'Concluído' ? 'bg-emerald-100 text-emerald-700' : enc.status === 'Em Andamento' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>{enc.status}</span>
+                                                                </td>
+                                                                <td className="p-4">
+                                                                    <p className="text-sm text-slate-700">{enc.periodoLetivo}</p>
+                                                                    <p className="text-xs text-slate-500">{enc.data}</p>
+                                                                </td>
+                                                                <td className="p-4 max-w-xs">
+                                                                    <p className="text-xs text-slate-600 line-clamp-1 mb-1" title={enc.evidencias}><strong className="text-slate-400">Evidência:</strong> {enc.evidencias}</p>
+                                                                    <p className="text-xs text-slate-600 line-clamp-1" title={enc.estrategia}><strong className="text-slate-400">Estratégia:</strong> {enc.estrategia}</p>
+                                                                </td>
+                                                                <td className="p-4">
+                                                                    <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                        <button title="Imprimir" onClick={() => setPrintingEncaminhamento(enc)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-brand-orange hover:border-brand-orange hover:bg-orange-50 flex items-center justify-center transition-colors shadow-sm">
+                                                                            <Printer size={14} />
+                                                                        </button>
+                                                                        <button title="Editar" onClick={() => handleEditEncInfantil(enc)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 flex items-center justify-center transition-colors shadow-sm">
+                                                                            <Edit size={14} />
+                                                                        </button>
+                                                                        <button title="Excluir" onClick={() => handleDeleteEncInfantil(enc.id)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50 flex items-center justify-center transition-colors shadow-sm">
+                                                                            <Trash2 size={14} />
+                                                                        </button>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                        {filteredEncInfantil.length === 0 && (
+                                                            <tr>
+                                                                <td colSpan={5} className="p-8 text-center bg-slate-50 border-b border-dashed border-slate-200">
+                                                                    <Baby className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                                                                    <p className="text-slate-500">Nenhum encaminhamento ou intervenção da Educação Infantil encontrada com os filtros selecionados.</p>
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                    </tbody>
+                                                </table>
+                                            </div>
                                         )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
+                                    </>
+                                )
+                            )}
                         </div>
                     </div>
                 );
