@@ -6,7 +6,8 @@ import { Button } from './ui/Button';
 import { 
   Camera, Plus, Search, Edit2, Trash2, Printer, 
   X, Calendar, School as SchoolIcon, Bookmark, Save,
-  Check, Info, Users, Image as ImageIcon, Loader2, ChevronLeft, ChevronRight
+  Check, Info, Users, Image as ImageIcon, Loader2, ChevronLeft, ChevronRight,
+  ListFilter, RotateCcw
 } from 'lucide-react';
 import { Escola, Coordenador, Segmento, Aluno } from '../types';
 import { supabase } from '../services/supabase';
@@ -83,10 +84,18 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [compressing, setCompressing] = useState(false);
 
-  // Filters
+  // Search & History Filters State
   const [searchTerm, setSearchTerm] = useState('');
-  const [schoolFilter, setSchoolFilter] = useState('ALL');
-  const [studentFilter, setStudentFilter] = useState('ALL');
+  const [historyFilterEscola, setHistoryFilterEscola] = useState('');
+  const [historyFilterAnoSerie, setHistoryFilterAnoSerie] = useState('');
+  const [historyFilterTurma, setHistoryFilterTurma] = useState('');
+  const [historyFilterCampoExperiencia, setHistoryFilterCampoExperiencia] = useState('');
+  const [historyFilterTipoRegistro, setHistoryFilterTipoRegistro] = useState('');
+  const [historyFilterAluno, setHistoryFilterAluno] = useState('');
+
+  // Pagination State
+  const [historyItemsPerPage, setHistoryItemsPerPage] = useState(12);
+  const [historyCurrentPage, setHistoryCurrentPage] = useState(1);
 
   // Print Portal
   const [printEntry, setPrintEntry] = useState<PortfolioEntry | null>(null);
@@ -637,19 +646,141 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
     }
   };
 
+  const hasActiveHistoryFilters = Boolean(
+    historyFilterEscola ||
+    historyFilterAnoSerie ||
+    historyFilterTurma ||
+    historyFilterCampoExperiencia ||
+    historyFilterTipoRegistro ||
+    historyFilterAluno
+  );
+
+  const handleClearHistoryFilters = () => {
+    setHistoryFilterEscola('');
+    setHistoryFilterAnoSerie('');
+    setHistoryFilterTurma('');
+    setHistoryFilterCampoExperiencia('');
+    setHistoryFilterTipoRegistro('');
+    setHistoryFilterAluno('');
+  };
+
+  const historyOptions = useMemo(() => {
+    const escolasMap = new Map<string, string>();
+    const faixasSet = new Set<string>();
+    const turmasSet = new Set<string>();
+    const camposSet = new Set<string>();
+    const alunosSet = new Set<string>();
+
+    entries.forEach(entry => {
+      const matchEscola = !historyFilterEscola || String(entry.escolaId) === String(historyFilterEscola);
+      const matchFaixa = !historyFilterAnoSerie || entry.anoSerie === historyFilterAnoSerie;
+      const matchTurma = !historyFilterTurma || entry.turmaNome === historyFilterTurma || String(entry.turmaId) === String(historyFilterTurma);
+      const matchCampo = !historyFilterCampoExperiencia || entry.campoExperiencia === historyFilterCampoExperiencia;
+      const matchTipo = !historyFilterTipoRegistro || 
+        (historyFilterTipoRegistro === 'COLETIVO' && entry.alunoId === null) || 
+        (historyFilterTipoRegistro === 'INDIVIDUAL' && entry.alunoId !== null);
+      const matchAluno = !historyFilterAluno || entry.alunoNome === historyFilterAluno || String(entry.alunoId) === String(historyFilterAluno);
+
+      // Escolas
+      if (entry.escolaId && entry.escolaNome) {
+        if (matchFaixa && matchTurma && matchCampo && matchTipo && matchAluno) {
+          escolasMap.set(String(entry.escolaId), entry.escolaNome);
+        }
+      }
+
+      // Faixas Etárias
+      if (entry.anoSerie) {
+        if (matchEscola && matchTurma && matchCampo && matchTipo && matchAluno) {
+          faixasSet.add(entry.anoSerie);
+        }
+      }
+
+      // Turmas
+      if (entry.turmaNome) {
+        if (matchEscola && matchFaixa && matchCampo && matchTipo && matchAluno) {
+          turmasSet.add(entry.turmaNome);
+        }
+      }
+
+      // Campos de Experiência
+      if (entry.campoExperiencia) {
+        if (matchEscola && matchFaixa && matchTurma && matchTipo && matchAluno) {
+          camposSet.add(entry.campoExperiencia);
+        }
+      }
+
+      // Alunos (Individuais)
+      if (entry.alunoNome && entry.alunoId !== null && entry.alunoNome !== 'Toda a Turma') {
+        if (matchEscola && matchFaixa && matchTurma && matchCampo && matchTipo) {
+          alunosSet.add(entry.alunoNome);
+        }
+      }
+    });
+
+    escolasInfantil.forEach(e => {
+      if (!escolasMap.has(e.id)) {
+        escolasMap.set(e.id, e.nome);
+      }
+    });
+
+    ['Creche I', 'Creche II', 'Creche III', 'Pré I', 'Pré II'].forEach(f => faixasSet.add(f));
+    CAMPOS_EXPERIENCIA.forEach(c => camposSet.add(c));
+
+    const escolasList = Array.from(escolasMap.entries()).map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome));
+    const faixasList = Array.from(faixasSet).sort();
+    const turmasList = Array.from(turmasSet).sort((a, b) => a.localeCompare(b));
+    const camposList = Array.from(camposSet).sort((a, b) => a.localeCompare(b));
+    const alunosList = Array.from(alunosSet).sort((a, b) => a.localeCompare(b));
+
+    return {
+      escolas: escolasList,
+      anosSeries: faixasList,
+      turmas: turmasList,
+      camposExperiencia: camposList,
+      alunos: alunosList
+    };
+  }, [entries, historyFilterEscola, historyFilterAnoSerie, historyFilterTurma, historyFilterCampoExperiencia, historyFilterTipoRegistro, historyFilterAluno, escolasInfantil]);
+
   // Filter entries based on search and filters
   const filteredEntries = useMemo(() => {
     return entries.filter(e => {
-      const matchSearch = e.titulo.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          e.descricao.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          e.alunoNome.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchSchool = schoolFilter === 'ALL' || e.escolaId === schoolFilter;
-      const matchStudent = studentFilter === 'ALL' || 
-                           (studentFilter === 'COLETIVO' && e.alunoId === null) || 
-                           (studentFilter === 'INDIVIDUAL' && e.alunoId !== null);
-      return matchSearch && matchSchool && matchStudent;
+      if (historyFilterEscola && String(e.escolaId) !== String(historyFilterEscola)) return false;
+      if (historyFilterAnoSerie && e.anoSerie !== historyFilterAnoSerie && !e.anoSerie?.toLowerCase().includes(historyFilterAnoSerie.toLowerCase())) return false;
+      if (historyFilterTurma && e.turmaNome !== historyFilterTurma && String(e.turmaId) !== String(historyFilterTurma)) return false;
+      if (historyFilterCampoExperiencia && e.campoExperiencia !== historyFilterCampoExperiencia) return false;
+      if (historyFilterTipoRegistro === 'COLETIVO' && e.alunoId !== null) return false;
+      if (historyFilterTipoRegistro === 'INDIVIDUAL' && e.alunoId === null) return false;
+      if (historyFilterAluno && e.alunoNome !== historyFilterAluno && String(e.alunoId) !== String(historyFilterAluno)) return false;
+
+      if (searchTerm.trim()) {
+        const term = searchTerm.toLowerCase().trim();
+        const matchTitulo = (e.titulo || '').toLowerCase().includes(term);
+        const matchDesc = (e.descricao || '').toLowerCase().includes(term);
+        const matchAluno = (e.alunoNome || '').toLowerCase().includes(term);
+        const matchTurma = (e.turmaNome || '').toLowerCase().includes(term);
+        const matchEscola = (e.escolaNome || '').toLowerCase().includes(term);
+        const matchCampo = (e.campoExperiencia || '').toLowerCase().includes(term);
+        if (!matchTitulo && !matchDesc && !matchAluno && !matchTurma && !matchEscola && !matchCampo) return false;
+      }
+
+      return true;
     });
-  }, [entries, searchTerm, schoolFilter, studentFilter]);
+  }, [entries, historyFilterEscola, historyFilterAnoSerie, historyFilterTurma, historyFilterCampoExperiencia, historyFilterTipoRegistro, historyFilterAluno, searchTerm]);
+
+  // Reset pagination to page 1 whenever any filter changes
+  useEffect(() => {
+    setHistoryCurrentPage(1);
+  }, [historyFilterEscola, historyFilterAnoSerie, historyFilterTurma, historyFilterCampoExperiencia, historyFilterTipoRegistro, historyFilterAluno, searchTerm]);
+
+  // Pagination Math
+  const totalHistoryItems = filteredEntries.length;
+  const totalHistoryPages = Math.max(1, Math.ceil(totalHistoryItems / historyItemsPerPage));
+  const safeHistoryCurrentPage = Math.min(historyCurrentPage, totalHistoryPages);
+
+  const paginatedEntries = useMemo(() => {
+    const start = (safeHistoryCurrentPage - 1) * historyItemsPerPage;
+    return filteredEntries.slice(start, start + historyItemsPerPage);
+  }, [filteredEntries, safeHistoryCurrentPage, historyItemsPerPage]);
 
   return (
     <div className="space-y-6 text-left">
@@ -912,43 +1043,131 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
       <div className="space-y-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h3 className="text-md font-black text-slate-800 uppercase tracking-wider">Histórico do Portfólio ECE</h3>
-            <p className="text-xs text-slate-500 mt-0.5">Explore e imprima os relatos e registros visuais da Educação Infantil</p>
+            <h3 className="text-md font-black text-slate-800 uppercase tracking-wider">Histórico do Portfólio</h3>
+            <p className="text-xs text-slate-500 mt-0.5 font-medium">Explore e imprima os relatos e registros visuais da Educação Infantil</p>
           </div>
 
-          <div className="flex flex-wrap gap-2 w-full md:w-auto">
-            <div className="relative flex-1 md:flex-none">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <input 
-                type="text" 
-                placeholder="Buscar por tema ou aluno..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-white outline-none focus:border-brand-orange transition-all text-xs font-semibold"
-              />
-            </div>
-
-            <SearchableSchoolSelect
-              escolas={escolasInfantil}
-              selectedId={schoolFilter}
-              onChange={setSchoolFilter}
-              showAllOption={true}
-              allOptionLabel="Todas Unidades"
-              className="max-w-[240px]"
-              inputClassName="pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
+          <div className="relative w-full md:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+            <input 
+              type="text" 
+              placeholder="Buscar por tema ou aluno..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-white outline-none focus:border-brand-orange transition-all text-xs font-semibold"
             />
-
-            <select 
-              value={studentFilter}
-              onChange={e => setStudentFilter(e.target.value)}
-              className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 outline-none focus:border-brand-orange"
-            >
-              <option value="ALL">Todos Registros</option>
-              <option value="COLETIVO">Apenas Coletivos</option>
-              <option value="INDIVIDUAL">Apenas Individuais</option>
-            </select>
           </div>
         </div>
+
+        {/* History Filters Card */}
+        <Card className="bg-white border-slate-200 shadow-sm p-4 rounded-2xl">
+          <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+            <div className="flex items-center gap-2">
+              <ListFilter className="text-brand-orange w-4 h-4" />
+              <span className="text-xs font-black text-slate-700 uppercase tracking-wider">Filtros do Histórico</span>
+            </div>
+            {hasActiveHistoryFilters && (
+              <button
+                onClick={handleClearHistoryFilters}
+                className="flex items-center gap-1 text-[11px] font-bold text-slate-500 hover:text-brand-orange transition-colors"
+              >
+                <RotateCcw size={12} />
+                <span>Limpar Filtros</span>
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {/* Unidade Escolar */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Unidade Escolar</label>
+              <select
+                value={historyFilterEscola}
+                onChange={e => setHistoryFilterEscola(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todas as Unidades</option>
+                {historyOptions.escolas.map(e => (
+                  <option key={e.id} value={e.id}>{e.nome}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Faixa Etária / Ano */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Faixa Etária / Ano</label>
+              <select
+                value={historyFilterAnoSerie}
+                onChange={e => setHistoryFilterAnoSerie(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todas as Faixas Etárias</option>
+                {historyOptions.anosSeries.map(a => (
+                  <option key={a} value={a}>{a}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Turma */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Turma</label>
+              <select
+                value={historyFilterTurma}
+                onChange={e => setHistoryFilterTurma(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todas as Turmas</option>
+                {historyOptions.turmas.map(t => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Campo de Experiência */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Campo de Experiência</label>
+              <select
+                value={historyFilterCampoExperiencia}
+                onChange={e => setHistoryFilterCampoExperiencia(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todos os Campos</option>
+                {historyOptions.camposExperiencia.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Tipo de Registro */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tipo de Registro</label>
+              <select
+                value={historyFilterTipoRegistro}
+                onChange={e => setHistoryFilterTipoRegistro(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todos os Tipos</option>
+                <option value="COLETIVO">Coletivo (Turma)</option>
+                <option value="INDIVIDUAL">Individual (Aluno)</option>
+              </select>
+            </div>
+
+            {/* Aluno */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Aluno</label>
+              <select
+                value={historyFilterAluno}
+                onChange={e => setHistoryFilterAluno(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todos os Alunos</option>
+                {historyOptions.alunos.map(al => (
+                  <option key={al} value={al}>{al}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </Card>
 
         {/* Gallery Cards Grid */}
         {loading ? (
@@ -961,23 +1180,86 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
             Nenhum registro de Portfólio Visual encontrado.
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredEntries.map(entry => (
-              <PortfolioCard 
-                key={entry.id}
-                entry={entry}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                onPrint={(ent) => {
-                  setPrintEntry(ent);
-                  setTimeout(() => {
-                    window.print();
-                    setPrintEntry(null);
-                  }, 150);
-                }}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {paginatedEntries.map(entry => (
+                <PortfolioCard 
+                  key={entry.id}
+                  entry={entry}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  onPrint={(ent) => {
+                    setPrintEntry(ent);
+                    setTimeout(() => {
+                      window.print();
+                      setPrintEntry(null);
+                    }, 150);
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* Pagination Controls */}
+            {totalHistoryItems > 0 && (
+              <Card className="bg-white border-slate-200 shadow-sm p-4 rounded-2xl">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-semibold text-slate-600">
+                  <div>
+                    Mostrando{' '}
+                    <span className="font-bold text-slate-800">
+                      {Math.min((safeHistoryCurrentPage - 1) * historyItemsPerPage + 1, totalHistoryItems)}
+                    </span>{' '}
+                    a{' '}
+                    <span className="font-bold text-slate-800">
+                      {Math.min(safeHistoryCurrentPage * historyItemsPerPage, totalHistoryItems)}
+                    </span>{' '}
+                    de <span className="font-bold text-slate-800">{totalHistoryItems}</span> registros de portfólio
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    {/* Items per page selector */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-500">Exibir:</span>
+                      <select
+                        value={historyItemsPerPage}
+                        onChange={e => setHistoryItemsPerPage(Number(e.target.value))}
+                        className="px-2 py-1 border border-slate-200 rounded-lg bg-white outline-none text-xs font-bold text-slate-700 focus:border-brand-orange transition-all"
+                      >
+                        <option value={6}>6</option>
+                        <option value={12}>12</option>
+                        <option value={24}>24</option>
+                        <option value={48}>48</option>
+                      </select>
+                    </div>
+
+                    {/* Page Navigation Buttons */}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setHistoryCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={safeHistoryCurrentPage === 1}
+                        className="p-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent text-slate-600 transition-all cursor-pointer disabled:cursor-not-allowed"
+                        title="Página Anterior"
+                      >
+                        <ChevronLeft size={14} />
+                      </button>
+
+                      <span className="px-2 font-bold text-slate-700">
+                        {safeHistoryCurrentPage} / {totalHistoryPages}
+                      </span>
+
+                      <button
+                        onClick={() => setHistoryCurrentPage(prev => Math.min(totalHistoryPages, prev + 1))}
+                        disabled={safeHistoryCurrentPage === totalHistoryPages}
+                        className="p-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent text-slate-600 transition-all cursor-pointer disabled:cursor-not-allowed"
+                        title="Próxima Página"
+                      >
+                        <ChevronRight size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            )}
+          </>
         )}
       </div>
     </div>

@@ -6,7 +6,8 @@ import { Button } from './ui/Button';
 import { 
   FileText, Plus, Search, Edit2, Trash2, Printer, 
   X, Calendar, School as SchoolIcon, Bookmark, Save,
-  Check, Info, ClipboardList, Layers
+  Check, Info, ClipboardList, Layers,
+  ListFilter, RotateCcw, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { Escola, Coordenador, Segmento } from '../types';
 import { supabase } from '../services/supabase';
@@ -40,7 +41,10 @@ interface ClassLogInfantil {
   selectedHabilidadeIds: string[]; // ECE BNCC Objective codes
   selectedObjetoIds?: string[]; // Linked Campo de Experiência IDs
   criadoEm: string;
+  professor?: string;
 }
+
+const FAiXAS_ETARIAS = ['Creche II', 'Creche III', 'Pré I', 'Pré II'];
 
 const CAMPOS_EXPERIENCIA = [
   'O eu, o outro e o nós',
@@ -83,10 +87,53 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
   const [selectedObjetoIds, setSelectedObjetoIds] = useState<string[]>([]);
   const [selectedHabilidadeIds, setSelectedHabilidadeIds] = useState<string[]>([]);
 
-  // Search & Filter State
+  // Search & History Filters State
   const [searchTerm, setSearchTerm] = useState('');
-  const [schoolFilter, setSchoolFilter] = useState('ALL');
-  const [classFilter, setClassFilter] = useState('ALL');
+  const [historyFilterEscola, setHistoryFilterEscola] = useState('');
+  const [historyFilterAnoSerie, setHistoryFilterAnoSerie] = useState('');
+  const [historyFilterTurma, setHistoryFilterTurma] = useState('');
+  const [historyFilterCampoExperiencia, setHistoryFilterCampoExperiencia] = useState('');
+  const [historyFilterBimestre, setHistoryFilterBimestre] = useState('');
+  const [historyFilterProfessor, setHistoryFilterProfessor] = useState('');
+
+  // Pagination State
+  const [historyItemsPerPage, setHistoryItemsPerPage] = useState(10);
+  const [historyCurrentPage, setHistoryCurrentPage] = useState(1);
+
+  const [coordenadoresList, setCoordenadoresList] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchCoordenadores = async () => {
+      try {
+        const { data } = await supabase.from('coordenadores').select('id, nome, contato, funcao');
+        if (data) setCoordenadoresList(data);
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    fetchCoordenadores();
+  }, []);
+
+  const coordMap = useMemo(() => {
+    const map = new Map<string, string>();
+    coordenadoresList.forEach((c: any) => {
+      if (c.contato) map.set(c.contato.toLowerCase().trim(), c.nome);
+      if (c.id) map.set(c.id, c.nome);
+    });
+    return map;
+  }, [coordenadoresList]);
+
+  const getTeacherName = (author?: string): string => {
+    if (!author) return '---';
+    const clean = author.toLowerCase().trim();
+    if (coordMap.has(clean)) return coordMap.get(clean)!;
+    if (coordMap.has(author)) return coordMap.get(author)!;
+    if (author.includes('@')) {
+      const namePart = author.split('@')[0].replace(/[._]/g, ' ');
+      return namePart.charAt(0).toUpperCase() + namePart.slice(1);
+    }
+    return author;
+  };
 
   // Printing State
   const [printLog, setPrintLog] = useState<ClassLogInfantil | null>(null);
@@ -131,6 +178,7 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
         const escolaObj = escolas.find(esc => esc.id === d.escola_id);
         const escolaNome = escolaObj ? escolaObj.nome : 'Unidade';
         const turmaNome = turmaMap.get(d.turma_id) || d.ano_serie || 'Turma';
+        const profName = getTeacherName(d.updated_by || d.created_by || d.professor);
 
         return {
           id: d.id,
@@ -148,7 +196,8 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
           periodo: d.periodo,
           selectedHabilidadeIds: d.selected_habilidade_ids || [],
           selectedObjetoIds: d.selected_objeto_ids || [],
-          criadoEm: d.created_at
+          criadoEm: d.created_at,
+          professor: profName
         };
       });
       setLogs(formatted);
@@ -765,16 +814,156 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
     }, 150);
   };
 
+  const hasActiveHistoryFilters = Boolean(
+    historyFilterEscola ||
+    historyFilterAnoSerie ||
+    historyFilterTurma ||
+    historyFilterCampoExperiencia ||
+    historyFilterBimestre ||
+    historyFilterProfessor
+  );
+
+  const handleClearHistoryFilters = () => {
+    setHistoryFilterEscola('');
+    setHistoryFilterAnoSerie('');
+    setHistoryFilterTurma('');
+    setHistoryFilterCampoExperiencia('');
+    setHistoryFilterBimestre('');
+    setHistoryFilterProfessor('');
+  };
+
+  const historyOptions = useMemo(() => {
+    const escolasMap = new Map<string, string>();
+    const faixasSet = new Set<string>();
+    const turmasSet = new Set<string>();
+    const camposSet = new Set<string>();
+    const bimestresSet = new Set<string>();
+    const professoresSet = new Set<string>();
+
+    logs.forEach(log => {
+      const profName = getTeacherName(log.professor);
+      const matchEscola = !historyFilterEscola || String(log.escolaId) === String(historyFilterEscola);
+      const matchFaixa = !historyFilterAnoSerie || log.anoSerie === historyFilterAnoSerie;
+      const matchTurma = !historyFilterTurma || log.turmaNome === historyFilterTurma || String(log.turmaId) === String(historyFilterTurma);
+      const matchCampo = !historyFilterCampoExperiencia || log.campoExperiencia === historyFilterCampoExperiencia;
+      const matchBimestre = !historyFilterBimestre || log.periodo === historyFilterBimestre;
+      const matchProf = !historyFilterProfessor || profName === historyFilterProfessor || log.professor === historyFilterProfessor;
+
+      // Escolas
+      if (log.escolaId && log.escolaNome) {
+        if (matchFaixa && matchTurma && matchCampo && matchBimestre && matchProf) {
+          escolasMap.set(String(log.escolaId), log.escolaNome);
+        }
+      }
+
+      // Faixas Etárias
+      if (log.anoSerie) {
+        if (matchEscola && matchTurma && matchCampo && matchBimestre && matchProf) {
+          faixasSet.add(log.anoSerie);
+        }
+      }
+
+      // Turmas
+      if (log.turmaNome) {
+        if (matchEscola && matchFaixa && matchCampo && matchBimestre && matchProf) {
+          turmasSet.add(log.turmaNome);
+        }
+      }
+
+      // Campos de Experiência
+      if (log.campoExperiencia) {
+        if (matchEscola && matchFaixa && matchTurma && matchBimestre && matchProf) {
+          camposSet.add(log.campoExperiencia);
+        }
+      }
+
+      // Bimestres
+      if (log.periodo) {
+        if (matchEscola && matchFaixa && matchTurma && matchCampo && matchProf) {
+          bimestresSet.add(log.periodo);
+        }
+      }
+
+      // Professores
+      if (profName && profName !== '---') {
+        if (matchEscola && matchFaixa && matchTurma && matchCampo && matchBimestre) {
+          professoresSet.add(profName);
+        }
+      }
+    });
+
+    escolasInfantil.forEach(e => {
+      if (!escolasMap.has(e.id)) {
+        escolasMap.set(e.id, e.nome);
+      }
+    });
+
+    FAiXAS_ETARIAS.forEach(f => faixasSet.add(f));
+    CAMPOS_EXPERIENCIA.forEach(c => camposSet.add(c));
+    PERIODOS.forEach(b => bimestresSet.add(b));
+
+    if (professoresSet.size === 0 && currentUser?.nome) {
+      professoresSet.add(currentUser.nome);
+    }
+
+    const escolasList = Array.from(escolasMap.entries()).map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome));
+    const faixasList = Array.from(faixasSet).sort();
+    const turmasList = Array.from(turmasSet).sort((a, b) => a.localeCompare(b));
+    const camposList = Array.from(camposSet).sort((a, b) => a.localeCompare(b));
+    const bimestresList = Array.from(bimestresSet).sort();
+    const professoresList = Array.from(professoresSet).sort((a, b) => a.localeCompare(b));
+
+    return {
+      escolas: escolasList,
+      anosSeries: faixasList,
+      turmas: turmasList,
+      camposExperiencia: camposList,
+      bimestres: bimestresList,
+      professores: professoresList
+    };
+  }, [logs, historyFilterEscola, historyFilterAnoSerie, historyFilterTurma, historyFilterCampoExperiencia, historyFilterBimestre, historyFilterProfessor, escolasInfantil, currentUser, coordMap]);
+
   // Filter lists for dashboard
   const filteredLogs = useMemo(() => {
     return logs.filter(l => {
-      const matchesSearch = l.conteudo.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                            l.campoExperiencia.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesSchool = schoolFilter === 'ALL' || l.escolaId === schoolFilter;
-      const matchesClass = classFilter === 'ALL' || l.turmaId === classFilter;
-      return matchesSearch && matchesSchool && matchesClass;
+      if (historyFilterEscola && String(l.escolaId) !== String(historyFilterEscola)) return false;
+      if (historyFilterAnoSerie && l.anoSerie !== historyFilterAnoSerie) return false;
+      if (historyFilterTurma && l.turmaNome !== historyFilterTurma && String(l.turmaId) !== String(historyFilterTurma)) return false;
+      if (historyFilterCampoExperiencia && l.campoExperiencia !== historyFilterCampoExperiencia) return false;
+      if (historyFilterBimestre && l.periodo !== historyFilterBimestre) return false;
+      
+      const profName = getTeacherName(l.professor);
+      if (historyFilterProfessor && profName !== historyFilterProfessor && l.professor !== historyFilterProfessor) return false;
+
+      if (searchTerm.trim()) {
+        const term = searchTerm.toLowerCase().trim();
+        const matchesConteudo = (l.conteudo || '').toLowerCase().includes(term);
+        const matchesCampo = (l.campoExperiencia || '').toLowerCase().includes(term);
+        const matchesRotina = (l.rotina || '').toLowerCase().includes(term);
+        const matchesTurma = (l.turmaNome || '').toLowerCase().includes(term);
+        const matchesEscola = (l.escolaNome || '').toLowerCase().includes(term);
+        const matchesObs = (l.observacoes || '').toLowerCase().includes(term);
+        if (!matchesConteudo && !matchesCampo && !matchesRotina && !matchesTurma && !matchesEscola && !matchesObs) return false;
+      }
+
+      return true;
     });
-  }, [logs, searchTerm, schoolFilter, classFilter]);
+  }, [logs, historyFilterEscola, historyFilterAnoSerie, historyFilterTurma, historyFilterCampoExperiencia, historyFilterBimestre, historyFilterProfessor, searchTerm, coordMap]);
+
+  // Reset pagination to page 1 whenever any filter changes
+  useEffect(() => {
+    setHistoryCurrentPage(1);
+  }, [historyFilterEscola, historyFilterAnoSerie, historyFilterTurma, historyFilterCampoExperiencia, historyFilterBimestre, historyFilterProfessor, searchTerm]);
+
+  // Pagination Math
+  const totalHistoryItems = filteredLogs.length;
+  const totalHistoryPages = Math.max(1, Math.ceil(totalHistoryItems / historyItemsPerPage));
+  const safeHistoryCurrentPage = Math.min(historyCurrentPage, totalHistoryPages);
+
+  const paginatedLogsHistory = useMemo(() => {
+    const start = (safeHistoryCurrentPage - 1) * historyItemsPerPage;
+    return filteredLogs.slice(start, start + historyItemsPerPage);
+  }, [filteredLogs, safeHistoryCurrentPage, historyItemsPerPage]);
 
   // Helper to retrieve ECE BNCC objective descriptions
   const getObjectiveDescription = (code: string) => {
@@ -1163,41 +1352,131 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h3 className="text-md font-black text-slate-800 uppercase tracking-wider">Histórico de Aulas e Vivências</h3>
-            <p className="text-xs text-slate-500 mt-0.5">Veja todas as vivências registradas no diário de classe da Educação Infantil</p>
+            <p className="text-xs text-slate-500 mt-0.5 font-medium">Veja todas as vivências registradas no diário de classe da Educação Infantil</p>
           </div>
 
-          <div className="flex flex-wrap gap-2 w-full md:w-auto">
-            <div className="relative flex-1 md:flex-none">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <input 
-                type="text" 
-                placeholder="Buscar por conteúdo..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-white outline-none focus:border-brand-orange transition-all text-xs font-semibold"
-              />
-            </div>
-
-            <SearchableSchoolSelect
-              escolas={escolasInfantil}
-              selectedId={schoolFilter}
-              onChange={setSchoolFilter}
-              showAllOption={true}
-              allOptionLabel="Todas Unidades"
-              className="max-w-[240px]"
-              inputClassName="pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
+          <div className="relative w-full md:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+            <input 
+              type="text" 
+              placeholder="Buscar por conteúdo..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-white outline-none focus:border-brand-orange transition-all text-xs font-semibold"
             />
-
-            <select 
-              value={classFilter}
-              onChange={e => setClassFilter(e.target.value)}
-              className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 outline-none focus:border-brand-orange"
-            >
-              <option value="ALL">Todas as Turmas ECE</option>
-              {turmas.map(t => <option key={t.id} value={t.id}>{t.name || t.anoSerie} • {t.turno || t.shift || ''}</option>)}
-            </select>
           </div>
         </div>
+
+        {/* History Filters Card */}
+        <Card className="bg-white border-slate-200 shadow-sm p-4 rounded-2xl">
+          <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+            <div className="flex items-center gap-2">
+              <ListFilter className="text-brand-orange w-4 h-4" />
+              <span className="text-xs font-black text-slate-700 uppercase tracking-wider">Filtros do Histórico</span>
+            </div>
+            {hasActiveHistoryFilters && (
+              <button
+                onClick={handleClearHistoryFilters}
+                className="flex items-center gap-1 text-[11px] font-bold text-slate-500 hover:text-brand-orange transition-colors"
+              >
+                <RotateCcw size={12} />
+                <span>Limpar Filtros</span>
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {/* Unidade Escolar */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Unidade Escolar</label>
+              <select
+                value={historyFilterEscola}
+                onChange={e => setHistoryFilterEscola(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todas as Unidades Escolares</option>
+                {historyOptions.escolas.map(e => (
+                  <option key={e.id} value={e.id}>{e.nome}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Faixa Etária / Ano */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Faixa Etária / Ano</label>
+              <select
+                value={historyFilterAnoSerie}
+                onChange={e => setHistoryFilterAnoSerie(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todas as Faixas Etárias</option>
+                {historyOptions.anosSeries.map(a => (
+                  <option key={a} value={a}>{a}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Turma */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Turma</label>
+              <select
+                value={historyFilterTurma}
+                onChange={e => setHistoryFilterTurma(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todas as Turmas</option>
+                {historyOptions.turmas.map(t => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Campo de Experiência */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Campo de Experiência</label>
+              <select
+                value={historyFilterCampoExperiencia}
+                onChange={e => setHistoryFilterCampoExperiencia(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todos os Campos</option>
+                {historyOptions.camposExperiencia.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Bimestre */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Bimestre</label>
+              <select
+                value={historyFilterBimestre}
+                onChange={e => setHistoryFilterBimestre(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todos os Bimestres</option>
+                {historyOptions.bimestres.map(b => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Professor */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Professor</label>
+              <select
+                value={historyFilterProfessor}
+                onChange={e => setHistoryFilterProfessor(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todos os Professores</option>
+                {historyOptions.professores.map(p => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </Card>
 
         <Card className="p-0 overflow-hidden border-slate-200 shadow-sm bg-white rounded-2xl">
           <div className="overflow-x-auto">
@@ -1220,7 +1499,7 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
                     </td>
                   </tr>
                 ) : (
-                  filteredLogs.map(log => (
+                  paginatedLogsHistory.map(log => (
                     <tr key={log.id} className="hover:bg-slate-50/50 transition-colors group">
                       <td className="px-6 py-3">
                         <div className="font-bold text-slate-800">
@@ -1229,6 +1508,11 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
                         <div className="text-[10px] text-slate-400 font-bold uppercase mt-0.5 tracking-tight truncate max-w-[200px]">
                           {log.escolaNome}
                         </div>
+                        {log.professor && log.professor !== '---' && (
+                          <div className="text-[9px] text-slate-400 mt-0.5 uppercase tracking-tight truncate max-w-[200px]">
+                            Prof: {log.professor}
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-3">
                         <div className="font-bold text-slate-700">{log.turmaNome}</div>
@@ -1293,6 +1577,66 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
               </tbody>
             </table>
           </div>
+
+          {/* Pagination Bar Footer */}
+          {totalHistoryItems > 0 && (
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-semibold text-slate-600">
+              <div>
+                Mostrando{' '}
+                <span className="font-bold text-slate-800">
+                  {Math.min((safeHistoryCurrentPage - 1) * historyItemsPerPage + 1, totalHistoryItems)}
+                </span>{' '}
+                a{' '}
+                <span className="font-bold text-slate-800">
+                  {Math.min(safeHistoryCurrentPage * historyItemsPerPage, totalHistoryItems)}
+                </span>{' '}
+                de <span className="font-bold text-slate-800">{totalHistoryItems}</span> registros de aulas e vivências
+              </div>
+
+              <div className="flex items-center gap-4">
+                {/* Items per page selector */}
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500">Exibir:</span>
+                  <select
+                    value={historyItemsPerPage}
+                    onChange={e => setHistoryItemsPerPage(Number(e.target.value))}
+                    className="px-2 py-1 border border-slate-200 rounded-lg bg-white outline-none text-xs font-bold text-slate-700 focus:border-brand-orange transition-all"
+                  >
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={30}>30</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
+
+                {/* Page Navigation Buttons */}
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setHistoryCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={safeHistoryCurrentPage === 1}
+                    className="p-1.5 border border-slate-200 rounded-lg hover:bg-white disabled:opacity-40 disabled:hover:bg-transparent text-slate-600 transition-all cursor-pointer disabled:cursor-not-allowed"
+                    title="Página Anterior"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+
+                  <span className="px-2 font-bold text-slate-700">
+                    {safeHistoryCurrentPage} / {totalHistoryPages}
+                  </span>
+
+                  <button
+                    onClick={() => setHistoryCurrentPage(prev => Math.min(totalHistoryPages, prev + 1))}
+                    disabled={safeHistoryCurrentPage === totalHistoryPages}
+                    className="p-1.5 border border-slate-200 rounded-lg hover:bg-white disabled:opacity-40 disabled:hover:bg-transparent text-slate-600 transition-all cursor-pointer disabled:cursor-not-allowed"
+                    title="Próxima Página"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </Card>
       </div>
 

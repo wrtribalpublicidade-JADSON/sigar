@@ -4,7 +4,8 @@ import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { 
   ClipboardCheck, Calendar, School as SchoolIcon, Search, Save, CheckCircle, 
-  XCircle, Percent, Users, Loader2, ListFilter, Trash2, RotateCcw, Printer, Edit
+  XCircle, Percent, Users, Loader2, ListFilter, Trash2, RotateCcw, Printer, Edit,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { Escola, Coordenador, Segmento } from '../types';
 import { supabase } from '../services/supabase';
@@ -84,6 +85,10 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
   const [historyFilterPeriodo, setHistoryFilterPeriodo] = useState('');
   const [historyFilterProfessor, setHistoryFilterProfessor] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Pagination State
+  const [historyItemsPerPage, setHistoryItemsPerPage] = useState(10);
+  const [historyCurrentPage, setHistoryCurrentPage] = useState(1);
 
   // Filter schools to only those offering Educação Infantil
   const escolasInfantil = useMemo(() => {
@@ -624,6 +629,15 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
       }
     });
 
+    escolasInfantil.forEach(e => {
+      if (!escolasMap.has(e.id)) {
+        escolasMap.set(e.id, e.nome);
+      }
+    });
+
+    FAIXAS_ETARIAS.forEach(f => anosSet.add(f));
+    PERIODOS.forEach(p => periodosSet.add(p));
+
     const escolasList = Array.from(escolasMap.entries()).map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome));
     const anosList = Array.from(anosSet).sort();
     const turmasList = Array.from(turmasSet).sort((a, b) => a.localeCompare(b));
@@ -637,7 +651,7 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
       periodos: periodosList,
       professores: professoresList
     };
-  }, [sheets, historyFilterEscola, historyFilterAnoSerie, historyFilterTurma, historyFilterPeriodo, historyFilterProfessor, coordMap]);
+  }, [sheets, historyFilterEscola, historyFilterAnoSerie, historyFilterTurma, historyFilterPeriodo, historyFilterProfessor, coordMap, escolasInfantil, FAIXAS_ETARIAS]);
 
   const hasActiveHistoryFilters = Boolean(
     historyFilterEscola || historyFilterAnoSerie || historyFilterTurma || historyFilterPeriodo || historyFilterProfessor
@@ -671,6 +685,21 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
       return true;
     });
   }, [sheets, historyFilterEscola, historyFilterAnoSerie, historyFilterTurma, historyFilterPeriodo, historyFilterProfessor, searchTerm, coordMap]);
+
+  // Reset pagination to page 1 whenever any filter changes
+  useEffect(() => {
+    setHistoryCurrentPage(1);
+  }, [historyFilterEscola, historyFilterAnoSerie, historyFilterTurma, historyFilterPeriodo, historyFilterProfessor, searchTerm]);
+
+  // Pagination Math
+  const totalHistoryItems = filteredSheets.length;
+  const totalHistoryPages = Math.max(1, Math.ceil(totalHistoryItems / historyItemsPerPage));
+  const safeHistoryCurrentPage = Math.min(historyCurrentPage, totalHistoryPages);
+
+  const paginatedSheetsHistory = useMemo(() => {
+    const start = (safeHistoryCurrentPage - 1) * historyItemsPerPage;
+    return filteredSheets.slice(start, start + historyItemsPerPage);
+  }, [filteredSheets, safeHistoryCurrentPage, historyItemsPerPage]);
 
   const filteredStudents = useMemo(() => {
     return students.filter(s => 
@@ -1101,7 +1130,7 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
                     </td>
                   </tr>
                 ) : (
-                  filteredSheets.map(sheet => (
+                  paginatedSheetsHistory.map(sheet => (
                     <tr key={sheet.id} className="hover:bg-slate-50/50 transition-colors group">
                       <td className="px-6 py-3">
                         <div className="font-bold text-slate-800">
@@ -1135,21 +1164,21 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
                         <div className="flex items-center justify-end gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
                           <button 
                             onClick={() => handlePrintSheet(sheet)} 
-                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" 
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all cursor-pointer" 
                             title="Imprimir Relatório de Frequência"
                           >
                             <Printer size={15} />
                           </button>
                           <button 
                             onClick={() => handleEditSheet(sheet)} 
-                            className="p-1.5 text-slate-400 hover:text-brand-orange hover:bg-orange-50 rounded-lg transition-all" 
+                            className="p-1.5 text-slate-400 hover:text-brand-orange hover:bg-orange-50 rounded-lg transition-all cursor-pointer" 
                             title="Editar Chamada"
                           >
                             <Edit size={15} />
                           </button>
                           <button 
                             onClick={() => handleDeleteSheet(sheet.id)} 
-                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" 
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all cursor-pointer" 
                             title="Excluir Registro"
                           >
                             <Trash2 size={15} />
@@ -1162,6 +1191,66 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
               </tbody>
             </table>
           </div>
+
+          {/* Pagination Bar Footer */}
+          {totalHistoryItems > 0 && (
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-semibold text-slate-600">
+              <div>
+                Mostrando{' '}
+                <span className="font-bold text-slate-800">
+                  {Math.min((safeHistoryCurrentPage - 1) * historyItemsPerPage + 1, totalHistoryItems)}
+                </span>{' '}
+                a{' '}
+                <span className="font-bold text-slate-800">
+                  {Math.min(safeHistoryCurrentPage * historyItemsPerPage, totalHistoryItems)}
+                </span>{' '}
+                de <span className="font-bold text-slate-800">{totalHistoryItems}</span> chamadas registradas
+              </div>
+
+              <div className="flex items-center gap-4">
+                {/* Items per page selector */}
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500">Exibir:</span>
+                  <select
+                    value={historyItemsPerPage}
+                    onChange={e => setHistoryItemsPerPage(Number(e.target.value))}
+                    className="px-2 py-1 border border-slate-200 rounded-lg bg-white outline-none text-xs font-bold text-slate-700 focus:border-brand-orange transition-all"
+                  >
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={30}>30</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
+
+                {/* Page Navigation Buttons */}
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setHistoryCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={safeHistoryCurrentPage === 1}
+                    className="p-1.5 border border-slate-200 rounded-lg hover:bg-white disabled:opacity-40 disabled:hover:bg-transparent text-slate-600 transition-all cursor-pointer disabled:cursor-not-allowed"
+                    title="Página Anterior"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+
+                  <span className="px-2 text-xs font-bold text-slate-700">
+                    {safeHistoryCurrentPage} / {totalHistoryPages}
+                  </span>
+
+                  <button
+                    onClick={() => setHistoryCurrentPage(prev => Math.min(totalHistoryPages, prev + 1))}
+                    disabled={safeHistoryCurrentPage === totalHistoryPages}
+                    className="p-1.5 border border-slate-200 rounded-lg hover:bg-white disabled:opacity-40 disabled:hover:bg-transparent text-slate-600 transition-all cursor-pointer disabled:cursor-not-allowed"
+                    title="Próxima Página"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </Card>
       </div>
 

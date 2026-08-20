@@ -6,7 +6,8 @@ import { Button } from './ui/Button';
 import { 
   BookOpen, Plus, Search, Edit2, Trash2, Printer, 
   X, Calendar, School as SchoolIcon, Bookmark, Save,
-  Check, Info, Layers, CheckCircle2, AlertCircle, Clock, MessageSquare, Eye, FileText
+  Check, Info, Layers, CheckCircle2, AlertCircle, Clock, MessageSquare, Eye, FileText,
+  ListFilter, RotateCcw, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { Escola, Coordenador, Segmento } from '../types';
 import { supabase } from '../services/supabase';
@@ -98,11 +99,18 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
   const [selectedObjetoIds, setSelectedObjetoIds] = useState<string[]>([]);
   const [selectedHabilidadeIds, setSelectedHabilidadeIds] = useState<string[]>([]);
 
-  // Search & Filter State
+  // Search & History Filters State
   const [searchTerm, setSearchTerm] = useState('');
-  const [schoolFilter, setSchoolFilter] = useState('ALL');
-  const [classFilter, setClassFilter] = useState('ALL');
+  const [historyFilterEscola, setHistoryFilterEscola] = useState<string>('');
+  const [historyFilterFaixaEtaria, setHistoryFilterFaixaEtaria] = useState<string>('');
+  const [historyFilterTurma, setHistoryFilterTurma] = useState<string>('');
+  const [historyFilterCampoExperiencia, setHistoryFilterCampoExperiencia] = useState<string>('');
+  const [historyFilterBimestre, setHistoryFilterBimestre] = useState<string>('');
   const [historyFilterStatus, setHistoryFilterStatus] = useState<string>('');
+
+  // Pagination State
+  const [historyCurrentPage, setHistoryCurrentPage] = useState(1);
+  const [historyItemsPerPage, setHistoryItemsPerPage] = useState(10);
 
   // Evaluation Modal state
   const [evaluatingPlan, setEvaluatingPlan] = useState<LessonPlanInfantil | null>(null);
@@ -878,21 +886,133 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
     );
   };
 
+  const hasActiveHistoryFilters = Boolean(
+    historyFilterEscola || historyFilterFaixaEtaria || historyFilterTurma || historyFilterCampoExperiencia || historyFilterBimestre || historyFilterStatus
+  );
+
+  const handleClearHistoryFilters = () => {
+    setHistoryFilterEscola('');
+    setHistoryFilterFaixaEtaria('');
+    setHistoryFilterTurma('');
+    setHistoryFilterCampoExperiencia('');
+    setHistoryFilterBimestre('');
+    setHistoryFilterStatus('');
+  };
+
+  // History Options memoization
+  const historyOptions = useMemo(() => {
+    const escolasMap = new Map<string, string>();
+    const faixasSet = new Set<string>();
+    const turmasSet = new Set<string>();
+    const camposSet = new Set<string>();
+    const bimestresSet = new Set<string>();
+
+    plans.forEach(plan => {
+      const matchEscola = !historyFilterEscola || String(plan.escolaId) === String(historyFilterEscola);
+      const matchFaixa = !historyFilterFaixaEtaria || plan.anoSerie === historyFilterFaixaEtaria;
+      const matchTurma = !historyFilterTurma || plan.turmaNome === historyFilterTurma || String(plan.turmaId) === String(historyFilterTurma);
+      const matchCampo = !historyFilterCampoExperiencia || plan.campoExperiencia === historyFilterCampoExperiencia;
+      const matchBimestre = !historyFilterBimestre || plan.periodo === historyFilterBimestre;
+
+      // Escolas
+      if (plan.escolaId && plan.escolaNome) {
+        if (matchFaixa && matchTurma && matchCampo && matchBimestre) {
+          escolasMap.set(String(plan.escolaId), plan.escolaNome);
+        }
+      }
+
+      // Faixas Etárias
+      if (plan.anoSerie) {
+        if (matchEscola && matchTurma && matchCampo && matchBimestre) {
+          faixasSet.add(plan.anoSerie);
+        }
+      }
+
+      // Turmas
+      if (plan.turmaNome) {
+        if (matchEscola && matchFaixa && matchCampo && matchBimestre) {
+          turmasSet.add(plan.turmaNome);
+        }
+      }
+
+      // Campos de Experiência
+      if (plan.campoExperiencia) {
+        if (matchEscola && matchFaixa && matchTurma && matchBimestre) {
+          camposSet.add(plan.campoExperiencia);
+        }
+      }
+
+      // Bimestres
+      if (plan.periodo) {
+        if (matchEscola && matchFaixa && matchTurma && matchCampo) {
+          bimestresSet.add(plan.periodo);
+        }
+      }
+    });
+
+    escolasInfantil.forEach(e => {
+      if (!escolasMap.has(e.id)) {
+        escolasMap.set(e.id, e.nome);
+      }
+    });
+
+    FAiXAS_ETARIAS.forEach(f => faixasSet.add(f));
+    CAMPOS_EXPERIENCIA.forEach(c => camposSet.add(c));
+    PERIODOS.forEach(b => bimestresSet.add(b));
+
+    const escolasList = Array.from(escolasMap.entries()).map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome));
+    const faixasList = Array.from(faixasSet).sort();
+    const turmasList = Array.from(turmasSet).sort((a, b) => a.localeCompare(b));
+    const camposList = Array.from(camposSet).sort((a, b) => a.localeCompare(b));
+    const bimestresList = Array.from(bimestresSet).sort();
+
+    return {
+      escolas: escolasList,
+      faixasEtarias: faixasList,
+      turmas: turmasList,
+      camposExperiencia: camposList,
+      bimestres: bimestresList
+    };
+  }, [plans, historyFilterEscola, historyFilterFaixaEtaria, historyFilterTurma, historyFilterCampoExperiencia, historyFilterBimestre, escolasInfantil]);
+
   // Filtered plans for historical view
   const filteredPlans = useMemo(() => {
     return plans.filter(plan => {
-      const matchesSearch = 
-        plan.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        plan.objetivos.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        plan.campoExperiencia.toLowerCase().includes(searchTerm.toLowerCase());
+      if (historyFilterEscola && String(plan.escolaId) !== String(historyFilterEscola)) return false;
+      if (historyFilterFaixaEtaria && plan.anoSerie !== historyFilterFaixaEtaria) return false;
+      if (historyFilterTurma && plan.turmaNome !== historyFilterTurma && String(plan.turmaId) !== String(historyFilterTurma)) return false;
+      if (historyFilterCampoExperiencia && plan.campoExperiencia !== historyFilterCampoExperiencia) return false;
+      if (historyFilterBimestre && plan.periodo !== historyFilterBimestre) return false;
+      if (historyFilterStatus && (plan.status || 'Em Análise') !== historyFilterStatus) return false;
 
-      const matchesSchool = schoolFilter === 'ALL' || plan.escolaId === schoolFilter;
-      const matchesClass = classFilter === 'ALL' || plan.turmaId === classFilter;
-      const matchesStatus = !historyFilterStatus || (plan.status || 'Em Análise') === historyFilterStatus;
+      if (searchTerm.trim()) {
+        const term = searchTerm.toLowerCase().trim();
+        const matchesTitulo = (plan.titulo || '').toLowerCase().includes(term);
+        const matchesObjetivos = (plan.objetivos || '').toLowerCase().includes(term);
+        const matchesEscola = (plan.escolaNome || '').toLowerCase().includes(term);
+        const matchesTurma = (plan.turmaNome || '').toLowerCase().includes(term);
+        const matchesCampo = (plan.campoExperiencia || '').toLowerCase().includes(term);
+        if (!matchesTitulo && !matchesObjetivos && !matchesEscola && !matchesTurma && !matchesCampo) return false;
+      }
 
-      return matchesSearch && matchesSchool && matchesClass && matchesStatus;
+      return true;
     });
-  }, [plans, searchTerm, schoolFilter, classFilter, historyFilterStatus]);
+  }, [plans, historyFilterEscola, historyFilterFaixaEtaria, historyFilterTurma, historyFilterCampoExperiencia, historyFilterBimestre, historyFilterStatus, searchTerm]);
+
+  // Reset pagination to page 1 whenever any filter changes
+  useEffect(() => {
+    setHistoryCurrentPage(1);
+  }, [historyFilterEscola, historyFilterFaixaEtaria, historyFilterTurma, historyFilterCampoExperiencia, historyFilterBimestre, historyFilterStatus, searchTerm]);
+
+  // Pagination Math
+  const totalHistoryItems = filteredPlans.length;
+  const totalHistoryPages = Math.max(1, Math.ceil(totalHistoryItems / historyItemsPerPage));
+  const safeHistoryCurrentPage = Math.min(historyCurrentPage, totalHistoryPages);
+
+  const paginatedPlansHistory = useMemo(() => {
+    const start = (safeHistoryCurrentPage - 1) * historyItemsPerPage;
+    return filteredPlans.slice(start, start + historyItemsPerPage);
+  }, [filteredPlans, safeHistoryCurrentPage, historyItemsPerPage]);
 
   return (
     <div className="space-y-6 pb-12 animate-fade-in relative text-left">
@@ -1488,44 +1608,132 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
       <div className="space-y-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h3 className="text-md font-black text-slate-800 uppercase tracking-wider">Histórico de Guias de Aprendizagem ECE</h3>
-            <p className="text-xs text-slate-500 mt-0.5">Consulte, edite ou exporte as guias já elaboradas da Educação Infantil</p>
+            <h3 className="text-md font-black text-slate-800 uppercase tracking-wider">Histórico de Guias de Aprendizagem</h3>
+            <p className="text-xs text-slate-500 mt-0.5 font-medium">Consulte, edite ou exporte as guias já elaboradas</p>
           </div>
 
-          <div className="flex flex-wrap gap-2 w-full md:w-auto">
-            <div className="relative flex-1 md:flex-none">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <input 
-                type="text" 
-                placeholder="Buscar por tema..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-white outline-none focus:border-brand-orange transition-all text-xs font-semibold"
-              />
-            </div>
-
-            <select
-              value={historyFilterStatus}
-              onChange={e => setHistoryFilterStatus(e.target.value)}
-              className="px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
-            >
-              <option value="">Todos os Status</option>
-              <option value="Em Análise">Em Análise</option>
-              <option value="Aprovado">Aprovado</option>
-              <option value="Devolvido para Correção">Devolvido para Correção</option>
-            </select>
-
-            <SearchableSchoolSelect
-              escolas={escolasInfantil}
-              selectedId={schoolFilter}
-              onChange={setSchoolFilter}
-              showAllOption={true}
-              allOptionLabel="Todas Unidades"
-              className="max-w-[240px]"
-              inputClassName="pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
+          <div className="relative w-full md:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+            <input 
+              type="text" 
+              placeholder="Buscar por tema..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-white outline-none focus:border-brand-orange transition-all text-xs font-semibold"
             />
           </div>
         </div>
+
+        {/* History Filters Card */}
+        <Card className="bg-white border-slate-200 shadow-sm p-4 rounded-2xl">
+          <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+            <div className="flex items-center gap-2">
+              <ListFilter className="text-brand-orange w-4 h-4" />
+              <span className="text-xs font-black text-slate-700 uppercase tracking-wider">Filtros do Histórico</span>
+            </div>
+            {hasActiveHistoryFilters && (
+              <button
+                onClick={handleClearHistoryFilters}
+                className="flex items-center gap-1 text-[11px] font-bold text-slate-500 hover:text-brand-orange transition-colors"
+              >
+                <RotateCcw size={12} />
+                <span>Limpar Filtros</span>
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {/* Unidade Escolar */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Unidade Escolar</label>
+              <select
+                value={historyFilterEscola}
+                onChange={e => setHistoryFilterEscola(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todas as Unidades Escolares</option>
+                {historyOptions.escolas.map(e => (
+                  <option key={e.id} value={e.id}>{e.nome}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Faixa Etária / Ano */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Faixa Etária / Ano</label>
+              <select
+                value={historyFilterFaixaEtaria}
+                onChange={e => setHistoryFilterFaixaEtaria(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todas as Faixas Etárias</option>
+                {historyOptions.faixasEtarias.map(a => (
+                  <option key={a} value={a}>{a}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Turma */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Turma</label>
+              <select
+                value={historyFilterTurma}
+                onChange={e => setHistoryFilterTurma(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todas as Turmas</option>
+                {historyOptions.turmas.map(t => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Campo de Experiência */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Campo de Experiência</label>
+              <select
+                value={historyFilterCampoExperiencia}
+                onChange={e => setHistoryFilterCampoExperiencia(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todos os Campos</option>
+                {historyOptions.camposExperiencia.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Bimestre */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Bimestre</label>
+              <select
+                value={historyFilterBimestre}
+                onChange={e => setHistoryFilterBimestre(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todos os Bimestres</option>
+                {historyOptions.bimestres.map(b => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Status */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Status de Avaliação</label>
+              <select
+                value={historyFilterStatus}
+                onChange={e => setHistoryFilterStatus(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todos os Status</option>
+                <option value="Em Análise">Em Análise</option>
+                <option value="Aprovado">Aprovado</option>
+                <option value="Devolvido para Correção">Devolvido para Correção</option>
+              </select>
+            </div>
+          </div>
+        </Card>
 
         <Card className="p-0 overflow-hidden border-slate-200 shadow-sm bg-white rounded-2xl">
           <div className="overflow-x-auto">
@@ -1543,11 +1751,11 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
                 {filteredPlans.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="py-12 text-center text-slate-400 font-semibold">
-                      Nenhuma Guia de Aprendizagem ECE encontrada.
+                      Nenhuma Guia de Aprendizagem encontrada.
                     </td>
                   </tr>
                 ) : (
-                  filteredPlans.map(plan => (
+                  paginatedPlansHistory.map(plan => (
                     <tr key={plan.id} className="hover:bg-slate-50/50 transition-colors group">
                       <td className="px-6 py-3">
                         <div className="font-bold text-slate-800">
@@ -1649,6 +1857,66 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
               </tbody>
             </table>
           </div>
+
+          {/* Pagination Bar Footer */}
+          {totalHistoryItems > 0 && (
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-semibold text-slate-600">
+              <div>
+                Mostrando{' '}
+                <span className="font-bold text-slate-800">
+                  {Math.min((safeHistoryCurrentPage - 1) * historyItemsPerPage + 1, totalHistoryItems)}
+                </span>{' '}
+                a{' '}
+                <span className="font-bold text-slate-800">
+                  {Math.min(safeHistoryCurrentPage * historyItemsPerPage, totalHistoryItems)}
+                </span>{' '}
+                de <span className="font-bold text-slate-800">{totalHistoryItems}</span> guias de aprendizagem registradas
+              </div>
+
+              <div className="flex items-center gap-4">
+                {/* Items per page selector */}
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500">Exibir:</span>
+                  <select
+                    value={historyItemsPerPage}
+                    onChange={e => setHistoryItemsPerPage(Number(e.target.value))}
+                    className="px-2 py-1 border border-slate-200 rounded-lg bg-white outline-none text-xs font-bold text-slate-700 focus:border-brand-orange transition-all"
+                  >
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={30}>30</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
+
+                {/* Page Navigation Buttons */}
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setHistoryCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={safeHistoryCurrentPage === 1}
+                    className="p-1.5 border border-slate-200 rounded-lg hover:bg-white disabled:opacity-40 disabled:hover:bg-transparent text-slate-600 transition-all cursor-pointer disabled:cursor-not-allowed"
+                    title="Página Anterior"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+
+                  <span className="px-2 font-bold text-slate-700">
+                    {safeHistoryCurrentPage} / {totalHistoryPages}
+                  </span>
+
+                  <button
+                    onClick={() => setHistoryCurrentPage(prev => Math.min(totalHistoryPages, prev + 1))}
+                    disabled={safeHistoryCurrentPage === totalHistoryPages}
+                    className="p-1.5 border border-slate-200 rounded-lg hover:bg-white disabled:opacity-40 disabled:hover:bg-transparent text-slate-600 transition-all cursor-pointer disabled:cursor-not-allowed"
+                    title="Próxima Página"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </Card>
       </div>
 
