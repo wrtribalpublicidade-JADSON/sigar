@@ -44,6 +44,7 @@ interface LessonPlanInfantil {
   anoSerie: string;
   periodo: string;
   criadoEm: string;
+  professor?: string;
   status?: 'Em Análise' | 'Aprovado' | 'Devolvido para Correção';
   observacaoCoordenacao?: string;
   avaliadoPor?: string;
@@ -126,6 +127,94 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
 
   // Printing State
   const [printPlan, setPrintPlan] = useState<LessonPlanInfantil | null>(null);
+  const [coordenadoresList, setCoordenadoresList] = useState<any[]>([]);
+  const [teachersAssignments, setTeachersAssignments] = useState<{ id: string; nome: string; contato: string; turmasIds: string[] }[]>([]);
+
+  // Fetch teacher names and assignments from coordenadores
+  useEffect(() => {
+    const fetchCoordenadoresAndTeachers = async () => {
+      if (isDemoMode) return;
+      try {
+        const { data: coordData, error: coordError } = await supabase
+          .from('coordenadores')
+          .select('id, contato, nome, funcao, escolas_ids');
+
+        if (!coordError && coordData) {
+          setCoordenadoresList(coordData);
+
+          const { data: ctData, error: ctError } = await supabase
+            .from('coordenadores_turmas')
+            .select('coordenador_id, turma_id');
+
+          const mapAssignments: Record<string, string[]> = {};
+          if (!ctError && ctData) {
+            ctData.forEach((row: any) => {
+              const cid = String(row.coordenador_id);
+              if (!mapAssignments[cid]) {
+                mapAssignments[cid] = [];
+              }
+              const tid = String(row.turma_id);
+              if (!mapAssignments[cid].includes(tid)) {
+                mapAssignments[cid].push(tid);
+              }
+            });
+          }
+
+          const teachersList = coordData
+            .filter((c: any) => c.funcao === 'Professor' || !c.funcao)
+            .map((c: any) => ({
+              id: String(c.id),
+              nome: c.nome,
+              contato: c.contato || '',
+              turmasIds: mapAssignments[String(c.id)] || []
+            }));
+
+          setTeachersAssignments(teachersList);
+        }
+      } catch (err) {
+        console.error('Erro ao carregar coordenadores e professores:', err);
+      }
+    };
+    fetchCoordenadoresAndTeachers();
+  }, [isDemoMode]);
+
+  const coordMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (coordenadoresList && coordenadoresList.length > 0) {
+      coordenadoresList.forEach((c: any) => {
+        if (c.contato && c.nome) {
+          map.set(c.contato.toLowerCase().trim(), c.nome.trim());
+        }
+      });
+    }
+    if (currentUser) {
+      if (currentUser.contato && currentUser.nome) {
+        map.set(currentUser.contato.toLowerCase().trim(), currentUser.nome.trim());
+      }
+      if ((currentUser as any).email && currentUser.nome) {
+        map.set(((currentUser as any).email as string).toLowerCase().trim(), currentUser.nome.trim());
+      }
+    }
+    return map;
+  }, [coordenadoresList, currentUser]);
+
+  const getTeacherName = (emailOrName: string | undefined): string => {
+    if (!emailOrName) return '';
+    const clean = emailOrName.trim();
+    const lower = clean.toLowerCase();
+    if (coordMap.has(lower)) {
+      return coordMap.get(lower)!;
+    }
+    return clean;
+  };
+
+  const findTeacherForTurma = (turmaId: string): string | null => {
+    if (!turmaId) return null;
+    const tid = String(turmaId);
+    const turmaTeacher = teachersAssignments.find(t => t.turmasIds.includes(tid));
+    if (turmaTeacher) return turmaTeacher.nome;
+    return null;
+  };
 
   // Filter schools to only those offering Educação Infantil
   const escolasInfantil = useMemo(() => {
@@ -564,6 +653,27 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
             const escolaObj = escolas.find(e => String(e.id) === String(d.escola_id));
             const escolaNome = escolaObj ? escolaObj.nome : (d.escola_nome || 'Unidade');
             const turmaNome = turmaMap.get(String(d.turma_id)) || d.turma_nome || d.ano_serie || 'Turma';
+            const criadorRaw = d.created_by || d.professor || '';
+            const avaliadorRaw = d.avaliado_por || d.avaliadoPor || '';
+
+            let resolvedProfessor = '';
+
+            if (criadorRaw && getTeacherName(criadorRaw).toLowerCase().trim() !== avaliadorRaw.toLowerCase().trim()) {
+              resolvedProfessor = getTeacherName(criadorRaw);
+            } else if (d.professor && getTeacherName(d.professor).toLowerCase().trim() !== avaliadorRaw.toLowerCase().trim()) {
+              resolvedProfessor = getTeacherName(d.professor);
+            }
+
+            if (!resolvedProfessor || resolvedProfessor.toLowerCase().trim() === avaliadorRaw.toLowerCase().trim()) {
+              const teacherFromTurma = findTeacherForTurma(String(d.turma_id));
+              if (teacherFromTurma && teacherFromTurma.toLowerCase().trim() !== avaliadorRaw.toLowerCase().trim()) {
+                resolvedProfessor = teacherFromTurma;
+              }
+            }
+
+            if (!resolvedProfessor) {
+              resolvedProfessor = getTeacherName(d.created_by || (d.updated_by !== avaliadorRaw ? d.updated_by : '') || d.professor || 'Professor(a) de Educação Infantil');
+            }
 
             return {
               id: d.id,
@@ -585,6 +695,7 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
               anoSerie: d.ano_serie,
               periodo: d.periodo,
               criadoEm: d.created_at,
+              professor: resolvedProfessor,
               status: d.status || 'Em Análise',
               observacaoCoordenacao: d.observacao_coordenacao || d.observacaoCoordenacao || '',
               avaliadoPor: d.avaliado_por || d.avaliadoPor || '',
@@ -686,6 +797,10 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
           avaliado_por: payload.avaliadoPor || null,
           avaliado_em: payload.avaliadoEm || null,
           ativo: true,
+          created_by: editingId 
+            ? (plans.find(p => p.id === editingId)?.professor || userEmail || currentUser?.contato || 'user') 
+            : (userEmail || currentUser?.contato || 'user'),
+          professor: payload.professor || currentUser?.nome || 'Professor',
           updated_at: new Date().toISOString(),
           updated_by: userEmail || currentUser?.contato || 'user'
         };
@@ -821,8 +936,13 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
     const avaliadorNome = currentUser?.nome || userEmail || 'Coordenador';
     const nowIso = new Date().toISOString();
 
+    const resolvedDocente = evaluatingPlan.professor && evaluatingPlan.professor.toLowerCase().trim() !== avaliadorNome.toLowerCase().trim()
+      ? evaluatingPlan.professor
+      : (findTeacherForTurma(evaluatingPlan.turmaId) || evaluatingPlan.professor || 'Professor(a) de Educação Infantil');
+
     const updatedPlan: LessonPlanInfantil = {
       ...evaluatingPlan,
+      professor: resolvedDocente,
       status: evalTargetStatus,
       observacaoCoordenacao: evalObsText.trim(),
       avaliadoPor: avaliadorNome,
@@ -837,8 +957,7 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
           observacao_coordenacao: evalObsText.trim(),
           avaliado_por: avaliadorNome,
           avaliado_em: nowIso,
-          updated_at: nowIso,
-          updated_by: avaliadorNome
+          updated_at: nowIso
         })
         .eq('id', evaluatingPlan.id);
 
@@ -1211,10 +1330,12 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
             <div style={{ textAlign: 'center' }}>
               <div style={{ borderTop: '1.5pt solid #0f172a', width: '100%', marginBottom: '6pt' }} />
               <p style={{ fontSize: '9pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#0f172a', marginBottom: '2pt' }}>
-                Assinatura do Professor(a)
+                {printPlan.professor && printPlan.professor !== printPlan.avaliadoPor
+                  ? printPlan.professor
+                  : (findTeacherForTurma(printPlan.turmaId) || printPlan.professor || 'Professor(a) de Educação Infantil')}
               </p>
               <p style={{ fontSize: '7pt', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#64748b', fontFamily: "'JetBrains Mono', monospace", marginBottom: '2pt' }}>
-                PROFESSOR(A) RESPONSÁVEL
+                ASSINATURA DO(A) DOCENTE
               </p>
               <p style={{ fontSize: '7pt', color: '#94a3b8', fontStyle: 'italic' }}>
                 Assinatura e Carimbo
@@ -1223,10 +1344,10 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
             <div style={{ textAlign: 'center' }}>
               <div style={{ borderTop: '1.5pt solid #0f172a', width: '100%', marginBottom: '6pt' }} />
               <p style={{ fontSize: '9pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#0f172a', marginBottom: '2pt' }}>
-                Assinatura da Coordenação Pedagógica
+                {printPlan.avaliadoPor || 'Coordenação Pedagógica'}
               </p>
               <p style={{ fontSize: '7pt', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#64748b', fontFamily: "'JetBrains Mono', monospace", marginBottom: '2pt' }}>
-                EQUIPE GESTORA / PEDAGÓGICA
+                EQUIPE GESTORA / VISTO
               </p>
               <p style={{ fontSize: '7pt', color: '#94a3b8', fontStyle: 'italic' }}>
                 Assinatura e Carimbo
@@ -2225,7 +2346,11 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
                   <div className="grid grid-cols-2 gap-8 pt-8 mt-8 border-t border-slate-200 text-center font-sans">
                     <div>
                       <div className="border-t border-slate-800 w-4/5 mx-auto mb-2" />
-                      <p className="font-black text-slate-800 uppercase text-[10px]">Professor(a) de Educação Infantil</p>
+                      <p className="font-black text-slate-800 uppercase text-[10px]">
+                        {viewingPlan.professor && viewingPlan.professor !== viewingPlan.avaliadoPor
+                          ? viewingPlan.professor
+                          : (findTeacherForTurma(viewingPlan.turmaId) || viewingPlan.professor || 'Professor(a) de Educação Infantil')}
+                      </p>
                       <p className="text-[9px] text-slate-500 uppercase font-medium">Assinatura do(a) Docente</p>
                     </div>
                     <div>

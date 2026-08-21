@@ -389,24 +389,58 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
 
   // Print Mode State
   const [printPlan, setPrintPlan] = useState<LessonPlan | null>(null);
+  const [teachersAssignments, setTeachersAssignments] = useState<{ id: string; nome: string; contato: string; turmasIds: string[]; turmaComponentes: Record<string, string[]> }[]>([]);
 
-  // Fetch teacher names from coordenadores
+  // Fetch teacher names and assignments from coordenadores
   useEffect(() => {
-    const fetchCoordenadores = async () => {
+    const fetchCoordenadoresAndTeachers = async () => {
       if (isDemoMode) return;
       try {
-        const { data, error } = await supabase
+        const { data: coordData, error: coordError } = await supabase
           .from('coordenadores')
-          .select('contato, nome');
+          .select('id, contato, nome, funcao, escolas_ids');
 
-        if (!error && data) {
-          setCoordenadoresList(data);
+        if (!coordError && coordData) {
+          setCoordenadoresList(coordData);
+
+          const { data: ctData, error: ctError } = await supabase
+            .from('coordenadores_turmas')
+            .select('coordenador_id, turma_id, componentes');
+
+          const mapAssignments: Record<string, { turmasIds: string[], turmaComponentes: Record<string, string[]> }> = {};
+          if (!ctError && ctData) {
+            ctData.forEach((row: any) => {
+              const cid = String(row.coordenador_id);
+              if (!mapAssignments[cid]) {
+                mapAssignments[cid] = { turmasIds: [], turmaComponentes: {} };
+              }
+              const tid = String(row.turma_id);
+              if (!mapAssignments[cid].turmasIds.includes(tid)) {
+                mapAssignments[cid].turmasIds.push(tid);
+              }
+              if (row.componentes && Array.isArray(row.componentes)) {
+                mapAssignments[cid].turmaComponentes[tid] = row.componentes;
+              }
+            });
+          }
+
+          const teachersList = coordData
+            .filter((c: any) => c.funcao === 'Professor' || !c.funcao)
+            .map((c: any) => ({
+              id: String(c.id),
+              nome: c.nome,
+              contato: c.contato || '',
+              turmasIds: mapAssignments[String(c.id)]?.turmasIds || [],
+              turmaComponentes: mapAssignments[String(c.id)]?.turmaComponentes || {}
+            }));
+
+          setTeachersAssignments(teachersList);
         }
       } catch (err) {
-        console.error('Erro ao carregar coordenadores:', err);
+        console.error('Erro ao carregar coordenadores e professores:', err);
       }
     };
-    fetchCoordenadores();
+    fetchCoordenadoresAndTeachers();
   }, [isDemoMode]);
 
   const coordMap = useMemo(() => {
@@ -430,12 +464,33 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
   }, [coordenadoresList, currentUser]);
 
   const getTeacherName = (emailOrName: string | undefined): string => {
-    if (!emailOrName) return '---';
-    const lower = emailOrName.toLowerCase().trim();
+    if (!emailOrName) return '';
+    const clean = emailOrName.trim();
+    const lower = clean.toLowerCase();
     if (coordMap.has(lower)) {
       return coordMap.get(lower)!;
     }
-    return emailOrName;
+    return clean;
+  };
+
+  const findTeacherForTurmaAndComponente = (turmaId: string, compName?: string): string | null => {
+    if (!turmaId) return null;
+    const tid = String(turmaId);
+    const normComp = compName ? normalizeSubjectName(compName) : '';
+
+    if (normComp) {
+      const specificTeacher = teachersAssignments.find(t => 
+        t.turmasIds.includes(tid) && 
+        t.turmaComponentes[tid] && 
+        t.turmaComponentes[tid].some(c => normalizeSubjectName(c) === normComp)
+      );
+      if (specificTeacher) return specificTeacher.nome;
+    }
+
+    const turmaTeacher = teachersAssignments.find(t => t.turmasIds.includes(tid));
+    if (turmaTeacher) return turmaTeacher.nome;
+
+    return null;
   };
 
   const fetchRealPlans = async () => {
@@ -510,6 +565,27 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
         const escolaNome = escolaObj ? escolaObj.nome : (p.escola_nome || 'Unidade');
         const turmaNome = turmaMap.get(String(p.turma_id)) || p.turma_nome || p.turmaNome || 'Turma';
         const criacaoData = p.data_criacao || (p.created_at ? p.created_at.split('T')[0] : (p.data || new Date().toISOString().split('T')[0]));
+        const criadorRaw = p.created_by || p.professor || '';
+        const avaliadorRaw = p.avaliado_por || p.avaliadoPor || '';
+
+        let resolvedProfessor = '';
+
+        if (criadorRaw && getTeacherName(criadorRaw).toLowerCase().trim() !== avaliadorRaw.toLowerCase().trim()) {
+          resolvedProfessor = getTeacherName(criadorRaw);
+        } else if (p.professor && getTeacherName(p.professor).toLowerCase().trim() !== avaliadorRaw.toLowerCase().trim()) {
+          resolvedProfessor = getTeacherName(p.professor);
+        }
+
+        if (!resolvedProfessor || resolvedProfessor.toLowerCase().trim() === avaliadorRaw.toLowerCase().trim()) {
+          const teacherFromTurma = findTeacherForTurmaAndComponente(String(p.turma_id), p.componente);
+          if (teacherFromTurma && teacherFromTurma.toLowerCase().trim() !== avaliadorRaw.toLowerCase().trim()) {
+            resolvedProfessor = teacherFromTurma;
+          }
+        }
+
+        if (!resolvedProfessor) {
+          resolvedProfessor = getTeacherName(p.created_by || (p.updated_by !== avaliadorRaw ? p.updated_by : '') || p.professor || 'Docente Responsável');
+        }
 
         return {
           id: p.id,
@@ -531,7 +607,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
           anoSerie: p.ano_serie,
           periodo: p.periodo,
           criadoEm: p.created_at,
-          professor: getTeacherName(p.updated_by || p.created_by || p.professor),
+          professor: resolvedProfessor,
           status: p.status || 'Em Análise',
           observacaoCoordenacao: p.observacao_coordenacao || p.observacaoCoordenacao || '',
           avaliadoPor: p.avaliado_por || p.avaliadoPor || '',
@@ -963,8 +1039,13 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
     const avaliadorNome = currentUser?.nome || userEmail || 'Coordenador';
     const nowIso = new Date().toISOString();
 
+    const resolvedDocente = evaluatingPlan.professor && evaluatingPlan.professor.toLowerCase().trim() !== avaliadorNome.toLowerCase().trim()
+      ? evaluatingPlan.professor
+      : (findTeacherForTurmaAndComponente(evaluatingPlan.turmaId, evaluatingPlan.componente) || evaluatingPlan.professor || 'Docente Responsável');
+
     const updatedPlan: LessonPlan = {
       ...evaluatingPlan,
+      professor: resolvedDocente,
       status: evalTargetStatus,
       observacaoCoordenacao: evalObsText.trim(),
       avaliadoPor: avaliadorNome,
@@ -979,8 +1060,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
           observacao_coordenacao: evalObsText.trim(),
           avaliado_por: avaliadorNome,
           avaliado_em: nowIso,
-          updated_at: nowIso,
-          updated_by: avaliadorNome
+          updated_at: nowIso
         })
         .eq('id', evaluatingPlan.id);
 
@@ -1394,10 +1474,12 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
             <div style={{ textAlign: 'center' }}>
               <div style={{ borderTop: '1.5pt solid #0f172a', width: '100%', marginBottom: '6pt' }} />
               <p style={{ fontSize: '9pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#0f172a', marginBottom: '2pt' }}>
-                Assinatura do Docente
+                {printPlan.professor && printPlan.professor !== printPlan.avaliadoPor
+                  ? printPlan.professor
+                  : (findTeacherForTurmaAndComponente(printPlan.turmaId, printPlan.componente) || printPlan.professor || 'Docente Responsável')}
               </p>
               <p style={{ fontSize: '7pt', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#64748b', fontFamily: "'JetBrains Mono', monospace", marginBottom: '2pt' }}>
-                PROFESSOR(A) RESPONSÁVEL
+                ASSINATURA DO(A) PROFESSOR(A)
               </p>
               <p style={{ fontSize: '7pt', color: '#94a3b8', fontStyle: 'italic' }}>
                 Assinatura e Carimbo
@@ -1406,10 +1488,10 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
             <div style={{ textAlign: 'center' }}>
               <div style={{ borderTop: '1.5pt solid #0f172a', width: '100%', marginBottom: '6pt' }} />
               <p style={{ fontSize: '9pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#0f172a', marginBottom: '2pt' }}>
-                Coordenação Pedagógica
+                {printPlan.avaliadoPor || 'Coordenação Pedagógica'}
               </p>
               <p style={{ fontSize: '7pt', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#64748b', fontFamily: "'JetBrains Mono', monospace", marginBottom: '2pt' }}>
-                EQUIPE GESTORA / PEDAGÓGICA
+                EQUIPE GESTORA / VISTO
               </p>
               <p style={{ fontSize: '7pt', color: '#94a3b8', fontStyle: 'italic' }}>
                 Assinatura e Carimbo
@@ -2467,7 +2549,11 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
                   <div className="grid grid-cols-2 gap-8 pt-8 mt-8 border-t border-slate-200 text-center font-sans">
                     <div>
                       <div className="border-t border-slate-800 w-4/5 mx-auto mb-2" />
-                      <p className="font-black text-slate-800 uppercase text-[10px]">{viewingPlan.professor || 'Docente Responsável'}</p>
+                      <p className="font-black text-slate-800 uppercase text-[10px]">
+                        {viewingPlan.professor && viewingPlan.professor !== viewingPlan.avaliadoPor
+                          ? viewingPlan.professor
+                          : (findTeacherForTurmaAndComponente(viewingPlan.turmaId, viewingPlan.componente) || viewingPlan.professor || 'Docente Responsável')}
+                      </p>
                       <p className="text-[9px] text-slate-500 uppercase font-medium">Assinatura do(a) Professor(a)</p>
                     </div>
                     <div>
