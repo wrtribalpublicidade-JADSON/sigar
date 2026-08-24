@@ -132,9 +132,45 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
   // Printing states
   const [students, setStudents] = useState<Aluno[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
+  const [loadingAttendanceStats, setLoadingAttendanceStats] = useState(false);
   const [selectedStudentForPrint, setSelectedStudentForPrint] = useState<Aluno | null>(null);
   const [printDocData, setPrintDocData] = useState<any>(null);
   const [isPrintingDocument, setIsPrintingDocument] = useState(false);
+
+  // Student Attendance Statistics for Notification of Low Attendance
+  interface StudentAttendanceStat {
+    totalClasses: number;
+    presences: number;
+    absences: number;
+    rate: number;
+    isPreEscola: boolean;
+    minRateRequired: number;
+    isLowAttendance: boolean;
+    stageName: string;
+    turmaNome: string;
+  }
+  const [studentStatsMap, setStudentStatsMap] = useState<Map<string | number, StudentAttendanceStat>>(new Map());
+
+  const isPreEscolaStage = (stageOrYear: string = ''): boolean => {
+    const norm = (stageOrYear || '')
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[-\s]/g, '');
+    
+    return (
+      norm.includes('preescola') ||
+      norm.includes('prei') ||
+      norm.includes('preii') ||
+      norm.includes('pre1') ||
+      norm.includes('pre2') ||
+      norm.includes('4a5anos') ||
+      norm.includes('4anos') ||
+      norm.includes('5anos') ||
+      norm.includes('infantil4') ||
+      norm.includes('infantil5')
+    );
+  };
 
   // Class report printing states
   const [isPrintTurmaModalOpen, setIsPrintTurmaModalOpen] = useState(false);
@@ -145,52 +181,287 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
   const [printBoletimStudent, setPrintBoletimStudent] = useState<Aluno | null>(null);
   const [isPrintingTurmaReport, setIsPrintingTurmaReport] = useState(false);
 
-  const loadStudentsList = async () => {
+  const loadStudentsAndAttendance = async () => {
     if (!escola.id) return;
     setLoadingStudents(true);
+    setLoadingAttendanceStats(true);
     try {
       if (isDemoMode) {
-        // Generate 10 realistic mock students for this school
+        // Generate realistic mock students for this school
         const mockStudents: Aluno[] = [
-          { id: 1, name: 'Arthur Silva Santos', stage: 'Creche II', status: 'Ativo', escola_id: escola.id },
-          { id: 2, name: 'Beatriz Ramos Lima', stage: '1º Ano', status: 'Ativo', escola_id: escola.id },
-          { id: 3, name: 'Carlos Eduardo Souza', stage: '5º Ano', status: 'Ativo', escola_id: escola.id },
-          { id: 4, name: 'Daniela Ferreira Costa', stage: '9º Ano', status: 'Ativo', escola_id: escola.id },
-          { id: 5, name: 'Gabriel Nascimento Rocha', stage: 'Creche III', status: 'Ativo', escola_id: escola.id },
-          { id: 6, name: 'Helena Mendes Abreu', stage: '2º Ano', status: 'Ativo', escola_id: escola.id },
-          { id: 7, name: 'Igor Miranda Alves', stage: '6º Ano', status: 'Ativo', escola_id: escola.id },
-          { id: 8, name: 'Julia Martins Oliveira', stage: 'Pré I', status: 'Ativo', escola_id: escola.id },
-          { id: 9, name: 'Lucas Pinheiro Castro', stage: '3º Ano', status: 'Ativo', escola_id: escola.id },
-          { id: 10, name: 'Mariana Santos Pereira', stage: 'Pré II', status: 'Ativo', escola_id: escola.id },
+          { id: 1, name: 'Arthur Silva Santos', stage: 'Creche II', status: 'Ativo', escola_id: escola.id, nome_mae: 'Ana Paula Silva' },
+          { id: 2, name: 'Beatriz Ramos Lima', stage: '1º Ano', status: 'Ativo', escola_id: escola.id, nome_mae: 'Carla Ramos' },
+          { id: 3, name: 'Carlos Eduardo Souza', stage: '5º Ano', status: 'Ativo', escola_id: escola.id, nome_mae: 'Maria Souza' },
+          { id: 4, name: 'Daniela Ferreira Costa', stage: '9º Ano', status: 'Ativo', escola_id: escola.id, nome_mae: 'Francisca Ferreira' },
+          { id: 5, name: 'Gabriel Nascimento Rocha', stage: 'Creche III', status: 'Ativo', escola_id: escola.id, nome_mae: 'Juliana Nascimento' },
+          { id: 6, name: 'Helena Mendes Abreu', stage: '2º Ano', status: 'Ativo', escola_id: escola.id, nome_mae: 'Patrícia Mendes' },
+          { id: 7, name: 'Igor Miranda Alves', stage: '6º Ano', status: 'Ativo', escola_id: escola.id, nome_mae: 'Raimunda Miranda' },
+          { id: 8, name: 'Julia Martins Oliveira', stage: 'Pré I', status: 'Ativo', escola_id: escola.id, nome_mae: 'Tereza Martins' },
+          { id: 9, name: 'Lucas Pinheiro Castro', stage: '3º Ano', status: 'Ativo', escola_id: escola.id, nome_mae: 'Simone Pinheiro' },
+          { id: 10, name: 'Mariana Santos Pereira', stage: 'Pré II', status: 'Ativo', escola_id: escola.id, nome_mae: 'Claudia Santos' },
         ];
         setStudents(mockStudents);
+
+        // Generate mock attendance stats:
+        // Julia (Pré I) -> 50% (< 60% mín)
+        // Mariana (Pré II) -> 55% (< 60% mín)
+        // Beatriz (1º Ano) -> 67% (< 75% mín)
+        // Carlos (5º Ano) -> 70% (< 75% mín)
+        const mockStatsMap = new Map<string | number, StudentAttendanceStat>();
+        mockStatsMap.set('8', { totalClasses: 20, presences: 10, absences: 10, rate: 50, isPreEscola: true, minRateRequired: 60, isLowAttendance: true, stageName: 'Pré I (4 anos)', turmaNome: 'Pré I • Manhã' });
+        mockStatsMap.set('10', { totalClasses: 20, presences: 11, absences: 9, rate: 55, isPreEscola: true, minRateRequired: 60, isLowAttendance: true, stageName: 'Pré II (5 anos)', turmaNome: 'Pré II • Manhã' });
+        mockStatsMap.set('2', { totalClasses: 30, presences: 20, absences: 10, rate: 67, isPreEscola: false, minRateRequired: 75, isLowAttendance: true, stageName: '1º Ano', turmaNome: '1º Ano A • Manhã' });
+        mockStatsMap.set('3', { totalClasses: 30, presences: 21, absences: 9, rate: 70, isPreEscola: false, minRateRequired: 75, isLowAttendance: true, stageName: '5º Ano', turmaNome: '5º Ano A • Tarde' });
+        
+        mockStatsMap.set('1', { totalClasses: 20, presences: 18, absences: 2, rate: 90, isPreEscola: false, minRateRequired: 60, isLowAttendance: false, stageName: 'Creche II', turmaNome: 'Creche II' });
+        mockStatsMap.set('4', { totalClasses: 30, presences: 28, absences: 2, rate: 93, isPreEscola: false, minRateRequired: 75, isLowAttendance: false, stageName: '9º Ano', turmaNome: '9º Ano A' });
+        mockStatsMap.set('5', { totalClasses: 20, presences: 19, absences: 1, rate: 95, isPreEscola: false, minRateRequired: 60, isLowAttendance: false, stageName: 'Creche III', turmaNome: 'Creche III' });
+        mockStatsMap.set('6', { totalClasses: 30, presences: 27, absences: 3, rate: 90, isPreEscola: false, minRateRequired: 75, isLowAttendance: false, stageName: '2º Ano', turmaNome: '2º Ano B' });
+        mockStatsMap.set('7', { totalClasses: 30, presences: 29, absences: 1, rate: 97, isPreEscola: false, minRateRequired: 75, isLowAttendance: false, stageName: '6º Ano', turmaNome: '6º Ano A' });
+        mockStatsMap.set('9', { totalClasses: 30, presences: 26, absences: 4, rate: 87, isPreEscola: false, minRateRequired: 75, isLowAttendance: false, stageName: '3º Ano', turmaNome: '3º Ano A' });
+
+        setStudentStatsMap(mockStatsMap);
         return;
       }
 
-      const { data, error } = await supabase
+      // Supabase Mode
+      const { data: stData, error: stErr } = await supabase
         .from('alunos')
         .select('*')
         .eq('escola_id', escola.id)
-        .order('name', { ascending: true });
+        .order('name', { ascending: true })
+        .range(0, 4999);
 
-      if (error) throw error;
-      setStudents(data || []);
+      if (stErr) throw stErr;
+      const loadedStudents: Aluno[] = stData || [];
+      setStudents(loadedStudents);
+
+      // Fetch turmas map for this school
+      const { data: turmasData } = await supabase
+        .from('turmas')
+        .select('id, name, year, shift, anoSerie, stage')
+        .eq('school_id', escola.id)
+        .range(0, 1999);
+
+      const turmaMap = new Map<string, any>();
+      (turmasData || []).forEach(t => {
+        turmaMap.set(String(t.id), t);
+      });
+
+      // Fetch fundamental sheets for this school (chunked)
+      let allFundSheets: any[] = [];
+      let page = 0;
+      let hasMore = true;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('frequencia_sheets')
+          .select('id, data, turma_id, componente, students')
+          .eq('escola_id', escola.id)
+          .or('ativo.eq.true,ativo.is.null')
+          .range(page * 1000, (page + 1) * 1000 - 1);
+
+        if (error) {
+          console.warn('Erro ao carregar pautas fundamental para documentos:', error);
+          break;
+        }
+        if (data && data.length > 0) {
+          allFundSheets = allFundSheets.concat(data);
+          if (data.length < 1000) hasMore = false;
+          else page++;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      // Fetch ECE sheets for this school (chunked)
+      let allEceSheets: any[] = [];
+      page = 0;
+      hasMore = true;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('frequencia_sheets_infantil')
+          .select('id, data, turma_id, ano_serie, students')
+          .eq('escola_id', escola.id)
+          .or('ativo.eq.true,ativo.is.null')
+          .range(page * 1000, (page + 1) * 1000 - 1);
+
+        if (error) {
+          console.warn('Erro ao carregar pautas infantil para documentos:', error);
+          break;
+        }
+        if (data && data.length > 0) {
+          allEceSheets = allEceSheets.concat(data);
+          if (data.length < 1000) hasMore = false;
+          else page++;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      // Initialize stats map for all students
+      const computedMap = new Map<string | number, StudentAttendanceStat>();
+
+      loadedStudents.forEach(st => {
+        const tObj = turmaMap.get(String(st.class_id || (st as any).turma_id));
+        const stageVal = st.stage || (st as any).ano_serie || tObj?.year || tObj?.anoSerie || tObj?.stage || '';
+        const isPre = isPreEscolaStage(stageVal);
+        const minReq = isPre ? 60 : 75;
+        const turmaNomeStr = tObj ? `${tObj.name || tObj.year} • ${tObj.shift || ''}` : (stageVal || 'Turma');
+
+        const statObj: StudentAttendanceStat = {
+          totalClasses: 0,
+          presences: 0,
+          absences: 0,
+          rate: 100,
+          isPreEscola: isPre,
+          minRateRequired: minReq,
+          isLowAttendance: false,
+          stageName: stageVal || (isPre ? 'Pré-Escola' : 'Ensino Fundamental'),
+          turmaNome: turmaNomeStr
+        };
+
+        computedMap.set(String(st.id), statObj);
+        if (typeof st.id === 'number') computedMap.set(st.id, statObj);
+      });
+
+      // Aggregate from fundamental sheets
+      allFundSheets.forEach(sheet => {
+        const sheetStudents = sheet.students || [];
+        sheetStudents.forEach((item: any) => {
+          const key = String(item.id);
+          let stat = computedMap.get(key);
+          if (!stat && item.name) {
+            const matchingSt = loadedStudents.find(s => s.name.trim().toLowerCase() === item.name.trim().toLowerCase());
+            if (matchingSt) {
+              stat = computedMap.get(String(matchingSt.id));
+            }
+          }
+
+          if (stat) {
+            stat.totalClasses += 1;
+            if (item.present) {
+              stat.presences += 1;
+            } else {
+              stat.absences += 1;
+            }
+          }
+        });
+      });
+
+      // Aggregate from ECE sheets
+      allEceSheets.forEach(sheet => {
+        const sheetStudents = sheet.students || [];
+        sheetStudents.forEach((item: any) => {
+          const key = String(item.id);
+          let stat = computedMap.get(key);
+          if (!stat && item.name) {
+            const matchingSt = loadedStudents.find(s => s.name.trim().toLowerCase() === item.name.trim().toLowerCase());
+            if (matchingSt) {
+              stat = computedMap.get(String(matchingSt.id));
+            }
+          }
+
+          if (stat) {
+            stat.totalClasses += 1;
+            if (item.present) {
+              stat.presences += 1;
+            } else {
+              stat.absences += 1;
+            }
+          }
+        });
+      });
+
+      // Calculate final rates and low attendance flags
+      computedMap.forEach((stat) => {
+        if (stat.totalClasses > 0) {
+          stat.rate = Math.round((stat.presences / stat.totalClasses) * 100);
+          stat.isLowAttendance = stat.rate < stat.minRateRequired;
+        } else {
+          stat.rate = 100;
+          stat.isLowAttendance = false;
+        }
+      });
+
+      setStudentStatsMap(computedMap);
     } catch (err) {
-      console.error('Error fetching students:', err);
+      console.error('Error fetching students and attendance for documents:', err);
     } finally {
       setLoadingStudents(false);
+      setLoadingAttendanceStats(false);
     }
   };
 
   useEffect(() => {
     if (activeTab === 'documentos' || activeTab === 'matriculas') {
-      loadStudentsList();
+      loadStudentsAndAttendance();
     }
   }, [activeTab, escola.id, isDemoMode]);
 
   useEffect(() => {
     setCurrentPageMatriculas(1);
   }, [searchTermMatriculas, stageFilterMatriculas, statusFilterMatriculas]);
+
+  const lowAttendanceStudents = useMemo(() => {
+    return students
+      .map(st => {
+        const stat = studentStatsMap.get(String(st.id)) || studentStatsMap.get(st.id);
+        const isPre = isPreEscolaStage(st.stage || (st as any).ano_serie || '');
+        const minReq = isPre ? 60 : 75;
+        const defaultStat: StudentAttendanceStat = {
+          totalClasses: 0,
+          presences: 0,
+          absences: 0,
+          rate: 100,
+          isPreEscola: isPre,
+          minRateRequired: minReq,
+          isLowAttendance: false,
+          stageName: st.stage || (isPre ? 'Pré-Escola' : 'Ensino Fundamental'),
+          turmaNome: 'Turma'
+        };
+        return {
+          student: st,
+          stat: stat || defaultStat
+        };
+      })
+      .filter(item => item.stat.isLowAttendance)
+      .sort((a, b) => a.stat.rate - b.stat.rate);
+  }, [students, studentStatsMap]);
+
+  const handleSelectStudentForDoc = (studentId: string | number) => {
+    setDocStudentId(studentId);
+    if (!studentId) {
+      setDocResponsavelNome('');
+      setDocResponsavelEndereco('');
+      setDocFrequenciaAtual(70);
+      setDocTotalFaltas(15);
+      return;
+    }
+
+    const st = students.find(s => String(s.id) === String(studentId));
+    if (st) {
+      const respName = (st as any).nome_mae || (st as any).nome_pai || (st as any).responsible_name || '';
+      setDocResponsavelNome(respName);
+
+      const parts = [
+        (st as any).endereco_logradouro,
+        (st as any).endereco_numero ? `nº ${(st as any).endereco_numero}` : '',
+        (st as any).endereco_bairro,
+        (st as any).endereco_municipio ? `${(st as any).endereco_municipio} - ${(st as any).endereco_uf || 'MA'}` : ''
+      ].filter(Boolean);
+      setDocResponsavelEndereco(parts.join(', '));
+
+      const stat = studentStatsMap.get(String(st.id)) || studentStatsMap.get(st.id);
+      if (stat && stat.totalClasses > 0) {
+        setDocFrequenciaAtual(stat.rate);
+        setDocTotalFaltas(stat.absences);
+      } else {
+        const isPre = isPreEscolaStage(st.stage || (st as any).ano_serie || '');
+        setDocFrequenciaAtual(isPre ? 55 : 70);
+        setDocTotalFaltas(10);
+      }
+    }
+  };
 
   const selectedStudentObj = useMemo(() => {
     return students.find(s => String(s.id) === String(docStudentId)) || null;
@@ -485,7 +756,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
       const { error } = await supabase.from('alunos').delete().eq('id', id);
       if (error) throw error;
       alert('Estudante removido com sucesso.');
-      loadStudentsList();
+      loadStudentsAndAttendance();
     } catch (error) {
       console.error(error);
       alert('Erro ao excluir registro.');
@@ -1805,6 +2076,96 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                   </div>
                 </div>
 
+                {/* Painel de Estudantes em Baixa Frequência (Exibição Automática para Notificação) */}
+                {selectedDocType === 'notificacao_frequencia' && (
+                  <div className="bg-white border border-red-200 rounded-2xl p-5 shadow-sm space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-red-100 pb-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="w-5 h-5 text-red-500" />
+                          <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider">
+                            Estudantes com Baixa Frequência Detectada
+                          </h4>
+                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-black ${lowAttendanceStudents.length > 0 ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                            {lowAttendanceStudents.length} em Alerta
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Critérios Legais: <strong>Educação Infantil (Pré-escola 4 a 5 anos): &lt; 60%</strong> (LDB art. 31, IV) • <strong>Ensino Fundamental: &lt; 75%</strong> (LDB art. 24, VI)
+                        </p>
+                      </div>
+                    </div>
+
+                    {loadingAttendanceStats ? (
+                      <div className="flex items-center justify-center py-6 gap-2 text-slate-400 text-xs font-bold">
+                        <Loader2 className="w-5 h-5 text-brand-orange animate-spin" />
+                        <span>Calculando frequência acumulada dos estudantes...</span>
+                      </div>
+                    ) : lowAttendanceStudents.length === 0 ? (
+                      <div className="py-4 px-4 bg-emerald-50/60 border border-emerald-100 rounded-xl flex items-center gap-3">
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                        <p className="text-xs text-emerald-800 font-semibold">
+                          Nenhum estudante com frequência abaixo do limite mínimo legal no momento. Todos os estudantes com frequência registrada estão com assiduidade regular (≥ 60% Pré-Escola e ≥ 75% Fundamental).
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] font-black border-y border-slate-100">
+                            <tr>
+                              <th className="px-4 py-2.5">Estudante / Turma</th>
+                              <th className="px-4 py-2.5">Etapa / Regra</th>
+                              <th className="px-4 py-2.5 text-center">Freq. Atual</th>
+                              <th className="px-4 py-2.5 text-center">Faltas</th>
+                              <th className="px-4 py-2.5">Responsável Legal</th>
+                              <th className="px-4 py-2.5 text-right">Ação</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {lowAttendanceStudents.map(({ student, stat }) => (
+                              <tr 
+                                key={student.id} 
+                                className={`hover:bg-orange-50/40 transition-colors ${String(docStudentId) === String(student.id) ? 'bg-orange-50 font-bold' : ''}`}
+                              >
+                                <td className="px-4 py-3">
+                                  <div className="font-bold text-slate-800 uppercase">{student.name}</div>
+                                  <div className="text-[10px] text-slate-400 font-semibold mt-0.5">{stat.turmaNome}</div>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-black uppercase ${stat.isPreEscola ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                    {stat.isPreEscola ? 'Pré-Escola (Mín 60%)' : 'Fundamental (Mín 75%)'}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-black bg-red-100 text-red-700 border border-red-200">
+                                    {stat.rate}%
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-center font-bold text-red-600">
+                                  {stat.absences} faltas <span className="text-[10px] font-normal text-slate-400">({stat.totalClasses} aulas)</span>
+                                </td>
+                                <td className="px-4 py-3 text-slate-700 font-medium">
+                                  {(student as any).nome_mae || (student as any).nome_pai || (student as any).responsible_name || 'Não informado'}
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSelectStudentForDoc(student.id)}
+                                    className="px-3 py-1.5 bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ml-auto"
+                                  >
+                                    <FileText size={13} />
+                                    Preencher Notificação
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {/* Form Card */}
                   <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
@@ -1827,15 +2188,30 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                           </label>
                           <select
                             value={docStudentId}
-                            onChange={(e) => setDocStudentId(e.target.value)}
+                            onChange={(e) => handleSelectStudentForDoc(e.target.value)}
                             className="w-full px-3 py-2.5 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
                           >
                             <option value="">Selecione um estudante...</option>
-                            {students.map(student => (
-                              <option key={student.id} value={student.id}>
-                                {student.name} ({student.stage})
-                              </option>
-                            ))}
+                            {lowAttendanceStudents.length > 0 && (
+                              <optgroup label="⚠️ Estudantes em Baixa Frequência (Abaixo do Limite Legal)">
+                                {lowAttendanceStudents.map(({ student, stat }) => (
+                                  <option key={student.id} value={student.id}>
+                                    ⚠️ {student.name} ({stat.turmaNome}) — {stat.rate}% freq ({stat.absences} faltas) [Mín: {stat.minRateRequired}%]
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                            <optgroup label="Demais Estudantes">
+                              {students.filter(st => !lowAttendanceStudents.some(item => String(item.student.id) === String(st.id))).map(student => {
+                                const stat = studentStatsMap.get(String(student.id)) || studentStatsMap.get(student.id);
+                                const rateStr = stat && stat.totalClasses > 0 ? ` — ${stat.rate}% freq` : '';
+                                return (
+                                  <option key={student.id} value={student.id}>
+                                    {student.name} ({student.stage}){rateStr}
+                                  </option>
+                                );
+                              })}
+                            </optgroup>
                           </select>
                         </div>
 
@@ -1975,12 +2351,19 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                       {selectedDocType === 'notificacao_frequencia' ? (
                         <div className="space-y-3 text-xs text-slate-600 leading-relaxed">
                           <p>
-                            A <strong>Notificação por Baixa Frequência</strong> deve ser emitida para estudantes cuja frequência escolar acumulada esteja abaixo do mínimo constitucional exigido (75%).
+                            A <strong>Notificação por Baixa Frequência</strong> é o instrumento formal emitido pela escola para alertar a família e garantir o cumprimento da assiduidade regular.
                           </p>
+                          <div className="space-y-2 p-3 bg-amber-50/80 border border-amber-200 rounded-xl text-amber-950">
+                            <p className="font-bold text-amber-900 uppercase text-[10px] tracking-wide">Limites Mínimos Exigidos (LDB):</p>
+                            <ul className="list-disc pl-4 space-y-1 text-xs">
+                              <li><strong>Educação Infantil (Pré-escola 4 a 5 anos):</strong> Frequência mínima de <strong>60%</strong> do total de horas (Art. 31, IV da LDB).</li>
+                              <li><strong>Ensino Fundamental:</strong> Frequência mínima de <strong>75%</strong> do total de horas letivas (Art. 24, VI da LDB).</li>
+                            </ul>
+                          </div>
                           <p>
-                            Este documento serve como a <strong>primeira notificação formal</strong> à família e integra o histórico do aluno de acordo com o estatuto da criança e do adolescente (ECA).
+                            Este documento integra o histórico escolar e serve como a <strong>primeira notificação formal</strong> à família, em conformidade com o <strong>Art. 56 do Estatuto da Criança e do Adolescente (ECA)</strong>.
                           </p>
-                          <p className="font-bold text-orange-600 bg-orange-50 p-2.5 rounded-lg border border-orange-100">
+                          <p className="font-bold text-orange-700 bg-orange-50 p-2.5 rounded-lg border border-orange-200">
                             Atenção: Caso o responsável não compareça ou não haja melhoria na frequência após a notificação, a escola deverá encaminhar a ficha FICAI ao Conselho Tutelar.
                           </p>
                         </div>
@@ -2534,7 +2917,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
         <CadastroEstudanteModal 
           isOpen={isCadastroModalOpen}
           onClose={() => setIsCadastroModalOpen(false)}
-          onSuccess={loadStudentsList}
+          onSuccess={loadStudentsAndAttendance}
           escolas={[escola]}
           initialStudent={selectedStudent}
           onOpenTurmaModal={() => setIsTurmaModalOpen(true)}

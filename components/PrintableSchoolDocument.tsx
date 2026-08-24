@@ -59,6 +59,16 @@ export const PrintableSchoolDocument: React.FC<PrintableSchoolDocumentProps> = (
 
   const isNotificacao = documentType === 'notificacao_frequencia';
 
+  const stageStr = (student.stage || (student as any).ano_serie || '').toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[-\s]/g, '');
+  const isPreEscola = stageStr.includes('preescola') || stageStr.includes('prei') || stageStr.includes('preii') || stageStr.includes('pre1') || stageStr.includes('pre2') || stageStr.includes('4a5anos') || stageStr.includes('4anos') || stageStr.includes('5anos') || stageStr.includes('infantil4') || stageStr.includes('infantil5');
+  const minLegalRate = isPreEscola ? 60 : 75;
+  const legalCitation = isPreEscola
+    ? "Artigo 31, inciso IV, da Lei de Diretrizes e Bases da Educação Nacional (LDB - Lei nº 9.394/1996), que estabelece a exigência de frequência mínima de 60% do total de horas para a pré-escola na Educação Infantil"
+    : "Artigo 24, inciso VI, da Lei de Diretrizes e Bases da Educação Nacional (LDB - Lei nº 9.394/1996), que estabelece a exigência de frequência mínima de 75% do total de horas letivas no Ensino Fundamental";
+
   const content = (
     <div className="print-only" style={{ padding: '50px 40px', fontFamily: 'Arial, sans-serif', fontSize: '14px', lineHeight: '1.6', color: '#000' }}>
       <style>
@@ -110,31 +120,30 @@ export const PrintableSchoolDocument: React.FC<PrintableSchoolDocumentProps> = (
           <p style={{ textIndent: '40px', textAlign: 'justify', marginBottom: '20px' }}>
             Prezado(a) Sr(a). <strong>{data.responsavelNome || '__________________________________________________'}</strong>, 
             responsável legal pelo(a) estudante <strong>{student.name}</strong>, matriculado(a) no 
-            <strong> {student.stage}</strong> nesta unidade de ensino.
+            <strong> {student.stage || (student as any).ano_serie || 'ano/etapa'}</strong> nesta unidade de ensino.
           </p>
 
           <p style={{ textIndent: '40px', textAlign: 'justify', marginBottom: '20px' }}>
             Vimos, por meio desta, comunicar que o(a) referido(a) estudante apresenta, até a presente data, uma 
-            frequência escolar de apenas <strong>{data.frequenciaAtual || '___'}%</strong>, acumulando um total de 
-            <strong> {data.totalFaltas || '___'} faltas</strong> injustificadas neste período letivo.
+            frequência escolar acumulada de apenas <strong>{data.frequenciaAtual ?? '___'}%</strong> (abaixo do percentual mínimo legal de <strong>{minLegalRate}%</strong>), acumulando um total de 
+            <strong> {data.totalFaltas ?? '___'} faltas</strong> neste período letivo.
           </p>
 
           <p style={{ textIndent: '40px', textAlign: 'justify', marginBottom: '20px' }}>
-            Ressaltamos que, de acordo com o <strong>Artigo 56 do Estatuto da Criança e do Adolescente (ECA - Lei nº 8.069/1990)</strong>, 
-            é dever dos pais ou responsáveis zelar pela frequência escolar dos filhos, e a escola tem a obrigação legal de 
-            comunicar ao Conselho Tutelar os casos de reiteração de faltas injustificadas e de evasão escolar, após esgotados os 
-            recursos escolares.
+            Ressaltamos que, de acordo com o <strong>{legalCitation}</strong>, conjuntamente com o <strong>Artigo 56 do Estatuto da Criança e do Adolescente (ECA - Lei nº 8.069/1990)</strong>, 
+            é dever indeclinável dos pais ou responsáveis zelar pela frequência regular dos filhos na escola, cabendo à instituição de ensino a 
+            obrigação legal de comunicar formalmente os responsáveis e, caso esgotadas as medidas escolares, acionar o Conselho Tutelar (FICAI) nos casos de reiteração de faltas injustificadas.
           </p>
 
           <p style={{ textIndent: '40px', textAlign: 'justify', marginBottom: '20px' }}>
             Diante do exposto, solicitamos o seu comparecimento a esta unidade escolar no dia 
             <strong> {formatarData(data.dataAtendimento)}</strong>, às <strong>{data.horarioAtendimento || '__:__'}h</strong>, 
-            para conversarmos sobre os motivos de tais ausências, definirmos estratégias de acompanhamento e assinarmos o 
-            Termo de Compromisso de Frequência Escolar, visando evitar prejuízos no processo de aprendizagem e desenvolvimento.
+            para tratarmos sobre os motivos de tais ausências, definirmos estratégias pedagógicas de recuperação e acompanhamento e firmarmos o 
+            Termo de Compromisso de Frequência Escolar, visando garantir o direito fundamental à educação e evitar prejuízos ao desenvolvimento escolar do estudante.
           </p>
 
           <p style={{ marginBottom: '40px' }}>
-            Certos de sua atenção e compreensão para com a vida escolar de seu(sua) filho(a)/pupilo(a), subscrevemo-nos.
+            Certos de sua pronta atenção e cooperação para com a vida escolar de seu(sua) filho(a)/dependente, subscrevemo-nos.
           </p>
 
           <div style={{ textAlign: 'right', marginBottom: '50px' }}>

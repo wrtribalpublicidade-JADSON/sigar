@@ -135,6 +135,54 @@ export const validarNIS = (nis: string): boolean => {
     return checkDigit === parseInt(clean.charAt(10), 10);
 };
 
+// Helpers for Turma Data Mapping & Auto-fill
+export const normalizeTurno = (rawTurno: string = ''): string => {
+    const norm = (rawTurno || '').trim().toUpperCase();
+    if (norm.includes('MANH') || norm.includes('MATUTIN')) return 'Matutino';
+    if (norm.includes('TARD') || norm.includes('VESPERTIN')) return 'Vespertino';
+    if (norm.includes('NOIT') || norm.includes('NOTURN')) return 'Noturno';
+    if (norm.includes('INTEGRAL')) return 'Integral';
+    return rawTurno || 'Matutino';
+};
+
+export const normalizeModalidade = (rawMod: string = ''): string => {
+    const norm = (rawMod || '').trim().toUpperCase();
+    if (norm === 'REGULAR' || norm.includes('ENSINO REGULAR')) return 'Ensino Regular';
+    if (norm.includes('MULTISSERIAD')) return 'Multisseriada';
+    if (norm.includes('MULTIETAP')) return 'Multietapa';
+    if (norm.includes('ESPECIAL')) return 'Educação Especial';
+    if (norm.includes('EJA') || norm.includes('JOVENS')) return 'EJA';
+    if (norm.includes('INTEGRAL')) return 'Educação Integral';
+    if (norm.includes('CAMPO')) return 'Educação do Campo';
+    if (norm.includes('INDIGENA') || norm.includes('INDÍGENA')) return 'Indígena';
+    if (norm.includes('QUILOMBOLA')) return 'Quilombola';
+    return rawMod || 'Ensino Regular';
+};
+
+export const inferEtapaFromTurma = (turma: any): string => {
+    if (turma.stage && turma.stage.trim()) {
+        return turma.stage.trim();
+    }
+    const yearOrName = (turma.year || turma.name || turma.anoSerie || '').toLowerCase();
+    if (yearOrName.includes('creche') || yearOrName.includes('pré') || yearOrName.includes('pre') || yearOrName.includes('infantil')) {
+        return 'Educação Infantil';
+    }
+    if (yearOrName.includes('1º') || yearOrName.includes('2º') || yearOrName.includes('3º') || yearOrName.includes('4º') || yearOrName.includes('5º') || yearOrName.includes('1 ano') || yearOrName.includes('2 ano') || yearOrName.includes('3 ano') || yearOrName.includes('4 ano') || yearOrName.includes('5 ano')) {
+        return 'Anos Iniciais';
+    }
+    if (yearOrName.includes('6º') || yearOrName.includes('7º') || yearOrName.includes('8º') || yearOrName.includes('9º') || yearOrName.includes('6 ano') || yearOrName.includes('7 ano') || yearOrName.includes('8 ano') || yearOrName.includes('9 ano')) {
+        return 'Anos Finais';
+    }
+    if (yearOrName.includes('etapa') || yearOrName.includes('eja')) {
+        return 'EJA';
+    }
+    return 'Ensino Fundamental';
+};
+
+export const extractAnoSerieFromTurma = (turma: any): string => {
+    return turma.year || turma.anoSerie || turma.name || '';
+};
+
 export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
     isOpen,
     onClose,
@@ -278,15 +326,38 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
         }
     }, [context.classId, context.schoolId]);
 
-    // When a turma is selected, auto-fill stage, year and shift if available
+    // When a turma is selected, auto-fill stage, year, shift and modality
+    const handleTurmaChange = (turmaId: string) => {
+        setSelectedTurmaId(turmaId);
+        if (!turmaId) return;
+
+        const found = turmas.find(t => String(t.id) === String(turmaId));
+        if (found) {
+            const detectedStage = inferEtapaFromTurma(found);
+            const detectedAnoSerie = extractAnoSerieFromTurma(found);
+            const detectedTurno = normalizeTurno(found.shift || found.turno || '');
+            const detectedModality = normalizeModalidade(found.modality || found.tipo || '');
+
+            setStage(detectedStage);
+            setAnoSerie(detectedAnoSerie);
+            setTurno(detectedTurno);
+            setModalidade(detectedModality);
+
+            if (found.teacher && (!selectedResponsible || selectedResponsible === '')) {
+                setSelectedResponsible(found.teacher);
+            }
+        }
+    };
+
     useEffect(() => {
         if (selectedTurmaId && turmas.length > 0) {
             const found = turmas.find(t => String(t.id) === String(selectedTurmaId));
             if (found) {
-                if (found.stage) setStage(found.stage);
-                if (found.year) setAnoSerie(found.year);
-                if (found.shift) setTurno(found.shift);
-                if (found.modality) setModalidade(found.modality);
+                if (!stage) setStage(inferEtapaFromTurma(found));
+                if (!anoSerie) setAnoSerie(extractAnoSerieFromTurma(found));
+                if (found.shift) setTurno(normalizeTurno(found.shift || found.turno || ''));
+                if (found.modality) setModalidade(normalizeModalidade(found.modality || found.tipo || ''));
+                if (found.teacher && !selectedResponsible) setSelectedResponsible(found.teacher);
             }
         }
     }, [selectedTurmaId, turmas]);
@@ -1351,14 +1422,14 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
                                             <div className="flex gap-2.5">
                                                 <select
                                                     value={selectedTurmaId}
-                                                    onChange={(e) => setSelectedTurmaId(e.target.value)}
+                                                    onChange={(e) => handleTurmaChange(e.target.value)}
                                                     className="flex-1 bg-white border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold text-slate-800 focus:ring-4 focus:ring-brand-orange/15 focus:border-brand-orange outline-none transition-all appearance-none cursor-pointer"
                                                     disabled={isLoadingTurmas || (!!context.classId && !id)}
                                                 >
                                                     <option value="">Selecione a turma...</option>
                                                     {turmas.map(t => (
                                                         <option key={t.id} value={t.id}>
-                                                            {t.year || t.stage || ''} - {t.name}
+                                                            {t.year || t.stage || ''} - {t.name} {t.shift ? `(${t.shift})` : ''}
                                                         </option>
                                                     ))}
                                                 </select>
@@ -1447,9 +1518,14 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
                                                 className="w-full bg-white border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold text-slate-800 focus:ring-4 focus:ring-brand-orange/15 focus:border-brand-orange outline-none transition-all cursor-pointer appearance-none"
                                             >
                                                 <option value="Ensino Regular">Ensino Regular</option>
+                                                <option value="Multisseriada">Multisseriada</option>
+                                                <option value="Multietapa">Multietapa</option>
                                                 <option value="Educação Especial">Educação Especial</option>
                                                 <option value="EJA">EJA (Jovens e Adultos)</option>
                                                 <option value="Educação Integral">Educação Integral</option>
+                                                <option value="Educação do Campo">Educação do Campo</option>
+                                                <option value="Indígena">Indígena</option>
+                                                <option value="Quilombola">Quilombola</option>
                                             </select>
                                         </div>
                                     </div>

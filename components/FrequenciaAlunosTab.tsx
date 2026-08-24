@@ -817,15 +817,15 @@ const PrintableFrequenciaAlunosReport: React.FC<PrintableFrequenciaAlunosReportP
       <div style={{ marginBottom: '16pt' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8.5pt' }}>
           <thead>
-            <tr style={{ background: '#0f172a', color: '#ffffff' }}>
-              <th style={{ padding: '5pt 6pt', border: '0.5pt solid #0f172a', textAlign: 'center', width: '28pt', fontWeight: 900 }}>#</th>
-              <th style={{ padding: '5pt 8pt', border: '0.5pt solid #0f172a', textAlign: 'left', fontWeight: 900 }}>Nome do Estudante</th>
-              <th style={{ padding: '5pt 8pt', border: '0.5pt solid #0f172a', textAlign: 'left', width: '110pt', fontWeight: 900 }}>Turma</th>
-              <th style={{ padding: '5pt 6pt', border: '0.5pt solid #0f172a', textAlign: 'center', width: '50pt', fontWeight: 900 }}>Aulas</th>
-              <th style={{ padding: '5pt 6pt', border: '0.5pt solid #0f172a', textAlign: 'center', width: '50pt', fontWeight: 900 }}>Pres.</th>
-              <th style={{ padding: '5pt 6pt', border: '0.5pt solid #0f172a', textAlign: 'center', width: '50pt', fontWeight: 900 }}>Faltas</th>
-              <th style={{ padding: '5pt 6pt', border: '0.5pt solid #0f172a', textAlign: 'center', width: '60pt', fontWeight: 900 }}>Freq (%)</th>
-              <th style={{ padding: '5pt 6pt', border: '0.5pt solid #0f172a', textAlign: 'center', width: '70pt', fontWeight: 900 }}>Situação</th>
+            <tr style={{ background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff' }}>
+              <th style={{ padding: '5.5pt 6pt', border: '0.5pt solid #0f172a', background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'center', width: '28pt', fontWeight: 900, fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>#</th>
+              <th style={{ padding: '5.5pt 8pt', border: '0.5pt solid #0f172a', background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'left', fontWeight: 900, fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>Nome do Estudante</th>
+              <th style={{ padding: '5.5pt 8pt', border: '0.5pt solid #0f172a', background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'left', width: '110pt', fontWeight: 900, fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>Turma</th>
+              <th style={{ padding: '5.5pt 6pt', border: '0.5pt solid #0f172a', background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'center', width: '50pt', fontWeight: 900, fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>Aulas</th>
+              <th style={{ padding: '5.5pt 6pt', border: '0.5pt solid #0f172a', background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'center', width: '50pt', fontWeight: 900, fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>Pres.</th>
+              <th style={{ padding: '5.5pt 6pt', border: '0.5pt solid #0f172a', background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'center', width: '50pt', fontWeight: 900, fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>Faltas</th>
+              <th style={{ padding: '5.5pt 6pt', border: '0.5pt solid #0f172a', background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'center', width: '60pt', fontWeight: 900, fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>Freq (%)</th>
+              <th style={{ padding: '5.5pt 6pt', border: '0.5pt solid #0f172a', background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'center', width: '70pt', fontWeight: 900, fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>Situação</th>
             </tr>
           </thead>
           <tbody>

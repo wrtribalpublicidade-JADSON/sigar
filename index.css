@@ -258,12 +258,15 @@
     break-inside: avoid !important;
   }
 
-  #print-report thead th {
-    background-color: #f1f5f9 !important;
-    font-weight: 700 !important;
+  #print-report thead th,
+  [id^="print-"] thead th {
+    background-color: #0f172a !important;
+    color: #ffffff !important;
+    font-weight: 800 !important;
     text-transform: uppercase !important;
-    font-size: 7pt !important;
+    font-size: 7.5pt !important;
     letter-spacing: 0.05em !important;
+    border: 0.5pt solid #0f172a !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }

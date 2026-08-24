@@ -134,10 +134,10 @@ export const PrintableFrequencia: React.FC<PrintableFrequenciaProps> = ({ sheet 
       <div style={{ marginBottom: '16pt' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8.5pt' }}>
           <thead>
-            <tr style={{ background: '#0f172a', color: '#ffffff' }}>
-              <th style={{ padding: '5pt 8pt', border: '0.5pt solid #0f172a', textAlign: 'center', width: '35pt', fontWeight: 900 }}>#</th>
-              <th style={{ padding: '5pt 8pt', border: '0.5pt solid #0f172a', textAlign: 'left', fontWeight: 900 }}>Nome do Estudante</th>
-              <th style={{ padding: '5pt 8pt', border: '0.5pt solid #0f172a', textAlign: 'center', width: '100pt', fontWeight: 900 }}>Status Frequência</th>
+            <tr style={{ background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff' }}>
+              <th style={{ padding: '5.5pt 8pt', border: '0.5pt solid #0f172a', background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'center', width: '35pt', fontWeight: 900, fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>#</th>
+              <th style={{ padding: '5.5pt 8pt', border: '0.5pt solid #0f172a', background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'left', fontWeight: 900, fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>Nome do Estudante</th>
+              <th style={{ padding: '5.5pt 8pt', border: '0.5pt solid #0f172a', background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'center', width: '110pt', fontWeight: 900, fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>Status Frequência</th>
             </tr>
           </thead>
           <tbody>
