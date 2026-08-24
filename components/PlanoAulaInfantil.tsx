@@ -14,6 +14,7 @@ import { supabase } from '../services/supabase';
 import { useNotification } from '../context/NotificationContext';
 import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
 import { BNCC_INFANTIL } from './ConselhoClasse';
+import { logAudit } from '../services/logService';
 
 interface PlanoAulaInfantilProps {
   escolas: Escola[];
@@ -826,6 +827,21 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
         localStorage.setItem('sigar_guias_aprendizagem_infantil', JSON.stringify(updatedPlans));
       }
 
+      await logAudit(
+        editingId ? 'UPDATE' : 'CREATE',
+        'PLANO_AULA_INFANTIL',
+        payload.id,
+        {
+          escola: payload.escolaNome,
+          turma: payload.turmaNome,
+          anoSerie: payload.anoSerie,
+          campoExperiencia: payload.campoExperiencia,
+          periodo: payload.periodo,
+          titulo: payload.titulo,
+          professor: payload.professor || userEmail || currentUser?.nome
+        }
+      );
+
       resetForm();
     } catch (err) {
       console.error('Erro ao salvar guia de aprendizagem:', err);
@@ -883,12 +899,22 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
         if (error) throw error;
       }
 
+      const planToDelete = plans.find(p => p.id === id);
       const updated = plans.filter(p => p.id !== id);
       setPlans(updated);
       if (isDemoMode) {
         localStorage.setItem('sigar_guias_aprendizagem_infantil', JSON.stringify(updated));
       }
       showNotification('success', 'Guia de aprendizagem removida com sucesso!');
+
+      if (planToDelete) {
+        await logAudit('DELETE', 'PLANO_AULA_INFANTIL', id, {
+          titulo: planToDelete.titulo,
+          turma: planToDelete.turmaNome,
+          campoExperiencia: planToDelete.campoExperiencia,
+          escola: planToDelete.escolaNome
+        });
+      }
     } catch (err) {
       console.error('Erro ao remover guia:', err);
       showNotification('error', 'Erro ao excluir do banco.');
@@ -977,6 +1003,15 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
     showNotification('success', evalTargetStatus === 'Aprovado' 
       ? 'Guia ECE APROVADA com sucesso!' 
       : 'Guia ECE DEVOLVIDA para correção.');
+
+    await logAudit('UPDATE', 'PLANO_AULA_INFANTIL_AVALIACAO', evaluatingPlan.id, {
+      status: evalTargetStatus,
+      avaliador: avaliadorNome,
+      titulo: evaluatingPlan.titulo,
+      turma: evaluatingPlan.turmaNome,
+      campoExperiencia: evaluatingPlan.campoExperiencia,
+      professor: resolvedDocente
+    });
 
     setEvaluatingPlan(null);
     setEvalObsText('');

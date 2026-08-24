@@ -9,6 +9,7 @@ import { ConfirmModal } from './ui/ConfirmModal';
 import { useNotification } from '../context/NotificationContext';
 import { normalizeRole } from '../utils/permissions';
 import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
+import { logAudit } from '../services/logService';
 
 interface UserManagementProps {
     userEmail: string | null;
@@ -252,6 +253,10 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
             const { error } = await supabase.auth.resetPasswordForEmail(selectedUser.contato);
             if (error) throw error;
             showNotification('success', `E-mail de redefinição de senha enviado para ${selectedUser.contato}.`);
+            await logAudit('UPDATE', 'USUARIO_SENHA', selectedUser.id, {
+                nome: selectedUser.nome,
+                email: selectedUser.contato
+            });
         } catch (error: any) {
             console.error('Password reset error:', error);
             showNotification('error', `Erro: ${error?.message || 'Falha ao enviar e-mail de redefinição.'}`);
@@ -305,6 +310,13 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
             }
 
             showNotification('success', 'Usuário atualizado com sucesso!');
+            await logAudit('UPDATE', 'USUARIO', selectedUser.id, {
+                nome: selectedUser.nome,
+                email: selectedUser.contato,
+                funcao: roleToSave || 'Sem função',
+                status: editStatus,
+                escolasCount: editSchools.length
+            });
             setIsEditModalOpen(false);
             loadData(); // Refresh grid
         } catch (error) {

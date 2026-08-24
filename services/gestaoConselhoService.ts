@@ -43,11 +43,13 @@ export const igCicloReunioesService = {
         if (reuniao.id && reuniao.id.length > 20) { // Assuming generated UUID
             const { data, error } = await supabase.from('ig_ciclo_reunioes').update(reuniao).eq('id', reuniao.id).select().single();
             if (error) throw error;
+            await logAudit('UPDATE', 'IG_REUNIAO', data.id, { tema: data.tema_reuniao || data.pauta, dataReuniao: data.data_reuniao });
             return data;
         } else {
             const { id, ...newReuniao } = reuniao;
             const { data, error } = await supabase.from('ig_ciclo_reunioes').insert(newReuniao).select().single();
             if (error) throw error;
+            await logAudit('CREATE', 'IG_REUNIAO', data.id, { tema: data.tema_reuniao || data.pauta, dataReuniao: data.data_reuniao });
             return data;
         }
     },
@@ -55,6 +57,7 @@ export const igCicloReunioesService = {
     async delete(id: string) {
         const { error } = await supabase.from('ig_ciclo_reunioes').delete().eq('id', id);
         if (error) throw error;
+        await logAudit('DELETE', 'IG_REUNIAO', id, {});
         return true;
     }
 };
@@ -84,11 +87,13 @@ export const igPlanoFormacaoService = {
         if (formacao.id && formacao.id.length > 20) {
             const { data, error } = await supabase.from('ig_plano_formacao').update(formacao).eq('id', formacao.id).select().single();
             if (error) throw error;
+            await logAudit('UPDATE', 'IG_FORMACAO', data.id, { tema: data.tema || data.titulo, dataFormacao: data.data_formacao });
             return data;
         } else {
             const { id, ...newFormacao } = formacao;
             const { data, error } = await supabase.from('ig_plano_formacao').insert(newFormacao).select().single();
             if (error) throw error;
+            await logAudit('CREATE', 'IG_FORMACAO', data.id, { tema: data.tema || data.titulo, dataFormacao: data.data_formacao });
             return data;
         }
     },
@@ -96,6 +101,7 @@ export const igPlanoFormacaoService = {
     async delete(id: string) {
         const { error } = await supabase.from('ig_plano_formacao').delete().eq('id', id);
         if (error) throw error;
+        await logAudit('DELETE', 'IG_FORMACAO', id, {});
         return true;
     }
 };
@@ -125,11 +131,13 @@ export const igPlanoAcaoService = {
         if (acao.id && acao.id.length > 20) {
             const { data, error } = await supabase.from('ig_plano_acao').update(acao).eq('id', acao.id).select().single();
             if (error) throw error;
+            await logAudit('UPDATE', 'IG_ACAO', data.id, { meta: data.meta_descricao || data.descricao, prazo: data.prazo });
             return data;
         } else {
             const { id, ...newAcao } = acao;
             const { data, error } = await supabase.from('ig_plano_acao').insert(newAcao).select().single();
             if (error) throw error;
+            await logAudit('CREATE', 'IG_ACAO', data.id, { meta: data.meta_descricao || data.descricao, prazo: data.prazo });
             return data;
         }
     },
@@ -137,6 +145,7 @@ export const igPlanoAcaoService = {
     async delete(id: string) {
         const { error } = await supabase.from('ig_plano_acao').delete().eq('id', id);
         if (error) throw error;
+        await logAudit('DELETE', 'IG_ACAO', id, {});
         return true;
     }
 };
@@ -166,11 +175,13 @@ export const igPppService = {
         if (ppp.id && ppp.id.length > 20) {
             const { data, error } = await supabase.from('ig_proposta_pedagogica').update(ppp).eq('id', ppp.id).select().single();
             if (error) throw error;
+            await logAudit('UPDATE', 'IG_PPP', data.id, { ano: data.ano_letivo, versao: data.versao });
             return data;
         } else {
             const { id, ...newPpp } = ppp;
             const { data, error } = await supabase.from('ig_proposta_pedagogica').insert(newPpp).select().single();
             if (error) throw error;
+            await logAudit('CREATE', 'IG_PPP', data.id, { ano: data.ano_letivo, versao: data.versao });
             return data;
         }
     },
@@ -178,12 +189,14 @@ export const igPppService = {
     async updateStatus(id: string, status: string) {
         const { data, error } = await supabase.from('ig_proposta_pedagogica').update({ status }).eq('id', id).select().single();
         if (error) throw error;
+        await logAudit('UPDATE', 'IG_PPP', id, { status });
         return data;
     },
 
     async delete(id: string) {
         const { error } = await supabase.from('ig_proposta_pedagogica').delete().eq('id', id);
         if (error) throw error;
+        await logAudit('DELETE', 'IG_PPP', id, {});
     }
 };
 
@@ -212,11 +225,13 @@ export const igAcompanhamentoSalaService = {
         if (acompanhamento.id && acompanhamento.id.length > 20) {
             const { data, error } = await supabase.from('ig_acompanhamento_sala').update(acompanhamento).eq('id', acompanhamento.id).select().single();
             if (error) throw error;
+            await logAudit('UPDATE', 'IG_ACOMP_SALA', data.id, { professor: data.professor_nome, turma: data.turma, dataObs: data.data_observacao });
             return data;
         } else {
             const { id, ...newAcompanhamento } = acompanhamento;
             const { data, error } = await supabase.from('ig_acompanhamento_sala').insert(newAcompanhamento).select().single();
             if (error) throw error;
+            await logAudit('CREATE', 'IG_ACOMP_SALA', data.id, { professor: data.professor_nome, turma: data.turma, dataObs: data.data_observacao });
             return data;
         }
     },
@@ -224,6 +239,7 @@ export const igAcompanhamentoSalaService = {
     async remove(id: string) {
         const { error } = await supabase.from('ig_acompanhamento_sala').delete().eq('id', id);
         if (error) throw error;
+        await logAudit('DELETE', 'IG_ACOMP_SALA', id, {});
     }
 };
 
@@ -241,11 +257,13 @@ export const igCalendarioOficialService = {
         if (evento.id && evento.id.length > 20) {
             const { data, error } = await supabase.from('ig_calendario_oficial').update(evento).eq('id', evento.id).select().single();
             if (error) throw error;
+            await logAudit('UPDATE', 'IG_CALENDARIO', data.id, { titulo: data.titulo || data.descricao, data: data.data });
             return data;
         } else {
             const { id, ...newEvento } = evento;
             const { data, error } = await supabase.from('ig_calendario_oficial').insert(newEvento).select().single();
             if (error) throw error;
+            await logAudit('CREATE', 'IG_CALENDARIO', data.id, { titulo: data.titulo || data.descricao, data: data.data });
             return data;
         }
     },
@@ -253,6 +271,7 @@ export const igCalendarioOficialService = {
     async delete(id: string) {
         const { error } = await supabase.from('ig_calendario_oficial').delete().eq('id', id);
         if (error) throw error;
+        await logAudit('DELETE', 'IG_CALENDARIO', id, {});
         return true;
     }
 };
@@ -570,6 +589,7 @@ export const ccTurmaService = {
             .single();
 
         if (error) throw error;
+        await logAudit('CREATE', 'TURMA', data.id, { name: data.name, stage: data.stage, shift: data.shift });
         return {
             id: data.id,
             etapa: data.stage,
@@ -600,6 +620,7 @@ export const ccTurmaService = {
             .single();
 
         if (error) throw error;
+        await logAudit('UPDATE', 'TURMA', id, { name: data.name, stage: data.stage, shift: data.shift });
         return {
             id: data.id,
             etapa: data.stage,
@@ -613,6 +634,7 @@ export const ccTurmaService = {
     async remove(id: string) {
         const { error } = await supabase.from('turmas').delete().eq('id', id);
         if (error) throw error;
+        await logAudit('DELETE', 'TURMA', id, {});
         return true;
     }
 };
@@ -730,10 +752,20 @@ export const ccAcompanhamentoDocenteService = {
             dbAcomp.id = acompanhamento.id;
             const { data, error } = await supabase.from(table).update(dbAcomp).eq('id', dbAcomp.id).select().single();
             if (error) throw error;
+            await logAudit('UPDATE', 'CONSELHO_ACOMP_DOCENTE', dbAcomp.id, {
+                estudante_nome: acompanhamento.estudante_nome,
+                turma_nome: acompanhamento.turma_nome,
+                professor: acompanhamento.professor
+            });
             return mapToUiAcompanhamento(data);
         } else {
             const { data, error } = await supabase.from(table).insert(dbAcomp).select().single();
             if (error) throw error;
+            await logAudit('CREATE', 'CONSELHO_ACOMP_DOCENTE', data.id, {
+                estudante_nome: acompanhamento.estudante_nome,
+                turma_nome: acompanhamento.turma_nome,
+                professor: acompanhamento.professor
+            });
             return mapToUiAcompanhamento(data);
         }
     },
@@ -742,6 +774,7 @@ export const ccAcompanhamentoDocenteService = {
         const table = getTableName('acompanhamento', stage);
         const { error } = await supabase.from(table).delete().eq('id', id);
         if (error) throw error;
+        await logAudit('DELETE', 'CONSELHO_ACOMP_DOCENTE', id, {});
         return true;
     }
 };
@@ -768,11 +801,19 @@ export const ccEncaminhamentosService = {
         if (encaminhamento.id && encaminhamento.id.length > 20) {
             const { data, error } = await supabase.from(table).update(encaminhamento).eq('id', encaminhamento.id).select().single();
             if (error) throw error;
+            await logAudit('UPDATE', 'CONSELHO_ENCAMINHAMENTO', data.id, {
+                estudante: encaminhamento.estudante_nome || encaminhamento.estudante_alvo,
+                tipo: encaminhamento.tipo_encaminhamento
+            });
             return data;
         } else {
             const { id, ...newEncaminhamento } = encaminhamento;
             const { data, error } = await supabase.from(table).insert(newEncaminhamento).select().single();
             if (error) throw error;
+            await logAudit('CREATE', 'CONSELHO_ENCAMINHAMENTO', data.id, {
+                estudante: encaminhamento.estudante_nome || encaminhamento.estudante_alvo,
+                tipo: encaminhamento.tipo_encaminhamento
+            });
             return data;
         }
     },
@@ -781,6 +822,7 @@ export const ccEncaminhamentosService = {
         const table = getTableName('encaminhamento', stage);
         const { error } = await supabase.from(table).delete().eq('id', id);
         if (error) throw error;
+        await logAudit('DELETE', 'CONSELHO_ENCAMINHAMENTO', id, {});
         return true;
     }
 };
@@ -822,6 +864,11 @@ export const ccAvaliacaoEtapaService = {
             .single();
 
         if (error) throw error;
+        await logAudit('UPDATE', 'CONSELHO_STATUS_ETAPA', data.id, {
+            status: data.status,
+            periodo: data.periodo,
+            componente: data.componente_curricular
+        });
         return data;
     },
 
@@ -835,6 +882,7 @@ export const ccAvaliacaoEtapaService = {
             .single();
 
         if (error) throw error;
+        await logAudit('UPDATE', 'CONSELHO_STATUS_ETAPA', id, { status, bloqueada });
         return data;
     }
 };
@@ -853,6 +901,7 @@ export const ccSolicitacaoDesbloqueioService = {
             .single();
 
         if (error) throw error;
+        await logAudit('CREATE', 'CONSELHO_SOLICITACAO', data.id, { motivo: solicitacao.motivo, periodo: solicitacao.periodo });
         return data;
     },
 

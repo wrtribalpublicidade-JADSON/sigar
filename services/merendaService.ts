@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { logAudit } from './logService';
 
 export interface MerendaItem {
   id: string;
@@ -127,6 +128,12 @@ export const salvarItemMerenda = async (item: Partial<MerendaItem>) => {
       .single();
     
     if (error) throw error;
+    await logAudit('UPDATE', 'MERENDA_ITEM', item.id, {
+      nome: item.nome,
+      categoria: item.categoria,
+      unidade: item.unidade,
+      estoqueIdeal: item.estoque_ideal
+    });
     return data;
   } else {
     // Insert new item
@@ -144,6 +151,12 @@ export const salvarItemMerenda = async (item: Partial<MerendaItem>) => {
       .single();
       
     if (error) throw error;
+    await logAudit('CREATE', 'MERENDA_ITEM', data.id, {
+      nome: item.nome,
+      categoria: item.categoria,
+      unidade: item.unidade,
+      estoqueIdeal: item.estoque_ideal
+    });
     return data;
   }
 };
@@ -154,6 +167,7 @@ export const excluirItemMerenda = async (id: string) => {
     .delete()
     .eq('id', id);
   if (error) throw error;
+  await logAudit('DELETE', 'MERENDA_ITEM', id, {});
 };
 
 export const registrarEntradaEstoque = async (entrada: {item_id: string, quantidade: number, origem: string, observacao?: string}) => {
@@ -164,6 +178,12 @@ export const registrarEntradaEstoque = async (entrada: {item_id: string, quantid
     .single();
   
   if (error) throw error;
+  await logAudit('CREATE', 'MERENDA_ENTRADA', data.id, {
+    itemId: entrada.item_id,
+    quantidade: entrada.quantidade,
+    origem: entrada.origem,
+    obs: entrada.observacao
+  });
   return data;
 };
 
@@ -189,6 +209,12 @@ export const registrarEntregaSaida = async (entrega: {escola_id: string, observa
     .insert(itensParaInserir);
 
   if (itensError) throw itensError;
+
+  await logAudit('CREATE', 'MERENDA_ENTREGA', entregaData.id, {
+    escolaId: entrega.escola_id,
+    itensCount: entrega.itens.length,
+    obs: entrega.observacoes
+  });
 
   return entregaData;
 };
@@ -244,6 +270,7 @@ export const excluirEntregaMerenda = async (entregaId: string) => {
     .eq('id', entregaId);
 
   if (error) throw error;
+  await logAudit('DELETE', 'MERENDA_ENTREGA', entregaId, {});
 };
 
 export const importarLoteMerenda = async (itens: any[]) => {

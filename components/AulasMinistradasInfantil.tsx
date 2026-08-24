@@ -14,6 +14,7 @@ import { supabase } from '../services/supabase';
 import { useNotification } from '../context/NotificationContext';
 import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
 import { BNCC_INFANTIL } from './ConselhoClasse';
+import { logAudit } from '../services/logService';
 
 interface AulasMinistradasInfantilProps {
   escolas: Escola[];
@@ -148,30 +149,55 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
   // Fetch real logs
   const fetchRealLogs = async () => {
     try {
-      const { data, error } = await supabase
-        .from('aulas_ministradas_infantil')
-        .select('*')
-        .eq('ativo', true)
-        .order('data', { ascending: false });
+      let allLogsData: any[] = [];
+      let page = 0;
+      const pageSize = 1000;
+      let hasMore = true;
 
-      if (error) throw error;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('aulas_ministradas_infantil')
+          .select('*')
+          .or('ativo.eq.true,ativo.is.null')
+          .order('data', { ascending: false })
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+
+        if (error) throw error;
+        if (data && data.length > 0) {
+          allLogsData = allLogsData.concat(data);
+          if (data.length < pageSize) {
+            hasMore = false;
+          } else {
+            page++;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
 
       // Also get turmas to map names
       const { data: allTurmas, error: turmasError } = await supabase
         .from('turmas')
-        .select('id, name, year, shift, anoSerie');
+        .select('id, name, year, shift, anoSerie')
+        .range(0, 4999);
       
       const turmaMap = new Map<string, string>();
       if (!turmasError && allTurmas) {
         allTurmas.forEach((t: any) => {
-          turmaMap.set(t.id, `${t.name || t.anoSerie || t.year} • ${t.shift || t.turno || ''}`);
+          turmaMap.set(String(t.id), `${t.name || t.anoSerie || t.year} • ${t.shift || t.turno || ''}`);
         });
       }
 
-      let filteredLogs = data || [];
+      let filteredLogs = allLogsData;
+      if (!isAdmin && currentUser && currentUser.funcao !== 'Administrador') {
+        const userSchoolIds = (currentUser?.escolasIds || []).map(String);
+        if (userSchoolIds.length > 0) {
+          filteredLogs = filteredLogs.filter((d: any) => userSchoolIds.includes(String(d.escola_id)));
+        }
+      }
       if (currentUser && currentUser.funcao === 'Professor') {
-        const assignedIds = currentUser.turmasIds || [];
-        filteredLogs = filteredLogs.filter((d: any) => assignedIds.includes(d.turma_id));
+        const assignedIds = (currentUser.turmasIds || []).map(String);
+        filteredLogs = filteredLogs.filter((d: any) => assignedIds.includes(String(d.turma_id)));
       }
 
       const formatted: ClassLogInfantil[] = filteredLogs.map(d => {
@@ -745,6 +771,22 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
         localStorage.setItem('sigar_aulas_ministradas_infantil', JSON.stringify(updatedLogs));
       }
 
+      await logAudit(
+        editingId ? 'UPDATE' : 'CREATE',
+        'AULAS_MINISTRADAS_INFANTIL',
+        payload.id,
+        {
+          data: payload.data,
+          escola: payload.escolaNome,
+          turma: payload.turmaNome,
+          anoSerie: payload.anoSerie,
+          campoExperiencia: payload.campoExperiencia,
+          periodo: payload.periodo,
+          conteudo: payload.conteudo.substring(0, 120),
+          professor: payload.professor || userEmail || currentUser?.nome
+        }
+      );
+
       resetForm();
     } catch (err) {
       console.error('Erro ao salvar registro de aula:', err);
@@ -784,12 +826,22 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
         if (error) throw error;
       }
 
+      const logToDelete = logs.find(l => l.id === id);
       const updated = logs.filter(l => l.id !== id);
       setLogs(updated);
       if (isDemoMode) {
         localStorage.setItem('sigar_aulas_ministradas_infantil', JSON.stringify(updated));
       }
       showNotification('success', 'Registro de aula removido com sucesso!');
+
+      if (logToDelete) {
+        await logAudit('DELETE', 'AULAS_MINISTRADAS_INFANTIL', id, {
+          data: logToDelete.data,
+          turma: logToDelete.turmaNome,
+          campoExperiencia: logToDelete.campoExperiencia,
+          escola: logToDelete.escolaNome
+        });
+      }
     } catch (err) {
       console.error('Erro ao remover registro:', err);
       showNotification('error', 'Erro ao excluir do banco.');

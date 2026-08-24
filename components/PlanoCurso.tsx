@@ -12,6 +12,7 @@ import * as XLSX from 'xlsx';
 import { Escola, Coordenador } from '../types';
 import { useNotification } from '../context/NotificationContext';
 import { supabase } from '../services/supabase';
+import { logAudit } from '../services/logService';
 
 interface PlanoCursoProps {
   escolas: Escola[]; // Mantido na assinatura para evitar quebras em outros arquivos
@@ -414,6 +415,10 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
               localStorage.setItem('sigar_planos_curso', JSON.stringify(updatedPlans));
             }
             showNotification('success', `${importedCount} Plano(s) de Curso importado(s) e unificado(s) com sucesso!`);
+            logAudit('CREATE', 'PLANO_CURSO_IMPORT', 'IMPORT_EXCEL', {
+              count: importedCount,
+              anoReferencia
+            });
             // Reset file input
             if (fileInputRef.current) fileInputRef.current.value = '';
           })
@@ -1138,6 +1143,19 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
       localStorage.setItem('sigar_planos_curso', JSON.stringify(updatedPlans));
     }
     
+    await logAudit(
+      editingId ? 'UPDATE' : 'CREATE',
+      'PLANO_CURSO',
+      payload.id,
+      {
+        anoReferencia: payload.anoReferencia,
+        anoSerie: payload.anoSerie,
+        componente: payload.componente,
+        bimestre: payload.bimestre,
+        itensCount: payload.itens.length
+      }
+    );
+
     resetForm();
   };
 
@@ -1170,10 +1188,20 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
       showNotification('success', 'Plano de Curso removido.');
     }
 
+    const planToDelete = plans.find(p => p.id === id);
     const updated = plans.filter(p => p.id !== id);
     setPlans(updated);
     if (isDemoMode) {
       localStorage.setItem('sigar_planos_curso', JSON.stringify(updated));
+    }
+
+    if (planToDelete) {
+      await logAudit('DELETE', 'PLANO_CURSO', id, {
+        anoSerie: planToDelete.anoSerie,
+        componente: planToDelete.componente,
+        bimestre: planToDelete.bimestre,
+        anoReferencia: planToDelete.anoReferencia
+      });
     }
   };
 

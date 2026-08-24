@@ -3,6 +3,7 @@ import { Shield, Lock, Eye, Edit3, Save, CheckCircle, X, ChevronDown, ChevronRig
 import { PageHeader } from './ui/PageHeader';
 import { loadPermissions as loadPermissionsFromDB, savePermissions as savePermissionsToDB } from '../services/permissoesService';
 import { AccessLevel, ALL_MODULES, ALL_ROLES, DEFAULT_PERMISSIONS } from '../utils/permissions';
+import { logAudit } from '../services/logService';
 
 const STORAGE_KEY = 'sigar_permissions';
 
@@ -96,6 +97,7 @@ export const PermissoesManager: React.FC = () => {
         setSaving(true);
         try {
             await savePermissionsToDB(permissions);
+            await logAudit('UPDATE', 'PERMISSOES', selectedRole, { funcao: selectedRole });
             setHasChanges(false);
             setSaved(true);
             setTimeout(() => setSaved(false), 2500);

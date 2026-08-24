@@ -14,6 +14,7 @@ import { Escola, Coordenador, Segmento, Aluno } from '../types';
 import { supabase } from '../services/supabase';
 import { useNotification } from '../context/NotificationContext';
 import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
+import { logAudit } from '../services/logService';
 
 interface ParecerDescritivoInfantilProps {
   escolas: Escola[];
@@ -297,28 +298,52 @@ export const ParecerDescritivoInfantil: React.FC<ParecerDescritivoInfantilProps>
     setLoading(true);
     try {
       if (!isDemoMode) {
-        const { data, error } = await supabase
-          .from('parecer_descritivo_infantil')
-          .select(`
-            *,
-            alunos (
-              name
-            ),
-            turmas (
-              name,
-              year,
-              shift
-            )
-          `)
-          .eq('ativo', true)
-          .order('created_at', { ascending: false });
+        let allPareceresData: any[] = [];
+        let page = 0;
+        const pageSize = 1000;
+        let hasMore = true;
 
-        if (error) throw error;
+        while (hasMore) {
+          const { data, error } = await supabase
+            .from('parecer_descritivo_infantil')
+            .select(`
+              *,
+              alunos (
+                name
+              ),
+              turmas (
+                name,
+                year,
+                shift
+              )
+            `)
+            .or('ativo.eq.true,ativo.is.null')
+            .order('created_at', { ascending: false })
+            .range(page * pageSize, (page + 1) * pageSize - 1);
 
-        let filteredData = data || [];
+          if (error) throw error;
+          if (data && data.length > 0) {
+            allPareceresData = allPareceresData.concat(data);
+            if (data.length < pageSize) {
+              hasMore = false;
+            } else {
+              page++;
+            }
+          } else {
+            hasMore = false;
+          }
+        }
+
+        let filteredData = allPareceresData;
+        if (!isAdmin && currentUser && currentUser.funcao !== 'Administrador') {
+          const userSchoolIds = (currentUser?.escolasIds || []).map(String);
+          if (userSchoolIds.length > 0) {
+            filteredData = filteredData.filter((d: any) => userSchoolIds.includes(String(d.escola_id)));
+          }
+        }
         if (currentUser && currentUser.funcao === 'Professor') {
-          const assignedIds = currentUser.turmasIds || [];
-          filteredData = filteredData.filter((d: any) => assignedIds.includes(d.turma_id));
+          const assignedIds = (currentUser.turmasIds || []).map(String);
+          filteredData = filteredData.filter((d: any) => assignedIds.includes(String(d.turma_id)));
         }
 
         const formatted: ParecerEntry[] = filteredData.map((d: any) => {
@@ -563,6 +588,20 @@ export const ParecerDescritivoInfantil: React.FC<ParecerDescritivoInfantilProps>
         showNotification('success', editingId ? 'Parecer atualizado no modo demo!' : 'Parecer salvo no modo demo!');
       }
 
+      await logAudit(
+        editingId ? 'UPDATE' : 'CREATE',
+        'PARECER_INFANTIL',
+        editingId || String(parsedAlunoId),
+        {
+          aluno: alunoNome,
+          turma: turmaNome,
+          escola: escolaNome,
+          anoSerie,
+          periodo: selectedPeriodo,
+          status: statusValue
+        }
+      );
+
       resetForm();
       loadEntries();
     } catch (err) {
@@ -611,7 +650,16 @@ export const ParecerDescritivoInfantil: React.FC<ParecerDescritivoInfantilProps>
         localStorage.setItem('sigar_parecer_descritivo_infantil', JSON.stringify(localEntries));
         setEntries(localEntries);
       }
+      const entryToDelete = entries.find(le => le.id === id);
       showNotification('success', 'Parecer descritivo removido!');
+      if (entryToDelete) {
+        await logAudit('DELETE', 'PARECER_INFANTIL', id, {
+          aluno: entryToDelete.alunoNome,
+          turma: entryToDelete.turmaNome,
+          escola: entryToDelete.escolaNome,
+          periodo: entryToDelete.periodo
+        });
+      }
       loadEntries();
     } catch (err) {
       console.error(err);

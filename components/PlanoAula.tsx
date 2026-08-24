@@ -14,6 +14,7 @@ import { supabase } from '../services/supabase';
 import { useNotification } from '../context/NotificationContext';
 import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
 import { isEducaInfantilYear, isCampoExperienciaInfantil, normalizeSubjectName } from '../utils';
+import { logAudit } from '../services/logService';
 
 interface PlanoAulaProps {
   escolas: Escola[];
@@ -870,6 +871,21 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       localStorage.setItem('sigar_planos_aula', JSON.stringify(updatedPlans));
     }
 
+    await logAudit(
+      editingId ? 'UPDATE' : 'CREATE',
+      'PLANO_AULA',
+      payload.id,
+      {
+        escola: payload.escolaNome,
+        turma: payload.turmaNome,
+        anoSerie: payload.anoSerie,
+        componente: payload.componente,
+        periodo: payload.periodo,
+        titulo: payload.titulo,
+        professor: payload.professor || getTeacherName(userEmail || currentUser?.contato)
+      }
+    );
+
     resetForm();
   };
 
@@ -914,10 +930,20 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       showNotification('success', 'Guia de Aprendizagem removida.');
     }
 
+    const planToDelete = plans.find(p => p.id === id);
     const updated = plans.filter(p => p.id !== id);
     setPlans(updated);
     if (isDemoMode) {
       localStorage.setItem('sigar_planos_aula', JSON.stringify(updated));
+    }
+
+    if (planToDelete) {
+      await logAudit('DELETE', 'PLANO_AULA', id, {
+        titulo: planToDelete.titulo,
+        turma: planToDelete.turmaNome,
+        componente: planToDelete.componente,
+        escola: planToDelete.escolaNome
+      });
     }
   };
 
@@ -1080,6 +1106,15 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
     showNotification('success', evalTargetStatus === 'Aprovado' 
       ? 'Guia de Aprendizagem APROVADA com sucesso!' 
       : 'Guia de Aprendizagem DEVOLVIDA para correção.');
+
+    await logAudit('UPDATE', 'PLANO_AULA_AVALIACAO', evaluatingPlan.id, {
+      status: evalTargetStatus,
+      avaliador: avaliadorNome,
+      titulo: evaluatingPlan.titulo,
+      turma: evaluatingPlan.turmaNome,
+      componente: evaluatingPlan.componente,
+      professor: resolvedDocente
+    });
 
     setEvaluatingPlan(null);
     setEvalObsText('');

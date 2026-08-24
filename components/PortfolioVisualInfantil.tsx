@@ -13,6 +13,7 @@ import { Escola, Coordenador, Segmento, Aluno } from '../types';
 import { supabase } from '../services/supabase';
 import { useNotification } from '../context/NotificationContext';
 import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
+import { logAudit } from '../services/logService';
 
 interface PortfolioVisualInfantilProps {
   escolas: Escola[];
@@ -600,6 +601,21 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
         showNotification('success', editingId ? 'Portfólio atualizado no modo demo!' : 'Portfólio salvo no modo demo!');
       }
 
+      await logAudit(
+        editingId ? 'UPDATE' : 'CREATE',
+        'PORTFOLIO_INFANTIL',
+        editingId || 'NEW',
+        {
+          titulo,
+          turma: turmaNome,
+          escola: escolaNome,
+          aluno: alunoNome,
+          campo: selectedCampo,
+          data: dataEntry,
+          fotosCount: uploadedImages.length
+        }
+      );
+
       resetForm();
       loadEntries();
     } catch (err) {
@@ -638,7 +654,16 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
         localStorage.setItem('sigar_portfolio_visual_infantil', JSON.stringify(localEntries));
         setEntries(localEntries);
       }
+      const entryToDelete = entries.find(le => le.id === id);
       showNotification('success', 'Registro removido com sucesso!');
+      if (entryToDelete) {
+        await logAudit('DELETE', 'PORTFOLIO_INFANTIL', id, {
+          titulo: entryToDelete.titulo,
+          turma: entryToDelete.turmaNome,
+          data: entryToDelete.data,
+          escola: entryToDelete.escolaNome
+        });
+      }
       loadEntries();
     } catch (err) {
       console.error(err);

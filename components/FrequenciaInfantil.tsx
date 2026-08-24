@@ -12,6 +12,7 @@ import { supabase } from '../services/supabase';
 import { useNotification } from '../context/NotificationContext';
 import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
 import { PrintableFrequencia } from './PrintableFrequencia';
+import { logAudit } from '../services/logService';
 
 interface FrequenciaInfantilProps {
   escolas: Escola[];
@@ -306,18 +307,42 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
     const loadSheets = async () => {
       try {
         if (!isDemoMode) {
-          const { data, error } = await supabase
-            .from('frequencia_sheets_infantil')
-            .select('*')
-            .eq('ativo', true)
-            .order('data', { ascending: false });
+          let allSheetsData: any[] = [];
+          let page = 0;
+          const pageSize = 1000;
+          let hasMore = true;
 
-          if (error) throw error;
+          while (hasMore) {
+            const { data, error } = await supabase
+              .from('frequencia_sheets_infantil')
+              .select('*')
+              .or('ativo.eq.true,ativo.is.null')
+              .order('data', { ascending: false })
+              .range(page * pageSize, (page + 1) * pageSize - 1);
 
-          let filteredSheetsData = data || [];
+            if (error) throw error;
+            if (data && data.length > 0) {
+              allSheetsData = allSheetsData.concat(data);
+              if (data.length < pageSize) {
+                hasMore = false;
+              } else {
+                page++;
+              }
+            } else {
+              hasMore = false;
+            }
+          }
+
+          let filteredSheetsData = allSheetsData;
+          if (!isAdmin && currentUser && currentUser.funcao !== 'Administrador') {
+            const userSchoolIds = (currentUser?.escolasIds || []).map(String);
+            if (userSchoolIds.length > 0) {
+              filteredSheetsData = filteredSheetsData.filter((d: any) => userSchoolIds.includes(String(d.escola_id)));
+            }
+          }
           if (currentUser && currentUser.funcao === 'Professor') {
-            const assignedIds = currentUser.turmasIds || [];
-            filteredSheetsData = filteredSheetsData.filter((d: any) => assignedIds.includes(d.turma_id));
+            const assignedIds = (currentUser.turmasIds || []).map(String);
+            filteredSheetsData = filteredSheetsData.filter((d: any) => assignedIds.includes(String(d.turma_id)));
           }
 
           const formatted: AttendanceSheetInfantil[] = filteredSheetsData.map(d => ({
@@ -529,6 +554,23 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
       if (isDemoMode) {
         localStorage.setItem('sigar_frequencia_sheets_infantil', JSON.stringify(updatedSheets));
       }
+
+      await logAudit(
+        existingIndex > -1 ? 'UPDATE' : 'CREATE',
+        'FREQUENCIA_INFANTIL',
+        payload.id,
+        {
+          data: payload.data,
+          escola: payload.escolaNome,
+          turma: payload.turmaNome,
+          anoSerie: payload.anoSerie,
+          periodo: payload.periodo,
+          presentes: payload.presentesCount,
+          total: payload.totalCount,
+          taxa: payload.rate
+        }
+      );
+
       setEditingSheet(null);
     } catch (err) {
       console.error('Erro ao salvar chamada ECE:', err);
@@ -570,12 +612,21 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
         if (error) throw error;
       }
 
+      const sheetToDelete = sheets.find(s => s.id === id);
       const updated = sheets.filter(s => s.id !== id);
       setSheets(updated);
       if (isDemoMode) {
         localStorage.setItem('sigar_frequencia_sheets_infantil', JSON.stringify(updated));
       }
       showNotification('success', 'Registro de frequência removido com sucesso.');
+
+      if (sheetToDelete) {
+        await logAudit('DELETE', 'FREQUENCIA_INFANTIL', id, {
+          data: sheetToDelete.data,
+          turma: sheetToDelete.turmaNome,
+          escola: sheetToDelete.escolaNome
+        });
+      }
     } catch (err) {
       console.error('Erro ao excluir registro:', err);
       showNotification('error', 'Erro ao excluir registro de frequência.');

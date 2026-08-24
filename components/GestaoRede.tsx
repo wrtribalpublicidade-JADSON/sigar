@@ -4,6 +4,7 @@ import { configuracaoService, PeriodoLetivo } from '../services/configuracaoServ
 import { useNotification } from '../context/NotificationContext';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
+import { logAudit } from '../services/logService';
 import { 
     Sliders, Calendar, BookOpen, GraduationCap, Save, Plus, Trash2, 
     ShieldAlert, Clock, Check, RefreshCw, Edit2, X
@@ -58,6 +59,12 @@ export const GestaoRede: React.FC = () => {
                 campos_experiencia: campos
             });
             await refreshConfiguracao();
+            await logAudit('UPDATE', 'GESTAO_REDE', 'config', {
+                notaMinima: parsedNota,
+                periodosCount: periodos.length,
+                componentesCount: componentes.length,
+                camposCount: campos.length
+            });
             showNotification('success', 'Configurações de rede atualizadas com sucesso!');
         } catch (err) {
             console.error('Error saving configuration:', err);

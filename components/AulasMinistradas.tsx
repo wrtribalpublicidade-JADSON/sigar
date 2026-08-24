@@ -15,6 +15,7 @@ import { useNotification } from '../context/NotificationContext';
 import { useConfiguracao } from '../context/ConfiguracaoContext';
 import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
 import { isEducaInfantilYear, isCampoExperienciaInfantil, normalizeSubjectName } from '../utils';
+import { logAudit } from '../services/logService';
 
 interface AulasMinistradasProps {
   escolas: Escola[];
@@ -223,27 +224,46 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
 
   const fetchRealLogs = async () => {
     try {
-      const { data, error } = await supabase
-        .from('aulas_ministradas')
-        .select('*')
-        .eq('ativo', true)
-        .order('data', { ascending: false });
+      let allLogsData: any[] = [];
+      let page = 0;
+      const pageSize = 1000;
+      let hasMore = true;
 
-      if (error) throw error;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('aulas_ministradas')
+          .select('*')
+          .or('ativo.eq.true,ativo.is.null')
+          .order('data', { ascending: false })
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+
+        if (error) throw error;
+        if (data && data.length > 0) {
+          allLogsData = allLogsData.concat(data);
+          if (data.length < pageSize) {
+            hasMore = false;
+          } else {
+            page++;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
 
       // Also get turmas to map names
       const { data: allTurmas, error: turmasError } = await supabase
         .from('turmas')
-        .select('id, name, year, shift');
+        .select('id, name, year, shift')
+        .range(0, 4999);
       
       const turmaMap = new Map<string, string>();
       if (!turmasError && allTurmas) {
         allTurmas.forEach((t: any) => {
-          turmaMap.set(t.id, `${t.name || t.year} • ${t.shift || ''}`);
+          turmaMap.set(String(t.id), `${t.name || t.year} • ${t.shift || ''}`);
         });
       }
 
-      let filteredLogs = data || [];
+      let filteredLogs = allLogsData;
       // Filter out Early Childhood Education entries (ECE stages and Campos de Experiência)
       filteredLogs = filteredLogs.filter((p: any) => {
         if (p.componente && isCampoExperienciaInfantil(p.componente)) return false;
@@ -252,32 +272,33 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
       });
 
       if (!isAdmin && currentUser && currentUser.funcao !== 'Administrador') {
-        const userSchoolIds = currentUser?.escolasIds || [];
+        const userSchoolIds = (currentUser?.escolasIds || []).map(String);
         if (userSchoolIds.length > 0) {
-          filteredLogs = filteredLogs.filter((p: any) => userSchoolIds.includes(p.escola_id));
+          filteredLogs = filteredLogs.filter((p: any) => userSchoolIds.includes(String(p.escola_id)));
         }
       }
       if (currentUser && currentUser.funcao === 'Professor') {
-        const assignedIds = currentUser.turmasIds || [];
+        const assignedIds = (currentUser.turmasIds || []).map(String);
         const currentEmail = (currentUser.contato || userEmail || '').toLowerCase().trim();
 
         filteredLogs = filteredLogs.filter((p: any) => {
-          if (!assignedIds.includes(p.turma_id)) return false;
-          const assignedComps = currentUser.turmaComponentes?.[p.turma_id] || [];
           const authorEmail = (p.updated_by || p.created_by || '').toLowerCase().trim();
-
           if (authorEmail && currentEmail && authorEmail === currentEmail) return true;
+          if (assignedIds.length > 0 && !assignedIds.includes(String(p.turma_id))) return false;
+
+          const assignedComps = currentUser.turmaComponentes?.[p.turma_id] || currentUser.turmaComponentes?.[String(p.turma_id)] || [];
           if (assignedComps.length > 0) {
-            return assignedComps.includes(p.componente);
+            const normPComp = normalizeSubjectName(p.componente);
+            return assignedComps.some((c: string) => normalizeSubjectName(c) === normPComp);
           }
-          return false;
+          return true;
         });
       }
 
       const formatted: ClassLog[] = filteredLogs.map((p: any) => {
         const escolaObj = escolas.find(esc => esc.id === p.escola_id);
         const escolaNome = escolaObj ? escolaObj.nome : 'Unidade';
-        const turmaNome = turmaMap.get(p.turma_id) || 'Turma';
+        const turmaNome = turmaMap.get(String(p.turma_id)) || 'Turma';
 
         return {
           id: p.id,
@@ -948,6 +969,22 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
       localStorage.setItem('sigar_aulas_ministradas', JSON.stringify(updatedLogs));
     }
 
+    await logAudit(
+      editingId ? 'UPDATE' : 'CREATE',
+      'AULAS_MINISTRADAS',
+      payload.id,
+      {
+        data: payload.data,
+        escola: payload.escolaNome,
+        turma: payload.turmaNome,
+        componente: payload.componente,
+        aulas: payload.aulas,
+        periodo: payload.periodo,
+        conteudo: payload.conteudo.substring(0, 120),
+        professor: payload.professor || userEmail || currentUser?.nome
+      }
+    );
+
     resetForm();
   };
 
@@ -990,10 +1027,21 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
       showNotification('success', 'Registro de aula removido.');
     }
 
+    const logToDelete = logs.find(l => l.id === id);
     const updated = logs.filter(l => l.id !== id);
     setLogs(updated);
     if (isDemoMode) {
       localStorage.setItem('sigar_aulas_ministradas', JSON.stringify(updated));
+    }
+
+    if (logToDelete) {
+      await logAudit('DELETE', 'AULAS_MINISTRADAS', id, {
+        data: logToDelete.data,
+        turma: logToDelete.turmaNome,
+        componente: logToDelete.componente,
+        aulas: logToDelete.aulas,
+        escola: logToDelete.escolaNome
+      });
     }
   };
 

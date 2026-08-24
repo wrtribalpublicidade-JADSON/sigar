@@ -120,15 +120,31 @@ export const AuditLogDashboard: React.FC<AuditLogDashboardProps> = ({ onBack }) 
         matchesDate(log.created_at)
     );
 
-    const filteredAuditLogs = auditLogs.filter(log =>
-        (appliedUser === '' ||
-         log.user_email?.toLowerCase().includes(appliedUser.toLowerCase()) || 
-         log.user_name?.toLowerCase().includes(appliedUser.toLowerCase()) || 
-         log.user_id?.includes(appliedUser)) &&
-        (filterModule === '' || 
-         (filterModule === 'NAVEGACAO' ? log.module?.startsWith('NAVEGACAO') : log.module === filterModule)) &&
-        matchesDate(log.created_at)
-    );
+    const filteredAuditLogs = auditLogs.filter(log => {
+        const matchesUser = appliedUser === '' ||
+            log.user_email?.toLowerCase().includes(appliedUser.toLowerCase()) || 
+            log.user_name?.toLowerCase().includes(appliedUser.toLowerCase()) || 
+            log.user_id?.includes(appliedUser);
+
+        let matchesModule = true;
+        if (filterModule) {
+            if (filterModule === 'NAVEGACAO') {
+                matchesModule = log.action === 'ACCESS' || log.action === 'NAVIGATE' || !!log.module?.startsWith('NAVEGACAO');
+            } else if (filterModule === 'ALTERACOES') {
+                matchesModule = log.action !== 'ACCESS' && log.action !== 'NAVIGATE' && !log.module?.startsWith('NAVEGACAO');
+            } else if (filterModule === 'DIARIO') {
+                matchesModule = ['PLANO_AULA', 'PLANO_AULA_AVALIACAO', 'PLANO_AULA_INFANTIL', 'PLANO_AULA_INFANTIL_AVALIACAO', 'FREQUENCIA', 'FREQUENCIA_INFANTIL', 'AULAS_MINISTRADAS', 'AULAS_MINISTRADAS_INFANTIL', 'PLANO_CURSO', 'PLANO_CURSO_INFANTIL', 'NOTAS', 'PARECER_INFANTIL', 'AVALIACAO_DOCENTE_INFANTIL', 'PORTFOLIO_INFANTIL'].includes(log.module);
+            } else if (filterModule === 'GESTAO') {
+                matchesModule = ['IG_REUNIAO', 'IG_FORMACAO', 'IG_ACAO', 'IG_PPP', 'IG_ACOMP_SALA', 'IG_CALENDARIO', 'CONSELHO_CLASSE', 'CONSELHO_ACOMP_DOCENTE', 'CONSELHO_ENCAMINHAMENTO', 'CONSELHO_STATUS_ETAPA', 'CONSELHO_SOLICITACAO', 'ATIVIDADE_COMPLEMENTAR', 'MERENDA_ITEM', 'MERENDA_ENTRADA', 'MERENDA_ENTREGA', 'GESTAO_REDE'].includes(log.module);
+            } else if (filterModule === 'CADASTROS') {
+                matchesModule = ['ESCOLA', 'VISITA', 'COORDENADOR', 'COORDENADOR_TURMAS', 'ESTUDANTE', 'TURMA', 'USUARIO', 'USUARIO_SENHA', 'PERMISSOES'].includes(log.module);
+            } else {
+                matchesModule = log.module === filterModule || (log.module?.startsWith('NAVEGACAO') && filterModule.startsWith('NAVEGACAO') && log.module === filterModule);
+            }
+        }
+
+        return matchesUser && matchesModule && matchesDate(log.created_at);
+    });
 
     const getAuditDescription = (log: AuditLog) => {
         if (log.action === 'ACCESS' || log.action === 'NAVIGATE' || log.module?.startsWith('NAVEGACAO')) {
@@ -140,6 +156,82 @@ export const AuditLogDashboard: React.FC<AuditLogDashboardProps> = ({ onBack }) 
         const actionStr = log.action === 'CREATE' ? 'Cadastrou' : log.action === 'UPDATE' ? 'Alterou' : log.action === 'DELETE' ? 'Excluiu' : log.action;
         
         switch (log.module) {
+            // === DIÁRIO DE CLASSE (FUNDAMENTAL & INFANTIL) ===
+            case 'PLANO_AULA':
+                return `${actionStr} guia de aprendizagem "${log.details?.titulo || ''}" • ${log.details?.turma || ''} (${log.details?.componente || ''})`;
+            case 'PLANO_AULA_AVALIACAO':
+                return `Avaliou guia de aprendizagem "${log.details?.titulo || ''}" como "${log.details?.status || ''}" • ${log.details?.turma || ''} (${log.details?.componente || ''})`;
+            case 'PLANO_AULA_INFANTIL':
+                return `${actionStr} guia ECE "${log.details?.titulo || ''}" • ${log.details?.turma || ''} (${log.details?.campoExperiencia || ''})`;
+            case 'PLANO_AULA_INFANTIL_AVALIACAO':
+                return `Avaliou guia ECE "${log.details?.titulo || ''}" como "${log.details?.status || ''}" • ${log.details?.turma || ''} (${log.details?.campoExperiencia || ''})`;
+            case 'FREQUENCIA':
+                return `${actionStr === 'Excluiu' ? 'Excluiu chamada' : actionStr === 'Alterou' ? 'Editou chamada' : 'Registrou chamada'} do dia ${log.details?.data || ''} • ${log.details?.turma || ''} (${log.details?.componente || ''})${log.details?.presentes !== undefined ? ` - ${log.details.presentes}/${log.details.total} presentes (${log.details.taxa}%)` : ''}`;
+            case 'FREQUENCIA_INFANTIL':
+                return `${actionStr === 'Excluiu' ? 'Excluiu chamada ECE' : actionStr === 'Alterou' ? 'Editou chamada ECE' : 'Registrou chamada ECE'} do dia ${log.details?.data || ''} • ${log.details?.turma || ''} (${log.details?.anoSerie || ''})${log.details?.presentes !== undefined ? ` - ${log.details.presentes}/${log.details.total} presentes (${log.details.taxa}%)` : ''}`;
+            case 'AULAS_MINISTRADAS':
+                return `${actionStr} registro de aula do dia ${log.details?.data || ''} • ${log.details?.turma || ''} (${log.details?.componente || ''}) - ${log.details?.aulas || 1} aula(s)${log.details?.conteudo ? `: "${log.details.conteudo}"` : ''}`;
+            case 'AULAS_MINISTRADAS_INFANTIL':
+                return `${actionStr} registro de aula ECE do dia ${log.details?.data || ''} • ${log.details?.turma || ''} (${log.details?.campoExperiencia || ''})${log.details?.conteudo ? `: "${log.details.conteudo}"` : ''}`;
+            case 'PLANO_CURSO':
+                return `${actionStr} plano de curso de ${log.details?.componente || ''} • ${log.details?.anoSerie || ''} (${log.details?.bimestre || ''} - Ref. ${log.details?.anoReferencia || ''})`;
+            case 'PLANO_CURSO_INFANTIL':
+                return `${actionStr} plano de curso ECE de ${log.details?.campoExperiencia || ''} • ${log.details?.anoSerie || ''} (${log.details?.bimestre || ''} - Ref. ${log.details?.anoReferencia || ''})`;
+            case 'PLANO_CURSO_IMPORT':
+            case 'PLANO_CURSO_INFANTIL_IMPORT':
+                return `Importou ${log.details?.count || ''} planos de curso via planilha Excel (Ano ${log.details?.anoReferencia || ''})`;
+            case 'PARECER_INFANTIL':
+                return `${actionStr} parecer descritivo de ${log.details?.aluno || 'aluno'} • ${log.details?.turma || ''} (${log.details?.periodo || ''}) - Status: ${log.details?.status || 'Salvo'}`;
+            case 'AVALIACAO_DOCENTE_INFANTIL':
+                return `Registrou avaliação docente BNCC • Turma: ${log.details?.turma || ''} • Campo: ${log.details?.campo || ''} (${log.details?.bimestre || ''})`;
+            case 'PORTFOLIO_INFANTIL':
+                return `${actionStr} registro no Portfólio Visual "${log.details?.titulo || ''}" • ${log.details?.turma || ''} (${log.details?.data || ''}) - ${log.details?.fotosCount || 0} foto(s)`;
+            case 'NOTAS':
+                return `${actionStr === 'Excluiu' || log.action === 'DELETE' ? 'Apagou' : 'Lançou / Atualizou'} notas da turma ${log.details?.class || ''} (${log.details?.component || ''} - ${log.details?.period || ''})`;
+
+            // === INSTRUMENTAIS DE GESTÃO & CONSELHO ===
+            case 'IG_REUNIAO':
+                return `${actionStr} reunião de ciclo de gestão: "${log.details?.tema || ''}" (${log.details?.dataReuniao || ''})`;
+            case 'IG_FORMACAO':
+                return `${actionStr} plano de formação continuada: "${log.details?.tema || ''}" (${log.details?.dataFormacao || ''})`;
+            case 'IG_ACAO':
+                return `${actionStr} meta/ação no Plano de Ação: "${log.details?.meta || ''}" (Prazo: ${log.details?.prazo || ''})`;
+            case 'IG_PPP':
+                return `${actionStr} Proposta Pedagógica (PPP) - Versão: ${log.details?.versao || ''} (${log.details?.ano || ''})`;
+            case 'IG_ACOMP_SALA':
+                return `${actionStr} acompanhamento em sala do(a) prof(a) ${log.details?.professor || ''} • Turma ${log.details?.turma || ''}`;
+            case 'IG_CALENDARIO':
+                return `${actionStr} evento oficial no calendário: "${log.details?.titulo || ''}" (${log.details?.data || ''})`;
+            case 'CONSELHO_CLASSE':
+                return `${actionStr} ata/registro do Conselho de Classe (${log.details?.turma || ''} - ${log.details?.periodo || ''})`;
+            case 'CONSELHO_ACOMP_DOCENTE':
+                return `${actionStr} acompanhamento docente do Conselho • Estudante: ${log.details?.estudante_nome || ''} (Prof: ${log.details?.professor || ''})`;
+            case 'CONSELHO_ENCAMINHAMENTO':
+                return `${actionStr} encaminhamento pedagógico (${log.details?.tipo || ''}) para o estudante ${log.details?.estudante || ''}`;
+            case 'CONSELHO_STATUS_ETAPA':
+                return `Atualizou status da etapa do conselho (${log.details?.periodo || ''} - ${log.details?.componente || ''}) para "${log.details?.status || ''}"`;
+            case 'CONSELHO_SOLICITACAO':
+                return `Enviou solicitação de desbloqueio para o ${log.details?.periodo || ''} (Motivo: ${log.details?.motivo || ''})`;
+
+            // === ATIVIDADES COMPLEMENTARES ===
+            case 'ATIVIDADE_COMPLEMENTAR':
+                return `${actionStr} atividade/oficina "${log.details?.nome || ''}" (${log.details?.categoria || ''})`;
+            case 'ATIVIDADE_COMPLEMENTAR_FREQUENCIA':
+                return `Registrou frequência na oficina (${log.details?.data || ''}) - ${log.details?.presentes || 0}/${log.details?.totalAlunos || 0} presentes`;
+            case 'ATIVIDADE_COMPLEMENTAR_MATRICULA':
+                return `${actionStr === 'Excluiu' || log.action === 'DELETE' ? 'Desvinculou estudante da oficina' : 'Matriculou estudante na oficina'}`;
+
+            // === MERENDA ESCOLAR ===
+            case 'MERENDA_ITEM':
+                return `${actionStr} item de merenda escolar "${log.details?.nome || ''}" (${log.details?.categoria || ''})`;
+            case 'MERENDA_ENTRADA':
+                return `Registrou entrada de estoque: ${log.details?.quantidade || ''} un. (Origem: ${log.details?.origem || 'Fornecedor'})`;
+            case 'MERENDA_ENTREGA':
+                return `${actionStr === 'Excluiu' || log.action === 'DELETE' ? 'Cancelou/Estornou' : 'Registrou'} entrega de merenda para escola (${log.details?.itensCount || ''} itens)`;
+            case 'MERENDA_ESCOLAR':
+                return `${actionStr} no controle de merenda escolar`;
+
+            // === CADASTROS GERAIS E CONFIGURAÇÕES ===
             case 'ESCOLA':
                 return `${actionStr} a escola ${log.details?.nome || log.details?.new?.nome || 'não identificada'}`;
             case 'VISITA':
@@ -155,26 +247,23 @@ export const AuditLogDashboard: React.FC<AuditLogDashboardProps> = ({ onBack }) 
                 return `${actionStr} o estudante ${log.details?.name || 'não identificado'}`;
             case 'TURMA':
                 return `${actionStr} a turma ${log.details?.name || log.details?.identificacao || 'não identificada'}`;
-            case 'NOTAS':
-                return `${actionStr === 'Excluiu' || log.action === 'DELETE' ? 'Apagou' : 'Lançou'} notas da turma ${log.details?.class || ''} (${log.details?.component || ''} - ${log.details?.period || ''})`;
+            case 'USUARIO':
+                return `Atualizou o perfil do usuário ${log.details?.nome || ''} (${log.details?.email || ''}) - Função: ${log.details?.funcao || ''}`;
+            case 'USUARIO_SENHA':
+                return `Solicitou envio de link para redefinição de senha do usuário ${log.details?.nome || ''} (${log.details?.email || ''})`;
+            case 'PERMISSOES':
+                return `Atualizou a matriz de permissões de acesso do perfil ${log.details?.funcao || log.record_id || ''}`;
+            case 'GESTAO_REDE':
+                return `Atualizou as diretrizes da rede municipal (Média: ${log.details?.notaMinima || '7.0'}, ${log.details?.periodosCount || 0} períodos)`;
+
+            // === SUPORTE TÉCNICO ===
             case 'SUPORTE_CHAMADO':
                 return `Abriu chamado de suporte "${log.details?.titulo || ''}" (#${log.record_id?.substring(0, 6)})`;
             case 'SUPORTE_MENSAGEM':
                 return `Enviou mensagem no chamado de suporte #${log.details?.chamado_id?.substring(0, 6) || log.record_id?.substring(0, 6)}`;
             case 'SUPORTE_STATUS':
                 return `Alterou status do chamado #${log.record_id?.substring(0, 6)} para "${log.details?.novo_status || ''}"`;
-            case 'PERMISSOES':
-                return `Alterou a matriz de permissões de acesso do perfil ${log.details?.funcao || ''}`;
-            case 'CONSELHO_CLASSE':
-                return `${actionStr} ata/registro do Conselho de Classe`;
-            case 'PLANO_AULA':
-                return `${actionStr} guia de aprendizagem "${log.details?.titulo || ''}"`;
-            case 'FREQUENCIA':
-                return `Registrou frequência da turma ${log.details?.turma || ''}`;
-            case 'MERENDA_ESCOLAR':
-                return `${actionStr} no controle de merenda escolar`;
-            case 'GESTAO_REDE':
-                return `${actionStr} nas configurações da rede municipal`;
+
             default:
                 if (log.details?.descricao) return log.details.descricao;
                 return `${actionStr} no módulo ${log.module}`;
@@ -268,32 +357,69 @@ export const AuditLogDashboard: React.FC<AuditLogDashboardProps> = ({ onBack }) 
                             onChange={(e) => setFilterModule(e.target.value)}
                             className="px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-orange/20 focus:border-brand-orange font-medium text-slate-700 bg-slate-50/50 focus:bg-white transition"
                         >
-                            <option value="">Todos os Módulos e Movimentações</option>
-                            <optgroup label="Movimentações / Acesso aos Menus">
-                                <option value="NAVEGACAO">Todas as Navegações de Menus</option>
-                                <option value="NAVEGACAO_MENU">Navegação: Grupo MENU</option>
-                                <option value="NAVEGACAO_DIÁRIO_DE_CLASSE">Navegação: Grupo DIÁRIO DE CLASSE</option>
-                                <option value="NAVEGACAO_GESTÃO">Navegação: Grupo GESTÃO</option>
-                                <option value="NAVEGACAO_REGISTRAR_VISITA">Navegação: REGISTRAR VISITA</option>
+                            <option value="">Todos os Registros e Movimentações</option>
+                            <option value="ALTERACOES">⚡ Apenas Ações / Alterações (Sem Navegação)</option>
+                            <option value="DIARIO">📖 Diário de Classe (Geral)</option>
+                            <option value="GESTAO">🏢 Gestão, Conselho & Merenda</option>
+                            <option value="CADASTROS">👥 Cadastros Gerais & Usuários</option>
+
+                            <optgroup label="Diário de Classe - Fundamental">
+                                <option value="PLANO_AULA">Guia de Aprendizagem</option>
+                                <option value="PLANO_AULA_AVALIACAO">Avaliação de Guia de Aprendizagem</option>
+                                <option value="FREQUENCIA">Frequência / Chamada</option>
+                                <option value="AULAS_MINISTRADAS">Aulas Ministradas</option>
+                                <option value="PLANO_CURSO">Plano de Curso</option>
+                                <option value="NOTAS">Lançamento de Notas</option>
                             </optgroup>
-                            <optgroup label="Cadastros e Alterações no Sistema">
+
+                            <optgroup label="Diário de Classe - Educação Infantil">
+                                <option value="PLANO_AULA_INFANTIL">Guia ECE</option>
+                                <option value="PLANO_AULA_INFANTIL_AVALIACAO">Avaliação de Guia ECE</option>
+                                <option value="FREQUENCIA_INFANTIL">Frequência ECE</option>
+                                <option value="AULAS_MINISTRADAS_INFANTIL">Aulas Ministradas ECE</option>
+                                <option value="PLANO_CURSO_INFANTIL">Plano de Curso ECE</option>
+                                <option value="PARECER_INFANTIL">Parecer Descritivo</option>
+                                <option value="AVALIACAO_DOCENTE_INFANTIL">Avaliação Docente BNCC</option>
+                                <option value="PORTFOLIO_INFANTIL">Portfólio Visual</option>
+                            </optgroup>
+
+                            <optgroup label="Instrumentais de Gestão & Conselho">
+                                <option value="IG_REUNIAO">Reuniões de Gestão</option>
+                                <option value="IG_FORMACAO">Planos de Formação</option>
+                                <option value="IG_ACAO">Plano de Ação</option>
+                                <option value="IG_PPP">Proposta Pedagógica (PPP)</option>
+                                <option value="IG_ACOMP_SALA">Acompanhamento em Sala</option>
+                                <option value="IG_CALENDARIO">Calendário Oficial</option>
+                                <option value="CONSELHO_CLASSE">Conselho de Classe</option>
+                                <option value="CONSELHO_ACOMP_DOCENTE">Acompanhamento Docente (Conselho)</option>
+                                <option value="CONSELHO_ENCAMINHAMENTO">Encaminhamentos Pedagógicos</option>
+                                <option value="CONSELHO_STATUS_ETAPA">Status de Etapa / Bloqueios</option>
+                                <option value="CONSELHO_SOLICITACAO">Solicitações de Desbloqueio</option>
+                            </optgroup>
+
+                            <optgroup label="Outros Módulos">
+                                <option value="ATIVIDADE_COMPLEMENTAR">Atividades Complementares / Oficinas</option>
+                                <option value="MERENDA_ITEM">Merenda: Itens</option>
+                                <option value="MERENDA_ENTRADA">Merenda: Entradas de Estoque</option>
+                                <option value="MERENDA_ENTREGA">Merenda: Entregas</option>
                                 <option value="ESCOLA">Escolas</option>
                                 <option value="VISITA">Visitas Técnicas</option>
                                 <option value="COORDENADOR">Coordenadores / Professores</option>
                                 <option value="TURMA">Turmas</option>
                                 <option value="ESTUDANTE">Estudantes</option>
-                                <option value="NOTAS">Notas</option>
-                                <option value="PLANO_AULA">Guias de Aprendizagem</option>
-                                <option value="FREQUENCIA">Frequência</option>
-                                <option value="CONSELHO_CLASSE">Conselho de Classe</option>
+                                <option value="USUARIO">Usuários</option>
                                 <option value="PERMISSOES">Permissões de Usuários</option>
-                                <option value="MERENDA_ESCOLAR">Merenda Escolar</option>
                                 <option value="GESTAO_REDE">Configurações da Rede</option>
                             </optgroup>
+
                             <optgroup label="Suporte Técnico">
                                 <option value="SUPORTE_CHAMADO">Suporte: Abertura de Chamados</option>
                                 <option value="SUPORTE_MENSAGEM">Suporte: Envio de Mensagens</option>
                                 <option value="SUPORTE_STATUS">Suporte: Alterações de Status</option>
+                            </optgroup>
+
+                            <optgroup label="Navegação de Menus">
+                                <option value="NAVEGACAO">Todas as Navegações de Menus</option>
                             </optgroup>
                         </select>
                     )}

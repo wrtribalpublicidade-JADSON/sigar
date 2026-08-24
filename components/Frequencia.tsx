@@ -15,6 +15,7 @@ import { useConfiguracao } from '../context/ConfiguracaoContext';
 import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
 import { isEducaInfantilYear, isCampoExperienciaInfantil, normalizeSubjectName } from '../utils';
 import { PrintableFrequencia } from './PrintableFrequencia';
+import { logAudit } from '../services/logService';
 
 interface FrequenciaProps {
   escolas: Escola[];
@@ -78,6 +79,7 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
   const [selectedTurmaId, setSelectedTurmaId] = useState('');
   const [componente, setComponente] = useState(COMPONENTES[0]);
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
+  const [isLoadingSheets, setIsLoadingSheets] = useState(false);
   const [hasLoadedStudents, setHasLoadedStudents] = useState(false);
   const [showSaveConfirmModal, setShowSaveConfirmModal] = useState(false);
   const [showSaveSuccessModal, setShowSaveSuccessModal] = useState(false);
@@ -166,7 +168,8 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
       try {
         const { data, error } = await supabase
           .from('coordenadores')
-          .select('contato, nome');
+          .select('contato, nome')
+          .range(0, 4999);
         if (!error && data) {
           setCoordenadoresList(data);
         }
@@ -210,66 +213,87 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
   };
 
   const fetchRealSheets = async () => {
+    setIsLoadingSheets(true);
     try {
-      const { data, error } = await supabase
-        .from('frequencia_sheets')
-        .select('*')
-        .eq('ativo', true)
-        .order('data', { ascending: false });
+      let allSheetsData: any[] = [];
+      let page = 0;
+      const pageSize = 1000;
+      let hasMore = true;
 
-      if (error) throw error;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('frequencia_sheets')
+          .select('*')
+          .or('ativo.eq.true,ativo.is.null')
+          .order('data', { ascending: false })
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+
+        if (error) throw error;
+        if (data && data.length > 0) {
+          allSheetsData = allSheetsData.concat(data);
+          if (data.length < pageSize) {
+            hasMore = false;
+          } else {
+            page++;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
 
       // Also get turmas to map names
       const { data: allTurmas, error: turmasError } = await supabase
         .from('turmas')
-        .select('id, name, year, shift');
+        .select('id, name, year, shift')
+        .range(0, 4999);
       
       const turmaMap = new Map<string, string>();
       const turmaAnoMap = new Map<string, string>();
       if (!turmasError && allTurmas) {
         allTurmas.forEach((t: any) => {
-          turmaMap.set(t.id, `${t.name || t.year} • ${t.shift || ''}`);
-          turmaAnoMap.set(t.id, t.year || '');
+          turmaMap.set(String(t.id), `${t.name || t.year} • ${t.shift || ''}`);
+          turmaAnoMap.set(String(t.id), t.year || '');
         });
       }
 
-      let filteredSheets = data || [];
+      let filteredSheets = allSheetsData;
       // Filter out Early Childhood Education entries (ECE stages and Campos de Experiência)
       filteredSheets = filteredSheets.filter((p: any) => {
         if (p.componente && isCampoExperienciaInfantil(p.componente)) return false;
-        const anoSerie = turmaAnoMap.get(p.turma_id) || p.ano_serie || '';
+        const anoSerie = turmaAnoMap.get(String(p.turma_id)) || p.ano_serie || '';
         if (anoSerie && isEducaInfantilYear(anoSerie)) return false;
         return true;
       });
 
       if (!isAdmin && currentUser && currentUser.funcao !== 'Administrador') {
-        const userSchoolIds = currentUser?.escolasIds || [];
+        const userSchoolIds = (currentUser?.escolasIds || []).map(String);
         if (userSchoolIds.length > 0) {
-          filteredSheets = filteredSheets.filter((p: any) => userSchoolIds.includes(p.escola_id));
+          filteredSheets = filteredSheets.filter((p: any) => userSchoolIds.includes(String(p.escola_id)));
         }
       }
       if (currentUser && currentUser.funcao === 'Professor') {
-        const assignedIds = currentUser.turmasIds || [];
+        const assignedIds = (currentUser.turmasIds || []).map(String);
         const currentEmail = (currentUser.contato || userEmail || '').toLowerCase().trim();
 
         filteredSheets = filteredSheets.filter((p: any) => {
-          if (!assignedIds.includes(p.turma_id)) return false;
-          const assignedComps = currentUser.turmaComponentes?.[p.turma_id] || [];
           const authorEmail = (p.updated_by || p.created_by || '').toLowerCase().trim();
-
           if (authorEmail && currentEmail && authorEmail === currentEmail) return true;
+          if (assignedIds.length > 0 && !assignedIds.includes(String(p.turma_id))) return false;
+
+          const assignedComps = currentUser.turmaComponentes?.[p.turma_id] || currentUser.turmaComponentes?.[String(p.turma_id)] || [];
           if (assignedComps.length > 0) {
-            return assignedComps.includes(p.componente);
+            const normPComp = normalizeSubjectName(p.componente);
+            return assignedComps.some((c: string) => normalizeSubjectName(c) === normPComp);
           }
-          return false;
+          return true;
         });
       }
 
       const formatted: AttendanceSheet[] = filteredSheets.map((p: any) => {
         const escolaObj = escolas.find(esc => esc.id === p.escola_id);
         const escolaNome = escolaObj ? escolaObj.nome : 'Unidade';
-        const turmaNome = turmaMap.get(p.turma_id) || 'Turma';
-        const anoSerie = turmaAnoMap.get(p.turma_id) || p.ano_serie || '';
+        const turmaNome = turmaMap.get(String(p.turma_id)) || 'Turma';
+        const anoSerie = turmaAnoMap.get(String(p.turma_id)) || p.ano_serie || '';
         const professor = p.professor || p.updated_by || p.created_by || p.responsavel || '';
 
         return {
@@ -295,6 +319,8 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
     } catch (err) {
       console.error('Erro ao buscar pautas de frequência do Supabase:', err);
       showNotification('error', 'Erro ao carregar dados do Supabase. Utilizando dados locais.');
+    } finally {
+      setIsLoadingSheets(false);
     }
   };
 
@@ -605,6 +631,21 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
       localStorage.setItem('sigar_frequencia_sheets', JSON.stringify(updatedSheets));
     }
 
+    await logAudit(
+      existingIndex > -1 ? 'UPDATE' : 'CREATE',
+      'FREQUENCIA',
+      payload.id,
+      {
+        data: payload.data,
+        escola: payload.escolaNome,
+        turma: payload.turmaNome,
+        componente: payload.componente,
+        presentes: payload.presentesCount,
+        total: payload.totalCount,
+        taxa: payload.rate
+      }
+    );
+
     setEditingSheet(null);
   };
 
@@ -647,10 +688,20 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
       showNotification('success', 'Registro de chamada removido.');
     }
 
+    const sheetToDelete = sheets.find(s => s.id === id);
     const updated = sheets.filter(s => s.id !== id);
     setSheets(updated);
     if (isDemoMode) {
       localStorage.setItem('sigar_frequencia_sheets', JSON.stringify(updated));
+    }
+
+    if (sheetToDelete) {
+      await logAudit('DELETE', 'FREQUENCIA', id, {
+        data: sheetToDelete.data,
+        turma: sheetToDelete.turmaNome,
+        componente: sheetToDelete.componente,
+        escola: sheetToDelete.escolaNome
+      });
     }
   };
 
@@ -1298,7 +1349,16 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredSheets.length === 0 ? (
+                {isLoadingSheets ? (
+                  <tr>
+                    <td colSpan={5} className="py-12 text-center text-slate-400 font-semibold">
+                      <div className="flex flex-col items-center justify-center">
+                        <Loader2 className="w-6 h-6 text-brand-orange animate-spin mb-2" />
+                        <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Carregando histórico completo de chamadas...</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : filteredSheets.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="py-12 text-center text-slate-400 font-semibold">
                       Nenhum registro de frequência salvo no histórico.

@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { logAudit } from './logService';
 
 export interface Atividade {
     id: string;
@@ -152,6 +153,12 @@ export const activitiesService = {
                 .single();
 
             if (error) throw error;
+            await logAudit('UPDATE', 'ATIVIDADE_COMPLEMENTAR', atv.id, {
+                nome: atv.nome,
+                categoria: atv.categoria,
+                escola: atv.unidadeEscolar,
+                instrutor: atv.instrutor
+            });
             return data;
         } else {
             const { data, error } = await supabase
@@ -161,6 +168,12 @@ export const activitiesService = {
                 .single();
 
             if (error) throw error;
+            await logAudit('CREATE', 'ATIVIDADE_COMPLEMENTAR', data.id, {
+                nome: atv.nome,
+                categoria: atv.categoria,
+                escola: atv.unidadeEscolar,
+                instrutor: atv.instrutor
+            });
             return data;
         }
     },
@@ -172,6 +185,7 @@ export const activitiesService = {
             .eq('id', id);
 
         if (error) throw error;
+        await logAudit('DELETE', 'ATIVIDADE_COMPLEMENTAR', id, {});
     },
 
     async enrollStudent(atividadeId: string, alunoId: number): Promise<void> {
@@ -180,6 +194,7 @@ export const activitiesService = {
             .insert({ atividade_id: atividadeId, aluno_id: alunoId });
 
         if (error) throw error;
+        await logAudit('CREATE', 'ATIVIDADE_COMPLEMENTAR_MATRICULA', atividadeId, { alunoId });
     },
 
     async unenrollStudent(atividadeId: string, alunoId: number): Promise<void> {
@@ -189,6 +204,7 @@ export const activitiesService = {
             .match({ atividade_id: atividadeId, aluno_id: alunoId });
 
         if (error) throw error;
+        await logAudit('DELETE', 'ATIVIDADE_COMPLEMENTAR_MATRICULA', atividadeId, { alunoId });
     },
 
     async getEnrolledStudents(atividadeId: string): Promise<any[]> {
@@ -271,6 +287,13 @@ export const activitiesService = {
             .upsert(records, { onConflict: 'atividade_id, aluno_id, data' });
 
         if (error) throw error;
+
+        const presentesCount = attendance.filter(a => a.presente).length;
+        await logAudit('CREATE', 'ATIVIDADE_COMPLEMENTAR_FREQUENCIA', atividadeId, {
+            data,
+            totalAlunos: attendance.length,
+            presentes: presentesCount
+        });
     },
 
     async getAttendance(atividadeId: string, data: string): Promise<AtividadePresenca[]> {

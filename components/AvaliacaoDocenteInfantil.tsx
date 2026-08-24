@@ -14,6 +14,7 @@ import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
 import { BNCC_INFANTIL } from './ConselhoClasse';
 import { ccAvaliacaoInfantilService, ccEstudanteService } from '../services/gestaoConselhoService';
 import { PrintableAvaliacaoDocenteInfantilReport } from './PrintableAvaliacaoDocenteInfantilReport';
+import { logAudit } from '../services/logService';
 
 interface AvaliacaoDocenteInfantilProps {
   escolas: Escola[];
@@ -467,6 +468,23 @@ export const AvaliacaoDocenteInfantil: React.FC<AvaliacaoDocenteInfantilProps> =
         await ccAvaliacaoInfantilService.saveMany(payload);
         showNotification('success', 'Avaliações salvas com sucesso no banco de dados!');
       }
+
+      const turmaObj = turmas.find(t => t.id === selectedTurmaId);
+      const turmaNome = turmaObj ? `${turmaObj.name || turmaObj.anoSerie} • ${turmaObj.turno || ''}` : 'Turma';
+      const escolaNome = escolas.find(e => e.id === currentSchoolId)?.nome || 'Unidade';
+
+      await logAudit(
+        'UPDATE',
+        'AVALIACAO_DOCENTE_INFANTIL',
+        selectedTurmaId,
+        {
+          escola: escolaNome,
+          turma: turmaNome,
+          campo: selectedCampo,
+          bimestre: selectedBimestre || `${bimestreNum}º Bimestre`,
+          totalAvaliados: students.length
+        }
+      );
 
       setInitialEvaluations({ ...evaluations });
     } catch (err) {
