@@ -66,9 +66,9 @@ export const GestaoRede: React.FC = () => {
                 camposCount: campos.length
             });
             showNotification('success', 'Configurações de rede atualizadas com sucesso!');
-        } catch (err) {
+        } catch (err: any) {
             console.error('Error saving configuration:', err);
-            showNotification('error', 'Ocorreu um erro ao salvar as configurações.');
+            showNotification('error', err?.message || 'Ocorreu um erro ao salvar as configurações.');
         } finally {
             setIsSaving(false);
         }
