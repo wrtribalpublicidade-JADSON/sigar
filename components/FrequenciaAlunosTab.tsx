@@ -25,6 +25,7 @@ interface StudentAttendanceSummary {
   totalClasses: number;
   presencesCount: number;
   absencesCount: number;
+  justifiedCount?: number;
   rate: number;
   isAlert: boolean;
 }
@@ -197,6 +198,7 @@ export const FrequenciaAlunosTab: React.FC<FrequenciaAlunosTabProps> = ({
             totalClasses: number;
             presences: number;
             absences: number;
+            justified: number;
           }>();
 
           // Initialize with all students
@@ -206,7 +208,8 @@ export const FrequenciaAlunosTab: React.FC<FrequenciaAlunosTabProps> = ({
               turmaNome: turmaMap.get(st.class_id || st.turma_id) || 'Turma',
               totalClasses: 0,
               presences: 0,
-              absences: 0
+              absences: 0,
+              justified: 0
             });
           });
 
@@ -222,15 +225,20 @@ export const FrequenciaAlunosTab: React.FC<FrequenciaAlunosTabProps> = ({
                   turmaNome: sheet.ano_serie || turmaMap.get(sheet.turma_id) || 'Turma',
                   totalClasses: 0,
                   presences: 0,
-                  absences: 0
+                  absences: 0,
+                  justified: 0
                 };
                 studentStatsMap.set(stIdStr, entry);
               }
 
               if (entry) {
                 entry.totalClasses += 1;
-                if (stItem.present) {
+                const isJustified = stItem.status === 'FJ' || stItem.justified;
+                const isPres = stItem.status === 'P' || (stItem.present && !isJustified);
+                if (isPres) {
                   entry.presences += 1;
+                } else if (isJustified) {
+                  entry.justified += 1;
                 } else {
                   entry.absences += 1;
                 }
@@ -249,6 +257,7 @@ export const FrequenciaAlunosTab: React.FC<FrequenciaAlunosTabProps> = ({
               totalClasses: data.totalClasses,
               presencesCount: data.presences,
               absencesCount: data.absences,
+              justifiedCount: data.justified,
               rate,
               isAlert: rate < 75 && data.totalClasses > 0
             };
@@ -375,7 +384,8 @@ export const FrequenciaAlunosTab: React.FC<FrequenciaAlunosTabProps> = ({
       Turma: st.turmaNome,
       'Total de Aulas': st.totalClasses,
       Presenças: st.presencesCount,
-      Faltas: st.absencesCount,
+      'Faltas': st.absencesCount,
+      'Faltas Justificadas': st.justifiedCount || 0,
       'Frequência (%)': `${st.rate}%`,
       Situação: st.isAlert ? 'Alerta (< 75%)' : 'Normal'
     }));
@@ -619,6 +629,7 @@ export const FrequenciaAlunosTab: React.FC<FrequenciaAlunosTabProps> = ({
                     <th className="px-6 py-3.5 text-center">Aulas no Período</th>
                     <th className="px-6 py-3.5 text-center">Presenças</th>
                     <th className="px-6 py-3.5 text-center">Faltas</th>
+                    <th className="px-6 py-3.5 text-center">Justificadas</th>
                     <th className="px-6 py-3.5 text-center">Frequência (%)</th>
                     <th className="px-6 py-3.5 text-center">Situação</th>
                   </tr>
@@ -626,7 +637,7 @@ export const FrequenciaAlunosTab: React.FC<FrequenciaAlunosTabProps> = ({
                 <tbody className="divide-y divide-slate-100">
                   {filteredStudents.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-12 text-center text-slate-400 font-semibold">
+                      <td colSpan={9} className="py-12 text-center text-slate-400 font-semibold">
                         Nenhum registro de estudante encontrado para os filtros selecionados.
                       </td>
                     </tr>
@@ -653,6 +664,9 @@ export const FrequenciaAlunosTab: React.FC<FrequenciaAlunosTabProps> = ({
                         </td>
                         <td className="px-6 py-3 text-center font-bold text-red-500">
                           {st.absencesCount}
+                        </td>
+                        <td className="px-6 py-3 text-center font-bold text-amber-600">
+                          {st.justifiedCount || 0}
                         </td>
                         <td className="px-6 py-3 text-center">
                           <span className={`inline-block font-black px-2.5 py-0.5 rounded-full text-[10px]
@@ -820,44 +834,48 @@ const PrintableFrequenciaAlunosReport: React.FC<PrintableFrequenciaAlunosReportP
             <tr style={{ background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff' }}>
               <th style={{ padding: '5.5pt 6pt', border: '0.5pt solid #0f172a', background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'center', width: '28pt', fontWeight: 900, fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>#</th>
               <th style={{ padding: '5.5pt 8pt', border: '0.5pt solid #0f172a', background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'left', fontWeight: 900, fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>Nome do Estudante</th>
-              <th style={{ padding: '5.5pt 8pt', border: '0.5pt solid #0f172a', background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'left', width: '110pt', fontWeight: 900, fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>Turma</th>
-              <th style={{ padding: '5.5pt 6pt', border: '0.5pt solid #0f172a', background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'center', width: '50pt', fontWeight: 900, fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>Aulas</th>
-              <th style={{ padding: '5.5pt 6pt', border: '0.5pt solid #0f172a', background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'center', width: '50pt', fontWeight: 900, fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>Pres.</th>
-              <th style={{ padding: '5.5pt 6pt', border: '0.5pt solid #0f172a', background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'center', width: '50pt', fontWeight: 900, fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>Faltas</th>
-              <th style={{ padding: '5.5pt 6pt', border: '0.5pt solid #0f172a', background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'center', width: '60pt', fontWeight: 900, fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>Freq (%)</th>
-              <th style={{ padding: '5.5pt 6pt', border: '0.5pt solid #0f172a', background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'center', width: '70pt', fontWeight: 900, fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>Situação</th>
+              <th style={{ padding: '5.5pt 8pt', border: '0.5pt solid #0f172a', background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'left', width: '100pt', fontWeight: 900, fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>Turma</th>
+              <th style={{ padding: '5.5pt 5pt', border: '0.5pt solid #0f172a', background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'center', width: '45pt', fontWeight: 900, fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>Aulas</th>
+              <th style={{ padding: '5.5pt 5pt', border: '0.5pt solid #0f172a', background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'center', width: '45pt', fontWeight: 900, fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>Pres.</th>
+              <th style={{ padding: '5.5pt 5pt', border: '0.5pt solid #0f172a', background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'center', width: '45pt', fontWeight: 900, fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>Faltas</th>
+              <th style={{ padding: '5.5pt 5pt', border: '0.5pt solid #0f172a', background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'center', width: '45pt', fontWeight: 900, fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>Justif.</th>
+              <th style={{ padding: '5.5pt 5pt', border: '0.5pt solid #0f172a', background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'center', width: '55pt', fontWeight: 900, fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>Freq (%)</th>
+              <th style={{ padding: '5.5pt 5pt', border: '0.5pt solid #0f172a', background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'center', width: '65pt', fontWeight: 900, fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>Situação</th>
             </tr>
           </thead>
           <tbody>
             {students.map((st, idx) => (
               <tr key={st.id} style={{ background: st.isAlert ? '#fef2f2' : (idx % 2 === 0 ? '#ffffff' : '#f8fafc') }}>
-                <td style={{ padding: '4pt 6pt', border: '0.5pt solid #cbd5e1', textAlign: 'center', fontWeight: 700, color: '#64748b' }}>
+                <td style={{ padding: '4pt 5pt', border: '0.5pt solid #cbd5e1', textAlign: 'center', fontWeight: 700, color: '#64748b' }}>
                   {String(idx + 1).padStart(2, '0')}
                 </td>
-                <td style={{ padding: '4pt 8pt', border: '0.5pt solid #cbd5e1', fontWeight: 700, color: '#1e293b' }}>
+                <td style={{ padding: '4pt 7pt', border: '0.5pt solid #cbd5e1', fontWeight: 700, color: '#1e293b' }}>
                   {st.name}
                 </td>
-                <td style={{ padding: '4pt 8pt', border: '0.5pt solid #cbd5e1', fontWeight: 600, color: '#475569' }}>
+                <td style={{ padding: '4pt 7pt', border: '0.5pt solid #cbd5e1', fontWeight: 600, color: '#475569' }}>
                   {st.turmaNome}
                 </td>
-                <td style={{ padding: '4pt 6pt', border: '0.5pt solid #cbd5e1', textAlign: 'center', fontWeight: 700, color: '#334155' }}>
+                <td style={{ padding: '4pt 5pt', border: '0.5pt solid #cbd5e1', textAlign: 'center', fontWeight: 700, color: '#334155' }}>
                   {st.totalClasses}
                 </td>
-                <td style={{ padding: '4pt 6pt', border: '0.5pt solid #cbd5e1', textAlign: 'center', fontWeight: 700, color: '#15803d' }}>
+                <td style={{ padding: '4pt 5pt', border: '0.5pt solid #cbd5e1', textAlign: 'center', fontWeight: 700, color: '#15803d' }}>
                   {st.presencesCount}
                 </td>
-                <td style={{ padding: '4pt 6pt', border: '0.5pt solid #cbd5e1', textAlign: 'center', fontWeight: 700, color: '#b91c1c' }}>
+                <td style={{ padding: '4pt 5pt', border: '0.5pt solid #cbd5e1', textAlign: 'center', fontWeight: 700, color: '#b91c1c' }}>
                   {st.absencesCount}
                 </td>
-                <td style={{ padding: '4pt 6pt', border: '0.5pt solid #cbd5e1', textAlign: 'center', fontWeight: 900, color: st.rate >= 75 ? '#0f172a' : '#b91c1c' }}>
+                <td style={{ padding: '4pt 5pt', border: '0.5pt solid #cbd5e1', textAlign: 'center', fontWeight: 700, color: '#d97706' }}>
+                  {st.justifiedCount || 0}
+                </td>
+                <td style={{ padding: '4pt 5pt', border: '0.5pt solid #cbd5e1', textAlign: 'center', fontWeight: 900, color: st.rate >= 75 ? '#0f172a' : '#b91c1c' }}>
                   {st.rate}%
                 </td>
-                <td style={{ padding: '4pt 6pt', border: '0.5pt solid #cbd5e1', textAlign: 'center', fontWeight: 900 }}>
+                <td style={{ padding: '4pt 5pt', border: '0.5pt solid #cbd5e1', textAlign: 'center', fontWeight: 900 }}>
                   <span style={{ 
                     display: 'inline-block',
-                    padding: '1.5pt 6pt',
+                    padding: '1.5pt 5pt',
                     borderRadius: '8pt',
-                    fontSize: '7pt',
+                    fontSize: '6.5pt',
                     letterSpacing: '0.04em',
                     background: st.isAlert ? '#fee2e2' : '#dcfce7',
                     color: st.isAlert ? '#b91c1c' : '#15803d'

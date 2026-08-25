@@ -1,13 +1,16 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 
-interface StudentAttendance {
+export interface StudentAttendance {
   id: string | number;
   name: string;
   present: boolean;
+  status?: 'P' | 'F' | 'FJ';
+  justified?: boolean;
+  justification?: string;
 }
 
-interface AttendanceSheet {
+export interface AttendanceSheet {
   id: string;
   data: string;
   escolaId: string;
@@ -38,7 +41,16 @@ export const PrintableFrequencia: React.FC<PrintableFrequenciaProps> = ({ sheet 
     ? new Date(sheet.data + 'T12:00:00').toLocaleDateString('pt-BR') 
     : emissionDate;
 
-  const absentsCount = sheet.totalCount - sheet.presentesCount;
+  const studentsList = sheet.students || [];
+  const presentsCount = studentsList.length > 0
+    ? studentsList.filter(s => s.status === 'P' || (s.status === undefined && s.present)).length
+    : sheet.presentesCount;
+  const justifiedCount = studentsList.length > 0
+    ? studentsList.filter(s => s.status === 'FJ' || s.justified).length
+    : 0;
+  const absentsCount = studentsList.length > 0
+    ? studentsList.filter(s => s.status === 'F' || (s.status === undefined && !s.present && !s.justified)).length
+    : (sheet.totalCount - sheet.presentesCount);
 
   return createPortal(
     <div id="print-report" className="hidden print:block bg-white text-slate-900 p-2" style={{ fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif" }}>
@@ -111,22 +123,26 @@ export const PrintableFrequencia: React.FC<PrintableFrequenciaProps> = ({ sheet 
       </div>
 
       {/* ====== SUMMARY METRICS ====== */}
-      <div className="print-avoid-break" style={{ marginBottom: '12pt', display: 'flex', gap: '8pt' }}>
-        <div style={{ flex: 1, border: '0.5pt solid #cbd5e1', borderRadius: '4pt', padding: '6pt 8pt', textAlign: 'center', background: '#f8fafc' }}>
-          <p style={{ margin: 0, fontSize: '6.5pt', fontWeight: 800, textTransform: 'uppercase', color: '#64748b' }}>Total Estudantes</p>
-          <p style={{ margin: '2pt 0 0', fontSize: '12pt', fontWeight: 900, color: '#0f172a' }}>{sheet.totalCount}</p>
+      <div className="print-avoid-break" style={{ marginBottom: '12pt', display: 'flex', gap: '6pt' }}>
+        <div style={{ flex: 1, border: '0.5pt solid #cbd5e1', borderRadius: '4pt', padding: '5pt 6pt', textAlign: 'center', background: '#f8fafc' }}>
+          <p style={{ margin: 0, fontSize: '6pt', fontWeight: 800, textTransform: 'uppercase', color: '#64748b' }}>Total Estudantes</p>
+          <p style={{ margin: '2pt 0 0', fontSize: '11pt', fontWeight: 900, color: '#0f172a' }}>{sheet.totalCount}</p>
         </div>
-        <div style={{ flex: 1, border: '0.5pt solid #bbf7d0', borderRadius: '4pt', padding: '6pt 8pt', textAlign: 'center', background: '#f0fdf4' }}>
-          <p style={{ margin: 0, fontSize: '6.5pt', fontWeight: 800, textTransform: 'uppercase', color: '#166534' }}>Presentes</p>
-          <p style={{ margin: '2pt 0 0', fontSize: '12pt', fontWeight: 900, color: '#15803d' }}>{sheet.presentesCount}</p>
+        <div style={{ flex: 1, border: '0.5pt solid #bbf7d0', borderRadius: '4pt', padding: '5pt 6pt', textAlign: 'center', background: '#f0fdf4' }}>
+          <p style={{ margin: 0, fontSize: '6pt', fontWeight: 800, textTransform: 'uppercase', color: '#166534' }}>Presentes (P)</p>
+          <p style={{ margin: '2pt 0 0', fontSize: '11pt', fontWeight: 900, color: '#15803d' }}>{presentsCount}</p>
         </div>
-        <div style={{ flex: 1, border: '0.5pt solid #fecaca', borderRadius: '4pt', padding: '6pt 8pt', textAlign: 'center', background: '#fef2f2' }}>
-          <p style={{ margin: 0, fontSize: '6.5pt', fontWeight: 800, textTransform: 'uppercase', color: '#991b1b' }}>Ausentes</p>
-          <p style={{ margin: '2pt 0 0', fontSize: '12pt', fontWeight: 900, color: '#dc2626' }}>{absentsCount}</p>
+        <div style={{ flex: 1, border: '0.5pt solid #fecaca', borderRadius: '4pt', padding: '5pt 6pt', textAlign: 'center', background: '#fef2f2' }}>
+          <p style={{ margin: 0, fontSize: '6pt', fontWeight: 800, textTransform: 'uppercase', color: '#991b1b' }}>Ausentes (F)</p>
+          <p style={{ margin: '2pt 0 0', fontSize: '11pt', fontWeight: 900, color: '#dc2626' }}>{absentsCount}</p>
         </div>
-        <div style={{ flex: 1, border: '0.5pt solid #fed7aa', borderRadius: '4pt', padding: '6pt 8pt', textAlign: 'center', background: '#fff7ed' }}>
-          <p style={{ margin: 0, fontSize: '6.5pt', fontWeight: 800, textTransform: 'uppercase', color: '#c2410c' }}>Índice Frequência</p>
-          <p style={{ margin: '2pt 0 0', fontSize: '12pt', fontWeight: 900, color: '#ea580c' }}>{sheet.rate}%</p>
+        <div style={{ flex: 1, border: '0.5pt solid #fde68a', borderRadius: '4pt', padding: '5pt 6pt', textAlign: 'center', background: '#fffbeb' }}>
+          <p style={{ margin: 0, fontSize: '6pt', fontWeight: 800, textTransform: 'uppercase', color: '#b45309' }}>Justificadas (FJ)</p>
+          <p style={{ margin: '2pt 0 0', fontSize: '11pt', fontWeight: 900, color: '#d97706' }}>{justifiedCount}</p>
+        </div>
+        <div style={{ flex: 1, border: '0.5pt solid #fed7aa', borderRadius: '4pt', padding: '5pt 6pt', textAlign: 'center', background: '#fff7ed' }}>
+          <p style={{ margin: 0, fontSize: '6pt', fontWeight: 800, textTransform: 'uppercase', color: '#c2410c' }}>Índice Frequência</p>
+          <p style={{ margin: '2pt 0 0', fontSize: '11pt', fontWeight: 900, color: '#ea580c' }}>{sheet.rate}%</p>
         </div>
       </div>
 
@@ -137,33 +153,58 @@ export const PrintableFrequencia: React.FC<PrintableFrequenciaProps> = ({ sheet 
             <tr style={{ background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff' }}>
               <th style={{ padding: '5.5pt 8pt', border: '0.5pt solid #0f172a', background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'center', width: '35pt', fontWeight: 900, fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>#</th>
               <th style={{ padding: '5.5pt 8pt', border: '0.5pt solid #0f172a', background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'left', fontWeight: 900, fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>Nome do Estudante</th>
-              <th style={{ padding: '5.5pt 8pt', border: '0.5pt solid #0f172a', background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'center', width: '110pt', fontWeight: 900, fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>Status Frequência</th>
+              <th style={{ padding: '5.5pt 8pt', border: '0.5pt solid #0f172a', background: '#0f172a', backgroundColor: '#0f172a', color: '#ffffff', textAlign: 'center', width: '120pt', fontWeight: 900, fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>Status Frequência</th>
             </tr>
           </thead>
           <tbody>
-            {(sheet.students || []).map((student, idx) => (
-              <tr key={student.id} style={{ background: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
-                <td style={{ padding: '4pt 8pt', border: '0.5pt solid #cbd5e1', textAlign: 'center', fontWeight: 700, color: '#64748b' }}>
-                  {String(idx + 1).padStart(2, '0')}
-                </td>
-                <td style={{ padding: '4pt 8pt', border: '0.5pt solid #cbd5e1', fontWeight: 700, color: '#1e293b' }}>
-                  {student.name}
-                </td>
-                <td style={{ padding: '4pt 8pt', border: '0.5pt solid #cbd5e1', textAlign: 'center', fontWeight: 900 }}>
-                  <span style={{ 
-                    display: 'inline-block',
-                    padding: '1.5pt 8pt',
-                    borderRadius: '10pt',
-                    fontSize: '7.5pt',
-                    letterSpacing: '0.05em',
-                    background: student.present ? '#dcfce7' : '#fee2e2',
-                    color: student.present ? '#15803d' : '#b91c1c'
-                  }}>
-                    {student.present ? 'PRESENTE' : 'AUSENTE'}
-                  </span>
-                </td>
-              </tr>
-            ))}
+            {(sheet.students || []).map((student, idx) => {
+              const isJustified = student.status === 'FJ' || student.justified;
+              const isAbsent = student.status === 'F' || (!student.present && !isJustified && student.status !== 'P');
+              const isPresent = student.status === 'P' || (student.present && !isJustified);
+
+              let badgeBg = '#dcfce7';
+              let badgeColor = '#15803d';
+              let badgeText = 'PRESENTE';
+
+              if (isJustified) {
+                badgeBg = '#fef3c7';
+                badgeColor = '#b45309';
+                badgeText = 'JUSTIFICADA';
+              } else if (isAbsent) {
+                badgeBg = '#fee2e2';
+                badgeColor = '#b91c1c';
+                badgeText = 'AUSENTE';
+              }
+
+              return (
+                <tr key={student.id} style={{ background: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                  <td style={{ padding: '4pt 8pt', border: '0.5pt solid #cbd5e1', textAlign: 'center', fontWeight: 700, color: '#64748b' }}>
+                    {String(idx + 1).padStart(2, '0')}
+                  </td>
+                  <td style={{ padding: '4pt 8pt', border: '0.5pt solid #cbd5e1', fontWeight: 700, color: '#1e293b' }}>
+                    <div>{student.name}</div>
+                    {isJustified && student.justification && (
+                      <div style={{ fontSize: '6.5pt', fontWeight: 600, color: '#b45309', marginTop: '1.5pt', fontStyle: 'italic' }}>
+                        Motivo: {student.justification}
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ padding: '4pt 8pt', border: '0.5pt solid #cbd5e1', textAlign: 'center', fontWeight: 900 }}>
+                    <span style={{ 
+                      display: 'inline-block',
+                      padding: '1.5pt 8pt',
+                      borderRadius: '10pt',
+                      fontSize: '7.5pt',
+                      letterSpacing: '0.05em',
+                      background: badgeBg,
+                      color: badgeColor
+                    }}>
+                      {badgeText}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

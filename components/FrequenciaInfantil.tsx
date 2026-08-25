@@ -5,7 +5,7 @@ import { Button } from './ui/Button';
 import { 
   ClipboardCheck, Calendar, School as SchoolIcon, Search, Save, CheckCircle, 
   XCircle, Percent, Users, Loader2, ListFilter, Trash2, RotateCcw, Printer, Edit,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, FileText
 } from 'lucide-react';
 import { Escola, Coordenador, Segmento } from '../types';
 import { supabase } from '../services/supabase';
@@ -13,6 +13,7 @@ import { useNotification } from '../context/NotificationContext';
 import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
 import { PrintableFrequencia } from './PrintableFrequencia';
 import { logAudit } from '../services/logService';
+import { JustificativaFaltaModal } from './modals/JustificativaFaltaModal';
 
 interface FrequenciaInfantilProps {
   escolas: Escola[];
@@ -23,10 +24,15 @@ interface FrequenciaInfantilProps {
   subHeader?: React.ReactNode;
 }
 
-interface StudentAttendance {
+export type AttendanceStatus = 'P' | 'F' | 'FJ';
+
+export interface StudentAttendance {
   id: string | number;
   name: string;
   present: boolean;
+  status?: AttendanceStatus;
+  justified?: boolean;
+  justification?: string;
 }
 
 interface AttendanceSheetInfantil {
@@ -60,7 +66,13 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
   const [sheets, setSheets] = useState<AttendanceSheetInfantil[]>([]);
   const [turmas, setTurmas] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
-  const [attendanceMap, setAttendanceMap] = useState<Record<string | number, boolean>>({});
+  const [attendanceMap, setAttendanceMap] = useState<Record<string | number, AttendanceStatus>>({});
+  const [justificationsMap, setJustificationsMap] = useState<Record<string | number, string>>({});
+  const [justificativaModalStudent, setJustificativaModalStudent] = useState<{
+    id: string | number;
+    name: string;
+    currentJustification?: string;
+  } | null>(null);
 
   // Filter & Context State
   const [dataFreq, setDataFreq] = useState(new Date().toISOString().split('T')[0]);
@@ -398,18 +410,41 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
         setStudents(data || []);
 
         // Check if we are currently editing a sheet for this turma
-        const initialMap: Record<string | number, boolean> = {};
-        const sheetStudentsMap = new Map<string, boolean>();
+        const initialMap: Record<string | number, AttendanceStatus> = {};
+        const initialJustifications: Record<string | number, string> = {};
+        const sheetStudentsMap = new Map<string, AttendanceStatus>();
         
         if (editingSheet && editingSheet.turmaId === selectedTurmaId) {
           (editingSheet.students || []).forEach(st => {
-            sheetStudentsMap.set(String(st.id), st.present);
+            let stStatus: AttendanceStatus = 'P';
+            if (st.status === 'P' || st.status === 'F' || st.status === 'FJ') {
+              stStatus = st.status;
+            } else if (st.justified) {
+              stStatus = 'FJ';
+            } else if (st.present === false) {
+              stStatus = 'F';
+            }
+            sheetStudentsMap.set(String(st.id), stStatus);
+            if (st.justification) {
+              initialJustifications[st.id] = st.justification;
+            }
           });
         } else {
           const existing = sheets.find(s => s.data === dataFreq && s.turmaId === selectedTurmaId);
           if (existing) {
             (existing.students || []).forEach(st => {
-              sheetStudentsMap.set(String(st.id), st.present);
+              let stStatus: AttendanceStatus = 'P';
+              if (st.status === 'P' || st.status === 'F' || st.status === 'FJ') {
+                stStatus = st.status;
+              } else if (st.justified) {
+                stStatus = 'FJ';
+              } else if (st.present === false) {
+                stStatus = 'F';
+              }
+              sheetStudentsMap.set(String(st.id), stStatus);
+              if (st.justification) {
+                initialJustifications[st.id] = st.justification;
+              }
             });
             setPeriodo(existing.periodo);
           }
@@ -420,10 +455,11 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
           if (sheetStudentsMap.has(sIdStr)) {
             initialMap[s.id] = sheetStudentsMap.get(sIdStr)!;
           } else {
-            initialMap[s.id] = true;
+            initialMap[s.id] = 'P';
           }
         });
         setAttendanceMap(initialMap);
+        setJustificationsMap(initialJustifications);
 
       } catch (err) {
         console.error('Erro ao carregar alunos:', err);
@@ -435,19 +471,76 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
     fetchStudents();
   }, [selectedTurmaId, dataFreq, sheets, editingSheet]);
 
-  // Toggle single presence
-  const toggleAttendance = (id: string | number) => {
+  // Set student status directly
+  const handleSetStudentStatus = (id: string | number, status: AttendanceStatus) => {
     setAttendanceMap(prev => ({
       ...prev,
-      [id]: !prev[id]
+      [id]: status
     }));
   };
 
-  // Toggle all presence/absence
-  const toggleAll = (present: boolean) => {
-    const updated = { ...attendanceMap };
+  const handleJustifyStudent = (student: any) => {
+    setJustificativaModalStudent({
+      id: student.id,
+      name: student.name,
+      currentJustification: justificationsMap[student.id] || ''
+    });
+  };
+
+  const handleConfirmJustification = (justification: string) => {
+    if (!justificativaModalStudent) return;
+    const sId = justificativaModalStudent.id;
+    setAttendanceMap(prev => ({
+      ...prev,
+      [sId]: 'FJ' as AttendanceStatus
+    }));
+    setJustificationsMap(prev => ({
+      ...prev,
+      [sId]: justification
+    }));
+    setJustificativaModalStudent(null);
+    showNotification('success', `Falta justificada registrada para ${justificativaModalStudent.name}.`);
+  };
+
+  const handleRemoveJustification = () => {
+    if (!justificativaModalStudent) return;
+    const sId = justificativaModalStudent.id;
+    setAttendanceMap(prev => ({
+      ...prev,
+      [sId]: 'F' as AttendanceStatus
+    }));
+    setJustificationsMap(prev => {
+      const next = { ...prev };
+      delete next[sId];
+      return next;
+    });
+    setJustificativaModalStudent(null);
+    showNotification('warning', 'Justificativa removida.');
+  };
+
+  // Cycle student status on row click (P -> F -> FJ -> P)
+  const handleCycleStudentStatus = (student: any) => {
+    const id = student.id;
+    const current = attendanceMap[id] || 'P';
+    if (current === 'P') {
+      handleSetStudentStatus(id, 'F');
+    } else if (current === 'F') {
+      handleJustifyStudent(student);
+    } else {
+      handleSetStudentStatus(id, 'P');
+    }
+  };
+
+  const toggleAttendance = (id: string | number) => {
+    const student = students.find(s => s.id === id);
+    if (student) handleCycleStudentStatus(student);
+  };
+
+  // Toggle all presence/absence/justified
+  const toggleAll = (status: AttendanceStatus) => {
+    const updated: Record<string | number, AttendanceStatus> = {};
     students.forEach(s => {
-      updated[s.id] = present;
+      updated[s.id] = status;
     });
     setAttendanceMap(updated);
   };
@@ -455,15 +548,13 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
   // Calculate statistics
   const stats = useMemo(() => {
     const total = students.length;
-    if (total === 0) return { total: 0, presents: 0, absents: 0, rate: 0 };
+    if (total === 0) return { total: 0, presents: 0, absents: 0, justified: 0, rate: 0 };
     
-    let presents = 0;
-    students.forEach(s => {
-      if (attendanceMap[s.id]) presents++;
-    });
-    const absents = total - presents;
+    const presents = Object.values(attendanceMap).filter(val => val === 'P').length;
+    const absents = Object.values(attendanceMap).filter(val => val === 'F').length;
+    const justified = Object.values(attendanceMap).filter(val => val === 'FJ').length;
     const rate = Math.round((presents / total) * 100);
-    return { total, presents, absents, rate };
+    return { total, presents, absents, justified, rate };
   }, [students, attendanceMap]);
 
   // Handle Save
@@ -483,11 +574,17 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
     const turmaObj = turmas.find(t => t.id === selectedTurmaId);
     const turmaNome = turmaObj ? `${turmaObj.name || turmaObj.anoSerie} • ${turmaObj.turno || ''}` : 'Turma';
 
-    const listStudents: StudentAttendance[] = students.map(s => ({
-      id: s.id,
-      name: s.name,
-      present: !!attendanceMap[s.id]
-    }));
+    const listStudents: StudentAttendance[] = students.map(s => {
+      const stStatus = attendanceMap[s.id] || 'P';
+      return {
+        id: s.id,
+        name: s.name,
+        present: stStatus === 'P',
+        status: stStatus,
+        justified: stStatus === 'FJ',
+        justification: stStatus === 'FJ' ? (justificationsMap[s.id] || '') : undefined
+      };
+    });
 
     const sheetId = crypto.randomUUID();
     const payload: AttendanceSheetInfantil = {
@@ -511,11 +608,10 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
       s.data === dataFreq && 
       s.turmaId === selectedTurmaId
     );
-         if (existingIndex > -1) {
+    if (existingIndex > -1) {
       payload.id = sheets[existingIndex].id;
     }
 
-    setSaving(true);
     try {
       if (!isDemoMode) {
         const dbPayload = {
@@ -566,6 +662,8 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
           anoSerie: payload.anoSerie,
           periodo: payload.periodo,
           presentes: payload.presentesCount,
+          faltas: stats.absents,
+          justificadas: stats.justified,
           total: payload.totalCount,
           taxa: payload.rate
         }
@@ -884,7 +982,7 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
         <>
           {/* Stats Summary cards */}
           {students.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               <Card className="bg-white border-slate-100 p-4 rounded-2xl flex items-center justify-between shadow-sm">
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Alunos</p>
@@ -897,7 +995,7 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
 
               <Card className="bg-white border-slate-100 p-4 rounded-2xl flex items-center justify-between shadow-sm">
                 <div>
-                  <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Presentes</p>
+                  <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Presentes (P)</p>
                   <h3 className="text-2xl font-black text-emerald-600 mt-1">{stats.presents}</h3>
                 </div>
                 <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-500">
@@ -907,11 +1005,21 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
 
               <Card className="bg-white border-slate-100 p-4 rounded-2xl flex items-center justify-between shadow-sm">
                 <div>
-                  <p className="text-[10px] font-bold text-red-400 uppercase tracking-wider">Ausentes</p>
+                  <p className="text-[10px] font-bold text-red-500 uppercase tracking-wider">Ausentes (F)</p>
                   <h3 className="text-2xl font-black text-red-500 mt-1">{stats.absents}</h3>
                 </div>
-                <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center text-red-400">
+                <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center text-red-500">
                   <XCircle className="w-5 h-5" />
+                </div>
+              </Card>
+
+              <Card className="bg-white border-slate-100 p-4 rounded-2xl flex items-center justify-between shadow-sm">
+                <div>
+                  <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Justificadas (FJ)</p>
+                  <h3 className="text-2xl font-black text-amber-600 mt-1">{stats.justified}</h3>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
+                  <FileText className="w-5 h-5" />
                 </div>
               </Card>
 
@@ -949,20 +1057,33 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
                 />
               </div>
 
-              <div className="flex gap-2 shrink-0">
+              <div className="flex flex-wrap gap-2 shrink-0">
                 <Button 
                   variant="secondary" 
-                  onClick={() => toggleAll(true)}
-                  className="rounded-xl text-[10px] font-bold py-1.5 px-3 uppercase bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100"
+                  onClick={() => toggleAll('P')}
+                  className="rounded-xl text-[10px] font-bold py-1.5 px-3 uppercase bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 flex items-center gap-1"
+                  title="Marcar todos como Presente"
                 >
+                  <CheckCircle className="w-3 h-3" />
                   Presente Todos
                 </Button>
                 <Button 
                   variant="secondary" 
-                  onClick={() => toggleAll(false)}
-                  className="rounded-xl text-[10px] font-bold py-1.5 px-3 uppercase bg-red-50 text-red-600 border-red-100 hover:bg-red-100"
+                  onClick={() => toggleAll('F')}
+                  className="rounded-xl text-[10px] font-bold py-1.5 px-3 uppercase bg-red-50 text-red-600 border-red-200 hover:bg-red-100 flex items-center gap-1"
+                  title="Marcar todos com Falta"
                 >
+                  <XCircle className="w-3 h-3" />
                   Ausente Todos
+                </Button>
+                <Button 
+                  variant="secondary" 
+                  onClick={() => toggleAll('FJ')}
+                  className="rounded-xl text-[10px] font-bold py-1.5 px-3 uppercase bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 flex items-center gap-1"
+                  title="Marcar todos com Falta Justificada"
+                >
+                  <FileText className="w-3 h-3" />
+                  Justificada Todos
                 </Button>
               </div>
             </div>
@@ -982,45 +1103,94 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
                   <thead className="bg-slate-50 border-b border-slate-100 uppercase text-[9px] font-black text-slate-500 tracking-wider">
                     <tr>
                       <th className="px-6 py-3">Número / Nome</th>
-                      <th className="px-6 py-3 text-center w-40">Status de Presença</th>
+                      <th className="px-6 py-3 text-center w-64">Status de Presença</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {filteredStudents.map((student, idx) => {
-                      const isPresent = !!attendanceMap[student.id];
+                      const currentStatus: AttendanceStatus = attendanceMap[student.id] || 'P';
                       return (
                         <tr 
                           key={student.id} 
-                          className={`transition-colors hover:bg-slate-50/50 cursor-pointer ${isPresent ? '' : 'bg-red-50/10'}`}
-                          onClick={() => toggleAttendance(student.id)}
+                          className={`transition-colors hover:bg-slate-50/70 cursor-pointer ${
+                            currentStatus === 'P' ? '' : currentStatus === 'FJ' ? 'bg-amber-50/20' : 'bg-red-50/10'
+                          }`}
+                          onClick={() => handleCycleStudentStatus(student)}
                         >
                           <td className="px-6 py-3.5">
-                            <div className="flex items-center gap-3">
-                              <span className="text-[10px] font-black text-slate-400 w-5">
-                                {String(idx + 1).padStart(2, '0')}
-                              </span>
-                              <span className="font-bold text-slate-800 uppercase tracking-tight text-left">
-                                {student.name}
-                              </span>
+                            <div className="flex flex-col gap-0.5">
+                              <div className="flex items-center gap-3">
+                                <span className="text-[10px] font-black text-slate-400 w-5">
+                                  {String(idx + 1).padStart(2, '0')}
+                                </span>
+                                <span className="font-bold text-slate-800 uppercase tracking-tight text-left">
+                                  {student.name}
+                                </span>
+                              </div>
+                              {currentStatus === 'FJ' && (
+                                <div 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleJustifyStudent(student);
+                                  }}
+                                  className="inline-flex items-center gap-1.5 ml-8 mt-1 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-[10.5px] font-semibold text-amber-800 hover:bg-amber-100/80 transition-colors cursor-pointer w-fit max-w-full shadow-xs"
+                                  title="Clique para editar a justificativa"
+                                >
+                                  <FileText className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                  <span className="truncate max-w-[320px]">
+                                    {justificationsMap[student.id] || 'Falta Justificada (Clique para detalhar)'}
+                                  </span>
+                                  <span className="text-[9.5px] text-amber-600 underline font-bold ml-1">Editar</span>
+                                </div>
+                              )}
                             </div>
                           </td>
-                          <td className="px-6 py-3 text-center" onClick={e => e.stopPropagation()}>
-                            <div className="inline-flex items-center">
+                          <td className="px-6 py-2.5 text-center" onClick={e => e.stopPropagation()}>
+                            <div className="inline-flex items-center p-1 bg-slate-100/90 rounded-xl border border-slate-200/70 shadow-inner gap-1">
+                              {/* PRESENTE (P) */}
                               <button
-                                onClick={() => toggleAttendance(student.id)}
-                                className={`relative inline-flex h-6 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out outline-none
-                                  ${isPresent ? 'bg-emerald-500' : 'bg-red-500'}`}
+                                type="button"
+                                onClick={() => handleSetStudentStatus(student.id, 'P')}
+                                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
+                                  currentStatus === 'P'
+                                    ? 'bg-emerald-500 text-white shadow-sm ring-1 ring-emerald-600'
+                                    : 'text-slate-500 hover:text-emerald-700 hover:bg-white/80'
+                                  }`}
+                                title="Presente (P)"
                               >
-                                <span
-                                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out
-                                    ${isPresent ? 'translate-x-6' : 'translate-x-0'}`}
-                                />
+                                <CheckCircle className="w-3.5 h-3.5" />
+                                <span>PRES</span>
                               </button>
-                              <span className={`text-[10px] font-black uppercase tracking-wider ml-2.5 w-12 text-left
-                                ${isPresent ? 'text-emerald-600' : 'text-red-500'}`}
+
+                              {/* AUSENTE / FALTA (F) */}
+                              <button
+                                type="button"
+                                onClick={() => handleSetStudentStatus(student.id, 'F')}
+                                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
+                                  currentStatus === 'F'
+                                    ? 'bg-red-500 text-white shadow-sm ring-1 ring-red-600'
+                                    : 'text-slate-500 hover:text-red-700 hover:bg-white/80'
+                                  }`}
+                                title="Falta não justificada (F)"
                               >
-                                {isPresent ? 'Pres' : 'Falt'}
-                              </span>
+                                <XCircle className="w-3.5 h-3.5" />
+                                <span>FALT</span>
+                              </button>
+
+                              {/* FALTA JUSTIFICADA (FJ) */}
+                              <button
+                                type="button"
+                                onClick={() => handleJustifyStudent(student)}
+                                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
+                                  currentStatus === 'FJ'
+                                    ? 'bg-amber-500 text-white shadow-sm ring-1 ring-amber-600'
+                                    : 'text-slate-500 hover:text-amber-700 hover:bg-white/80'
+                                  }`}
+                                title="Falta Justificada (Abre modal de justificativa)"
+                              >
+                                <FileText className="w-3.5 h-3.5" />
+                                <span>JUST</span>
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -1307,6 +1477,19 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
 
       {/* Printable Report Portal Component */}
       <PrintableFrequencia sheet={selectedSheetForPrint as any} />
+
+      {/* Justificativa de Ausência Modal */}
+      <JustificativaFaltaModal
+        isOpen={!!justificativaModalStudent}
+        onClose={() => setJustificativaModalStudent(null)}
+        onConfirm={handleConfirmJustification}
+        onRemove={handleRemoveJustification}
+        studentName={justificativaModalStudent?.name || ''}
+        currentJustification={justificativaModalStudent?.currentJustification || ''}
+        dataChamada={dataFreq}
+        turmaNome={turmas.find(t => t.id === selectedTurmaId)?.name || 'Turma'}
+        componente={anoSerie}
+      />
     </div>
   );
 };

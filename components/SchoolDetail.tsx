@@ -339,7 +339,9 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
 
           if (stat) {
             stat.totalClasses += 1;
-            if (item.present) {
+            const isJustified = item.status === 'FJ' || item.justified;
+            const isPres = item.status === 'P' || (item.present && !isJustified);
+            if (isPres) {
               stat.presences += 1;
             } else {
               stat.absences += 1;
@@ -363,7 +365,9 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
 
           if (stat) {
             stat.totalClasses += 1;
-            if (item.present) {
+            const isJustified = item.status === 'FJ' || item.justified;
+            const isPres = item.status === 'P' || (item.present && !isJustified);
+            if (isPres) {
               stat.presences += 1;
             } else {
               stat.absences += 1;
