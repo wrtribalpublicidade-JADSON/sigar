@@ -814,12 +814,12 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
     };
 
     if (!isDemoMode) {
-      const dbPayload = {
+      const dbPayload: any = {
         id: payload.id,
         data: payload.data,
-        data_criacao: payload.dataCriacao,
-        data_inicio: payload.dataInicio,
-        data_termino: payload.dataTermino,
+        data_criacao: payload.dataCriacao || payload.data,
+        data_inicio: payload.dataInicio || null,
+        data_termino: payload.dataTermino || null,
         escola_id: payload.escolaId,
         turma_id: payload.turmaId,
         componente: payload.componente,
@@ -836,6 +836,10 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
         avaliado_por: payload.avaliadoPor || null,
         avaliado_em: payload.avaliadoEm || null,
         ativo: true,
+        created_by: editingId 
+          ? (plans.find(p => p.id === editingId)?.professor || userEmail || currentUser?.contato || 'user') 
+          : (userEmail || currentUser?.contato || 'user'),
+        professor: payload.professor || currentUser?.nome || 'Professor',
         updated_at: new Date().toISOString(),
         updated_by: userEmail || currentUser?.contato || 'user'
       };
@@ -846,7 +850,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
 
       if (error) {
         console.error('Erro ao salvar guia no Supabase:', error);
-        showNotification('error', 'Erro ao salvar a guia de aprendizagem no banco de dados.');
+        showNotification('error', `Erro ao salvar a guia de aprendizagem: ${error.message}`);
         return;
       }
 

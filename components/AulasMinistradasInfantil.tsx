@@ -788,9 +788,9 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
       );
 
       resetForm();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao salvar registro de aula:', err);
-      showNotification('error', 'Falha ao gravar os dados.');
+      showNotification('error', err?.message ? `Falha ao gravar os dados: ${err.message}` : 'Falha ao gravar os dados.');
     }
   };
 

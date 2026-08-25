@@ -776,18 +776,18 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
 
     try {
       if (!isDemoMode) {
-        const dbPayload = {
+        const dbPayload: any = {
           id: payload.id,
           data: payload.data,
-          data_criacao: payload.dataCriacao,
-          data_inicio: payload.dataInicio,
-          data_termino: payload.dataTermino,
+          data_criacao: payload.dataCriacao || payload.data,
+          data_inicio: payload.dataInicio || null,
+          data_termino: payload.dataTermino || null,
           escola_id: payload.escolaId,
           turma_id: payload.turmaId,
           campo_experiencia: payload.campoExperiencia,
           titulo: payload.titulo,
           objetivos: payload.objetivos,
-          habilidades: JSON.stringify(payload.habilidades),
+          habilidades: JSON.stringify(payload.habilidades || []),
           metodologia: payload.metodologia,
           recursos: payload.recursos,
           avaliacao: payload.avaliacao,
@@ -843,9 +843,9 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
       );
 
       resetForm();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao salvar guia de aprendizagem:', err);
-      showNotification('error', 'Falha ao gravar os dados.');
+      showNotification('error', err?.message ? `Falha ao gravar os dados: ${err.message}` : 'Falha ao gravar os dados.');
     }
   };
 
