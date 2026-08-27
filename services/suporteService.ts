@@ -125,7 +125,7 @@ export async function fetchChamados(
             .order('created_at', { ascending: false });
 
         if (!isAdmin && userEmail) {
-            query = query.eq('usuario_email', userEmail);
+            query = query.ilike('usuario_email', userEmail.trim());
         }
 
         const { data, error } = await query;
