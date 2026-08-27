@@ -801,6 +801,12 @@ export default function App() {
   };
 
   const handleSaveSchool = async (newSchool: Escola) => {
+    const isUserAdmin = isAdmin || effectiveUser?.funcao === 'Administrador' || (effectiveUser?.funcao && effectiveUser.funcao.toLowerCase().trim() === 'administrador');
+    if (!isUserAdmin) {
+      showNotification('error', 'Apenas perfis de Administrador têm permissão para criar novas escolas.');
+      return;
+    }
+
     if (isDemoMode) {
       setEscolas(prev => [...prev, newSchool]);
       showNotification('success', 'Escola adicionada (Modo Demo).');
@@ -1217,6 +1223,7 @@ export default function App() {
             onUpdate={handleUpdateEscola}
             onDelete={handleDeleteSchool}
             userRole={effectiveUser?.funcao}
+            isAdmin={isAdmin}
           />
         );
       case 'DETALHE_ESCOLA':

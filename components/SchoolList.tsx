@@ -15,6 +15,7 @@ interface SchoolListProps {
   onUpdate: (escola: Escola) => void;
   onDelete: (escolaId: string) => void;
   userRole?: string;
+  isAdmin?: boolean;
 }
 
 const createEmptyNivel = (): DadosNivel => ({
@@ -79,8 +80,10 @@ const calcTotalAlunos = (escola: Escola): number => {
   return total;
 };
 
-export const SchoolList: React.FC<SchoolListProps> = ({ escolas, onSelectEscola, onSave, onUpdate, onDelete, userRole }) => {
-  const canEdit = !userRole || userRole === 'Administrador' || hasFullAccess('LISTA_ESCOLAS', userRole);
+export const SchoolList: React.FC<SchoolListProps> = ({ escolas, onSelectEscola, onSave, onUpdate, onDelete, userRole, isAdmin }) => {
+  const isUserAdmin = Boolean(isAdmin || userRole === 'Administrador' || (userRole && userRole.toLowerCase().trim() === 'administrador'));
+  const canEdit = isUserAdmin || hasFullAccess('LISTA_ESCOLAS', userRole);
+  const canCreateSchool = isUserAdmin;
   const [isRegistering, setIsRegistering] = useState(false);
   const [editingSchoolId, setEditingSchoolId] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -171,6 +174,11 @@ export const SchoolList: React.FC<SchoolListProps> = ({ escolas, onSelectEscola,
         onUpdate(updatedSchool);
       }
     } else {
+      if (!canCreateSchool) {
+        setIsRegistering(false);
+        setShowConfirmModal(false);
+        return;
+      }
       const newSchool: Escola = {
         id: generateUUID(),
         nome: formData.nome || '',
@@ -211,6 +219,10 @@ export const SchoolList: React.FC<SchoolListProps> = ({ escolas, onSelectEscola,
   );
 
   if (isRegistering) {
+    if (!editingSchoolId && !canCreateSchool) {
+      setIsRegistering(false);
+      return null;
+    }
     return (
       <div className="max-w-5xl 2xl:max-w-6xl mx-auto space-y-8 animate-fade-in relative font-sans pb-20">
 
@@ -328,7 +340,7 @@ export const SchoolList: React.FC<SchoolListProps> = ({ escolas, onSelectEscola,
         badgeText={`${escolas.length} Unidades Ativas`}
         actions={[
           { label: 'Exportar', icon: Download, onClick: handleExport, variant: 'secondary' as const },
-          ...(canEdit ? [{ label: 'Nova Escola', icon: Plus, onClick: () => setIsRegistering(true), variant: 'primary' as const }] : [])
+          ...(canCreateSchool ? [{ label: 'Nova Escola', icon: Plus, onClick: () => setIsRegistering(true), variant: 'primary' as const }] : [])
         ]}
       />
 
