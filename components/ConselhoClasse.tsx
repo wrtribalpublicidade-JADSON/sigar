@@ -296,6 +296,83 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         return `${t.anoSerie} ${ident} • ${t.turno}`.toUpperCase();
     };
 
+    const cleanTurmaName = (s: string) => {
+        if (!s) return '';
+        const mainPart = s.split('•')[0];
+        return mainPart
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/\b(ano|serie|turma)\b/g, '')
+            .replace(/[^a-z0-9]/g, '');
+    };
+
+    const findTurmaMatch = (turmas: TurmaData[], labelToFind: string): TurmaData | undefined => {
+        if (!labelToFind) return undefined;
+        let matched = turmas.find(t => t.id === labelToFind);
+        if (matched) return matched;
+        
+        matched = turmas.find(t => getTurmaLabel(t) === labelToFind);
+        if (matched) return matched;
+        
+        const cleanToFind = cleanTurmaName(labelToFind);
+        matched = turmas.find(t => cleanTurmaName(getTurmaLabel(t)) === cleanToFind);
+        if (matched) return matched;
+        
+        matched = turmas.find(t => {
+            const cleanAnoSerie = cleanTurmaName(t.anoSerie || '');
+            const cleanIdent = cleanTurmaName(t.identificacao || '');
+            return cleanAnoSerie === cleanToFind || (cleanAnoSerie + cleanIdent) === cleanToFind;
+        });
+        return matched;
+    };
+
+    const isMatchingTurma = (recordTurmaText: string | undefined, filterTurma: TurmaData | null) => {
+        if (!filterTurma) return true; // "TODAS AS TURMAS"
+        if (!recordTurmaText) return false;
+
+        const cleanRecord = cleanTurmaName(recordTurmaText);
+        const cleanFilterLabel = cleanTurmaName(getTurmaLabel(filterTurma));
+        const cleanFilterAno = cleanTurmaName(filterTurma.anoSerie || '');
+        const cleanFilterIdent = cleanTurmaName(filterTurma.identificacao || '');
+
+        if (!cleanRecord) return false;
+        if (cleanRecord === cleanFilterLabel) return true;
+        if (cleanFilterAno && cleanRecord === cleanFilterAno) return true;
+        if (cleanFilterAno && cleanFilterIdent && cleanRecord === (cleanFilterAno + cleanFilterIdent)) return true;
+        if (cleanFilterAno && (cleanRecord.includes(cleanFilterAno) || cleanFilterAno.includes(cleanRecord))) return true;
+
+        return false;
+    };
+
+    const isMatchingResponsavel = (recordResp: string | undefined, filterResp: string) => {
+        if (!filterResp || filterResp === 'ALL') return true;
+        if (!recordResp) return false;
+        const r = recordResp.trim().toLowerCase();
+        const f = filterResp.trim().toLowerCase();
+        return r === f || r.includes(f) || f.includes(r);
+    };
+
+    const isMatchingBimestre = (recordBimestre: string | undefined, filterBimestre: string) => {
+        if (!filterBimestre || filterBimestre === 'ALL') return true;
+        if (!recordBimestre) return false;
+        return recordBimestre.trim().toLowerCase() === filterBimestre.trim().toLowerCase();
+    };
+
+    const isMatchingCampoOuComponente = (recordField: string | undefined, filterField: string) => {
+        if (!filterField || filterField === 'ALL') return true;
+        if (!recordField) return false;
+        const rec = recordField.trim().toLowerCase();
+        const fil = filterField.trim().toLowerCase();
+        return rec === fil || rec.includes(fil) || fil.includes(rec);
+    };
+
+    const isMatchingEscola = (recordEscolaId: string | undefined, filterEscolaId: string) => {
+        if (!filterEscolaId || filterEscolaId === 'ALL') return true;
+        if (!recordEscolaId) return true;
+        return recordEscolaId === filterEscolaId;
+    };
+
     const handleConsultarAcomp = async () => {
         setIsLoadingAcomp(true);
         try {
@@ -303,8 +380,8 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                 ? (isAdmin ? undefined : escolas.map(e => e.id))
                 : selectedEscolaId;
 
-            const shouldFetchFundamental = (forcedEtapa === 'fundamental') || (!forcedEtapa && (selectedEtapaFiltro === 'ALL' || selectedEtapaFiltro === 'fundamental'));
-            const shouldFetchInfantil = (forcedEtapa === 'infantil') || (!forcedEtapa && (selectedEtapaFiltro === 'ALL' || selectedEtapaFiltro === 'infantil'));
+            const shouldFetchFundamental = (forcedEtapa === 'fundamental') || (!forcedEtapa && (selectedEtapaFiltro === 'ALL' || selectedEtapaFiltro === 'fundamental' || acompEtapa === 'fundamental'));
+            const shouldFetchInfantil = (forcedEtapa === 'infantil') || (!forcedEtapa && (selectedEtapaFiltro === 'ALL' || selectedEtapaFiltro === 'infantil' || acompEtapa === 'infantil'));
 
             const [acomp, acompInfantil] = await Promise.all([
                 shouldFetchFundamental ? ccAcompanhamentoDocenteService.getAll(fetchEscolaId, 'fundamental') : Promise.resolve([]),
@@ -359,8 +436,8 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                 ? (isAdmin ? undefined : escolas.map(e => e.id))
                 : selectedEscolaId;
 
-            const shouldFetchFundamental = (forcedEtapa === 'fundamental') || (!forcedEtapa && (selectedEtapaFiltro === 'ALL' || selectedEtapaFiltro === 'fundamental'));
-            const shouldFetchInfantil = (forcedEtapa === 'infantil') || (!forcedEtapa && (selectedEtapaFiltro === 'ALL' || selectedEtapaFiltro === 'infantil'));
+            const shouldFetchFundamental = (forcedEtapa === 'fundamental') || (!forcedEtapa && (selectedEtapaFiltro === 'ALL' || selectedEtapaFiltro === 'fundamental' || encEtapa === 'fundamental'));
+            const shouldFetchInfantil = (forcedEtapa === 'infantil') || (!forcedEtapa && (selectedEtapaFiltro === 'ALL' || selectedEtapaFiltro === 'infantil' || encEtapa === 'infantil'));
 
             const [encs, encsInfantil] = await Promise.all([
                 shouldFetchFundamental ? ccEncaminhamentosService.getAll(fetchEscolaId, 'fundamental') : Promise.resolve([]),
@@ -629,22 +706,22 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     const filteredAcompanhamentos = useMemo(() => {
         return mockAcompanhamentos.filter(a => {
             if (a.etapa === 'infantil') return false;
-            if (selectedEscolaId && selectedEscolaId !== 'ALL' && a.escola_id && a.escola_id !== selectedEscolaId) return false;
-            if (activeTurma && a.turma && a.turma !== getTurmaLabel(activeTurma) && !a.turma.toLowerCase().includes(activeTurma.anoSerie?.toLowerCase() || '')) return false;
-            if (selectedComponenteFiltro && selectedComponenteFiltro !== 'ALL' && a.componente !== selectedComponenteFiltro) return false;
-            if (selectedResponsavel && selectedResponsavel !== 'ALL' && a.professor !== selectedResponsavel) return false;
-            if (selectedBimestreFiltro && selectedBimestreFiltro !== 'ALL' && a.periodoLetivo !== selectedBimestreFiltro) return false;
+            if (!isMatchingEscola(a.escola_id, selectedEscolaId)) return false;
+            if (!isMatchingTurma(a.turma, activeTurma)) return false;
+            if (!isMatchingCampoOuComponente(a.componente, selectedComponenteFiltro)) return false;
+            if (!isMatchingResponsavel(a.professor, selectedResponsavel)) return false;
+            if (!isMatchingBimestre(a.periodoLetivo, selectedBimestreFiltro)) return false;
             return true;
         });
     }, [mockAcompanhamentos, activeTurma, selectedEscolaId, selectedComponenteFiltro, selectedResponsavel, selectedBimestreFiltro]);
 
     const filteredAcompInfantil = useMemo(() => {
         return mockAcompInfantil.filter(a => {
-            if (selectedEscolaId && selectedEscolaId !== 'ALL' && a.escola_id && a.escola_id !== selectedEscolaId) return false;
-            if (activeTurma && a.agrupamento && a.agrupamento !== getTurmaLabel(activeTurma) && !a.agrupamento.toLowerCase().includes(activeTurma.anoSerie?.toLowerCase() || '')) return false;
-            if (selectedCampoExperiencia && selectedCampoExperiencia !== 'ALL' && a.campoExperiencia !== selectedCampoExperiencia) return false;
-            if (selectedResponsavel && selectedResponsavel !== 'ALL' && a.professor !== selectedResponsavel) return false;
-            if (selectedBimestreFiltro && selectedBimestreFiltro !== 'ALL' && a.periodoLetivo !== selectedBimestreFiltro) return false;
+            if (!isMatchingEscola(a.escola_id, selectedEscolaId)) return false;
+            if (!isMatchingTurma(a.agrupamento, activeTurma)) return false;
+            if (!isMatchingCampoOuComponente(a.campoExperiencia, selectedCampoExperiencia)) return false;
+            if (!isMatchingResponsavel(a.professor, selectedResponsavel)) return false;
+            if (!isMatchingBimestre(a.periodoLetivo, selectedBimestreFiltro)) return false;
             return true;
         });
     }, [mockAcompInfantil, activeTurma, selectedEscolaId, selectedCampoExperiencia, selectedResponsavel, selectedBimestreFiltro]);
@@ -652,21 +729,21 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     const filteredEncaminhamentos = useMemo(() => {
         return mockEncaminhamentos.filter(e => {
             if (e.etapa === 'infantil') return false;
-            if (selectedEscolaId && selectedEscolaId !== 'ALL' && e.escola_id && e.escola_id !== selectedEscolaId) return false;
-            if (activeTurma && e.turma && e.turma !== getTurmaLabel(activeTurma) && !e.turma.toLowerCase().includes(activeTurma.anoSerie?.toLowerCase() || '')) return false;
-            if (selectedResponsavel && selectedResponsavel !== 'ALL' && e.responsavel !== selectedResponsavel) return false;
-            if (selectedBimestreFiltro && selectedBimestreFiltro !== 'ALL' && e.periodoLetivo !== selectedBimestreFiltro) return false;
+            if (!isMatchingEscola(e.escola_id, selectedEscolaId)) return false;
+            if (!isMatchingTurma(e.turma, activeTurma)) return false;
+            if (!isMatchingResponsavel(e.responsavel || e.professor, selectedResponsavel)) return false;
+            if (!isMatchingBimestre(e.periodoLetivo, selectedBimestreFiltro)) return false;
             return true;
         });
     }, [mockEncaminhamentos, activeTurma, selectedEscolaId, selectedResponsavel, selectedBimestreFiltro]);
 
     const filteredEncInfantil = useMemo(() => {
         return mockEncInfantil.filter(e => {
-            if (selectedEscolaId && selectedEscolaId !== 'ALL' && e.escola_id && e.escola_id !== selectedEscolaId) return false;
-            if (activeTurma && e.agrupamento && e.agrupamento !== getTurmaLabel(activeTurma) && !e.agrupamento.toLowerCase().includes(activeTurma.anoSerie?.toLowerCase() || '')) return false;
-            if (selectedCampoExperiencia && selectedCampoExperiencia !== 'ALL' && e.campoExperiencia !== selectedCampoExperiencia) return false;
-            if (selectedResponsavel && selectedResponsavel !== 'ALL' && e.professor !== selectedResponsavel) return false;
-            if (selectedBimestreFiltro && selectedBimestreFiltro !== 'ALL' && e.periodoLetivo !== selectedBimestreFiltro) return false;
+            if (!isMatchingEscola(e.escola_id, selectedEscolaId)) return false;
+            if (!isMatchingTurma(e.agrupamento, activeTurma)) return false;
+            if (!isMatchingCampoOuComponente(e.campoExperiencia, selectedCampoExperiencia)) return false;
+            if (!isMatchingResponsavel(e.professor || e.responsavel, selectedResponsavel)) return false;
+            if (!isMatchingBimestre(e.periodoLetivo, selectedBimestreFiltro)) return false;
             return true;
         });
     }, [mockEncInfantil, activeTurma, selectedEscolaId, selectedCampoExperiencia, selectedResponsavel, selectedBimestreFiltro]);
@@ -698,9 +775,14 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                         turmas = turmas.filter(isTurmaFundamental);
                     }
                     setTurmasCadastradas(turmas);
-                    if (turmas.length > 0) {
-                        setActiveTurma(turmas[0]);
+                    if (activeTab === 'estudantil' || activeTab === 'avaliacao') {
+                        if (turmas.length > 0) {
+                            setActiveTurma(turmas[0]);
+                        } else {
+                            setActiveTurma(null);
+                        }
                     } else {
+                        // For acompanhamento and encaminhamentos, keep 'ALL' (null) so all school records are visible
                         setActiveTurma(null);
                     }
                 }
@@ -711,7 +793,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             }
         };
         loadTurmas();
-    }, [selectedEscolaId, currentEscolaId, escolas, forcedEtapa]);
+    }, [selectedEscolaId, currentEscolaId, escolas, forcedEtapa, activeTab]);
     const [showSuccessToast, setShowSuccessToast] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isCadastroEstudanteOpen, setIsCadastroEstudanteOpen] = useState(false);
@@ -1713,6 +1795,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
 
             const formattedResult = {
                 id: result.id,
+                escola_id: result.escola_id || currentEscolaId,
                 professor: result.professor,
                 agrupamento: result.turma_nome,
                 periodoLetivo: result.periodo_letivo,
@@ -1804,6 +1887,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
 
             const formattedResult = {
                 id: result.id,
+                escola_id: result.escola_id || currentEscolaId,
                 professor: result.professor,
                 componente: result.componente_curricular,
                 turma: result.turma_nome,
@@ -1812,7 +1896,8 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                 estudante: result.estudante_nome,
                 lider: result.lider_turma,
                 dificuldades: result.dificuldades,
-                intervencao: result.intervencao_pedagogica
+                intervencao: result.intervencao_pedagogica,
+                etapa: 'fundamental'
             };
 
             if (acompForm.id) {
@@ -1999,6 +2084,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
 
             const formattedResult = {
                 id: result.id,
+                escola_id: result.escola_id || currentEscolaId,
                 estudante: result.estudante_nome,
                 turma: result.turma,
                 tipo: result.tipo_encaminhamento,
@@ -2007,7 +2093,8 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                 data: result.data_registro,
                 periodoLetivo: result.periodo_letivo,
                 status: result.status,
-                responsavel: result.responsavel
+                responsavel: result.responsavel,
+                etapa: 'fundamental'
             };
 
             if (encForm.id) {
@@ -2082,37 +2169,6 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         professor: '',
         status: 'Pendente'
     });
-
-    const cleanTurmaName = (s: string) => {
-        if (!s) return '';
-        const mainPart = s.split('•')[0];
-        return mainPart
-            .toLowerCase()
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .replace(/\b(ano|serie|turma)\b/g, '')
-            .replace(/[^a-z0-9]/g, '');
-    };
-
-    const findTurmaMatch = (turmas: TurmaData[], labelToFind: string): TurmaData | undefined => {
-        if (!labelToFind) return undefined;
-        let matched = turmas.find(t => t.id === labelToFind);
-        if (matched) return matched;
-        
-        matched = turmas.find(t => getTurmaLabel(t) === labelToFind);
-        if (matched) return matched;
-        
-        const cleanToFind = cleanTurmaName(labelToFind);
-        matched = turmas.find(t => cleanTurmaName(getTurmaLabel(t)) === cleanToFind);
-        if (matched) return matched;
-        
-        matched = turmas.find(t => {
-            const cleanAnoSerie = cleanTurmaName(t.anoSerie || '');
-            const cleanIdent = cleanTurmaName(t.identificacao || '');
-            return cleanAnoSerie === cleanToFind || (cleanAnoSerie + cleanIdent) === cleanToFind;
-        });
-        return matched;
-    };
 
     const [acompFormStudents, setAcompFormStudents] = useState<any[]>([]);
     const [acompInfantilFormStudents, setAcompInfantilFormStudents] = useState<any[]>([]);
@@ -2228,6 +2284,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
 
             const formattedResult = {
                 id: result.id,
+                escola_id: result.escola_id || currentEscolaId,
                 crianca: result.estudante_nome,
                 agrupamento: result.turma,
                 campoExperiencia: result.campo_experiencia,
@@ -3514,7 +3571,12 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                 (schoolLevels.hasBoth || (!schoolLevels.hasInfantil && !schoolLevels.hasFundamental)) && !activeTurma && !forcedEtapa && (
                                     <div className="flex gap-2 mb-6 bg-slate-100 p-1.5 rounded-2xl w-fit">
                                         <button
-                                            onClick={() => isFundamentalAllowed && setAcompEtapa('fundamental')}
+                                            onClick={() => {
+                                                if (isFundamentalAllowed) {
+                                                    setAcompEtapa('fundamental');
+                                                    setSelectedEtapaFiltro('fundamental');
+                                                }
+                                            }}
                                             disabled={!isFundamentalAllowed}
                                             className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${acompEtapa === 'fundamental'
                                                 ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
@@ -3524,7 +3586,12 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                             <School size={16} /> Ensino Fundamental
                                         </button>
                                         <button
-                                            onClick={() => isInfantilAllowed && setAcompEtapa('infantil')}
+                                            onClick={() => {
+                                                if (isInfantilAllowed) {
+                                                    setAcompEtapa('infantil');
+                                                    setSelectedEtapaFiltro('infantil');
+                                                }
+                                            }}
                                             disabled={!isInfantilAllowed}
                                             className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${acompEtapa === 'infantil'
                                                 ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
@@ -4047,7 +4114,12 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                             {(schoolLevels.hasBoth || (!schoolLevels.hasInfantil && !schoolLevels.hasFundamental)) && !activeTurma && !forcedEtapa && (
                                 <div className="flex gap-2 mb-6 bg-slate-100 p-1.5 rounded-2xl w-fit">
                                     <button
-                                        onClick={() => isFundamentalAllowed && setEncEtapa('fundamental')}
+                                        onClick={() => {
+                                            if (isFundamentalAllowed) {
+                                                setEncEtapa('fundamental');
+                                                setSelectedEtapaFiltro('fundamental');
+                                            }
+                                        }}
                                         disabled={!isFundamentalAllowed}
                                         className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${encEtapa === 'fundamental'
                                             ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
@@ -4057,7 +4129,12 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                         <School size={16} /> Ensino Fundamental
                                     </button>
                                     <button
-                                        onClick={() => isInfantilAllowed && setEncEtapa('infantil')}
+                                        onClick={() => {
+                                            if (isInfantilAllowed) {
+                                                setEncEtapa('infantil');
+                                                setSelectedEtapaFiltro('infantil');
+                                            }
+                                        }}
                                         disabled={!isInfantilAllowed}
                                         className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${encEtapa === 'infantil'
                                             ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
