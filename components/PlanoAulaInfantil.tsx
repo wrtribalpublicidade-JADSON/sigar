@@ -15,6 +15,7 @@ import { useNotification } from '../context/NotificationContext';
 import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
 import { BNCC_INFANTIL } from './ConselhoClasse';
 import { logAudit } from '../services/logService';
+import { ConfirmModal } from './ui/ConfirmModal';
 
 interface PlanoAulaInfantilProps {
   escolas: Escola[];
@@ -118,6 +119,9 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
   const [evaluatingPlan, setEvaluatingPlan] = useState<LessonPlanInfantil | null>(null);
   const [evalObsText, setEvalObsText] = useState('');
   const [evalTargetStatus, setEvalTargetStatus] = useState<'Aprovado' | 'Devolvido para Correção'>('Aprovado');
+
+  // Delete Confirmation Modal state
+  const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null);
 
   const canEvaluateGuia = useMemo(() => {
     if (isAdmin) return true;
@@ -886,8 +890,14 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Deseja realmente remover esta guia de aprendizagem?')) return;
+  const handleDeleteClick = (id: string) => {
+    setDeleteConfirmationId(id);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirmationId) return;
+    const id = deleteConfirmationId;
+    setDeleteConfirmationId(null);
 
     try {
       if (!isDemoMode) {
@@ -1999,7 +2009,7 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
                             <Edit2 size={15} />
                           </button>
                           <button 
-                            onClick={() => handleDelete(plan.id)} 
+                            onClick={() => handleDeleteClick(plan.id)} 
                             className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" 
                             title="Excluir"
                           >
@@ -2408,6 +2418,18 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={deleteConfirmationId !== null}
+        onClose={() => setDeleteConfirmationId(null)}
+        onConfirm={handleConfirmDelete}
+        title="EXCLUIR GUIA DE APRENDIZAGEM?"
+        message="Esta operação removerá permanentemente esta guia de aprendizagem e todos os seus dados associados do sistema."
+        icon={Trash2}
+        variant="danger"
+        confirmText="Confirmar"
+        cancelText="Cancelar"
+      />
     </div>
   );
 };
