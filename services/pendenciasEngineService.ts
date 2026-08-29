@@ -11,6 +11,7 @@ import {
   ViewState
 } from '../types';
 import { logAudit } from './logService';
+import { generateUUID } from '../utils';
 
 const DEFAULT_CONFIG: AlertasConfiguracao = {
   prazo_padrao_dias: 5,
@@ -776,7 +777,7 @@ export const pendenciasEngineService = {
           updatedList.push(existing);
           existingMap.delete(key);
         } else {
-          const generatedId = `gen-${Date.now()}-${i}`;
+          const generatedId = generateUUID();
           const fullItem: AlertaPendencia = {
             ...det,
             id: generatedId,
@@ -784,7 +785,7 @@ export const pendenciasEngineService = {
             updated_at: nowISO
           };
           updatedList.push(fullItem);
-          newToInsert.push(det);
+          newToInsert.push({ ...det, id: generatedId });
         }
       }
 
