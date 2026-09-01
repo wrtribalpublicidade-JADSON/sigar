@@ -57,6 +57,9 @@ export interface CoursePlan {
   anoSerie: string;
   itens: ItemPlano[];
   criadoEm: string;
+  updatedBy?: string;
+  createdBy?: string;
+  updatedAt?: string;
 }
 
 interface RepositorioHabilidade {
@@ -376,6 +379,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
             p.bimestre === importedPlan.bimestre
           );
 
+          const userIdentifier = userEmail || currentUser?.contato || currentUser?.nome || 'user';
           const payload: CoursePlan = {
             id: existingIdx >= 0 ? updatedPlans[existingIdx].id : generateId(),
             anoReferencia: importedPlan.anoReferencia,
@@ -383,7 +387,10 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
             componente: importedPlan.componente,
             bimestre: importedPlan.bimestre,
             itens: importedPlan.itens,
-            criadoEm: new Date().toISOString()
+            criadoEm: new Date().toISOString(),
+            updatedBy: userIdentifier,
+            createdBy: userIdentifier,
+            updatedAt: new Date().toISOString()
           };
 
           if (existingIdx >= 0) {
@@ -401,7 +408,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
               ano_serie: payload.anoSerie,
               itens: payload.itens,
               updated_at: new Date().toISOString(),
-              updated_by: userEmail || currentUser?.contato || 'user'
+              updated_by: userIdentifier
             };
             const { error } = await supabase.from('planos_curso').upsert(dbPayload);
             if (error) throw error;
@@ -501,6 +508,69 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
   // Print Mode State
   const [printPlan, setPrintPlan] = useState<CoursePlan | null>(null);
 
+  // Coordenadores/Usuários list for name resolution
+  const [coordenadoresList, setCoordenadoresList] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchCoordenadores = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('coordenadores')
+          .select('id, contato, nome, funcao');
+        if (!error && data) {
+          setCoordenadoresList(data);
+        }
+      } catch (err) {
+        console.error('Erro ao carregar coordenadores:', err);
+      }
+    };
+    fetchCoordenadores();
+  }, []);
+
+  const coordMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (coordenadoresList && coordenadoresList.length > 0) {
+      coordenadoresList.forEach((c: any) => {
+        if (c.contato && c.nome) {
+          map.set(c.contato.toLowerCase().trim(), c.nome.trim());
+        }
+        if (c.id && c.nome) {
+          map.set(String(c.id).toLowerCase().trim(), c.nome.trim());
+        }
+      });
+    }
+    if (currentUser) {
+      if (currentUser.contato && currentUser.nome) {
+        map.set(currentUser.contato.toLowerCase().trim(), currentUser.nome.trim());
+      }
+      if ((currentUser as any).email && currentUser.nome) {
+        map.set(((currentUser as any).email as string).toLowerCase().trim(), currentUser.nome.trim());
+      }
+      if (currentUser.id && currentUser.nome) {
+        map.set(String(currentUser.id).toLowerCase().trim(), currentUser.nome.trim());
+      }
+    }
+    return map;
+  }, [coordenadoresList, currentUser]);
+
+  const getUserDisplayName = (authorOrEmail?: string): string => {
+    if (!authorOrEmail) return 'Sistema Municipal';
+    const clean = authorOrEmail.trim();
+    if (!clean) return 'Sistema Municipal';
+    if (clean === 'SISTEMA_MUNICIPAL' || clean === 'sistema_municipal') return 'Sistema Municipal';
+    const lower = clean.toLowerCase();
+    if (coordMap.has(lower)) {
+      return coordMap.get(lower)!;
+    }
+    if (clean.includes('@')) {
+      const parts = clean.split('@')[0].split(/[._-]/).filter(Boolean);
+      if (parts.length > 0) {
+        return parts.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+      }
+    }
+    return clean;
+  };
+
   const fetchRealData = async () => {
     try {
       // 1. Fetch planos_curso
@@ -519,7 +589,10 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
         bimestre: p.bimestre,
         anoSerie: p.ano_serie,
         itens: p.itens || [],
-        criadoEm: p.created_at
+        criadoEm: p.created_at,
+        updatedBy: p.updated_by || p.created_by,
+        createdBy: p.created_by || p.updated_by,
+        updatedAt: p.updated_at
       }));
       setPlans(formattedPlans);
 
@@ -589,7 +662,10 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
                 bimestre: p.bimestre,
                 anoSerie: p.anoSerie || '',
                 itens: [migratedItem],
-                criadoEm: p.criadoEm || new Date().toISOString()
+                criadoEm: p.criadoEm || new Date().toISOString(),
+                updatedBy: p.updatedBy || p.updated_by || p.createdBy || p.created_by,
+                createdBy: p.createdBy || p.created_by,
+                updatedAt: p.updatedAt || p.updated_at
               };
             });
             setPlans(migrated);
@@ -1090,6 +1166,7 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
       return;
     }
 
+    const userIdentifier = userEmail || currentUser?.contato || currentUser?.nome || 'user';
     const payload: CoursePlan = {
       id: editingId || generateId(),
       anoReferencia,
@@ -1097,7 +1174,10 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
       bimestre,
       anoSerie,
       itens: validItens,
-      criadoEm: new Date().toISOString()
+      criadoEm: editingId ? (plans.find(p => p.id === editingId)?.criadoEm || new Date().toISOString()) : new Date().toISOString(),
+      updatedBy: userIdentifier,
+      createdBy: editingId ? (plans.find(p => p.id === editingId)?.createdBy || userIdentifier) : userIdentifier,
+      updatedAt: new Date().toISOString()
     };
 
     if (!isDemoMode) {
@@ -1108,8 +1188,9 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
         bimestre: payload.bimestre,
         ano_serie: payload.anoSerie,
         itens: payload.itens,
-        updated_at: new Date().toISOString(),
-        updated_by: userEmail || currentUser?.contato || 'user'
+        updated_at: payload.updatedAt,
+        updated_by: userIdentifier,
+        created_by: payload.createdBy
       };
 
       const { error } = await supabase
@@ -1223,9 +1304,11 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
   ]);
 
   const filteredPlans = plans.filter(p => {
+    const userLabel = getUserDisplayName(p.updatedBy || p.createdBy);
     const matchesSearch = searchTerm === '' || 
                           p.componente.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          p.itens?.some(item => item.eixoTematico.toLowerCase().includes(searchTerm.toLowerCase()));
+                          p.itens?.some(item => item.eixoTematico.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                          userLabel.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesGrade = gradeFilter === 'ALL' || p.anoSerie === gradeFilter;
     return matchesSearch && matchesGrade;
   });
@@ -2109,67 +2192,93 @@ export const PlanoCurso: React.FC<PlanoCursoProps> = ({ escolas, isDemoMode, isA
                   <th className="px-6 py-4">Período / Ano Letivo</th>
                   <th className="px-6 py-4">Ano/Série / Componente</th>
                   <th className="px-6 py-4">Eixos Planejados</th>
+                  <th className="px-6 py-4">Usuário</th>
                   <th className="px-6 py-4 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredPlans.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="py-12 text-center text-slate-400 font-semibold">
+                    <td colSpan={5} className="py-12 text-center text-slate-400 font-semibold">
                       Nenhum plano de curso unificado encontrado.
                     </td>
                   </tr>
                 ) : (
-                  paginatedPlansHistory.map(plan => (
-                    <tr key={plan.id} className="hover:bg-slate-50/50 transition-colors group">
-                      <td className="px-6 py-3 text-slate-800 font-bold">
-                        {plan.bimestre} ({plan.anoReferencia})
-                      </td>
-                      <td className="px-6 py-3">
-                        <div className="font-bold text-slate-700">{plan.anoSerie || '---'}</div>
-                        <div className="text-[10px] text-brand-orange font-bold uppercase mt-0.5">
-                          {plan.componente}
-                        </div>
-                      </td>
-                      <td className="px-6 py-3">
-                        <div className="space-y-1.5 max-w-[420px]">
-                          {plan.itens?.map((item, index) => (
-                            <div key={item.id || index} className="text-slate-800 flex flex-col gap-0.5">
-                              <span className="font-bold text-slate-700">• {item.eixoTematico || 'Eixo Geral'}</span>
-                              <span className="text-[10px] text-slate-400 font-semibold pl-2.5">
-                                ({item.objetos?.length || 0} objetos, {item.habilidades?.length || 0} habilid., {item.links?.length || 0} vínc.)
-                              </span>
+                  paginatedPlansHistory.map(plan => {
+                    const userName = getUserDisplayName(plan.updatedBy || plan.createdBy);
+                    const initial = userName && userName !== '---' ? userName.charAt(0).toUpperCase() : 'U';
+                    const dateFormatted = plan.updatedAt || plan.criadoEm 
+                      ? new Date(plan.updatedAt || plan.criadoEm).toLocaleDateString('pt-BR')
+                      : null;
+
+                    return (
+                      <tr key={plan.id} className="hover:bg-slate-50/50 transition-colors group">
+                        <td className="px-6 py-3 text-slate-800 font-bold">
+                          {plan.bimestre} ({plan.anoReferencia})
+                        </td>
+                        <td className="px-6 py-3">
+                          <div className="font-bold text-slate-700">{plan.anoSerie || '---'}</div>
+                          <div className="text-[10px] text-brand-orange font-bold uppercase mt-0.5">
+                            {plan.componente}
+                          </div>
+                        </td>
+                        <td className="px-6 py-3">
+                          <div className="space-y-1.5 max-w-[420px]">
+                            {plan.itens?.map((item, index) => (
+                              <div key={item.id || index} className="text-slate-800 flex flex-col gap-0.5">
+                                <span className="font-bold text-slate-700">• {item.eixoTematico || 'Eixo Geral'}</span>
+                                <span className="text-[10px] text-slate-400 font-semibold pl-2.5">
+                                  ({item.objetos?.length || 0} objetos, {item.habilidades?.length || 0} habilid., {item.links?.length || 0} vínc.)
+                                </span>
+                              </div>
+                            )) || <div className="text-slate-400 italic">Sem eixos vinculados</div>}
+                          </div>
+                        </td>
+                        <td className="px-6 py-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-full bg-orange-50 border border-orange-200/80 flex items-center justify-center font-bold text-orange-600 text-[11px] shrink-0">
+                              {initial}
                             </div>
-                          )) || <div className="text-slate-400 italic">Sem eixos vinculados</div>}
-                        </div>
-                      </td>
-                      <td className="px-6 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
-                          <button 
-                            onClick={() => handlePrint(plan)} 
-                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" 
-                            title="Imprimir Plano Unificado"
-                          >
-                            <Printer size={15} />
-                          </button>
-                          <button 
-                            onClick={() => handleEdit(plan)} 
-                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" 
-                            title="Editar"
-                          >
-                            <Edit2 size={15} />
-                          </button>
-                          <button 
-                            onClick={() => handleDelete(plan.id)} 
-                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" 
-                            title="Excluir"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                            <div className="min-w-0">
+                              <div className="font-bold text-slate-700 truncate max-w-[170px]" title={userName}>
+                                {userName}
+                              </div>
+                              {dateFormatted && (
+                                <div className="text-[10px] text-slate-400 font-medium">
+                                  {dateFormatted}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-3 text-right">
+                          <div className="flex items-center justify-end gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
+                            <button 
+                              onClick={() => handlePrint(plan)} 
+                              className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" 
+                              title="Imprimir Plano Unificado"
+                            >
+                              <Printer size={15} />
+                            </button>
+                            <button 
+                              onClick={() => handleEdit(plan)} 
+                              className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" 
+                              title="Editar"
+                            >
+                              <Edit2 size={15} />
+                            </button>
+                            <button 
+                              onClick={() => handleDelete(plan.id)} 
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" 
+                              title="Excluir"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
