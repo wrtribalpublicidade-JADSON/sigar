@@ -3,11 +3,13 @@ import {
     X, Check, Trash2, Edit, Users, Calendar, AlertTriangle, Search, 
     Info, Lock, Plus, User, Sparkles, MapPin, HeartHandshake, 
     GraduationCap, ChevronLeft, ChevronRight, FileText, Globe, 
-    Building2, CheckCircle2, Loader2, ShieldAlert, CheckCircle, AlertCircle
+    Building2, CheckCircle2, Loader2, ShieldAlert, CheckCircle, AlertCircle,
+    Printer
 } from 'lucide-react';
 import { ccEstudanteService } from '../../services/gestaoConselhoService';
 import { supabase } from '../../services/supabase';
 import { Aluno } from '../../types';
+import { PrintableDossieEstudante } from '../PrintableDossieEstudante';
 
 interface CadastroEstudanteModalProps {
     isOpen: boolean;
@@ -263,6 +265,7 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [isPrintingDossie, setIsPrintingDossie] = useState(false);
 
     // Calculations for validations
     const isCpfValid = validarCPF(cpf);
@@ -771,13 +774,24 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
                                 </div>
                             </div>
                             {id && (
-                                <button
-                                    type="button"
-                                    onClick={resetForm}
-                                    className="text-xs font-black text-brand-orange hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-3.5 py-2 rounded-xl transition-all cursor-pointer border border-orange-100 shadow-sm"
-                                >
-                                    + Novo Cadastro
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsPrintingDossie(true)}
+                                        className="text-xs font-black text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-3.5 py-2 rounded-xl transition-all cursor-pointer border border-emerald-200 shadow-sm flex items-center gap-1.5"
+                                        title="Imprimir Dossiê do Estudante"
+                                    >
+                                        <Printer size={14} />
+                                        <span>Imprimir Dossiê</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={resetForm}
+                                        className="text-xs font-black text-brand-orange hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-3.5 py-2 rounded-xl transition-all cursor-pointer border border-orange-100 shadow-sm"
+                                    >
+                                        + Novo Cadastro
+                                    </button>
+                                </div>
                             )}
                         </div>
 
@@ -1802,6 +1816,61 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
                     </p>
                 </div>
             </div>
+
+            {/* Printable Dossiê Component */}
+            {isPrintingDossie && (
+                <PrintableDossieEstudante
+                    student={{
+                        id: Number(id) || initialStudent?.id || 0,
+                        name: name.trim().toUpperCase(),
+                        cpf: cpf.trim() || undefined,
+                        birth_date: birthDate || undefined,
+                        gender: gender || undefined,
+                        registration_number: initialStudent?.registration_number || undefined,
+                        escola_id: selectedSchoolId,
+                        class_id: selectedTurmaId,
+                        stage: stage || 'Ensino Fundamental',
+                        status: status || 'Ativo',
+                        observations: observations.trim() || undefined,
+                        professor_responsavel: selectedResponsible || undefined,
+                        ano_matricula: Number(anoMatricula) || 2025,
+                        created_at: initialStudent?.created_at,
+                        nome_mae: nomeMae.trim() || undefined,
+                        nome_pai: nomePai.trim() || undefined,
+                        certidao_nascimento: certidaoNascimento.trim() || undefined,
+                        id_educacenso: idEducacenso.trim() || undefined,
+                        nis: nis.trim() || undefined,
+                        rg: rg.trim() || undefined,
+                        cor_raca: corRaca || 'Não declarada',
+                        nacionalidade: nacionalidade || 'Brasileira',
+                        pais_nascimento: paisNascimento.trim() || 'Brasil',
+                        uf_nascimento: ufNascimento || undefined,
+                        municipio_nascimento: municipioNascimento.trim() || undefined,
+                        estudante_estrangeiro: estudanteEstrangeiro || 'Não',
+                        cep: cep.trim() || undefined,
+                        endereco_uf: enderecoUf || undefined,
+                        endereco_municipio: enderecoMunicipio.trim() || undefined,
+                        endereco_distrito: enderecoDistrito.trim() || undefined,
+                        endereco_bairro: enderecoBairro.trim() || undefined,
+                        endereco_logradouro: enderecoLogradouro.trim() || undefined,
+                        endereco_numero: enderecoNumero.trim() || undefined,
+                        endereco_complemento: enderecoComplemento.trim() || undefined,
+                        endereco_zona: enderecoZona || 'Urbana',
+                        possui_deficiencia: possuiDeficiencia,
+                        deficiencia_tipos: possuiDeficiencia === 'Sim' ? deficienciaTipos : [],
+                        recursos_sala_saeb: possuiDeficiencia === 'Sim' ? recursosSalaSaeb : [],
+                        recebe_aee: possuiDeficiencia === 'Sim' ? recebeAee : 'Não recebe AEE',
+                        turno: turno || 'Matutino',
+                        modalidade: modalidade || 'Ensino Regular',
+                        data_matricula: dataMatricula || undefined,
+                        situacao_vinculo: situacaoVinculo || 'Matriculado',
+                        ano_serie: anoSerie || undefined
+                    }}
+                    escola={escolas.find(e => String(e.id) === String(selectedSchoolId)) || null}
+                    turmaInfo={turmas.find(t => String(t.id) === String(selectedTurmaId)) ? `${turmas.find(t => String(t.id) === String(selectedTurmaId))?.year || ''} - ${turmas.find(t => String(t.id) === String(selectedTurmaId))?.name || ''}` : anoSerie}
+                    onClose={() => setIsPrintingDossie(false)}
+                />
+            )}
         </div>
     );
 };
