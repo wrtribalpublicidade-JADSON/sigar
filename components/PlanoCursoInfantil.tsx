@@ -6,7 +6,8 @@ import { Button } from './ui/Button';
 import { 
   ClipboardList, Plus, Search, Edit2, Trash2, Printer, 
   X, Calendar, Bookmark, Save, Layers,
-  Link2, Check, Download, Upload
+  Link2, Check, Download, Upload,
+  ArrowUpDown, ArrowUp, ArrowDown
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Escola, Coordenador } from '../types';
@@ -14,6 +15,7 @@ import { useNotification } from '../context/NotificationContext';
 import { supabase } from '../services/supabase';
 import { BNCC_INFANTIL } from './ConselhoClasse';
 import { logAudit } from '../services/logService';
+import { ConfirmModal } from './ui/ConfirmModal';
 
 interface PlanoCursoInfantilProps {
   escolas: Escola[]; // Mantido na assinatura para evitar quebras em outros arquivos
@@ -830,38 +832,42 @@ export const PlanoCursoInfantil: React.FC<PlanoCursoInfantilProps> = ({
     setModalTab('create');
   };
 
-  const handleDeleteHabilidade = async (hab: RepositorioHabilidade) => {
-    if (confirm(`Tem certeza que deseja excluir permanentemente o objetivo "${hab.codigo}" do repositório?`)) {
-      try {
-        if (!isDemoMode) {
-          const { error } = await supabase
-            .from('habilidades_repositorio')
-            .delete()
-            .eq('id', hab.id);
+  const [deleteHabTarget, setDeleteHabTarget] = useState<RepositorioHabilidade | null>(null);
 
-          if (error) throw error;
-        }
+  const handleConfirmDeleteHab = async () => {
+    if (!deleteHabTarget) return;
+    const hab = deleteHabTarget;
+    setDeleteHabTarget(null);
 
-        const updatedRepo = habRepository.filter((h: RepositorioHabilidade) => h.id !== hab.id);
-        setHabRepository(updatedRepo);
+    try {
+      if (!isDemoMode) {
+        const { error } = await supabase
+          .from('habilidades_repositorio')
+          .delete()
+          .eq('id', hab.id);
 
-        if (isDemoMode) {
-          localStorage.setItem('sigar_repositorio_objetivos_infantil', JSON.stringify(updatedRepo));
-        }
-
-        setItens(prev => prev.map((item: ItemPlano) => {
-          return {
-            ...item,
-            habilidades: item.habilidades.filter((h: Habilidade) => h.codigo !== hab.codigo),
-            links: item.links.filter((l: ObjetoHabilidadeLink) => l.habilidadeId !== hab.id)
-          };
-        }));
-
-        showNotification('success', `Objetivo ${hab.codigo} excluído com sucesso do repositório.`);
-      } catch (err) {
-        console.error('Erro ao excluir objetivo:', err);
-        showNotification('error', 'Erro ao excluir objetivo do repositório.');
+        if (error) throw error;
       }
+
+      const updatedRepo = habRepository.filter((h: RepositorioHabilidade) => h.id !== hab.id);
+      setHabRepository(updatedRepo);
+
+      if (isDemoMode) {
+        localStorage.setItem('sigar_repositorio_objetivos_infantil', JSON.stringify(updatedRepo));
+      }
+
+      setItens(prev => prev.map((item: ItemPlano) => {
+        return {
+          ...item,
+          habilidades: item.habilidades.filter((h: Habilidade) => h.codigo !== hab.codigo),
+          links: item.links.filter((l: ObjetoHabilidadeLink) => l.habilidadeId !== hab.id)
+        };
+      }));
+
+      showNotification('success', `Objetivo ${hab.codigo} excluído com sucesso do repositório.`);
+    } catch (err) {
+      console.error('Erro ao excluir objetivo:', err);
+      showNotification('error', 'Erro ao excluir objetivo do repositório.');
     }
   };
 
@@ -1241,8 +1247,12 @@ export const PlanoCursoInfantil: React.FC<PlanoCursoInfantilProps> = ({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Deseja realmente excluir este Plano de Curso ECE?')) return;
+  const [deletePlanId, setDeletePlanId] = useState<string | null>(null);
+
+  const handleConfirmDeletePlan = async () => {
+    if (!deletePlanId) return;
+    const id = deletePlanId;
+    setDeletePlanId(null);
     
     if (!isDemoMode) {
       const { error } = await supabase
@@ -1283,15 +1293,75 @@ export const PlanoCursoInfantil: React.FC<PlanoCursoInfantilProps> = ({
     setItens([createDefaultItem()]);
   };
 
-  const filteredPlans = plans.filter(p => {
-    const userLabel = getUserDisplayName(p.updatedBy || p.createdBy);
-    const matchesSearch = searchTerm === '' || 
-                          p.componente.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          p.itens?.some(item => item.eixoTematico.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                          userLabel.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesGrade = gradeFilter === 'ALL' || p.anoSerie === gradeFilter;
-    return matchesSearch && matchesGrade;
-  });
+  type SortField = 'periodo' | 'serie' | 'eixos' | 'usuario';
+  type SortDirection = 'asc' | 'desc';
+
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      if (sortDirection === 'asc') {
+        setSortDirection('desc');
+      } else {
+        setSortField(null);
+        setSortDirection('asc');
+      }
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const filteredPlans = useMemo(() => {
+    const list = plans.filter(p => {
+      const userLabel = getUserDisplayName(p.updatedBy || p.createdBy);
+      const matchesSearch = searchTerm === '' || 
+                            p.componente.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            p.itens?.some(item => item.eixoTematico.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                            userLabel.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesGrade = gradeFilter === 'ALL' || p.anoSerie === gradeFilter;
+      return matchesSearch && matchesGrade;
+    });
+
+    if (!sortField) return list;
+
+    return [...list].sort((a, b) => {
+      let comparison = 0;
+      if (sortField === 'periodo') {
+        const getBimestreNum = (str: string = '') => {
+          const match = str.match(/\d+/);
+          return match ? parseInt(match[0], 10) : 0;
+        };
+        const anoA = Number(a.anoReferencia) || 0;
+        const anoB = Number(b.anoReferencia) || 0;
+        if (anoA !== anoB) {
+          comparison = anoA - anoB;
+        } else {
+          comparison = getBimestreNum(a.bimestre) - getBimestreNum(b.bimestre);
+        }
+      } else if (sortField === 'serie') {
+        const strA = `${a.anoSerie || ''} ${a.componente || ''}`.trim();
+        const strB = `${b.anoSerie || ''} ${b.componente || ''}`.trim();
+        comparison = strA.localeCompare(strB, 'pt-BR', { numeric: true, sensitivity: 'base' });
+      } else if (sortField === 'eixos') {
+        const eixoA = a.itens?.[0]?.eixoTematico || '';
+        const eixoB = b.itens?.[0]?.eixoTematico || '';
+        comparison = eixoA.localeCompare(eixoB, 'pt-BR', { sensitivity: 'base' });
+      } else if (sortField === 'usuario') {
+        const userA = getUserDisplayName(a.updatedBy || a.createdBy) || '';
+        const userB = getUserDisplayName(b.updatedBy || b.createdBy) || '';
+        comparison = userA.localeCompare(userB, 'pt-BR', { sensitivity: 'base' });
+        if (comparison === 0) {
+          const dateA = new Date(a.updatedAt || a.criadoEm || 0).getTime();
+          const dateB = new Date(b.updatedAt || b.criadoEm || 0).getTime();
+          comparison = dateA - dateB;
+        }
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+  }, [plans, searchTerm, gradeFilter, sortField, sortDirection, coordMap, currentUser]);
 
   const handlePrint = (plan: CoursePlan) => {
     setPrintPlan(plan);
@@ -1944,7 +2014,7 @@ export const PlanoCursoInfantil: React.FC<PlanoCursoInfantilProps> = ({
                               {/* Delete Button */}
                               <button
                                 type="button"
-                                onClick={() => handleDeleteHabilidade(hab)}
+                                onClick={() => setDeleteHabTarget(hab)}
                                 className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
                                 title="Excluir"
                               >
@@ -2155,10 +2225,70 @@ export const PlanoCursoInfantil: React.FC<PlanoCursoInfantilProps> = ({
             <table className="w-full text-left border-collapse text-xs">
               <thead className="bg-slate-50 border-b border-slate-100 uppercase text-[10px] font-black text-slate-500 tracking-wider">
                 <tr>
-                  <th className="px-6 py-4">Período / Ano Letivo</th>
-                  <th className="px-6 py-4">Faixa Etária / Campo de Experiência</th>
-                  <th className="px-6 py-4">Direitos Planejados</th>
-                  <th className="px-6 py-4">Usuário</th>
+                  <th 
+                    onClick={() => handleSort('periodo')} 
+                    className="px-6 py-4 cursor-pointer select-none hover:bg-slate-100/80 transition-colors group"
+                    title="Clique para ordenar por Período / Ano Letivo"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Período / Ano Letivo</span>
+                      <span className={`transition-colors ${sortField === 'periodo' ? 'text-brand-orange' : 'text-slate-300 group-hover:text-slate-500'}`}>
+                        {sortField === 'periodo' ? (
+                          sortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 opacity-60" />
+                        )}
+                      </span>
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('serie')} 
+                    className="px-6 py-4 cursor-pointer select-none hover:bg-slate-100/80 transition-colors group"
+                    title="Clique para ordenar por Faixa Etária / Campo de Experiência"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Faixa Etária / Campo de Experiência</span>
+                      <span className={`transition-colors ${sortField === 'serie' ? 'text-brand-orange' : 'text-slate-300 group-hover:text-slate-500'}`}>
+                        {sortField === 'serie' ? (
+                          sortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 opacity-60" />
+                        )}
+                      </span>
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('eixos')} 
+                    className="px-6 py-4 cursor-pointer select-none hover:bg-slate-100/80 transition-colors group"
+                    title="Clique para ordenar por Direitos Planejados"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Direitos Planejados</span>
+                      <span className={`transition-colors ${sortField === 'eixos' ? 'text-brand-orange' : 'text-slate-300 group-hover:text-slate-500'}`}>
+                        {sortField === 'eixos' ? (
+                          sortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 opacity-60" />
+                        )}
+                      </span>
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('usuario')} 
+                    className="px-6 py-4 cursor-pointer select-none hover:bg-slate-100/80 transition-colors group"
+                    title="Clique para ordenar por Usuário"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Usuário</span>
+                      <span className={`transition-colors ${sortField === 'usuario' ? 'text-brand-orange' : 'text-slate-300 group-hover:text-slate-500'}`}>
+                        {sortField === 'usuario' ? (
+                          sortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 opacity-60" />
+                        )}
+                      </span>
+                    </div>
+                  </th>
                   <th className="px-6 py-4 text-right">Ações</th>
                 </tr>
               </thead>
@@ -2234,7 +2364,7 @@ export const PlanoCursoInfantil: React.FC<PlanoCursoInfantilProps> = ({
                               <Edit2 size={15} />
                             </button>
                             <button 
-                              onClick={() => handleDelete(plan.id)} 
+                              onClick={() => setDeletePlanId(plan.id)} 
                               className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" 
                               title="Excluir"
                             >
@@ -2251,6 +2381,30 @@ export const PlanoCursoInfantil: React.FC<PlanoCursoInfantilProps> = ({
           </div>
         </Card>
       </div>
+
+      <ConfirmModal
+        isOpen={deletePlanId !== null}
+        onClose={() => setDeletePlanId(null)}
+        onConfirm={handleConfirmDeletePlan}
+        title="EXCLUIR PLANO DE CURSO ECE?"
+        message="Esta operação removerá permanentemente este plano de curso e todos os seus dados associados do sistema."
+        icon={Trash2}
+        variant="danger"
+        confirmText="Confirmar"
+        cancelText="Cancelar"
+      />
+
+      <ConfirmModal
+        isOpen={deleteHabTarget !== null}
+        onClose={() => setDeleteHabTarget(null)}
+        onConfirm={handleConfirmDeleteHab}
+        title="EXCLUIR OBJETIVO?"
+        message={`Esta operação removerá permanentemente o objetivo "${deleteHabTarget?.codigo}" do repositório.`}
+        icon={Trash2}
+        variant="danger"
+        confirmText="Confirmar"
+        cancelText="Cancelar"
+      />
     </div>
   );
 };

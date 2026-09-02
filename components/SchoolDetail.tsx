@@ -116,7 +116,9 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
   const [selectedStudent, setSelectedStudent] = useState<Aluno | null>(null);
 
   // State for document generation
-  const [selectedDocType, setSelectedDocType] = useState<'notificacao_frequencia' | 'autorizacao_imagem'>('notificacao_frequencia');
+  const [selectedDocType, setSelectedDocType] = useState<
+    'notificacao_frequencia' | 'autorizacao_imagem' | 'declaracao_matricula' | 'declaracao_frequencia'
+  >('notificacao_frequencia');
   const [docStudentId, setDocStudentId] = useState<string | number>('');
   const [docResponsavelNome, setDocResponsavelNome] = useState('');
   const [docResponsavelCpf, setDocResponsavelCpf] = useState('');
@@ -124,6 +126,12 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
   const [docResponsavelTelefone, setDocResponsavelTelefone] = useState('');
   const [docFrequenciaAtual, setDocFrequenciaAtual] = useState<number>(70);
   const [docTotalFaltas, setDocTotalFaltas] = useState<number>(15);
+  const [docTotalAulas, setDocTotalAulas] = useState<number>(0);
+  const [docAnoLetivo, setDocAnoLetivo] = useState<string>('2026');
+  const [docAnoSerieEtapa, setDocAnoSerieEtapa] = useState<string>('');
+  const [docFinalidade, setDocFinalidade] = useState<string>('Comprovação junto a programas sociais (Bolsa Família / Cadastro Único)');
+  const [docPeriodoApuracao, setDocPeriodoApuracao] = useState<string>('Ano Letivo de 2026 (Até a presente data)');
+  const [docObservacoes, setDocObservacoes] = useState<string>('');
   const [docDataAtendimento, setDocDataAtendimento] = useState<string>(
     new Date(Date.now() + 86400000).toISOString().split('T')[0] // Tomorrow
   );
@@ -436,9 +444,13 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
     setDocStudentId(studentId);
     if (!studentId) {
       setDocResponsavelNome('');
+      setDocResponsavelCpf('');
       setDocResponsavelEndereco('');
+      setDocResponsavelTelefone('');
       setDocFrequenciaAtual(70);
       setDocTotalFaltas(15);
+      setDocTotalAulas(0);
+      setDocAnoSerieEtapa('');
       return;
     }
 
@@ -446,6 +458,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
     if (st) {
       const respName = (st as any).nome_mae || (st as any).nome_pai || (st as any).responsible_name || '';
       setDocResponsavelNome(respName);
+      setDocResponsavelCpf((st as any).cpf || '');
 
       const parts = [
         (st as any).endereco_logradouro,
@@ -459,11 +472,31 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
       if (stat && stat.totalClasses > 0) {
         setDocFrequenciaAtual(stat.rate);
         setDocTotalFaltas(stat.absences);
+        setDocTotalAulas(stat.totalClasses);
       } else {
         const isPre = isPreEscolaStage(st.stage || (st as any).ano_serie || '');
-        setDocFrequenciaAtual(isPre ? 55 : 70);
-        setDocTotalFaltas(10);
+        setDocFrequenciaAtual(isPre ? 60 : 75);
+        setDocTotalFaltas(0);
+        setDocTotalAulas(0);
       }
+
+      // Pre-fill Ano/Série/Etapa
+      const stTurma = schoolTurmas.find(t => String(t.id) === String(st.class_id));
+      const anoSerieVal = stTurma?.year || stTurma?.anoSerie || (st as any).ano_serie || '';
+      const etapaVal = stTurma?.stage || st.stage || '';
+      let combinedStage = '';
+      if (anoSerieVal && etapaVal) {
+        if (anoSerieVal.toLowerCase().includes(etapaVal.toLowerCase())) {
+          combinedStage = anoSerieVal;
+        } else if (etapaVal.toLowerCase().includes(anoSerieVal.toLowerCase())) {
+          combinedStage = etapaVal;
+        } else {
+          combinedStage = `${anoSerieVal} - ${etapaVal}`;
+        }
+      } else {
+        combinedStage = anoSerieVal || etapaVal || 'Ensino Fundamental';
+      }
+      setDocAnoSerieEtapa(combinedStage);
     }
   };
 
@@ -482,8 +515,14 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
       responsavelTelefone: docResponsavelTelefone,
       frequenciaAtual: docFrequenciaAtual,
       totalFaltas: docTotalFaltas,
+      totalAulas: docTotalAulas,
       dataAtendimento: docDataAtendimento,
-      horarioAtendimento: docHorarioAtendimento
+      horarioAtendimento: docHorarioAtendimento,
+      anoLetivo: docAnoLetivo,
+      anoSerieEtapa: docAnoSerieEtapa,
+      finalidade: docFinalidade,
+      periodoApuracao: docPeriodoApuracao,
+      observacoes: docObservacoes
     });
     setIsPrintingDocument(true);
   };
@@ -682,7 +721,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
   };
 
   useEffect(() => {
-    if (activeTab === 'detalhamento_turmas' || activeTab === 'matriculas' || activeTab === 'professores' || activeTab === 'turmas') {
+    if (activeTab === 'detalhamento_turmas' || activeTab === 'matriculas' || activeTab === 'professores' || activeTab === 'turmas' || activeTab === 'documentos') {
       loadSchoolTurmas();
     }
   }, [escola.id, activeTab, isDemoMode]);
@@ -2054,28 +2093,52 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                 <div className="border-b border-slate-100 pb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div>
                     <h3 className="text-xl font-bold text-slate-800 uppercase tracking-tight">Emissão de Documentos</h3>
-                    <p className="text-sm text-slate-500 mt-1">Gere notificações de frequência e autorizações oficiais</p>
+                    <p className="text-sm text-slate-500 mt-1">Gere declarações oficiais de matrícula e frequência, notificações e autorizações</p>
                   </div>
-                  <div className="flex bg-slate-100 p-1 rounded-xl w-fit border border-slate-200">
+                  <div className="flex flex-wrap bg-slate-100 p-1 rounded-xl w-full sm:w-fit border border-slate-200 gap-1">
                     <button
                       onClick={() => setSelectedDocType('notificacao_frequencia')}
-                      className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
+                      className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
                         selectedDocType === 'notificacao_frequencia'
                           ? 'bg-white text-orange-600 shadow-sm'
                           : 'text-slate-500 hover:text-slate-800'
                       }`}
                     >
+                      <AlertTriangle className="w-3.5 h-3.5 text-orange-500" />
                       Notificação de Frequência
                     </button>
                     <button
                       onClick={() => setSelectedDocType('autorizacao_imagem')}
-                      className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
+                      className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
                         selectedDocType === 'autorizacao_imagem'
                           ? 'bg-white text-orange-600 shadow-sm'
                           : 'text-slate-500 hover:text-slate-800'
                       }`}
                     >
+                      <FileText className="w-3.5 h-3.5 text-blue-500" />
                       Autorização de Imagem e Som
+                    </button>
+                    <button
+                      onClick={() => setSelectedDocType('declaracao_matricula')}
+                      className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
+                        selectedDocType === 'declaracao_matricula'
+                          ? 'bg-white text-orange-600 shadow-sm'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      <GraduationCap className="w-3.5 h-3.5 text-emerald-600" />
+                      Declaração de Matrícula
+                    </button>
+                    <button
+                      onClick={() => setSelectedDocType('declaracao_frequencia')}
+                      className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
+                        selectedDocType === 'declaracao_frequencia'
+                          ? 'bg-white text-orange-600 shadow-sm'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      <ClipboardCheck className="w-3.5 h-3.5 text-purple-600" />
+                      Declaração de Frequência
                     </button>
                   </div>
                 </div>
@@ -2176,7 +2239,11 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                     <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b pb-3">
                       {selectedDocType === 'notificacao_frequencia' 
                         ? 'Dados da Notificação por Baixa Frequência' 
-                        : 'Dados do Termo de Autorização de Imagem/Som'}
+                        : selectedDocType === 'autorizacao_imagem'
+                        ? 'Dados do Termo de Autorização de Imagem/Som'
+                        : selectedDocType === 'declaracao_matricula'
+                        ? 'Dados da Declaração de Matrícula do Estudante'
+                        : 'Dados da Declaração de Frequência Escolar'}
                     </h4>
 
                     {loadingStudents ? (
@@ -2219,19 +2286,41 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                           </select>
                         </div>
 
-                        {/* Common Fields */}
-                        <div>
-                          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
-                            Nome do Pai, Mãe ou Responsável Legal *
-                          </label>
-                          <input
-                            type="text"
-                            value={docResponsavelNome}
-                            onChange={(e) => setDocResponsavelNome(e.target.value)}
-                            placeholder="Nome completo do responsável"
-                            className="w-full px-3 py-2.5 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
-                          />
-                        </div>
+                        {/* Selected Student Information Chip */}
+                        {selectedStudentObj && (
+                          <div className="bg-slate-50/80 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-2">
+                              <span className="font-bold text-slate-800 uppercase">{selectedStudentObj.name}</span>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                                Matrícula Ativa: {selectedStudentObj.registration_number || `SIGAR-${selectedStudentObj.id}`}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] text-slate-600 pt-1">
+                              <div><strong>Etapa/Turma:</strong> {selectedStudentObj.stage || (selectedStudentObj as any).ano_serie || 'Não especificada'}</div>
+                              <div><strong>Data Nasc.:</strong> {selectedStudentObj.birth_date ? selectedStudentObj.birth_date.split('T')[0] : 'Não informada'}</div>
+                              <div><strong>CPF:</strong> {selectedStudentObj.cpf || 'Não cadastrado'}</div>
+                              <div><strong>Mãe:</strong> {(selectedStudentObj as any).nome_mae || 'Não informada'}</div>
+                              <div><strong>NIS:</strong> {(selectedStudentObj as any).nis || 'Não informado'}</div>
+                              <div><strong>Frequência Atual:</strong> {docFrequenciaAtual}%</div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Common Fields for Notificacao e Autorizacao */}
+                        {(selectedDocType === 'notificacao_frequencia' || selectedDocType === 'autorizacao_imagem') && (
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                              Nome do Pai, Mãe ou Responsável Legal *
+                            </label>
+                            <input
+                              type="text"
+                              value={docResponsavelNome}
+                              onChange={(e) => setDocResponsavelNome(e.target.value)}
+                              placeholder="Nome completo do responsável"
+                              className="w-full px-3 py-2.5 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+                            />
+                          </div>
+                        )}
 
                         {/* Attendance specific fields */}
                         {selectedDocType === 'notificacao_frequencia' && (
@@ -2330,16 +2419,173 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                           </div>
                         )}
 
+                        {/* Declaração de Matrícula specific fields */}
+                        {selectedDocType === 'declaracao_matricula' && (
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                  Ano Letivo *
+                                </label>
+                                <input
+                                  type="text"
+                                  value={docAnoLetivo}
+                                  onChange={(e) => setDocAnoLetivo(e.target.value)}
+                                  placeholder="2026"
+                                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                  Ano / Série / Etapa *
+                                </label>
+                                <input
+                                  type="text"
+                                  value={docAnoSerieEtapa}
+                                  onChange={(e) => setDocAnoSerieEtapa(e.target.value)}
+                                  placeholder="Ex: 6º ANO - Anos Finais"
+                                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                  Frequência do Estudante (%) *
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  value={docFrequenciaAtual}
+                                  onChange={(e) => setDocFrequenciaAtual(Number(e.target.value))}
+                                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                Finalidade da Declaração *
+                              </label>
+                              <input
+                                type="text"
+                                value={docFinalidade}
+                                onChange={(e) => setDocFinalidade(e.target.value)}
+                                placeholder="Ex: Comprovação junto ao Programa Bolsa Família"
+                                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                Observações Adicionais (Opcional)
+                              </label>
+                              <input
+                                type="text"
+                                value={docObservacoes}
+                                onChange={(e) => setDocObservacoes(e.target.value)}
+                                placeholder="Ex: Cursando no turno matutino / Sem pendências documentais"
+                                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Declaração de Frequência specific fields */}
+                        {selectedDocType === 'declaracao_frequencia' && (
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                  Frequência Apurada (%) *
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  value={docFrequenciaAtual}
+                                  onChange={(e) => setDocFrequenciaAtual(Number(e.target.value))}
+                                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                  Faltas Acumuladas *
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={docTotalFaltas}
+                                  onChange={(e) => setDocTotalFaltas(Number(e.target.value))}
+                                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                  Aulas Dadas/Registradas *
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={docTotalAulas}
+                                  onChange={(e) => setDocTotalAulas(Number(e.target.value))}
+                                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+                                />
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                  Período de Apuração *
+                                </label>
+                                <input
+                                  type="text"
+                                  value={docPeriodoApuracao}
+                                  onChange={(e) => setDocPeriodoApuracao(e.target.value)}
+                                  placeholder="Ex: Ano Letivo de 2026 (Até a presente data)"
+                                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                  Finalidade da Declaração *
+                                </label>
+                                <input
+                                  type="text"
+                                  value={docFinalidade}
+                                  onChange={(e) => setDocFinalidade(e.target.value)}
+                                  placeholder="Ex: Condicionalidades do Programa Bolsa Família"
+                                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                Observações Adicionais (Opcional)
+                              </label>
+                              <input
+                                type="text"
+                                value={docObservacoes}
+                                onChange={(e) => setDocObservacoes(e.target.value)}
+                                placeholder="Observações específicas sobre o comparecimento ou justificativas"
+                                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+                              />
+                            </div>
+                          </div>
+                        )}
+
                         <div className="pt-4 flex justify-end">
                           <button
                             type="button"
                             onClick={handleGenerateDocument}
-                            disabled={!docStudentId || !docResponsavelNome}
+                            disabled={!docStudentId || ((selectedDocType === 'notificacao_frequencia' || selectedDocType === 'autorizacao_imagem') && !docResponsavelNome)}
                             className={`px-6 py-3 bg-brand-orange text-white rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-orange-600 shadow-sm transition-all ${
-                              (!docStudentId || !docResponsavelNome) ? 'opacity-50 cursor-not-allowed' : ''
+                              (!docStudentId || ((selectedDocType === 'notificacao_frequencia' || selectedDocType === 'autorizacao_imagem') && !docResponsavelNome)) ? 'opacity-50 cursor-not-allowed' : ''
                             }`}
                           >
-                            <Printer size={16} /> Emitir e Imprimir Documento
+                            <Printer size={16} /> 
+                            {selectedDocType === 'declaracao_matricula' 
+                              ? 'Emitir e Imprimir Declaração de Matrícula' 
+                              : selectedDocType === 'declaracao_frequencia'
+                              ? 'Emitir e Imprimir Declaração de Frequência'
+                              : 'Emitir e Imprimir Documento'}
                           </button>
                         </div>
                       </div>
@@ -2371,7 +2617,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                             Atenção: Caso o responsável não compareça ou não haja melhoria na frequência após a notificação, a escola deverá encaminhar a ficha FICAI ao Conselho Tutelar.
                           </p>
                         </div>
-                      ) : (
+                      ) : selectedDocType === 'autorizacao_imagem' ? (
                         <div className="space-y-3 text-xs text-slate-600 leading-relaxed">
                           <p>
                             O <strong>Termo de Autorização de Imagem e Som</strong> é indispensável para todos os estudantes menores de idade.
@@ -2381,6 +2627,43 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                           </p>
                           <p className="font-bold text-slate-700 bg-white p-2.5 rounded-lg border border-slate-200">
                             Recomendação: Colete esta autorização durante o ato de matrícula no início do ano letivo.
+                          </p>
+                        </div>
+                      ) : selectedDocType === 'declaracao_matricula' ? (
+                        <div className="space-y-3 text-xs text-slate-600 leading-relaxed">
+                          <p>
+                            A <strong>Declaração de Matrícula</strong> atesta formalmente que o estudante possui vínculo ativo e regular nesta unidade de ensino no presente ano letivo.
+                          </p>
+                          <div className="space-y-1.5 p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl text-emerald-950">
+                            <p className="font-bold text-emerald-900 uppercase text-[10px] tracking-wide">Principais Finalidades:</p>
+                            <ul className="list-disc pl-4 space-y-1 text-xs">
+                              <li>Comprovação para Programa Bolsa Família e Cadastro Único.</li>
+                              <li>Solicitação de passe escolar / gratuidade no transporte.</li>
+                              <li>Procedimentos de transferência escolar ou convênios.</li>
+                            </ul>
+                          </div>
+                          <p>
+                            O documento é gerado com os dados cadastrais oficiais do EducaCenso/SIGAR e possui validade legal de <strong>30 dias</strong> após a emissão.
+                          </p>
+                          <p className="font-bold text-emerald-700 bg-emerald-50 p-2.5 rounded-lg border border-emerald-200">
+                            Lembrete: Deve ser assinado e carimbado pela Direção Geral ou Secretaria Escolar para ter plena validade.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3 text-xs text-slate-600 leading-relaxed">
+                          <p>
+                            A <strong>Declaração de Frequência Escolar</strong> é o comprovante oficial da assiduidade e comparecimento do estudante às aulas ministradas.
+                          </p>
+                          <div className="space-y-1.5 p-3 bg-purple-50/80 border border-purple-200 rounded-xl text-purple-950">
+                            <p className="font-bold text-purple-900 uppercase text-[10px] tracking-wide">Acompanhamento de Condicionalidades:</p>
+                            <ul className="list-disc pl-4 space-y-1 text-xs">
+                              <li>Exigido pelo CRAS/MDS para acompanhamento do Bolsa Família.</li>
+                              <li>Comprovação de frequência perante o Conselho Tutelar e Ministério Público.</li>
+                              <li>Apurado diretamente a partir do Diário de Classe Eletrônico.</li>
+                            </ul>
+                          </div>
+                          <p>
+                            Informa o percentual de presença acumulado, total de faltas e aulas dadas até a data da emissão.
                           </p>
                         </div>
                       )}
@@ -2908,6 +3191,9 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
           documentType={selectedDocType}
           student={selectedStudentForPrint}
           escolaNome={escola.nome}
+          escolaGestor={escola.gestor}
+          turmaNome={schoolTurmas.find(t => String(t.id) === String(selectedStudentForPrint?.class_id))?.name || ''}
+          turmaTurno={schoolTurmas.find(t => String(t.id) === String(selectedStudentForPrint?.class_id))?.shift || selectedStudentForPrint?.turno}
           data={printDocData}
           onClose={() => {
             setIsPrintingDocument(false);
