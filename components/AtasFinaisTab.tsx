@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { supabase } from '../services/supabase';
 import { useConfiguracao } from '../context/ConfiguracaoContext';
 import { 
-  FileText, Printer, Download, Users, AlertTriangle, Loader2, CheckCircle, XCircle 
+  FileText, Printer, Download, Users, AlertTriangle, Loader2, CheckCircle, XCircle, ArrowRightLeft 
 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
@@ -26,6 +26,14 @@ interface AlunoAtaData {
   mediaGeral: number;
   frequenciaRate: number;
   situacaoFinal: string;
+  isTransferido?: boolean;
+  transferenciaInfo?: {
+    tipo?: string;
+    status?: string;
+    destino?: string;
+    data?: string;
+    motivo?: string;
+  };
 }
 
 export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
@@ -55,6 +63,7 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
     return match?.shift ? [match.shift] : ['MANHÃ', 'TARDE', 'NOITE'];
   }, [schoolTurmas, selectedTurmaId]);
   const [students, setStudents] = useState<any[]>([]);
+  const [transferencias, setTransferencias] = useState<any[]>([]);
   const [gradesSheets, setGradesSheets] = useState<any[]>([]);
   const [frequencias, setFrequencias] = useState<any[]>([]);
   const [preschoolEvals, setPreschoolEvals] = useState<any[]>([]);
@@ -110,13 +119,29 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
         if (isDemoMode) {
           // Mock data for demo mode
           const mockAlunos = [
-            { id: 'm1', name: 'Alice Silveira Barbosa' },
-            { id: 'm2', name: 'Arthur Gabriel Fernandes' },
-            { id: 'm3', name: 'Beatriz Costa Rodrigues' },
-            { id: 'm4', name: 'Caio Roberto Lima' },
-            { id: 'm5', name: 'Eduarda Vitória Gomes' }
+            { id: 'm1', name: 'Alice Silveira Barbosa', status: 'Ativo' },
+            { id: 'm2', name: 'Arthur Gabriel Fernandes', status: 'Ativo' },
+            { id: 'm3', name: 'Beatriz Costa Rodrigues', status: 'Transferido', situacao_vinculo: 'Transferido' },
+            { id: 'm4', name: 'Caio Roberto Lima', status: 'Ativo' },
+            { id: 'm5', name: 'Eduarda Vitória Gomes', status: 'Ativo' }
           ];
           setStudents(mockAlunos);
+
+          const mockTransf = [
+            {
+              id: 't-mock-1',
+              aluno_id: 'm3',
+              aluno_nome: 'Beatriz Costa Rodrigues',
+              tipo: 'INTERNA',
+              escola_origem_id: escola.id,
+              turma_origem_id: selectedTurmaId,
+              escola_destino_nome: 'U.E.B. Professor Paulo Freire',
+              turma_destino_nome: 'Turma B',
+              status: 'APROVADO',
+              created_at: '2026-06-15T10:00:00Z'
+            }
+          ];
+          setTransferencias(mockTransf);
 
           if (isInfantil) {
             // Generate mock evaluations for preschool
@@ -174,12 +199,55 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
             .eq('class_id', selectedTurmaId)
             .order('name');
           if (errA) throw errA;
-          setStudents(dbAlunos || []);
 
-          const studentIds = (dbAlunos || []).map(s => s.id);
+          // 2. Fetch Transfers associated with this class
+          let dbTransf: any[] = [];
+          try {
+            const { data: tData, error: errT } = await supabase
+              .from('transferencias_estudantes')
+              .select('*')
+              .or(`turma_origem_id.eq.${selectedTurmaId},turma_destino_id.eq.${selectedTurmaId}`);
+            if (!errT && tData) {
+              dbTransf = tData;
+            }
+          } catch (tError) {
+            console.warn('Could not fetch transferencias_estudantes:', tError);
+          }
 
-          if (dbAlunos && dbAlunos.length > 0) {
-            // 2. Fetch Grades Sheets
+          let allAlunos = [...(dbAlunos || [])];
+
+          // Include students who transferred out of this class during the school year
+          if (dbTransf.length > 0) {
+            const outTransfers = dbTransf.filter(
+              (t: any) => String(t.turma_origem_id) === String(selectedTurmaId) && t.status !== 'NEGADO'
+            );
+            const missingStudentIds = outTransfers
+              .map((t: any) => t.aluno_id)
+              .filter((id: any) => id && !allAlunos.some((a: any) => String(a.id) === String(id)));
+
+            if (missingStudentIds.length > 0) {
+              try {
+                const { data: outStudents } = await supabase
+                  .from('alunos')
+                  .select('*')
+                  .in('id', missingStudentIds);
+                if (outStudents && outStudents.length > 0) {
+                  allAlunos = [...allAlunos, ...outStudents];
+                }
+              } catch (outErr) {
+                console.warn('Could not fetch transferred out students:', outErr);
+              }
+            }
+          }
+
+          allAlunos.sort((a: any, b: any) => (a.name || '').localeCompare(b.name || '', 'pt-BR'));
+          setStudents(allAlunos);
+          setTransferencias(dbTransf);
+
+          const studentIds = allAlunos.map(s => s.id);
+
+          if (allAlunos && allAlunos.length > 0) {
+            // 3. Fetch Grades Sheets
             if (!isInfantil) {
               const { data: dbSheets, error: errS } = await supabase
                 .from('notas_sheets')
@@ -198,7 +266,7 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
               setPreschoolEvals(dbEvals || []);
             }
 
-            // 3. Fetch Frequencies
+            // 4. Fetch Frequencies
             const { data: dbFreq, error: errF } = await supabase
               .from(isInfantil ? 'frequencia_sheets_infantil' : 'frequencia_sheets')
               .select('*')
@@ -225,7 +293,47 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
     const notaMinima = configuracao?.nota_minima_aprovacao ?? 7.0;
 
     return students.map(student => {
-      // 1. Calculate Attendance
+      // 1. Check transfer records
+      const transferRecord = transferencias.find((t: any) =>
+        String(t.aluno_id) === String(student.id) &&
+        (String(t.turma_origem_id) === String(selectedTurmaId) || !t.turma_origem_id)
+      );
+
+      const isTransferStatus = 
+        (student.status && String(student.status).toLowerCase().includes('transf')) ||
+        (student.situacao_vinculo && String(student.situacao_vinculo).toLowerCase().includes('transf')) ||
+        (transferRecord && transferRecord.status !== 'NEGADO');
+
+      let isTransferido = false;
+      let transferenciaInfo: any = undefined;
+      let situacaoTransferencia = '';
+
+      if (isTransferStatus) {
+        isTransferido = true;
+        const tipo = transferRecord?.tipo || 'EXTERNA';
+        const statusTransf = transferRecord?.status || 'APROVADO';
+        const destino = transferRecord?.tipo === 'EXTERNA'
+          ? (transferRecord?.escola_externa_nome || 'Rede Externa')
+          : (transferRecord?.escola_destino_nome ? `${transferRecord.escola_destino_nome}${transferRecord.turma_destino_nome ? ` (${transferRecord.turma_destino_nome})` : ''}` : 'Outra Unidade Escolar');
+
+        transferenciaInfo = {
+          tipo,
+          status: statusTransf,
+          destino: destino || student.observations || 'Transferido(a)',
+          data: transferRecord?.updated_at || transferRecord?.created_at,
+          motivo: transferRecord?.motivo
+        };
+
+        if (statusTransf === 'PENDENTE') {
+          situacaoTransferencia = 'TRANSF. PENDENTE';
+        } else if (statusTransf === 'EM_ANALISE') {
+          situacaoTransferencia = 'TRANSF. EM ANÁLISE';
+        } else {
+          situacaoTransferencia = 'TRANSFERIDO(A)';
+        }
+      }
+
+      // 2. Calculate Attendance
       let presentDays = 0;
       let totalDays = 0;
 
@@ -270,8 +378,9 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
           }
         });
 
-        // Infantil situation is usually Promovido
-        const situacaoFinal = frequenciaRate >= 75 ? 'PROMOVIDO(A)' : 'REPROVADO POR FALTA';
+        const situacaoFinal = isTransferido 
+          ? situacaoTransferencia 
+          : (frequenciaRate >= 75 ? 'PROMOVIDO(A)' : 'REPROVADO POR FALTA');
 
         return {
           id: student.id,
@@ -280,7 +389,9 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
           preschoolConcepts,
           mediaGeral: 0,
           frequenciaRate,
-          situacaoFinal
+          situacaoFinal,
+          isTransferido,
+          transferenciaInfo
         };
       } else {
         // Fundamental Aggregation
@@ -317,11 +428,15 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
 
         const mediaGeral = subjectsCount > 0 ? parseFloat((totalSum / subjectsCount).toFixed(2)) : 0;
 
-        let situacaoFinal = 'APROVADO(A)';
-        if (frequenciaRate < 75) {
+        let situacaoFinal = '';
+        if (isTransferido) {
+          situacaoFinal = situacaoTransferencia;
+        } else if (frequenciaRate < 75) {
           situacaoFinal = 'REPROVADO POR FALTA';
         } else if (isReprovadoByGrades) {
           situacaoFinal = 'REPROVADO(A)';
+        } else {
+          situacaoFinal = 'APROVADO(A)';
         }
 
         return {
@@ -330,11 +445,17 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
           grades,
           mediaGeral,
           frequenciaRate,
-          situacaoFinal
+          situacaoFinal,
+          isTransferido,
+          transferenciaInfo
         };
       }
     });
-  }, [students, gradesSheets, frequencias, preschoolEvals, isInfantil, listColumnNames, configuracao]);
+  }, [students, transferencias, selectedTurmaId, gradesSheets, frequencias, preschoolEvals, isInfantil, listColumnNames, configuracao]);
+
+  const transferredStudents = useMemo(() => {
+    return aggregatedData.filter(s => s.isTransferido);
+  }, [aggregatedData]);
 
   // Browser print action
   const handlePrintAta = () => {
@@ -480,6 +601,25 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
             new Table({
               rows: rows
             }),
+            ...(transferredStudents.length > 0 ? [
+              new Paragraph({ text: '', spacing: { before: 200 } }),
+              new Paragraph({
+                children: [
+                  new TextRun({ text: 'RELAÇÃO DE ESTUDANTES TRANSFERIDOS:', bold: true, size: 20 })
+                ],
+                spacing: { after: 100 }
+              }),
+              ...transferredStudents.map(s => new Paragraph({
+                children: [
+                  new TextRun({ text: `• ${s.name}: `, bold: true, size: 18 }),
+                  new TextRun({ 
+                    text: `${s.transferenciaInfo?.tipo === 'EXTERNA' ? 'Transferência Externa' : 'Transferência Interna'}${s.transferenciaInfo?.destino ? ` para ${s.transferenciaInfo.destino}` : ''} - Situação da Transferência: ${s.situacaoFinal}${s.transferenciaInfo?.data ? ` (${new Date(s.transferenciaInfo.data).toLocaleDateString('pt-BR')})` : ''}`,
+                    size: 18 
+                  })
+                ],
+                spacing: { after: 60 }
+              }))
+            ] : []),
             new Paragraph({ text: '', spacing: { after: 800 } }),
             new Paragraph({
               alignment: AlignmentType.CENTER,
@@ -575,22 +715,43 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
           </div>
 
           {selectedTurmaId && aggregatedData.length > 0 && (
-            <div className="flex gap-2">
-              <Button
-                onClick={handlePrintAta}
-                className="rounded-xl px-4 py-2.5 text-xs font-bold bg-brand-orange hover:bg-orange-600 shadow-sm flex items-center gap-2"
-              >
-                <Printer className="w-4 h-4" />
-                Imprimir Ata
-              </Button>
-              <Button
-                onClick={handleExportDocx}
-                variant="secondary"
-                className="rounded-xl px-4 py-2.5 text-xs font-bold bg-slate-100 hover:bg-slate-200 border-slate-200 shadow-sm flex items-center gap-2"
-              >
-                <Download className="w-4 h-4" />
-                Exportar Word
-              </Button>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="hidden lg:flex items-center gap-2 text-[11px] font-bold text-slate-500">
+                <span className="px-2.5 py-1.5 rounded-xl bg-slate-100 border border-slate-200">
+                  Total: {aggregatedData.length}
+                </span>
+                <span className="px-2.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  Aprovados: {aggregatedData.filter(s => s.situacaoFinal.includes('APROVADO') || s.situacaoFinal.includes('PROMOVIDO')).length}
+                </span>
+                {aggregatedData.some(s => s.situacaoFinal.includes('REPROVADO')) && (
+                  <span className="px-2.5 py-1.5 rounded-xl bg-red-50 text-red-700 border border-red-200">
+                    Reprovados: {aggregatedData.filter(s => s.situacaoFinal.includes('REPROVADO')).length}
+                  </span>
+                )}
+                {transferredStudents.length > 0 && (
+                  <span className="px-2.5 py-1.5 rounded-xl bg-sky-50 text-sky-700 border border-sky-200 flex items-center gap-1">
+                    <ArrowRightLeft className="w-3 h-3" />
+                    Transferidos: {transferredStudents.length}
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  onClick={handlePrintAta}
+                  className="rounded-xl px-4 py-2.5 text-xs font-bold bg-brand-orange hover:bg-orange-600 shadow-sm flex items-center gap-2"
+                >
+                  <Printer className="w-4 h-4" />
+                  Imprimir Ata
+                </Button>
+                <Button
+                  onClick={handleExportDocx}
+                  variant="secondary"
+                  className="rounded-xl px-4 py-2.5 text-xs font-bold bg-slate-100 hover:bg-slate-200 border-slate-200 shadow-sm flex items-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  Exportar Word
+                </Button>
+              </div>
             </div>
           )}
         </div>
@@ -698,13 +859,22 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
                           {String(idx + 1).padStart(2, '0')}
                         </td>
                         <td className="border border-slate-300 px-3 py-1.5 font-bold text-slate-800 uppercase text-[10px]">
-                          {student.name}
+                          <div>{student.name}</div>
+                          {student.isTransferido && (
+                            <div className="flex items-center gap-1 mt-0.5 no-print">
+                              <span className="inline-flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 rounded bg-sky-50 text-sky-800 border border-sky-200 font-sans">
+                                <ArrowRightLeft className="w-2.5 h-2.5 text-sky-600" />
+                                {student.transferenciaInfo?.tipo === 'EXTERNA' ? 'Transferência Externa' : 'Transferência Interna'}
+                                {student.transferenciaInfo?.destino ? ` • Destino: ${student.transferenciaInfo.destino}` : ''}
+                              </span>
+                            </div>
+                          )}
                         </td>
                         {listColumnNames.map(col => {
                           const val = isInfantil 
                             ? (student.preschoolConcepts?.[col] || '-') 
                             : (student.grades[col] !== undefined && student.grades[col] !== null ? student.grades[col]!.toFixed(1).replace('.', ',') : '-');
-                          const isLowGrade = !isInfantil && student.grades[col] !== null && student.grades[col]! < (configuracao?.nota_minima_aprovacao ?? 7.0);
+                          const isLowGrade = !student.isTransferido && !isInfantil && student.grades[col] !== null && student.grades[col]! < (configuracao?.nota_minima_aprovacao ?? 7.0);
                           
                           return (
                             <td 
@@ -718,17 +888,21 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
                         })}
                         {!isInfantil && (
                           <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-slate-800">
-                            {student.mediaGeral.toFixed(1).replace('.', ',')}
+                            {student.mediaGeral > 0 ? student.mediaGeral.toFixed(1).replace('.', ',') : '-'}
                           </td>
                         )}
                         <td className={`border border-slate-300 px-2 py-1.5 text-center font-semibold
-                          ${student.frequenciaRate < 75 ? 'text-red-600 font-bold bg-red-50/30' : 'text-slate-700'}`}
+                          ${!student.isTransferido && student.frequenciaRate < 75 ? 'text-red-600 font-bold bg-red-50/30' : 'text-slate-700'}`}
                         >
                           {student.frequenciaRate}%
                         </td>
                         <td className="border border-slate-300 px-3 py-1.5 text-center">
                           <span className={`inline-block font-black text-[9px] px-2 py-0.5 rounded-full uppercase
-                            ${isApproved ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'}`}
+                            ${student.isTransferido 
+                              ? 'bg-sky-100 text-sky-800 border border-sky-300 shadow-sm' 
+                              : isApproved 
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
+                              : 'bg-red-50 text-red-600 border border-red-100'}`}
                           >
                             {student.situacaoFinal}
                           </span>
@@ -738,6 +912,51 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
                   })}
                 </tbody>
               </table>
+
+              {/* Relação de Alunos Transferidos / Observações da Ata */}
+              {transferredStudents.length > 0 && (
+                <div className="mt-6 border border-slate-300 rounded-lg p-3 bg-slate-50 text-xs font-sans">
+                  <div className="flex items-center justify-between mb-2 border-b border-slate-200 pb-1.5">
+                    <span className="font-black text-slate-700 text-[10px] uppercase tracking-wider flex items-center gap-1.5">
+                      <ArrowRightLeft className="w-3.5 h-3.5 text-sky-600" />
+                      Relação de Estudantes Transferidos no Decorrer do Ano Letivo
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-sky-100 text-sky-800 border border-sky-200">
+                      {transferredStudents.length} {transferredStudents.length === 1 ? 'estudante' : 'estudantes'}
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-[10px] border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-slate-500 font-bold">
+                          <th className="py-1">Estudante</th>
+                          <th className="py-1">Tipo Transferência</th>
+                          <th className="py-1">Destino</th>
+                          <th className="py-1 text-center">Situação da Transferência</th>
+                          <th className="py-1 text-right">Data</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                        {transferredStudents.map((s) => (
+                          <tr key={s.id} className="text-slate-700 font-medium">
+                            <td className="py-1.5 font-bold uppercase">{s.name}</td>
+                            <td className="py-1.5">{s.transferenciaInfo?.tipo === 'EXTERNA' ? 'Transferência Externa' : 'Transferência Interna'}</td>
+                            <td className="py-1.5 text-slate-600">{s.transferenciaInfo?.destino || '-'}</td>
+                            <td className="py-1.5 text-center">
+                              <span className="font-black text-sky-800 bg-sky-100 border border-sky-300 px-2 py-0.5 rounded-full text-[9px] uppercase">
+                                {s.situacaoFinal}
+                              </span>
+                            </td>
+                            <td className="py-1.5 text-right text-slate-500">
+                              {s.transferenciaInfo?.data ? new Date(s.transferenciaInfo.data).toLocaleDateString('pt-BR') : '-'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Signatures */}
@@ -880,7 +1099,7 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
                     );
                   })}
                   {!isInfantil && (
-                    <td className="text-center font-bold">{student.mediaGeral.toFixed(1).replace('.', ',')}</td>
+                    <td className="text-center font-bold">{student.mediaGeral > 0 ? student.mediaGeral.toFixed(1).replace('.', ',') : '-'}</td>
                   )}
                   <td className="text-center">{student.frequenciaRate}%</td>
                   <td className="text-center font-bold uppercase">{student.situacaoFinal}</td>
@@ -888,6 +1107,35 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
               ))}
             </tbody>
           </table>
+
+          {/* Printed Section for Transferred Students */}
+          {transferredStudents.length > 0 && (
+            <div className="mt-4 border border-black p-2 text-[8pt] font-sans">
+              <div className="font-bold uppercase text-[8pt] mb-1">Relação de Estudantes Transferidos:</div>
+              <table className="w-full text-[7.5pt] border-collapse mt-1">
+                <thead>
+                  <tr className="bg-gray-100">
+                    <th className="border border-black px-1.5 py-0.5 text-left">Estudante</th>
+                    <th className="border border-black px-1.5 py-0.5 text-left">Tipo Transferência</th>
+                    <th className="border border-black px-1.5 py-0.5 text-left">Destino</th>
+                    <th className="border border-black px-1.5 py-0.5 text-center">Situação da Transferência</th>
+                    <th className="border border-black px-1.5 py-0.5 text-center">Data</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transferredStudents.map((s) => (
+                    <tr key={s.id}>
+                      <td className="border border-black px-1.5 py-0.5 font-bold uppercase">{s.name}</td>
+                      <td className="border border-black px-1.5 py-0.5">{s.transferenciaInfo?.tipo === 'EXTERNA' ? 'Externa' : 'Interna'}</td>
+                      <td className="border border-black px-1.5 py-0.5">{s.transferenciaInfo?.destino || '-'}</td>
+                      <td className="border border-black px-1.5 py-0.5 text-center font-bold">{s.situacaoFinal}</td>
+                      <td className="border border-black px-1.5 py-0.5 text-center">{s.transferenciaInfo?.data ? new Date(s.transferenciaInfo.data).toLocaleDateString('pt-BR') : '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {/* Signatures */}
           <div className="mt-12">
