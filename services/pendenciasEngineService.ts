@@ -453,11 +453,12 @@ export const pendenciasEngineService = {
           const escolaObj = targetEscolas.find(e => prof.escolasIds.includes(e.id) || (turmaObj && e.id === turmaObj.school_id));
           const comps = userTurmaComp[tId] || ['Língua Portuguesa', 'Matemática'];
 
-          // Co-responsáveis da escola (Coordenador Pedagógico, Gestor Geral, Gestor Pedagógico)
+          // Co-responsáveis da escola (Coordenador Regional, Coordenador Pedagógico, Gestor Geral, Gestor Pedagógico)
           const gestoresEscola = coordenadores.filter(c => 
             escolaObj?.id && c.escolasIds?.includes(escolaObj.id) && 
-            (c.funcao === 'Coordenador Pedagógico' || c.funcao === 'Gestor Geral' || c.funcao === 'Gestor Pedagógico' || 
-             (c.funcao as string)?.toLowerCase().includes('coordenador pedagógico') || 
+            c.id !== prof.id &&
+            (c.funcao === 'Coordenador Regional' || c.funcao === 'Coordenador Pedagógico' || c.funcao === 'Gestor Geral' || c.funcao === 'Gestor Pedagógico' || 
+             (c.funcao as string)?.toLowerCase().includes('coordenador') || 
              (c.funcao as string)?.toLowerCase().includes('gestor'))
           );
           const coResponsaveisNomes = gestoresEscola.map(g => `${g.nome} (${g.funcao})`).join(', ') || undefined;
@@ -703,10 +704,32 @@ export const pendenciasEngineService = {
             const totalAguardando = guiasEscolaF.length + guiasEscolaI.length;
 
             if (totalAguardando > 0) {
-              const coordResp = coordenadoresPedagogicos.find(c => c.escolasIds.includes(esc.id));
-              const regionalGestores = coordenadores.filter(c => c.funcao === 'Coordenador Regional' || c.funcao === 'Gestor Geral');
-              const coResponsaveisNomes = regionalGestores.map(g => `${g.nome} (${g.funcao})`).join(', ') || undefined;
-              const coResponsaveisIds = regionalGestores.map(g => g.id);
+              // Responsável principal: Coordenador Pedagógico da escola ou Gestor Geral/Pedagógico
+              const coordPed = coordenadores.find(c => 
+                c.escolasIds?.includes(esc.id) && 
+                (c.funcao === 'Coordenador Pedagógico' || (c.funcao as string)?.toLowerCase().includes('coordenador pedagógico'))
+              );
+              const gestorGeral = coordenadores.find(c => 
+                c.escolasIds?.includes(esc.id) && 
+                (c.funcao === 'Gestor Geral' || c.funcao === 'Gestor Pedagógico' || (c.funcao as string)?.toLowerCase().includes('gestor'))
+              );
+              const coordResp = coordPed || gestorGeral;
+
+              // Co-responsáveis: APENAS gestores e coordenadores vinculados à unidade responsável (esc.id)
+              const gestoresUnidade = coordenadores.filter(c => 
+                c.escolasIds?.includes(esc.id) &&
+                c.id !== coordResp?.id &&
+                (
+                  c.funcao === 'Coordenador Regional' ||
+                  c.funcao === 'Gestor Geral' ||
+                  c.funcao === 'Gestor Pedagógico' ||
+                  c.funcao === 'Coordenador Pedagógico' ||
+                  (c.funcao as string)?.toLowerCase().includes('gestor') ||
+                  (c.funcao as string)?.toLowerCase().includes('coordenador')
+                )
+              );
+              const coResponsaveisNomes = gestoresUnidade.map(g => `${g.nome} (${g.funcao})`).join(', ') || undefined;
+              const coResponsaveisIds = gestoresUnidade.map(g => g.id);
 
               detectedList.push({
                 usuario_id: coordResp?.id || undefined,
@@ -742,6 +765,9 @@ export const pendenciasEngineService = {
       today.setHours(0, 0, 0, 0);
 
       const makeKey = (item: { tipo_pendencia: string; escola_id?: string; turma_id?: string; componente?: string; periodo?: string; usuario_id?: string }) => {
+        if (item.tipo_pendencia === 'APROVACAO_GUIAS') {
+          return `${item.tipo_pendencia}|${item.escola_id || ''}|${item.periodo || ''}`;
+        }
         return `${item.tipo_pendencia}|${item.escola_id || ''}|${item.turma_id || ''}|${item.componente || ''}|${item.periodo || ''}|${item.usuario_id || ''}`;
       };
 
@@ -753,6 +779,7 @@ export const pendenciasEngineService = {
       const newToInsert: any[] = [];
       const updatedList: AlertaPendencia[] = [];
       const overdueToUpdate: string[] = [];
+      const toUpdateCoResp: Array<{ id: string; co_responsaveis_nomes?: string; co_responsaveis_ids?: string[] }> = [];
 
       for (let i = 0; i < detectedList.length; i++) {
         const det = detectedList[i];
@@ -770,9 +797,25 @@ export const pendenciasEngineService = {
               overdueToUpdate.push(existing.id);
             }
           }
-          // Garante campos de co-responsabilidade atualizados
+
+          const coRespChanged = existing.co_responsaveis_nomes !== det.co_responsaveis_nomes;
+          // Garante campos de co-responsabilidade e responsável da escola atualizados
           existing.co_responsaveis_nomes = det.co_responsaveis_nomes;
           existing.co_responsaveis_ids = det.co_responsaveis_ids;
+          if (det.usuario_id && (!existing.usuario_id || existing.usuario_nome === 'Coordenação Pedagógica')) {
+            existing.usuario_id = det.usuario_id;
+            existing.usuario_nome = det.usuario_nome;
+            existing.usuario_perfil = det.usuario_perfil;
+            existing.usuario_email = det.usuario_email;
+          }
+
+          if (coRespChanged) {
+            toUpdateCoResp.push({
+              id: existing.id,
+              co_responsaveis_nomes: det.co_responsaveis_nomes,
+              co_responsaveis_ids: det.co_responsaveis_ids
+            });
+          }
 
           updatedList.push(existing);
           existingMap.delete(key);
@@ -795,15 +838,26 @@ export const pendenciasEngineService = {
       }
 
       // Persistência assíncrona em background (não bloqueia resposta ao usuário)
-      if (newToInsert.length > 0) {
-        setTimeout(async () => {
-          try {
+      setTimeout(async () => {
+        try {
+          if (newToInsert.length > 0) {
             await supabase.from('alertas_pendencias').insert(newToInsert.slice(0, 300));
-          } catch (err) {
-            console.warn('Background sync insert notice:', err);
           }
-        }, 10);
-      }
+          if (toUpdateCoResp.length > 0) {
+            for (const item of toUpdateCoResp.slice(0, 100)) {
+              await supabase
+                .from('alertas_pendencias')
+                .update({
+                  co_responsaveis_nomes: item.co_responsaveis_nomes || null,
+                  co_responsaveis_ids: item.co_responsaveis_ids || null
+                })
+                .eq('id', item.id);
+            }
+          }
+        } catch (err) {
+          console.warn('Background sync notice:', err);
+        }
+      }, 20);
 
       return updatedList.sort((a, b) => {
         const statusScore = (s: StatusPendenciaAlerta) => {
