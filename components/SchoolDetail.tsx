@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { ArrowLeft, Target, TrendingUp, History, FileText, Save, Users, Calculator, Briefcase, Plus, Trash2, Edit, ClipboardCheck, AlertCircle, AlertTriangle, CheckCircle2, School as SchoolIcon, LayoutDashboard, GraduationCap, Clock, Activity, Award, BookOpen, UserPlus, X, MapPin, ChevronRight, CheckSquare, Printer, Loader2, Search, RefreshCw } from 'lucide-react';
 import { PageHeader } from './ui/PageHeader';
 import { PrintableVisitReport } from './PrintableVisitReport';
@@ -120,6 +120,9 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
     'notificacao_frequencia' | 'autorizacao_imagem' | 'declaracao_matricula' | 'declaracao_frequencia'
   >('notificacao_frequencia');
   const [docStudentId, setDocStudentId] = useState<string | number>('');
+  const [docStudentSearch, setDocStudentSearch] = useState('');
+  const [docStudentDropdownOpen, setDocStudentDropdownOpen] = useState(false);
+  const docStudentSearchRef = useRef<HTMLDivElement>(null);
   const [docResponsavelNome, setDocResponsavelNome] = useState('');
   const [docResponsavelCpf, setDocResponsavelCpf] = useState('');
   const [docResponsavelEndereco, setDocResponsavelEndereco] = useState('');
@@ -439,6 +442,17 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
       .filter(item => item.stat.isLowAttendance)
       .sort((a, b) => a.stat.rate - b.stat.rate);
   }, [students, studentStatsMap]);
+
+  // Click-outside handler for student search dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (docStudentSearchRef.current && !docStudentSearchRef.current.contains(event.target as Node)) {
+        setDocStudentDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleSelectStudentForDoc = (studentId: string | number) => {
     setDocStudentId(studentId);
@@ -2252,38 +2266,129 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        {/* Student Selector */}
-                        <div>
+                        {/* Student Selector with Search */}
+                        <div ref={docStudentSearchRef} className="relative">
                           <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
                             Selecionar Estudante *
                           </label>
-                          <select
-                            value={docStudentId}
-                            onChange={(e) => handleSelectStudentForDoc(e.target.value)}
-                            className="w-full px-3 py-2.5 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
-                          >
-                            <option value="">Selecione um estudante...</option>
-                            {lowAttendanceStudents.length > 0 && (
-                              <optgroup label="⚠️ Estudantes em Baixa Frequência (Abaixo do Limite Legal)">
-                                {lowAttendanceStudents.map(({ student, stat }) => (
-                                  <option key={student.id} value={student.id}>
-                                    ⚠️ {student.name} ({stat.turmaNome}) — {stat.rate}% freq ({stat.absences} faltas) [Mín: {stat.minRateRequired}%]
-                                  </option>
-                                ))}
-                              </optgroup>
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                            <input
+                              type="text"
+                              value={docStudentDropdownOpen ? docStudentSearch : (selectedStudentObj ? selectedStudentObj.name : docStudentSearch)}
+                              onChange={(e) => {
+                                setDocStudentSearch(e.target.value);
+                                setDocStudentDropdownOpen(true);
+                                if (!e.target.value && docStudentId) {
+                                  handleSelectStudentForDoc('');
+                                }
+                              }}
+                              onFocus={() => {
+                                setDocStudentDropdownOpen(true);
+                                if (selectedStudentObj) {
+                                  setDocStudentSearch('');
+                                }
+                              }}
+                              placeholder="Digite o nome do estudante para buscar..."
+                              className="w-full pl-9 pr-8 py-2.5 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange focus:ring-2 focus:ring-orange-100 transition-all bg-white"
+                              autoComplete="off"
+                            />
+                            {docStudentId && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleSelectStudentForDoc('');
+                                  setDocStudentSearch('');
+                                  setDocStudentDropdownOpen(false);
+                                }}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
                             )}
-                            <optgroup label="Demais Estudantes">
-                              {students.filter(st => !lowAttendanceStudents.some(item => String(item.student.id) === String(st.id))).map(student => {
-                                const stat = studentStatsMap.get(String(student.id)) || studentStatsMap.get(student.id);
-                                const rateStr = stat && stat.totalClasses > 0 ? ` — ${stat.rate}% freq` : '';
-                                return (
-                                  <option key={student.id} value={student.id}>
-                                    {student.name} ({student.stage}){rateStr}
-                                  </option>
-                                );
-                              })}
-                            </optgroup>
-                          </select>
+                          </div>
+
+                          {docStudentDropdownOpen && (() => {
+                            const searchTerm = docStudentSearch.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                            const filteredLow = lowAttendanceStudents.filter(({ student }) =>
+                              !searchTerm || student.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(searchTerm)
+                            );
+                            const regularStudents = students.filter(st => !lowAttendanceStudents.some(item => String(item.student.id) === String(st.id)));
+                            const filteredRegular = regularStudents.filter(student =>
+                              !searchTerm || student.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(searchTerm)
+                            );
+                            const hasResults = filteredLow.length > 0 || filteredRegular.length > 0;
+
+                            return (
+                              <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg max-h-64 overflow-y-auto">
+                                {!hasResults ? (
+                                  <div className="px-4 py-3 text-xs text-slate-400 font-semibold text-center">
+                                    Nenhum estudante encontrado para "{docStudentSearch}"
+                                  </div>
+                                ) : (
+                                  <>
+                                    {filteredLow.length > 0 && (
+                                      <>
+                                        <div className="px-3 py-2 bg-red-50 text-[10px] font-black text-red-600 uppercase tracking-wider border-b border-red-100 sticky top-0">
+                                          ⚠️ Estudantes em Baixa Frequência
+                                        </div>
+                                        {filteredLow.map(({ student, stat }) => (
+                                          <button
+                                            key={student.id}
+                                            type="button"
+                                            onClick={() => {
+                                              handleSelectStudentForDoc(student.id);
+                                              setDocStudentSearch('');
+                                              setDocStudentDropdownOpen(false);
+                                            }}
+                                            className={`w-full text-left px-3 py-2 text-xs hover:bg-orange-50 transition-colors flex items-center gap-2 border-b border-slate-50 ${
+                                              String(docStudentId) === String(student.id) ? 'bg-orange-50 font-bold' : ''
+                                            }`}
+                                          >
+                                            <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                                            <div className="flex-1 min-w-0">
+                                              <div className="font-bold text-slate-800 truncate">{student.name}</div>
+                                              <div className="text-[10px] text-slate-400 font-medium">
+                                                {stat.turmaNome} — {stat.rate}% freq ({stat.absences} faltas) [Mín: {stat.minRateRequired}%]
+                                              </div>
+                                            </div>
+                                          </button>
+                                        ))}
+                                      </>
+                                    )}
+                                    {filteredRegular.length > 0 && (
+                                      <>
+                                        <div className="px-3 py-2 bg-slate-50 text-[10px] font-black text-slate-500 uppercase tracking-wider border-b border-slate-100 sticky top-0">
+                                          Demais Estudantes ({filteredRegular.length})
+                                        </div>
+                                        {filteredRegular.map(student => {
+                                          const stat = studentStatsMap.get(String(student.id)) || studentStatsMap.get(student.id);
+                                          const rateStr = stat && stat.totalClasses > 0 ? ` — ${stat.rate}% freq` : '';
+                                          return (
+                                            <button
+                                              key={student.id}
+                                              type="button"
+                                              onClick={() => {
+                                                handleSelectStudentForDoc(student.id);
+                                                setDocStudentSearch('');
+                                                setDocStudentDropdownOpen(false);
+                                              }}
+                                              className={`w-full text-left px-3 py-2 text-xs hover:bg-orange-50 transition-colors border-b border-slate-50 ${
+                                                String(docStudentId) === String(student.id) ? 'bg-orange-50 font-bold' : ''
+                                              }`}
+                                            >
+                                              <div className="font-semibold text-slate-700 truncate">{student.name}</div>
+                                              <div className="text-[10px] text-slate-400 font-medium">{student.stage}{rateStr}</div>
+                                            </button>
+                                          );
+                                        })}
+                                      </>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
 
                         {/* Selected Student Information Chip */}
