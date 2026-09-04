@@ -457,6 +457,14 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
         }
       });
     }
+    // Include teachers so their emails can be resolved to names
+    if (teachersAssignments && teachersAssignments.length > 0) {
+      teachersAssignments.forEach((t) => {
+        if (t.contato && t.nome) {
+          map.set(t.contato.toLowerCase().trim(), t.nome.trim());
+        }
+      });
+    }
     if (currentUser) {
       if (currentUser.contato && currentUser.nome) {
         map.set(currentUser.contato.toLowerCase().trim(), currentUser.nome.trim());
@@ -466,7 +474,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       }
     }
     return map;
-  }, [coordenadoresList, currentUser]);
+  }, [coordenadoresList, teachersAssignments, currentUser]);
 
   const getTeacherName = (emailOrName: string | undefined): string => {
     if (!emailOrName) return '';
