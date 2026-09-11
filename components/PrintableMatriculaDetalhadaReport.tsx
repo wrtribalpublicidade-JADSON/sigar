@@ -6,6 +6,7 @@ interface PrintableMatriculaDetalhadaReportProps {
     escolas: Escola[];
     filtroLocalizacao: string;
     filtroTurno: 'Todos' | 'Integral' | 'Manhã' | 'Tarde';
+    orientacao?: 'landscape' | 'portrait' | 'auto';
 }
 
 const GRADES = [
@@ -38,7 +39,9 @@ export const PrintableMatriculaDetalhadaReport: React.FC<PrintableMatriculaDetal
     escolas,
     filtroLocalizacao,
     filtroTurno,
+    orientacao = 'landscape',
 }) => {
+    const isLandscape = orientacao === 'landscape';
     const currentYear = new Date().getFullYear();
     const emissionDate = new Date().toLocaleDateString('pt-BR');
     const emissionTime = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -71,27 +74,54 @@ export const PrintableMatriculaDetalhadaReport: React.FC<PrintableMatriculaDetal
     };
 
     const thStyle: React.CSSProperties = {
-        padding: '3pt 2pt',
+        padding: isLandscape ? '4pt 3pt' : '3pt 1.5pt',
         border: '0.5pt solid #334155',
-        fontSize: '5.5pt',
+        fontSize: isLandscape ? '6pt' : '5pt',
         fontWeight: 800,
         textTransform: 'uppercase',
         color: '#fff',
         textAlign: 'center',
-        letterSpacing: '0.05em',
+        letterSpacing: isLandscape ? '0.05em' : '0.02em',
     };
 
     const tdStyle: React.CSSProperties = {
-        padding: '2.5pt 2pt',
+        padding: isLandscape ? '3pt 3pt' : '2pt 1.5pt',
         border: '0.5pt solid #e2e8f0',
-        fontSize: '7pt',
+        fontSize: isLandscape ? '7.5pt' : '6.5pt',
         textAlign: 'center',
         fontWeight: 600,
         color: '#334155',
     };
 
     return createPortal(
-        <div id="print-matricula-detalhada-report" className="hidden print:block bg-white text-slate-900" style={{ fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif", fontSize: '8pt' }}>
+        <div id="print-matricula-detalhada-report" className="hidden print:block bg-white text-slate-900" style={{ fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif", fontSize: isLandscape ? '8pt' : '7.5pt', width: '100%' }}>
+            <style>{`
+                @media print {
+                    @page {
+                        ${orientacao === 'landscape' ? 'size: A4 landscape;' : orientacao === 'portrait' ? 'size: A4 portrait;' : 'size: auto;'}
+                        margin: ${orientacao === 'landscape' ? '6mm 8mm 8mm 8mm;' : '10mm 6mm 10mm 6mm;'};
+                    }
+                    #print-matricula-detalhada-report {
+                        width: 100% !important;
+                        max-width: 100% !important;
+                        padding: 0 !important;
+                        margin: 0 !important;
+                    }
+                    table {
+                        width: 100% !important;
+                        border-collapse: collapse !important;
+                    }
+                    thead {
+                        display: table-header-group !important;
+                    }
+                    tfoot {
+                        display: table-footer-group !important;
+                    }
+                    tr {
+                        page-break-inside: avoid !important;
+                    }
+                }
+            `}</style>
 
             {/* ====== INSTITUTIONAL HEADER ====== */}
             <div className="text-center mb-3 pb-3" style={{ borderBottom: '2pt solid #0f172a' }}>
@@ -173,12 +203,12 @@ export const PrintableMatriculaDetalhadaReport: React.FC<PrintableMatriculaDetal
                     <thead>
                         {/* Group header row */}
                         <tr>
-                            <th rowSpan={2} style={{ ...thStyle, background: '#0f172a', textAlign: 'left', padding: '4pt 6pt', minWidth: '140pt' }}>Unidade Escolar</th>
+                            <th rowSpan={2} style={{ ...thStyle, background: '#0f172a', textAlign: 'left', padding: isLandscape ? '4pt 8pt' : '3pt 4pt', minWidth: isLandscape ? '160pt' : '110pt' }}>Unidade Escolar</th>
                             <th colSpan={4} style={{ ...thStyle, background: '#3730a3' }}>Educação Infantil</th>
                             <th colSpan={5} style={{ ...thStyle, background: '#047857' }}>Anos Iniciais</th>
                             <th colSpan={4} style={{ ...thStyle, background: '#c2410c' }}>Anos Finais</th>
                             <th style={{ ...thStyle, background: '#475569' }}>EJA</th>
-                            <th rowSpan={2} style={{ ...thStyle, background: '#0f172a', fontSize: '6pt', width: '6%' }}>Total</th>
+                            <th rowSpan={2} style={{ ...thStyle, background: '#0f172a', fontSize: isLandscape ? '6.5pt' : '5.5pt', width: '6%' }}>Total</th>
                         </tr>
                         {/* Grade names row */}
                         <tr>
@@ -187,7 +217,7 @@ export const PrintableMatriculaDetalhadaReport: React.FC<PrintableMatriculaDetal
                                     g.group === 'Anos Iniciais' ? '#059669' :
                                     g.group === 'Anos Finais' ? '#ea580c' : '#64748b';
                                 return (
-                                    <th key={g.key} style={{ ...thStyle, background: bg, fontSize: '5pt', whiteSpace: 'nowrap' }}>
+                                    <th key={g.key} style={{ ...thStyle, background: bg, fontSize: isLandscape ? '6pt' : '5pt', whiteSpace: 'nowrap' }}>
                                         {g.label}
                                     </th>
                                 );

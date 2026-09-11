@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { PageHeader } from './ui/PageHeader';
-import { ChevronDown, ChevronRight, FileText, Calendar, Printer, CheckSquare, AlertCircle, FileSpreadsheet, Download, Search, MapPin, Users, GraduationCap, Shield, UserCheck, BarChart3, Briefcase, Building2, Phone, Mail, BookOpen, Clock, Star, Trophy, ClipboardCheck } from 'lucide-react';
+import { ChevronDown, ChevronRight, FileText, Calendar, Printer, CheckSquare, AlertCircle, FileSpreadsheet, Download, Search, MapPin, Users, GraduationCap, Shield, UserCheck, BarChart3, Briefcase, Building2, Phone, Mail, BookOpen, Clock, Star, Trophy, ClipboardCheck, Layout } from 'lucide-react';
 import { Visita, Escola, Coordenador, RecursoHumano } from '../types';
 import { exportToCSV } from '../utils';
 import { useNotification } from '../context/NotificationContext';
@@ -74,6 +74,7 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
    const [expandedEscolaId, setExpandedEscolaId] = useState<string | null>(null);
    const [matriculaSubTab, setMatriculaSubTab] = useState<'consolidado' | 'detalhado'>('consolidado');
    const [selectedTurno, setSelectedTurno] = useState<'Todos' | 'Integral' | 'Manhã' | 'Tarde'>('Todos');
+   const [selectedOrientacao, setSelectedOrientacao] = useState<'landscape' | 'portrait' | 'auto'>('landscape');
 
    // === Servidores Tab State ===
    const [servidorFuncaoFilter, setServidorFuncaoFilter] = useState<string>('Todas');
@@ -901,6 +902,26 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
                         </div>
                      )}
 
+                     {matriculaSubTab === 'detalhado' && (
+                        <div className="flex-1 space-y-2">
+                           <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                              <Layout className="w-4 h-4 text-indigo-500" /> Orientação do Papel
+                           </label>
+                           <div className="relative">
+                              <select
+                                 value={selectedOrientacao}
+                                 onChange={e => setSelectedOrientacao(e.target.value as any)}
+                                 className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 pr-10 text-sm font-bold text-slate-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 appearance-none shadow-sm"
+                              >
+                                 <option value="landscape">Paisagem (Horizontal - Recomendado)</option>
+                                 <option value="portrait">Retrato (Vertical)</option>
+                                 <option value="auto">Automático (Escolher na Impressão)</option>
+                              </select>
+                              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                           </div>
+                        </div>
+                     )}
+
                      <button
                         onClick={handlePrintMatricula}
                         className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-indigo-500/20 transition-all flex items-center gap-2 whitespace-nowrap"
@@ -1673,6 +1694,7 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
                escolas={escolas}
                filtroLocalizacao={selectedLocalizacao}
                filtroTurno={selectedTurno}
+               orientacao={selectedOrientacao}
             />
          )}
 
