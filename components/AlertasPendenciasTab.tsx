@@ -3,7 +3,8 @@ import {
   AlertTriangle, ShieldAlert, CheckCircle2, Clock, Search, Filter, 
   RefreshCw, Send, CheckSquare, Square, History, ExternalLink, 
   ChevronRight, ChevronLeft, Calendar, Users, School, BookOpen, Layers, 
-  ArrowUpRight, AlertCircle, Sparkles, SlidersHorizontal, CheckCircle
+  ArrowUpRight, AlertCircle, Sparkles, SlidersHorizontal, CheckCircle,
+  Printer, Download, FileText
 } from 'lucide-react';
 import { 
   AlertaPendencia, 
@@ -18,6 +19,7 @@ import { pendenciasEngineService, getDaysDifference } from '../services/pendenci
 import { GerarAlertaModal } from './modals/GerarAlertaModal';
 import { HistoricoPendenciaModal } from './modals/HistoricoPendenciaModal';
 import { useNotification } from '../context/NotificationContext';
+import { PrintableAlertasPendenciasReport } from './PrintableAlertasPendenciasReport';
 
 interface AlertasPendenciasTabProps {
   escolas: Escola[];
@@ -65,6 +67,11 @@ export const AlertasPendenciasTab: React.FC<AlertasPendenciasTabProps> = ({
   const [isAlertaModalOpen, setIsAlertaModalOpen] = useState(false);
   const [historicoItem, setHistoricoItem] = useState<AlertaPendencia | null>(null);
   const [isHistoricoModalOpen, setIsHistoricoModalOpen] = useState(false);
+
+  // Print & PDF Modal State
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [printItems, setPrintItems] = useState<AlertaPendencia[]>([]);
+  const [printInitialMode, setPrintInitialMode] = useState<'relatorio' | 'oficio'>('relatorio');
 
   // Escolas ordenadas em ordem alfabética
   const sortedEscolas = useMemo(() => {
@@ -299,6 +306,38 @@ export const AlertasPendenciasTab: React.FC<AlertasPendenciasTabProps> = ({
     }
   };
 
+  // Print & PDF Modal Handlers
+  const handleOpenPrintRelatorio = (onlySelected: boolean = false) => {
+    let itemsToPrint = filteredList;
+    if (onlySelected && selectedIds.length > 0) {
+      itemsToPrint = pendencias.filter(p => selectedIds.includes(p.id));
+    }
+    if (itemsToPrint.length === 0) {
+      showNotification('warning', 'Nenhuma pendência disponível para impressão.');
+      return;
+    }
+    setPrintItems(itemsToPrint);
+    setPrintInitialMode('relatorio');
+    setIsPrintModalOpen(true);
+  };
+
+  const handleOpenPrintOficioIndividual = (item: AlertaPendencia) => {
+    setPrintItems([item]);
+    setPrintInitialMode('oficio');
+    setIsPrintModalOpen(true);
+  };
+
+  const handleOpenPrintOficioMassa = () => {
+    const itemsToPrint = pendencias.filter(p => selectedIds.includes(p.id));
+    if (itemsToPrint.length === 0) {
+      showNotification('warning', 'Selecione ao menos uma pendência para emitir as notificações formais.');
+      return;
+    }
+    setPrintItems(itemsToPrint);
+    setPrintInitialMode('oficio');
+    setIsPrintModalOpen(true);
+  };
+
   // Status Badge Helper
   const renderStatusBadge = (status: StatusPendenciaAlerta, prazo?: string) => {
     const { days, isOverdue } = getDaysDifference(prazo);
@@ -449,14 +488,46 @@ export const AlertasPendenciasTab: React.FC<AlertasPendenciasTabProps> = ({
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2">
             
-            {/* Mass Alert Button */}
+            {/* Mass Actions */}
             {selectedIds.length > 0 && (
+              <>
+                <button
+                  onClick={handleOpenAlertaMassa}
+                  className="px-4 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl text-xs font-black shadow-md shadow-orange-500/20 flex items-center gap-2 transition-all animate-scale-in uppercase tracking-wider"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  Gerar Alertas ({selectedIds.length})
+                </button>
+
+                <button
+                  onClick={() => handleOpenPrintRelatorio(true)}
+                  className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 transition-all animate-scale-in uppercase tracking-wider"
+                  title="Imprimir / Salvar em PDF as pendências selecionadas"
+                >
+                  <Printer className="w-3.5 h-3.5 text-orange-400" />
+                  Imprimir Selecionadas ({selectedIds.length})
+                </button>
+
+                <button
+                  onClick={handleOpenPrintOficioMassa}
+                  className="px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 transition-all animate-scale-in uppercase tracking-wider"
+                  title="Emitir Notificações Formais das pendências selecionadas"
+                >
+                  <FileText className="w-3.5 h-3.5 text-orange-500" />
+                  Notificações Formais ({selectedIds.length})
+                </button>
+              </>
+            )}
+
+            {/* BOTÃO IMPRIMIR / SALVAR PDF GERAL */}
+            {filteredList.length > 0 && (
               <button
-                onClick={handleOpenAlertaMassa}
-                className="px-4 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl text-xs font-black shadow-md shadow-orange-500/20 flex items-center gap-2 transition-all animate-scale-in uppercase tracking-wider"
+                onClick={() => handleOpenPrintRelatorio(false)}
+                className="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 hover:border-slate-300 rounded-xl text-xs font-black shadow-sm flex items-center gap-2 transition-all uppercase tracking-wider hover:scale-[1.01] active:scale-[0.99]"
+                title="Imprimir ou salvar relatório consolidado de pendências em PDF"
               >
-                <Send className="w-3.5 h-3.5" />
-                Gerar Alertas em Massa ({selectedIds.length})
+                <Printer className="w-3.5 h-3.5 text-orange-500" />
+                <span>Imprimir / PDF</span>
               </button>
             )}
 
@@ -642,8 +713,21 @@ export const AlertasPendenciasTab: React.FC<AlertasPendenciasTabProps> = ({
                 )}
               </div>
 
-              <div className="text-xs text-slate-500 font-semibold">
-                Total de <strong className="text-slate-800">{totalItems}</strong> pendências encontradas
+              <div className="flex items-center gap-3">
+                <div className="text-xs text-slate-500 font-semibold">
+                  Total de <strong className="text-slate-800">{totalItems}</strong> pendências encontradas
+                </div>
+
+                {totalItems > 0 && (
+                  <button
+                    onClick={() => handleOpenPrintRelatorio(false)}
+                    className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all uppercase tracking-wide"
+                    title="Imprimir relatório das pendências filtradas ou salvar em PDF"
+                  >
+                    <Printer className="w-3.5 h-3.5 text-orange-500" />
+                    <span>Imprimir / PDF</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -791,6 +875,15 @@ export const AlertasPendenciasTab: React.FC<AlertasPendenciasTabProps> = ({
                         {/* Action Buttons */}
                         <div className="flex items-center gap-1.5">
                           
+                          {/* Imprimir Notificação Individual */}
+                          <button
+                            onClick={() => handleOpenPrintOficioIndividual(item)}
+                            title="Imprimir notificação formal desta pendência / Salvar em PDF"
+                            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition-colors"
+                          >
+                            <Printer className="w-3.5 h-3.5 text-slate-600" />
+                          </button>
+
                           {/* Histórico */}
                           <button
                             onClick={() => {
@@ -921,6 +1014,24 @@ export const AlertasPendenciasTab: React.FC<AlertasPendenciasTabProps> = ({
         onClose={() => setIsHistoricoModalOpen(false)}
         item={historicoItem}
       />
+
+      {/* MODAL: IMPRESSÃO E SALVAR EM PDF */}
+      {isPrintModalOpen && (
+        <PrintableAlertasPendenciasReport
+          items={printItems}
+          filtroTipo={filterTipo === 'ALL' ? 'Todos os Tipos' : filterTipo}
+          filtroStatus={filterStatus === 'ALL' ? 'Todos os Status' : filterStatus}
+          filtroEscola={filterEscola === 'ALL' ? 'Todas as Escolas' : (escolas.find(e => e.id === filterEscola)?.nome || filterEscola)}
+          filtroResponsavelNome={filterResponsavel === 'ALL' ? 'Todos os Usuários' : (coordenadores.find(c => c.id === filterResponsavel)?.nome || filterResponsavel)}
+          filtroPerfil={filterPerfil === 'ALL' ? 'Todos os Perfis' : filterPerfil}
+          filtroPeriodo={filterPeriodo === 'ALL' ? 'Todos os Períodos' : filterPeriodo}
+          escolaNome={filterEscola !== 'ALL' ? escolas.find(e => e.id === filterEscola)?.nome : undefined}
+          currentUserName={currentUserName}
+          currentUserRole={currentUserRole}
+          initialMode={printInitialMode}
+          onClose={() => setIsPrintModalOpen(false)}
+        />
+      )}
     </div>
   );
 };

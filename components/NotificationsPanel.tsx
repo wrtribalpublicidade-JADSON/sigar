@@ -4,12 +4,13 @@ import { Escola, Coordenador, ViewState } from '../types';
 import {
     Bell, CheckCircle, AlertTriangle, XCircle, Search,
     Filter, ChevronRight, School, Users, FileText, Calendar, Target,
-    ShieldAlert, Sparkles
+    ShieldAlert, Sparkles, Printer
 } from 'lucide-react';
 import { Card } from './ui/Card';
 import { checkSchoolPendencies } from '../utils';
 import { PendencyType } from '../types';
 import { AlertasPendenciasTab } from './AlertasPendenciasTab';
+import { PrintableUnidadesNotificacoesReport } from './PrintableUnidadesNotificacoesReport';
 
 interface NotificationsPanelProps {
     escolas: Escola[];
@@ -43,6 +44,7 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCoordenador, setSelectedCoordenador] = useState('');
     const [filterType, setFilterType] = useState<PendencyType | 'ALL'>('ALL');
+    const [isPrintUnidadesOpen, setIsPrintUnidadesOpen] = useState(false);
 
     const pendingData = useMemo(() => {
         const results: SchoolPendency[] = [];
@@ -182,6 +184,17 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({
                     >
                         Plano de Ação
                     </button>
+
+                    {filteredData.length > 0 && (
+                        <button
+                            onClick={() => setIsPrintUnidadesOpen(true)}
+                            className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold whitespace-nowrap flex items-center gap-1.5 shadow-sm transition-all uppercase tracking-wider ml-auto"
+                            title="Imprimir ou salvar em PDF as notificações das unidades"
+                        >
+                            <Printer className="w-3.5 h-3.5 text-orange-400" />
+                            <span>Imprimir / PDF</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -234,6 +247,17 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({
                 </div>
             )}
                 </div>
+            )}
+
+            {/* MODAL: IMPRESSÃO DE NOTIFICAÇÕES DAS UNIDADES */}
+            {isPrintUnidadesOpen && (
+                <PrintableUnidadesNotificacoesReport
+                    data={filteredData}
+                    filtroCoordenadorNome={selectedCoordenador ? (coordenadores.find(c => c.id === selectedCoordenador)?.nome || 'Coordenador Selecionado') : 'Todos os Coordenadores'}
+                    filtroTipo={filterType === 'ALL' ? 'Todas as Demandas' : filterType}
+                    currentUserName={currentUser?.nome || 'Administrador'}
+                    onClose={() => setIsPrintUnidadesOpen(false)}
+                />
             )}
         </div>
     );
