@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { configuracaoService, ConfiguracaoRede, PeriodoLetivo } from '../services/configuracaoService';
+import { configuracaoService, ConfiguracaoRede, PeriodoLetivo, DEFAULT_HORARIOS_CONFIG, DEFAULT_MATRIZES_CURRICULARES } from '../services/configuracaoService';
 
 interface ConfiguracaoContextData {
     configuracao: ConfiguracaoRede;
@@ -27,7 +27,9 @@ const DEFAULT_CONFIG: ConfiguracaoRede = {
         "TRAÇOS, SONS, CORES E FORMAS",
         "ESCUTA, FALA, PENSAMENTO E IMAGINAÇÃO",
         "ESPAÇOS, TEMPOS, QUANTIDADES, RELAÇÕES E TRANSFORMAÇÕES"
-    ]
+    ],
+    horarios_config: DEFAULT_HORARIOS_CONFIG,
+    matrizes_curriculares: DEFAULT_MATRIZES_CURRICULARES
 };
 
 const ConfiguracaoContext = createContext<ConfiguracaoContextData>({} as ConfiguracaoContextData);

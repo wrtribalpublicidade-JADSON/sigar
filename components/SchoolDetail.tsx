@@ -12,6 +12,7 @@ import { PrintableTurmaMatriculasReport } from './PrintableTurmaMatriculasReport
 import { PrintableBoletimIndividualEstudante } from './PrintableBoletimIndividualEstudante';
 import { AtasFinaisTab } from './AtasFinaisTab';
 import { FrequenciaAlunosTab } from './FrequenciaAlunosTab';
+import { QuadroHorarioDocente } from './QuadroHorarioDocente';
 import { hasTabAccess, hasFullTabAccess } from '../utils/permissions';
 import {
   BarChart,
@@ -104,6 +105,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
   const [tempSelectedTurmas, setTempSelectedTurmas] = useState<string[]>([]);
   const [tempTurmaComponentes, setTempTurmaComponentes] = useState<Record<string, string[]>>({});
   const [isSavingTurmas, setIsSavingTurmas] = useState(false);
+  const [professoresSubTab, setProfessoresSubTab] = useState<'vinculos' | 'horarios'>('vinculos');
 
   // State for Matriculas tab
   const [searchTermMatriculas, setSearchTermMatriculas] = useState('');
@@ -3005,12 +3007,49 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
               <div className="space-y-6 animate-fade-in">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-5">
                   <div>
-                    <h3 className="text-2xl font-bold text-slate-800">Professores e Vínculos</h3>
+                    <h3 className="text-2xl font-bold text-slate-800">Professores</h3>
                     <p className="text-slate-500 text-sm mt-1">
-                      Gerenciamento dos professores vinculados a esta unidade escolar e suas turmas.
+                      Gerenciamento dos professores vinculados a esta unidade escolar, suas turmas e quadro de horários.
                     </p>
                   </div>
                 </div>
+
+                {/* Sub-Tabs: Vínculos | Quadro de Horários */}
+                <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit">
+                  <button
+                    onClick={() => setProfessoresSubTab('vinculos')}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
+                      professoresSubTab === 'vinculos'
+                        ? 'bg-white text-slate-800 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    Professores e Vínculos
+                  </button>
+                  <button
+                    onClick={() => setProfessoresSubTab('horarios')}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 ${
+                      professoresSubTab === 'horarios'
+                        ? 'bg-white text-slate-800 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    Quadro de Horários
+                  </button>
+                </div>
+
+                {professoresSubTab === 'horarios' ? (
+                  <QuadroHorarioDocente
+                    escolaId={escola.id}
+                    escola={escola}
+                    schoolTeachers={schoolTeachers}
+                    schoolTurmas={schoolTurmas}
+                    isDemoMode={isDemoMode}
+                    canEdit={canEditTab}
+                  />
+                ) : (
+                <>
+                {/* BEGIN vinculos content */}
 
                 {schoolTeachers.length === 0 ? (
                   <div className="bg-slate-50 rounded-2xl border border-slate-200 border-dashed p-12 text-center">
@@ -3242,6 +3281,9 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                       </div>
                     </div>
                   </div>
+                )}
+                {/* END vinculos content */}
+                </>
                 )}
               </div>
             )

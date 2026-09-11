@@ -299,11 +299,37 @@ export const isCampoExperienciaInfantil = (componenteStr: string): boolean => {
   );
 };
 
+const CANONICAL_SUBJECTS: Record<string, string> = {
+  'lingua portuguesa': 'Língua Portuguesa',
+  'língua portuguesa': 'Língua Portuguesa',
+  'portugues': 'Língua Portuguesa',
+  'português': 'Língua Portuguesa',
+  'matematica': 'Matemática',
+  'matemática': 'Matemática',
+  'ciencias': 'Ciências',
+  'ciências': 'Ciências',
+  'ciencias naturais': 'Ciências',
+  'ciências naturais': 'Ciências',
+  'historia': 'História',
+  'história': 'História',
+  'geografia': 'Geografia',
+  'arte': 'Arte',
+  'artes': 'Arte',
+  'educacao fisica': 'Educação Física',
+  'educação física': 'Educação Física',
+  'ensino religioso': 'Ensino Religioso',
+  'lingua inglesa': 'Língua Inglesa',
+  'língua inglesa': 'Língua Inglesa',
+  'ingles': 'Língua Inglesa',
+  'inglês': 'Língua Inglesa',
+};
+
 export const normalizeSubjectName = (name: string | undefined): string => {
   if (!name) return '';
-  const trimmed = name.trim();
-  if (trimmed.toLowerCase() === 'inglês' || trimmed.toLowerCase() === 'ingles') {
-    return 'Língua Inglesa';
+  const trimmed = name.replace(/\*/g, '').trim();
+  const lower = trimmed.toLowerCase();
+  if (CANONICAL_SUBJECTS[lower]) {
+    return CANONICAL_SUBJECTS[lower];
   }
   return trimmed;
 };
