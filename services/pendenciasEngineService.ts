@@ -331,30 +331,67 @@ export const pendenciasEngineService = {
         targetCoordenadores = targetCoordenadores.filter(c => c.escolasIds.includes(targetEscolaId));
       }
 
-      // Preparar queries do Supabase direcionadas por escola
+      // Preparar queries do Supabase direcionadas por filtros
       let existingQuery = supabase.from('alertas_pendencias').select('*');
-      let guiasFQuery = supabase.from('guias_aprendizagem').select('id, escola_id, turma_id, componente, periodo, status, created_by');
-      let guiasIQuery = supabase.from('guias_aprendizagem_infantil').select('id, escola_id, turma_id, campo_experiencia, periodo, status, created_by');
-      let aulasFQuery = supabase.from('aulas_ministradas').select('id, escola_id, turma_id, componente, periodo, data, created_by');
-      let aulasIQuery = supabase.from('aulas_ministradas_infantil').select('id, escola_id, turma_id, campo_experiencia, periodo, data, created_by');
-      let freqFQuery = supabase.from('frequencia_sheets').select('id, escola_id, turma_id, componente, data, created_by');
-      let freqIQuery = supabase.from('frequencia_sheets_infantil').select('id, escola_id, turma_id, periodo, data, created_by');
-      let notasFQuery = supabase.from('notas_sheets').select('id, escola_id, turma_id, componente, bimestre, created_by');
+
+      const needGuias = !targetTipo || targetTipo === 'GUIA_APRENDIZAGEM' || targetTipo === 'APROVACAO_GUIAS';
+      const needAulas = !targetTipo || targetTipo === 'AULAS_MINISTRADAS';
+      const needFreq = !targetTipo || targetTipo === 'FREQUENCIA';
+      const needNotas = !targetTipo || targetTipo === 'NOTAS';
+      const needCCF = !targetTipo || targetTipo === 'CONSELHO_CLASSE_FUNDAMENTAL';
+      const needCCI = !targetTipo || targetTipo === 'CONSELHO_CLASSE_INFANTIL';
+
+      let guiasFQuery = needGuias ? supabase.from('guias_aprendizagem').select('id, escola_id, turma_id, componente, periodo, status, created_by') : null;
+      let guiasIQuery = needGuias ? supabase.from('guias_aprendizagem_infantil').select('id, escola_id, turma_id, campo_experiencia, periodo, status, created_by') : null;
+      let aulasFQuery = needAulas ? supabase.from('aulas_ministradas').select('id, escola_id, turma_id, componente, periodo, data, created_by') : null;
+      let aulasIQuery = needAulas ? supabase.from('aulas_ministradas_infantil').select('id, escola_id, turma_id, campo_experiencia, periodo, data, created_by') : null;
+      let freqFQuery = needFreq ? supabase.from('frequencia_sheets').select('id, escola_id, turma_id, componente, data, created_by') : null;
+      let freqIQuery = needFreq ? supabase.from('frequencia_sheets_infantil').select('id, escola_id, turma_id, periodo, data, created_by') : null;
+      let notasFQuery = needNotas ? supabase.from('notas_sheets').select('id, escola_id, turma_id, componente, bimestre, created_by') : null;
       let turmasQuery = supabase.from('turmas').select('id, name, year, stage, school_id');
+      let ccFQuery = needCCF ? supabase.from('cc_f_avaliacao').select('escola_id, turma_id, periodo_letivo') : null;
+      let ccIQuery = needCCI ? supabase.from('cc_i_avaliacoes').select('escola_id, turma_id, bimestre') : null;
 
       if (targetEscolaId) {
         existingQuery = existingQuery.eq('escola_id', targetEscolaId);
-        guiasFQuery = guiasFQuery.eq('escola_id', targetEscolaId);
-        guiasIQuery = guiasIQuery.eq('escola_id', targetEscolaId);
-        aulasFQuery = aulasFQuery.eq('escola_id', targetEscolaId);
-        aulasIQuery = aulasIQuery.eq('escola_id', targetEscolaId);
-        freqFQuery = freqFQuery.eq('escola_id', targetEscolaId);
-        freqIQuery = freqIQuery.eq('escola_id', targetEscolaId);
-        notasFQuery = notasFQuery.eq('escola_id', targetEscolaId);
+        if (guiasFQuery) guiasFQuery = guiasFQuery.eq('escola_id', targetEscolaId);
+        if (guiasIQuery) guiasIQuery = guiasIQuery.eq('escola_id', targetEscolaId);
+        if (aulasFQuery) aulasFQuery = aulasFQuery.eq('escola_id', targetEscolaId);
+        if (aulasIQuery) aulasIQuery = aulasIQuery.eq('escola_id', targetEscolaId);
+        if (freqFQuery) freqFQuery = freqFQuery.eq('escola_id', targetEscolaId);
+        if (freqIQuery) freqIQuery = freqIQuery.eq('escola_id', targetEscolaId);
+        if (notasFQuery) notasFQuery = notasFQuery.eq('escola_id', targetEscolaId);
         turmasQuery = turmasQuery.eq('school_id', targetEscolaId);
+        if (ccFQuery) ccFQuery = ccFQuery.eq('escola_id', targetEscolaId);
+        if (ccIQuery) ccIQuery = ccIQuery.eq('escola_id', targetEscolaId);
       }
 
-      // Executar todas as consultas em paralelo
+      if (targetTipo) {
+        existingQuery = existingQuery.eq('tipo_pendencia', targetTipo);
+      }
+      if (targetPeriodo) {
+        existingQuery = existingQuery.eq('periodo', targetPeriodo);
+        if (guiasFQuery) guiasFQuery = guiasFQuery.eq('periodo', targetPeriodo);
+        if (guiasIQuery) guiasIQuery = guiasIQuery.eq('periodo', targetPeriodo);
+        if (notasFQuery) notasFQuery = notasFQuery.eq('bimestre', targetPeriodo);
+        if (ccFQuery) ccFQuery = ccFQuery.eq('periodo_letivo', targetPeriodo);
+        if (ccIQuery) {
+          const bimNum = targetPeriodo.startsWith('1') ? 1 : targetPeriodo.startsWith('2') ? 2 : targetPeriodo.startsWith('3') ? 3 : 4;
+          ccIQuery = ccIQuery.eq('bimestre', bimNum);
+        }
+      }
+      if (options?.status && options.status !== 'ALL') {
+        existingQuery = existingQuery.eq('status', options.status);
+      }
+      if (options?.perfil && options.perfil !== 'ALL') {
+        existingQuery = existingQuery.eq('usuario_perfil', options.perfil);
+      }
+      if (targetUsuarioId) {
+        existingQuery = existingQuery.eq('usuario_id', targetUsuarioId);
+      }
+
+      // Executar consultas necessárias em paralelo
+      const emptyRes = { data: [] as any[] };
       const [
         existingAlertsRes,
         guiasFRes,
@@ -364,17 +401,21 @@ export const pendenciasEngineService = {
         frequenciaFRes,
         frequenciaIRes,
         notasFRes,
-        turmasRes
+        turmasRes,
+        ccFRes,
+        ccIRes
       ] = await Promise.all([
         existingQuery.limit(3000),
-        guiasFQuery.limit(3000),
-        guiasIQuery.limit(2000),
-        aulasFQuery.limit(3000),
-        aulasIQuery.limit(2000),
-        freqFQuery.limit(3000),
-        freqIQuery.limit(2000),
-        notasFQuery.limit(3000),
-        turmasQuery.limit(2000)
+        guiasFQuery ? guiasFQuery.limit(3000) : Promise.resolve(emptyRes),
+        guiasIQuery ? guiasIQuery.limit(2000) : Promise.resolve(emptyRes),
+        aulasFQuery ? aulasFQuery.limit(3000) : Promise.resolve(emptyRes),
+        aulasIQuery ? aulasIQuery.limit(2000) : Promise.resolve(emptyRes),
+        freqFQuery ? freqFQuery.limit(3000) : Promise.resolve(emptyRes),
+        freqIQuery ? freqIQuery.limit(2000) : Promise.resolve(emptyRes),
+        notasFQuery ? notasFQuery.limit(3000) : Promise.resolve(emptyRes),
+        turmasQuery.limit(2000),
+        ccFQuery ? ccFQuery.limit(5000) : Promise.resolve(emptyRes),
+        ccIQuery ? ccIQuery.limit(3000) : Promise.resolve(emptyRes)
       ]);
 
       const existingAlerts: AlertaPendencia[] = (existingAlertsRes.data as AlertaPendencia[]) || [];
@@ -399,6 +440,20 @@ export const pendenciasEngineService = {
         if (g.periodo) guiasISet.add(`${g.turma_id}|${g.campo_experiencia || 'Educação Infantil'}|${g.periodo}`);
         guiasISet.add(`${g.turma_id}|${g.campo_experiencia || 'Educação Infantil'}|1º Bimestre`);
         guiasISet.add(`${g.turma_id}|Educação Infantil|${g.periodo || '1º Bimestre'}`);
+      });
+
+      const ccFSet = new Set<string>();
+      (ccFRes.data || []).forEach((c: any) => {
+        if (c.turma_id && c.periodo_letivo) {
+          ccFSet.add(`${c.turma_id}|${c.periodo_letivo}`);
+        }
+      });
+
+      const ccISet = new Set<string>();
+      (ccIRes.data || []).forEach((c: any) => {
+        if (c.turma_id && c.bimestre) {
+          ccISet.add(`${c.turma_id}|${c.bimestre}º Bimestre`);
+        }
       });
 
       const aulasSet = new Set<string>();
@@ -759,7 +814,131 @@ export const pendenciasEngineService = {
       }
 
       // ----------------------------------------------------
-      // C. SINCRONIZAÇÃO E MERGE INSTANTÂNEO
+      // C. DETECÇÃO: CONSELHO DE CLASSE FUNDAMENTAL
+      // ----------------------------------------------------
+      if (!targetTipo || targetTipo === 'CONSELHO_CLASSE_FUNDAMENTAL') {
+        targetEscolas.forEach(esc => {
+          const turmasFundamental = turmas.filter(t => 
+            t.school_id === esc.id && 
+            !((t.stage || '').toLowerCase().includes('infantil') || (t.year || '').toLowerCase().includes('creche') || (t.year || '').toLowerCase().includes('pré'))
+          );
+
+          if (turmasFundamental.length > 0) {
+            const coordPed = coordenadores.find(c => 
+              c.escolasIds?.includes(esc.id) && 
+              (c.funcao === 'Coordenador Pedagógico' || (c.funcao as string)?.toLowerCase().includes('coordenador pedagógico'))
+            );
+            const gestorGeral = coordenadores.find(c => 
+              c.escolasIds?.includes(esc.id) && 
+              (c.funcao === 'Gestor Geral' || c.funcao === 'Gestor Pedagógico' || (c.funcao as string)?.toLowerCase().includes('gestor'))
+            );
+            const coordResp = coordPed || gestorGeral;
+
+            const gestoresEscola = coordenadores.filter(c => 
+              c.escolasIds?.includes(esc.id) && c.id !== coordResp?.id &&
+              (c.funcao === 'Coordenador Regional' || c.funcao === 'Coordenador Pedagógico' || c.funcao === 'Gestor Geral' || c.funcao === 'Gestor Pedagógico' || (c.funcao as string)?.toLowerCase().includes('gestor') || (c.funcao as string)?.toLowerCase().includes('coordenador'))
+            );
+            const coResponsaveisNomes = gestoresEscola.map(g => `${g.nome} (${g.funcao})`).join(', ') || undefined;
+            const coResponsaveisIds = gestoresEscola.map(g => g.id);
+
+            turmasFundamental.forEach(turmaObj => {
+              PERIODOS_ATIVOS.forEach(bim => {
+                if (!ccFSet.has(`${turmaObj.id}|${bim}`)) {
+                  detectedList.push({
+                    usuario_id: coordResp?.id || undefined,
+                    usuario_nome: coordResp?.nome || 'Coordenação Pedagógica',
+                    usuario_perfil: coordResp?.funcao || 'Coordenador Pedagógico',
+                    usuario_email: coordResp?.contato || undefined,
+                    tipo_pendencia: 'CONSELHO_CLASSE_FUNDAMENTAL',
+                    modulo: 'Conselho de Classe',
+                    view_destino: 'CONSELHO_CLASSE_FUNDAMENTAL',
+                    titulo: 'Conselho de Classe Fundamental Pendente',
+                    descricao: `Fechamento e deliberações do Conselho de Classe pendentes para a turma ${turmaObj.year} - ${turmaObj.name} (${bim}).`,
+                    escola_id: esc.id,
+                    escola_nome: esc.nome,
+                    co_responsaveis_nomes: coResponsaveisNomes,
+                    co_responsaveis_ids: coResponsaveisIds,
+                    turma_id: turmaObj.id,
+                    turma_nome: `${turmaObj.year} - ${turmaObj.name}`,
+                    periodo: bim,
+                    bimestre: bim,
+                    etapa_ensino: 'Fundamental',
+                    data_identificacao: nowISO,
+                    status: 'PENDENTE',
+                    prioridade: 'ALTA',
+                    nivel_escalonamento: 0
+                  });
+                }
+              });
+            });
+          }
+        });
+      }
+
+      // ----------------------------------------------------
+      // D. DETECÇÃO: CONSELHO DE CLASSE INFANTIL
+      // ----------------------------------------------------
+      if (!targetTipo || targetTipo === 'CONSELHO_CLASSE_INFANTIL') {
+        targetEscolas.forEach(esc => {
+          const turmasInfantil = turmas.filter(t => 
+            t.school_id === esc.id && 
+            ((t.stage || '').toLowerCase().includes('infantil') || (t.year || '').toLowerCase().includes('creche') || (t.year || '').toLowerCase().includes('pré'))
+          );
+
+          if (turmasInfantil.length > 0) {
+            const coordPed = coordenadores.find(c => 
+              c.escolasIds?.includes(esc.id) && 
+              (c.funcao === 'Coordenador Pedagógico' || (c.funcao as string)?.toLowerCase().includes('coordenador pedagógico'))
+            );
+            const gestorGeral = coordenadores.find(c => 
+              c.escolasIds?.includes(esc.id) && 
+              (c.funcao === 'Gestor Geral' || c.funcao === 'Gestor Pedagógico' || (c.funcao as string)?.toLowerCase().includes('gestor'))
+            );
+            const coordResp = coordPed || gestorGeral;
+
+            const gestoresEscola = coordenadores.filter(c => 
+              c.escolasIds?.includes(esc.id) && c.id !== coordResp?.id &&
+              (c.funcao === 'Coordenador Regional' || c.funcao === 'Coordenador Pedagógico' || c.funcao === 'Gestor Geral' || c.funcao === 'Gestor Pedagógico' || (c.funcao as string)?.toLowerCase().includes('gestor') || (c.funcao as string)?.toLowerCase().includes('coordenador'))
+            );
+            const coResponsaveisNomes = gestoresEscola.map(g => `${g.nome} (${g.funcao})`).join(', ') || undefined;
+            const coResponsaveisIds = gestoresEscola.map(g => g.id);
+
+            turmasInfantil.forEach(turmaObj => {
+              PERIODOS_ATIVOS.forEach(bim => {
+                if (!ccISet.has(`${turmaObj.id}|${bim}`)) {
+                  detectedList.push({
+                    usuario_id: coordResp?.id || undefined,
+                    usuario_nome: coordResp?.nome || 'Coordenação Pedagógica',
+                    usuario_perfil: coordResp?.funcao || 'Coordenador Pedagógico',
+                    usuario_email: coordResp?.contato || undefined,
+                    tipo_pendencia: 'CONSELHO_CLASSE_INFANTIL',
+                    modulo: 'Conselho de Classe',
+                    view_destino: 'CONSELHO_CLASSE_INFANTIL',
+                    titulo: 'Conselho de Classe Infantil Pendente',
+                    descricao: `Avaliações de desenvolvimento e fechamento do Conselho de Classe pendentes para a turma ${turmaObj.year} - ${turmaObj.name} (${bim}).`,
+                    escola_id: esc.id,
+                    escola_nome: esc.nome,
+                    co_responsaveis_nomes: coResponsaveisNomes,
+                    co_responsaveis_ids: coResponsaveisIds,
+                    turma_id: turmaObj.id,
+                    turma_nome: `${turmaObj.year} - ${turmaObj.name}`,
+                    periodo: bim,
+                    bimestre: bim,
+                    etapa_ensino: 'Infantil',
+                    data_identificacao: nowISO,
+                    status: 'PENDENTE',
+                    prioridade: 'ALTA',
+                    nivel_escalonamento: 0
+                  });
+                }
+              });
+            });
+          }
+        });
+      }
+
+      // ----------------------------------------------------
+      // E. SINCRONIZAÇÃO E MERGE INSTANTÂNEO
       // ----------------------------------------------------
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -767,6 +946,9 @@ export const pendenciasEngineService = {
       const makeKey = (item: { tipo_pendencia: string; escola_id?: string; turma_id?: string; componente?: string; periodo?: string; usuario_id?: string }) => {
         if (item.tipo_pendencia === 'APROVACAO_GUIAS') {
           return `${item.tipo_pendencia}|${item.escola_id || ''}|${item.periodo || ''}`;
+        }
+        if (item.tipo_pendencia === 'CONSELHO_CLASSE_FUNDAMENTAL' || item.tipo_pendencia === 'CONSELHO_CLASSE_INFANTIL') {
+          return `${item.tipo_pendencia}|${item.escola_id || ''}|${item.turma_id || ''}|${item.periodo || ''}`;
         }
         return `${item.tipo_pendencia}|${item.escola_id || ''}|${item.turma_id || ''}|${item.componente || ''}|${item.periodo || ''}|${item.usuario_id || ''}`;
       };
@@ -832,8 +1014,14 @@ export const pendenciasEngineService = {
         }
       }
 
-      // Preservar pendências manuais já existentes no banco
+      // Preservar pendências manuais já existentes no banco que correspondam aos filtros pesquisados
       for (const oldPending of existingMap.values()) {
+        if (targetTipo && oldPending.tipo_pendencia !== targetTipo) continue;
+        if (targetEscolaId && oldPending.escola_id !== targetEscolaId) continue;
+        if (targetPeriodo && oldPending.periodo !== targetPeriodo) continue;
+        if (options?.status && options.status !== 'ALL' && oldPending.status !== options.status) continue;
+        if (options?.perfil && options.perfil !== 'ALL' && oldPending.usuario_perfil !== options.perfil) continue;
+        if (targetUsuarioId && oldPending.usuario_id !== targetUsuarioId) continue;
         updatedList.push(oldPending);
       }
 
@@ -859,7 +1047,28 @@ export const pendenciasEngineService = {
         }
       }, 20);
 
-      return updatedList.sort((a, b) => {
+      // Garantir que a lista retornada respeita estritamente os filtros requisitados
+      let finalList = updatedList;
+      if (targetTipo) {
+        finalList = finalList.filter(p => p.tipo_pendencia === targetTipo);
+      }
+      if (targetEscolaId) {
+        finalList = finalList.filter(p => p.escola_id === targetEscolaId);
+      }
+      if (targetPeriodo) {
+        finalList = finalList.filter(p => p.periodo === targetPeriodo);
+      }
+      if (options?.status && options.status !== 'ALL') {
+        finalList = finalList.filter(p => p.status === options.status);
+      }
+      if (options?.perfil && options.perfil !== 'ALL') {
+        finalList = finalList.filter(p => p.usuario_perfil === options.perfil);
+      }
+      if (targetUsuarioId) {
+        finalList = finalList.filter(p => p.usuario_id === targetUsuarioId);
+      }
+
+      return finalList.sort((a, b) => {
         const statusScore = (s: StatusPendenciaAlerta) => {
           if (s === 'ESCALONADA') return 5;
           if (s === 'VENCIDA') return 4;
@@ -1005,6 +1214,52 @@ const getMockPendencias = (escolas: Escola[], coordenadores: Coordenador[]): Ale
       data_identificacao: new Date().toISOString(),
       status: 'PENDENTE',
       prioridade: 'MEDIA',
+      nivel_escalonamento: 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    },
+    {
+      id: 'mock-6',
+      usuario_nome: 'Jaide Nunes Pereira',
+      usuario_perfil: 'Coordenador Pedagógico',
+      usuario_email: 'jaide@educacao.gov.br',
+      tipo_pendencia: 'CONSELHO_CLASSE_FUNDAMENTAL',
+      modulo: 'Conselho de Classe',
+      view_destino: 'CONSELHO_CLASSE_FUNDAMENTAL',
+      titulo: 'Conselho de Classe Fundamental Pendente',
+      descricao: 'Fechamento e deliberações do Conselho de Classe pendentes para o 6º Ano A (1º Bimestre).',
+      escola_nome: escola1,
+      co_responsaveis_nomes: 'Diretoria Escolar',
+      turma_nome: '6º ANO A',
+      periodo: '1º Bimestre',
+      bimestre: '1º Bimestre',
+      etapa_ensino: 'Fundamental',
+      data_identificacao: new Date().toISOString(),
+      status: 'PENDENTE',
+      prioridade: 'ALTA',
+      nivel_escalonamento: 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    },
+    {
+      id: 'mock-7',
+      usuario_nome: 'Jaide Nunes Pereira',
+      usuario_perfil: 'Coordenador Pedagógico',
+      usuario_email: 'jaide@educacao.gov.br',
+      tipo_pendencia: 'CONSELHO_CLASSE_INFANTIL',
+      modulo: 'Conselho de Classe',
+      view_destino: 'CONSELHO_CLASSE_INFANTIL',
+      titulo: 'Conselho de Classe Infantil Pendente',
+      descricao: 'Avaliações de desenvolvimento e deliberações do Conselho de Classe pendentes para a Pré-Escola II (1º Bimestre).',
+      escola_nome: escola2,
+      co_responsaveis_nomes: 'Diretoria Escolar',
+      turma_nome: 'Pré II A',
+      periodo: '1º Bimestre',
+      bimestre: '1º Bimestre',
+      etapa_ensino: 'Infantil',
+      data_identificacao: new Date().toISOString(),
+      status: 'PENDENTE',
+      prioridade: 'ALTA',
       nivel_escalonamento: 0,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()

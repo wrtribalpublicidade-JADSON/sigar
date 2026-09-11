@@ -94,6 +94,13 @@ export const AlertasPendenciasTab: React.FC<AlertasPendenciasTabProps> = ({
     }
   };
 
+  // Helper para verificar se o servidor é Coordenador Pedagógico ou Gestor
+  const isGestorOuCoordenador = (c?: Coordenador) => {
+    if (!c) return false;
+    const f = (c.funcao || '').toLowerCase();
+    return f.includes('coordenador') || f.includes('gestor') || f.includes('diretor');
+  };
+
   // Consultar / Carregar Registros por demanda (otimizado com filtros)
   const handleConsultar = async () => {
     setIsLoading(true);
@@ -112,20 +119,38 @@ export const AlertasPendenciasTab: React.FC<AlertasPendenciasTabProps> = ({
       const data = await pendenciasEngineService.scanAndSyncPendencies(escolas, coordenadores, isDemoMode, options);
       setPendencias(data);
       setHasSearched(true);
-      showNotification('success', `${data.length} pendências encontradas e carregadas com sucesso!`);
+
+      const matchCount = data.filter(item => {
+        const matchesTipo = filterTipo === 'ALL' || item.tipo_pendencia === filterTipo;
+        const matchesStatus = filterStatus === 'ALL' || item.status === filterStatus;
+        const matchesEscola = filterEscola === 'ALL' || item.escola_id === filterEscola;
+        let matchesResponsavel = true;
+        if (filterResponsavel !== 'ALL') {
+          const selectedCoord = coordenadores.find(c => c.id === filterResponsavel);
+          if (selectedCoord && isGestorOuCoordenador(selectedCoord) && selectedCoord.escolasIds && selectedCoord.escolasIds.length > 0) {
+            matchesResponsavel = item.usuario_id === filterResponsavel || 
+              (!!item.escola_id && selectedCoord.escolasIds.includes(item.escola_id));
+          } else {
+            matchesResponsavel = item.usuario_id === filterResponsavel;
+          }
+        }
+        const matchesPerfil = filterPerfil === 'ALL' || item.usuario_perfil === filterPerfil;
+        const matchesPeriodo = filterPeriodo === 'ALL' || item.periodo === filterPeriodo;
+        const matchesPrioridade = filterPrioridade === 'ALL' || item.prioridade === filterPrioridade;
+        return matchesTipo && matchesStatus && matchesEscola && matchesResponsavel && matchesPerfil && matchesPeriodo && matchesPrioridade;
+      }).length;
+
+      if (matchCount > 0) {
+        showNotification('success', `${matchCount} pendência${matchCount > 1 ? 's' : ''} encontrada${matchCount > 1 ? 's' : ''} e carregada${matchCount > 1 ? 's' : ''} com sucesso!`);
+      } else {
+        showNotification('warning', 'Nenhuma pendência encontrada para os filtros selecionados.');
+      }
     } catch (e) {
       console.error(e);
       showNotification('error', 'Falha ao consultar pendências.');
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // Helper para verificar se o servidor é Coordenador Pedagógico ou Gestor
-  const isGestorOuCoordenador = (c?: Coordenador) => {
-    if (!c) return false;
-    const f = (c.funcao || '').toLowerCase();
-    return f.includes('coordenador') || f.includes('gestor') || f.includes('diretor');
   };
 
   // Filtered List
