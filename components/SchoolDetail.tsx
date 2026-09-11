@@ -2918,11 +2918,32 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                                 </span>
                               </td>
                               <td className="px-6 py-4 text-center">
-                                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase
-                                  ${(student.status as string === 'Ativo' || student.status as string === 'active') ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                                  <span className={`w-1.5 h-1.5 rounded-full ${(student.status as string === 'Ativo' || student.status as string === 'active') ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                                  {(student.status as string === 'Ativo' || student.status as string === 'active') ? 'Ativo' : student.status}
-                                </span>
+                                {(() => {
+                                  const isEvadido = student.status === 'Evadido' || student.situacao_vinculo === 'Evadido' || Boolean(student.motivo_evasao);
+                                  const isAtivo = (student.status as string === 'Ativo' || student.status as string === 'active') && !isEvadido;
+                                  if (isEvadido) {
+                                    return (
+                                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase bg-amber-100 text-amber-800 border border-amber-200">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                        Evadido
+                                      </span>
+                                    );
+                                  }
+                                  if (isAtivo) {
+                                    return (
+                                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-700">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                        Ativo
+                                      </span>
+                                    );
+                                  }
+                                  return (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase bg-red-100 text-red-700">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                                      {student.status || 'Inativo'}
+                                    </span>
+                                  );
+                                })()}
                               </td>
                               <td className="px-6 py-4 text-right">
                                   <div className="flex items-center justify-end gap-1 opacity-20 group-hover:opacity-100 transition-opacity">

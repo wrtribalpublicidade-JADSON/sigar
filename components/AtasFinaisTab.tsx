@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { supabase } from '../services/supabase';
 import { useConfiguracao } from '../context/ConfiguracaoContext';
 import { 
-  FileText, Printer, Download, Users, AlertTriangle, Loader2, CheckCircle, XCircle, ArrowRightLeft 
+  FileText, Printer, Download, Users, AlertTriangle, Loader2, CheckCircle, XCircle, ArrowRightLeft, UserX 
 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
@@ -33,6 +33,13 @@ interface AlunoAtaData {
     destino?: string;
     data?: string;
     motivo?: string;
+  };
+  isEvadido?: boolean;
+  evasaoInfo?: {
+    data?: string;
+    motivo?: string;
+    observacoes?: string;
+    acoes?: string[];
   };
 }
 
@@ -123,7 +130,17 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
             { id: 'm2', name: 'Arthur Gabriel Fernandes', status: 'Ativo' },
             { id: 'm3', name: 'Beatriz Costa Rodrigues', status: 'Transferido', situacao_vinculo: 'Transferido' },
             { id: 'm4', name: 'Caio Roberto Lima', status: 'Ativo' },
-            { id: 'm5', name: 'Eduarda Vitória Gomes', status: 'Ativo' }
+            { id: 'm5', name: 'Eduarda Vitória Gomes', status: 'Ativo' },
+            { 
+              id: 'm6', 
+              name: 'Lucas Gabriel Nascimento', 
+              status: 'Evadido', 
+              situacao_vinculo: 'Evadido', 
+              data_evasao: '2026-08-15', 
+              motivo_evasao: 'Mudança de residência/município sem solicitação de transferência',
+              observacoes_evasao: 'Família mudou-se para a zona rural de outro município. Realizada tentativa de busca ativa escolar via contato telefônico e visita domiciliar.',
+              acoes_busca_ativa: ['Contato telefônico com pais ou responsáveis', 'Visita domiciliar pedagógica / Assistência social']
+            }
           ];
           setStudents(mockAlunos);
 
@@ -333,7 +350,35 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
         }
       }
 
-      // 2. Calculate Attendance
+      // 2. Check evasion (Abandono Escolar)
+      const isEvadidoStatus = 
+        (student.situacao_vinculo && (
+          String(student.situacao_vinculo).toLowerCase().includes('evad') ||
+          String(student.situacao_vinculo).toLowerCase().includes('aband')
+        )) ||
+        (student.status && (
+          String(student.status).toLowerCase().includes('evad') ||
+          String(student.status).toLowerCase().includes('aband')
+        )) ||
+        Boolean(student.motivo_evasao || student.data_evasao) ||
+        (Array.isArray(student.historico_matriculas) && student.historico_matriculas.some((h: any) =>
+          String(h.turma_id) === String(selectedTurmaId) && (h.situacao === 'Evadido' || String(h.situacao).toLowerCase().includes('evad'))
+        ));
+
+      let isEvadido = false;
+      let evasaoInfo: any = undefined;
+
+      if (isEvadidoStatus && !isTransferido) {
+        isEvadido = true;
+        evasaoInfo = {
+          data: student.data_evasao,
+          motivo: student.motivo_evasao || 'Abandono escolar',
+          observacoes: student.observacoes_evasao || student.observations,
+          acoes: Array.isArray(student.acoes_busca_ativa) ? student.acoes_busca_ativa : []
+        };
+      }
+
+      // 3. Calculate Attendance
       let presentDays = 0;
       let totalDays = 0;
 
@@ -380,6 +425,8 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
 
         const situacaoFinal = isTransferido 
           ? situacaoTransferencia 
+          : isEvadido
+          ? 'EVADIDO(A)'
           : (frequenciaRate >= 75 ? 'PROMOVIDO(A)' : 'REPROVADO POR FALTA');
 
         return {
@@ -391,7 +438,9 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
           frequenciaRate,
           situacaoFinal,
           isTransferido,
-          transferenciaInfo
+          transferenciaInfo,
+          isEvadido,
+          evasaoInfo
         };
       } else {
         // Fundamental Aggregation
@@ -431,6 +480,8 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
         let situacaoFinal = '';
         if (isTransferido) {
           situacaoFinal = situacaoTransferencia;
+        } else if (isEvadido) {
+          situacaoFinal = 'EVADIDO(A)';
         } else if (frequenciaRate < 75) {
           situacaoFinal = 'REPROVADO POR FALTA';
         } else if (isReprovadoByGrades) {
@@ -447,7 +498,9 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
           frequenciaRate,
           situacaoFinal,
           isTransferido,
-          transferenciaInfo
+          transferenciaInfo,
+          isEvadido,
+          evasaoInfo
         };
       }
     });
@@ -455,6 +508,10 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
 
   const transferredStudents = useMemo(() => {
     return aggregatedData.filter(s => s.isTransferido);
+  }, [aggregatedData]);
+
+  const evadedStudents = useMemo(() => {
+    return aggregatedData.filter(s => s.isEvadido || s.situacaoFinal.includes('EVADIDO'));
   }, [aggregatedData]);
 
   // Browser print action
@@ -620,6 +677,25 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
                 spacing: { after: 60 }
               }))
             ] : []),
+            ...(evadedStudents.length > 0 ? [
+              new Paragraph({ text: '', spacing: { before: 200 } }),
+              new Paragraph({
+                children: [
+                  new TextRun({ text: 'RELAÇÃO DE ESTUDANTES EVADIDOS (ABANDONO ESCOLAR):', bold: true, size: 20 })
+                ],
+                spacing: { after: 100 }
+              }),
+              ...evadedStudents.map(s => new Paragraph({
+                children: [
+                  new TextRun({ text: `• ${s.name}: `, bold: true, size: 18 }),
+                  new TextRun({ 
+                    text: `Evadido(a)${s.evasaoInfo?.data ? ` em ${new Date(s.evasaoInfo.data + 'T12:00:00').toLocaleDateString('pt-BR')}` : ''} - Motivo: ${s.evasaoInfo?.motivo || 'Abandono Escolar'}${s.evasaoInfo?.observacoes ? ` (${s.evasaoInfo.observacoes})` : ''}`,
+                    size: 18 
+                  })
+                ],
+                spacing: { after: 60 }
+              }))
+            ] : []),
             new Paragraph({ text: '', spacing: { after: 800 } }),
             new Paragraph({
               alignment: AlignmentType.CENTER,
@@ -732,6 +808,12 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
                   <span className="px-2.5 py-1.5 rounded-xl bg-sky-50 text-sky-700 border border-sky-200 flex items-center gap-1">
                     <ArrowRightLeft className="w-3 h-3" />
                     Transferidos: {transferredStudents.length}
+                  </span>
+                )}
+                {evadedStudents.length > 0 && (
+                  <span className="px-2.5 py-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-300 flex items-center gap-1 font-bold">
+                    <UserX className="w-3 h-3 text-amber-600" />
+                    Evadidos: {evadedStudents.length}
                   </span>
                 )}
               </div>
@@ -869,12 +951,21 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
                               </span>
                             </div>
                           )}
+                          {student.isEvadido && (
+                            <div className="flex items-center gap-1 mt-0.5 no-print">
+                              <span className="inline-flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-900 border border-amber-300 font-sans">
+                                <UserX className="w-2.5 h-2.5 text-amber-700" />
+                                Evadido(a){student.evasaoInfo?.data ? ` em ${new Date(student.evasaoInfo.data + 'T12:00:00').toLocaleDateString('pt-BR')}` : ''}
+                                {student.evasaoInfo?.motivo ? ` • Motivo: ${student.evasaoInfo.motivo}` : ''}
+                              </span>
+                            </div>
+                          )}
                         </td>
                         {listColumnNames.map(col => {
                           const val = isInfantil 
                             ? (student.preschoolConcepts?.[col] || '-') 
                             : (student.grades[col] !== undefined && student.grades[col] !== null ? student.grades[col]!.toFixed(1).replace('.', ',') : '-');
-                          const isLowGrade = !student.isTransferido && !isInfantil && student.grades[col] !== null && student.grades[col]! < (configuracao?.nota_minima_aprovacao ?? 7.0);
+                          const isLowGrade = !student.isTransferido && !student.isEvadido && !isInfantil && student.grades[col] !== null && student.grades[col]! < (configuracao?.nota_minima_aprovacao ?? 7.0);
                           
                           return (
                             <td 
@@ -892,13 +983,15 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
                           </td>
                         )}
                         <td className={`border border-slate-300 px-2 py-1.5 text-center font-semibold
-                          ${!student.isTransferido && student.frequenciaRate < 75 ? 'text-red-600 font-bold bg-red-50/30' : 'text-slate-700'}`}
+                          ${!student.isTransferido && !student.isEvadido && student.frequenciaRate < 75 ? 'text-red-600 font-bold bg-red-50/30' : 'text-slate-700'}`}
                         >
                           {student.frequenciaRate}%
                         </td>
                         <td className="border border-slate-300 px-3 py-1.5 text-center">
                           <span className={`inline-block font-black text-[9px] px-2 py-0.5 rounded-full uppercase
-                            ${student.isTransferido 
+                            ${student.isEvadido || student.situacaoFinal.includes('EVADIDO')
+                              ? 'bg-amber-100 text-amber-900 border border-amber-300 shadow-sm'
+                              : student.isTransferido 
                               ? 'bg-sky-100 text-sky-800 border border-sky-300 shadow-sm' 
                               : isApproved 
                               ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
@@ -954,6 +1047,46 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
                         ))}
                       </tbody>
                     </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Relação de Alunos Evadidos (Abandono Escolar) */}
+              {evadedStudents.length > 0 && (
+                <div className="mt-4 border border-amber-300 rounded-lg p-3 bg-amber-50/50 text-xs font-sans">
+                  <div className="flex items-center justify-between mb-2 border-b border-amber-200 pb-1.5">
+                    <span className="font-black text-amber-900 text-[10px] uppercase tracking-wider flex items-center gap-1.5">
+                      <UserX className="w-3.5 h-3.5 text-amber-700" />
+                      Relação de Estudantes Evadidos (Abandono Escolar)
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-200 text-amber-900 border border-amber-300">
+                      {evadedStudents.length} {evadedStudents.length === 1 ? 'estudante evadido' : 'estudantes evadidos'}
+                    </span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {evadedStudents.map((s) => (
+                      <div key={s.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px] p-2 bg-white rounded border border-amber-200">
+                        <div>
+                          <span className="font-bold text-slate-800 uppercase">{s.name}</span>
+                          <span className="text-slate-600 ml-2">
+                            — Motivo: <strong>{s.evasaoInfo?.motivo || 'Abandono Escolar'}</strong>
+                            {s.evasaoInfo?.data && (
+                              <span className="text-slate-400 ml-1">
+                                ({new Date(s.evasaoInfo.data + 'T12:00:00').toLocaleDateString('pt-BR')})
+                              </span>
+                            )}
+                          </span>
+                          {s.evasaoInfo?.observacoes && (
+                            <p className="text-[10px] text-slate-500 italic mt-0.5">
+                              Obs: {s.evasaoInfo.observacoes}
+                            </p>
+                          )}
+                        </div>
+                        <span className="font-black text-[9px] px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 self-start sm:self-auto uppercase shrink-0">
+                          EVADIDO(A)
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
@@ -1130,6 +1263,40 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
                       <td className="border border-black px-1.5 py-0.5">{s.transferenciaInfo?.destino || '-'}</td>
                       <td className="border border-black px-1.5 py-0.5 text-center font-bold">{s.situacaoFinal}</td>
                       <td className="border border-black px-1.5 py-0.5 text-center">{s.transferenciaInfo?.data ? new Date(s.transferenciaInfo.data).toLocaleDateString('pt-BR') : '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Printed Section for Evaded Students */}
+          {evadedStudents.length > 0 && (
+            <div className="mt-4 border border-black p-2 text-[8pt] font-sans">
+              <div className="font-bold uppercase text-[8pt] mb-1">Relação de Estudantes Evadidos (Abandono Escolar):</div>
+              <table className="w-full text-[7.5pt] border-collapse mt-1">
+                <thead>
+                  <tr className="bg-gray-100">
+                    <th className="border border-black px-1.5 py-0.5 text-left">Estudante</th>
+                    <th className="border border-black px-1.5 py-0.5 text-center">Data da Evasão</th>
+                    <th className="border border-black px-1.5 py-0.5 text-left">Motivo Declarado</th>
+                    <th className="border border-black px-1.5 py-0.5 text-center">Situação Homologada</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {evadedStudents.map((s) => (
+                    <tr key={s.id}>
+                      <td className="border border-black px-1.5 py-0.5 font-bold uppercase">{s.name}</td>
+                      <td className="border border-black px-1.5 py-0.5 text-center">
+                        {s.evasaoInfo?.data ? new Date(s.evasaoInfo.data + 'T12:00:00').toLocaleDateString('pt-BR') : '-'}
+                      </td>
+                      <td className="border border-black px-1.5 py-0.5">
+                        {s.evasaoInfo?.motivo || 'Abandono Escolar'}
+                        {s.evasaoInfo?.observacoes ? ` (${s.evasaoInfo.observacoes})` : ''}
+                      </td>
+                      <td className="border border-black px-1.5 py-0.5 text-center font-bold uppercase">
+                        EVADIDO(A)
+                      </td>
                     </tr>
                   ))}
                 </tbody>

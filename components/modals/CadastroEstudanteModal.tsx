@@ -4,11 +4,11 @@ import {
     Info, Lock, Plus, User, Sparkles, MapPin, HeartHandshake, 
     GraduationCap, ChevronLeft, ChevronRight, FileText, Globe, 
     Building2, CheckCircle2, Loader2, ShieldAlert, CheckCircle, AlertCircle,
-    Printer
+    Printer, History, UserX, Clock, Phone, Home, MessageSquare
 } from 'lucide-react';
 import { ccEstudanteService } from '../../services/gestaoConselhoService';
 import { supabase } from '../../services/supabase';
-import { Aluno } from '../../types';
+import { Aluno, HistoricoMatriculaItem } from '../../types';
 import { PrintableDossieEstudante } from '../PrintableDossieEstudante';
 
 interface CadastroEstudanteModalProps {
@@ -62,6 +62,28 @@ const RECURSOS_SAEB_OPCOES = [
     'Tempo Adicional',
     'Mobiliário Acessível',
     'Comunicação Alternativa/Aumentativa'
+];
+
+export const MOTIVOS_EVASAO_OPCOES = [
+    'Mudança de residência/município sem solicitação de transferência',
+    'Dificuldade de locomoção ou falta de transporte escolar',
+    'Inserção precoce no mercado de trabalho / Auxílio à renda familiar',
+    'Desinteresse pelos estudos / Desmotivação escolar',
+    'Dificuldades acentuadas de aprendizagem / Histórico de reprovação',
+    'Vulnerabilidade social / Conflitos no ambiente familiar',
+    'Gravidez na adolescência / Cuidados com filhos',
+    'Problemas crônicos de saúde do estudante ou de familiar',
+    'Outro motivo declarado'
+];
+
+export const ACOES_BUSCA_ATIVA_OPCOES = [
+    'Contato telefônico com pais ou responsáveis',
+    'Notificação por aplicativo / Mensagem eletrônica',
+    'Visita domiciliar pedagógica / Assistência social',
+    'Convocação presencial formal na unidade escolar',
+    'Encaminhamento ao Conselho Tutelar / FICAI',
+    'Acionamento da Plataforma Busca Ativa Escolar',
+    'Encaminhamento aos serviços da rede socioassistencial (CRAS/CREAS)'
 ];
 
 // Document Formatters
@@ -255,6 +277,26 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
     const [status, setStatus] = useState('Ativo');
     const [observations, setObservations] = useState('');
 
+    // Evasão Escolar
+    const [dataEvasao, setDataEvasao] = useState('');
+    const [motivoEvasao, setMotivoEvasao] = useState('');
+    const [observacoesEvasao, setObservacoesEvasao] = useState('');
+    const [acoesBuscaAtiva, setAcoesBuscaAtiva] = useState<string[]>([]);
+
+    // Histórico de Matrículas
+    const [historicoMatriculas, setHistoricoMatriculas] = useState<HistoricoMatriculaItem[]>([]);
+    const [isFormHistoricoOpen, setIsFormHistoricoOpen] = useState(false);
+    const [editingHistIndex, setEditingHistIndex] = useState<number | null>(null);
+    const [histAnoLetivo, setHistAnoLetivo] = useState<number>(new Date().getFullYear() - 1);
+    const [histEscolaNome, setHistEscolaNome] = useState('');
+    const [histTurmaNome, setHistTurmaNome] = useState('');
+    const [histAnoSerie, setHistAnoSerie] = useState('');
+    const [histTurno, setHistTurno] = useState('Matutino');
+    const [histSituacao, setHistSituacao] = useState('Concluído');
+    const [histDataMatricula, setHistDataMatricula] = useState('');
+    const [histDataSaida, setHistDataSaida] = useState('');
+    const [histObservacoes, setHistObservacoes] = useState('');
+
     // Select options & UI State
     const [teachers, setTeachers] = useState<any[]>([]);
     const [turmas, setTurmas] = useState<any[]>([]);
@@ -272,6 +314,74 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
     const isCpfFilled = cpf.replace(/\D/g, '').length > 0;
     const isNisValid = validarNIS(nis);
     const isNisFilled = nis.replace(/\D/g, '').length > 0;
+
+    // Handlers para o Histórico de Matrículas
+    const handleOpenAddHistorico = () => {
+        setEditingHistIndex(null);
+        setHistAnoLetivo(new Date().getFullYear() - 1);
+        setHistEscolaNome(escolas.find(e => e.id === selectedSchoolId)?.nome || '');
+        setHistTurmaNome('');
+        setHistAnoSerie('');
+        setHistTurno('Matutino');
+        setHistSituacao('Concluído');
+        setHistDataMatricula('');
+        setHistDataSaida('');
+        setHistObservacoes('');
+        setIsFormHistoricoOpen(true);
+    };
+
+    const handleEditHistorico = (index: number) => {
+        const item = historicoMatriculas[index];
+        if (!item) return;
+        setEditingHistIndex(index);
+        setHistAnoLetivo(item.ano_letivo || new Date().getFullYear() - 1);
+        setHistEscolaNome(item.escola_nome || '');
+        setHistTurmaNome(item.turma_nome || '');
+        setHistAnoSerie(item.ano_serie || '');
+        setHistTurno(item.turno || 'Matutino');
+        setHistSituacao(item.situacao || 'Concluído');
+        setHistDataMatricula(item.data_matricula || '');
+        setHistDataSaida(item.data_saida || '');
+        setHistObservacoes(item.observacoes || '');
+        setIsFormHistoricoOpen(true);
+    };
+
+    const handleSaveHistoricoItem = () => {
+        if (!histAnoLetivo || !histAnoSerie) {
+            alert('Por favor, preencha o Ano Letivo e o Ano/Série da matrícula histórica.');
+            return;
+        }
+
+        const newItem: HistoricoMatriculaItem = {
+            id: editingHistIndex !== null && historicoMatriculas[editingHistIndex]?.id 
+                ? historicoMatriculas[editingHistIndex].id 
+                : `hist-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+            ano_letivo: Number(histAnoLetivo),
+            escola_nome: histEscolaNome.trim() || undefined,
+            turma_nome: histTurmaNome.trim() || undefined,
+            ano_serie: histAnoSerie.trim(),
+            turno: histTurno,
+            situacao: histSituacao,
+            data_matricula: histDataMatricula || undefined,
+            data_saida: histDataSaida || undefined,
+            observacoes: histObservacoes.trim() || undefined
+        };
+
+        if (editingHistIndex !== null) {
+            setHistoricoMatriculas(prev => prev.map((it, idx) => idx === editingHistIndex ? newItem : it));
+        } else {
+            setHistoricoMatriculas(prev => [newItem, ...prev]);
+        }
+
+        setIsFormHistoricoOpen(false);
+        setEditingHistIndex(null);
+    };
+
+    const handleRemoveHistoricoItem = (index: number) => {
+        if (window.confirm('Deseja remover este registro do histórico de matrículas?')) {
+            setHistoricoMatriculas(prev => prev.filter((_, idx) => idx !== index));
+        }
+    };
 
     // ViaCEP lookup
     const handleCepLookup = async (cepValue: string) => {
@@ -474,7 +584,7 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
             cpf: cpf.trim() || undefined,
             birth_date: birthDate || undefined,
             gender: gender || undefined,
-            status,
+            status: situacaoVinculo === 'Evadido' ? 'Inativo' : status,
             observations: observations.trim() || undefined,
             stage: stage || currentTurma?.stage || currentTurma?.year || context.groupName.split('-')[0].trim() || 'Ensino Fundamental',
             ano_serie: anoSerie || currentTurma?.year || undefined,
@@ -520,7 +630,14 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
             turno: turno || 'Matutino',
             modalidade: modalidade || 'Ensino Regular',
             data_matricula: dataMatricula || undefined,
-            situacao_vinculo: situacaoVinculo || 'Matriculado'
+            situacao_vinculo: situacaoVinculo || 'Matriculado',
+
+            // Histórico de Matrículas e Evasão
+            historico_matriculas: historicoMatriculas,
+            data_evasao: situacaoVinculo === 'Evadido' ? (dataEvasao || new Date().toISOString().split('T')[0]) : undefined,
+            motivo_evasao: situacaoVinculo === 'Evadido' ? (motivoEvasao || undefined) : undefined,
+            observacoes_evasao: situacaoVinculo === 'Evadido' ? (observacoesEvasao || undefined) : undefined,
+            acoes_busca_ativa: situacaoVinculo === 'Evadido' ? acoesBuscaAtiva : []
         };
 
         try {
@@ -592,6 +709,15 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
         setStatus(student.status || 'Ativo');
         setObservations(student.observations || '');
 
+        // Histórico de Matrículas e Evasão
+        setHistoricoMatriculas(Array.isArray(student.historico_matriculas) ? student.historico_matriculas : []);
+        setDataEvasao(student.data_evasao || '');
+        setMotivoEvasao(student.motivo_evasao || '');
+        setObservacoesEvasao(student.observacoes_evasao || '');
+        setAcoesBuscaAtiva(Array.isArray(student.acoes_busca_ativa) ? student.acoes_busca_ativa : []);
+        setIsFormHistoricoOpen(false);
+        setEditingHistIndex(null);
+
         setError(null);
         setActiveTab('identificacao');
     };
@@ -656,6 +782,16 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
         setSituacaoVinculo('Matriculado');
         setStatus('Ativo');
         setObservations('');
+
+        // Reset Histórico e Evasão
+        setHistoricoMatriculas([]);
+        setDataEvasao('');
+        setMotivoEvasao('');
+        setObservacoesEvasao('');
+        setAcoesBuscaAtiva([]);
+        setIsFormHistoricoOpen(false);
+        setEditingHistIndex(null);
+
         setError(null);
         setActiveTab('identificacao');
     };
@@ -1564,10 +1700,24 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
                                             </label>
                                             <select
                                                 value={situacaoVinculo}
-                                                onChange={(e) => setSituacaoVinculo(e.target.value)}
-                                                className="w-full bg-white border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold text-slate-800 focus:ring-4 focus:ring-brand-orange/15 focus:border-brand-orange outline-none transition-all cursor-pointer appearance-none"
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setSituacaoVinculo(val);
+                                                    if (val === 'Evadido') {
+                                                        setStatus('Inativo');
+                                                        if (!dataEvasao) {
+                                                            setDataEvasao(new Date().toISOString().split('T')[0]);
+                                                        }
+                                                    }
+                                                }}
+                                                className={`w-full bg-white border rounded-2xl px-5 py-3.5 text-sm font-bold focus:ring-4 outline-none transition-all cursor-pointer appearance-none ${
+                                                    situacaoVinculo === 'Evadido'
+                                                        ? 'border-amber-400 text-amber-900 bg-amber-50/50 focus:ring-amber-300/30'
+                                                        : 'border-slate-200 text-slate-800 focus:ring-brand-orange/15 focus:border-brand-orange'
+                                                }`}
                                             >
                                                 <option value="Matriculado">Matriculado (Ativo)</option>
+                                                <option value="Evadido">Evadido / Abandono Escolar</option>
                                                 <option value="Transferido">Transferido</option>
                                                 <option value="Desistente">Deixou de Frequentar / Desistente</option>
                                                 <option value="Concluído">Concluído</option>
@@ -1606,6 +1756,98 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
                                         </div>
                                     </div>
 
+                                    {/* Bloco de Registro de Evasão Escolar */}
+                                    {situacaoVinculo === 'Evadido' && (
+                                        <div className="bg-amber-50/80 border-2 border-amber-300/80 rounded-3xl p-5 sm:p-6 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                            <div className="flex items-center gap-3 text-amber-900 border-b border-amber-200/80 pb-3">
+                                                <div className="w-10 h-10 rounded-2xl bg-amber-200/80 flex items-center justify-center text-amber-800 shadow-sm shrink-0">
+                                                    <UserX className="w-5 h-5" />
+                                                </div>
+                                                <div>
+                                                    <h5 className="font-black text-sm text-amber-950 uppercase tracking-tight">
+                                                        Registro de Evasão Escolar (Abandono)
+                                                    </h5>
+                                                    <p className="text-xs text-amber-800 font-medium">
+                                                        Este estudante constará oficialmente na <strong>Ata Final de Resultados</strong> como <strong>EVADIDO(A)</strong>.
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-[11px] font-black tracking-widest text-amber-900 uppercase mb-2 ml-1">
+                                                        Data da Evasão / Abandono *
+                                                    </label>
+                                                    <input
+                                                        type="date"
+                                                        value={dataEvasao || new Date().toISOString().split('T')[0]}
+                                                        onChange={(e) => setDataEvasao(e.target.value)}
+                                                        className="w-full bg-white border border-amber-300 rounded-2xl px-4 py-3 text-sm font-bold text-slate-800 focus:ring-4 focus:ring-amber-400/20 focus:border-amber-500 outline-none transition-all cursor-pointer"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-[11px] font-black tracking-widest text-amber-900 uppercase mb-2 ml-1">
+                                                        Motivo Declarado ou Apurado *
+                                                    </label>
+                                                    <select
+                                                        value={motivoEvasao}
+                                                        onChange={(e) => setMotivoEvasao(e.target.value)}
+                                                        className="w-full bg-white border border-amber-300 rounded-2xl px-4 py-3 text-sm font-bold text-slate-800 focus:ring-4 focus:ring-amber-400/20 focus:border-amber-500 outline-none transition-all cursor-pointer appearance-none"
+                                                    >
+                                                        <option value="">Selecione o motivo da evasão...</option>
+                                                        {MOTIVOS_EVASAO_OPCOES.map((mot, idx) => (
+                                                            <option key={idx} value={mot}>{mot}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-[11px] font-black tracking-widest text-amber-900 uppercase mb-2 ml-1">
+                                                    Ações de Busca Ativa Realizadas
+                                                </label>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {ACOES_BUSCA_ATIVA_OPCOES.map((acao, idx) => {
+                                                        const isSelected = acoesBuscaAtiva.includes(acao);
+                                                        return (
+                                                            <button
+                                                                key={idx}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setAcoesBuscaAtiva(prev => 
+                                                                        isSelected ? prev.filter(a => a !== acao) : [...prev, acao]
+                                                                    );
+                                                                }}
+                                                                className={`text-xs px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-1.5 cursor-pointer select-none active:scale-95 ${
+                                                                    isSelected 
+                                                                        ? 'bg-amber-600 text-white shadow-sm' 
+                                                                        : 'bg-white text-slate-700 border border-amber-200 hover:bg-amber-100/60'
+                                                                }`}
+                                                            >
+                                                                {isSelected ? <Check className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5 opacity-50" />}
+                                                                <span>{acao}</span>
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-[11px] font-black tracking-widest text-amber-900 uppercase mb-1.5 ml-1">
+                                                    Observações Complementares da Evasão e Diligências
+                                                </label>
+                                                <textarea
+                                                    rows={2}
+                                                    value={observacoesEvasao}
+                                                    onChange={(e) => setObservacoesEvasao(e.target.value)}
+                                                    placeholder="Descreva detalhes adicionais, tentativas de resgate do educando, laudos ou parecer da equipe pedagógica..."
+                                                    className="w-full bg-white border border-amber-300 rounded-2xl p-4 text-xs font-bold text-slate-800 focus:ring-4 focus:ring-amber-400/20 focus:border-amber-500 outline-none transition-all resize-none placeholder:text-slate-400"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {/* Observações Gerais */}
                                     <div>
                                         <label className="block text-[11px] font-black tracking-widest text-slate-400 uppercase mb-2 ml-1">
@@ -1618,6 +1860,298 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
                                             placeholder="Informações adicionais, laudos médicos, histórico escolar relevante..."
                                             className="w-full bg-white border border-slate-200 rounded-2xl p-5 text-sm font-bold text-slate-800 focus:ring-4 focus:ring-brand-orange/15 focus:border-brand-orange outline-none transition-all resize-none placeholder:text-slate-300"
                                         />
+                                    </div>
+
+                                    {/* Histórico de Matrículas do Estudante */}
+                                    <div className="border-t border-slate-200 pt-6 space-y-4">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                            <div className="flex items-center gap-2.5">
+                                                <div className="w-9 h-9 rounded-2xl bg-orange-100 flex items-center justify-center text-brand-orange">
+                                                    <History className="w-5 h-5" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">
+                                                        Histórico de Matrículas do Estudante
+                                                    </h4>
+                                                    <p className="text-xs text-slate-400">
+                                                        Registro de anos letivos anteriores e movimentações escolares ({historicoMatriculas.length} {historicoMatriculas.length === 1 ? 'registro' : 'registros'})
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {!isFormHistoricoOpen && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleOpenAddHistorico}
+                                                    className="px-4 py-2 rounded-xl text-xs font-bold bg-white text-brand-orange border border-orange-200 hover:bg-orange-50 shadow-sm transition-all flex items-center gap-1.5 cursor-pointer self-start sm:self-auto active:scale-95"
+                                                >
+                                                    <Plus className="w-4 h-4" />
+                                                    Adicionar Matrícula Anterior
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* Formulário Inline para Adicionar / Editar item do Histórico */}
+                                        {isFormHistoricoOpen && (
+                                            <div className="bg-slate-50 border border-slate-200 rounded-3xl p-5 space-y-4 animate-in fade-in duration-200">
+                                                <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                                                    <span className="text-xs font-black uppercase text-slate-700 tracking-wider flex items-center gap-2">
+                                                        <Calendar className="w-4 h-4 text-brand-orange" />
+                                                        {editingHistIndex !== null ? 'Editar Registro de Matrícula' : 'Nova Matrícula no Histórico'}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setIsFormHistoricoOpen(false);
+                                                            setEditingHistIndex(null);
+                                                        }}
+                                                        className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+
+                                                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
+                                                    <div className="sm:col-span-3">
+                                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                                                            Ano Letivo *
+                                                        </label>
+                                                        <input
+                                                            type="number"
+                                                            min={2000}
+                                                            max={2035}
+                                                            value={histAnoLetivo}
+                                                            onChange={(e) => setHistAnoLetivo(Number(e.target.value))}
+                                                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-brand-orange outline-none"
+                                                        />
+                                                    </div>
+
+                                                    <div className="sm:col-span-5">
+                                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                                                            Unidade Escolar
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={histEscolaNome}
+                                                            onChange={(e) => setHistEscolaNome(e.target.value)}
+                                                            placeholder="Nome da escola..."
+                                                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-brand-orange outline-none"
+                                                        />
+                                                    </div>
+
+                                                    <div className="sm:col-span-4">
+                                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                                                            Ano / Série *
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={histAnoSerie}
+                                                            onChange={(e) => setHistAnoSerie(e.target.value)}
+                                                            placeholder="Ex: 5º Ano, Creche II..."
+                                                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-brand-orange outline-none"
+                                                        />
+                                                    </div>
+
+                                                    <div className="sm:col-span-4">
+                                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                                                            Turma
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={histTurmaNome}
+                                                            onChange={(e) => setHistTurmaNome(e.target.value)}
+                                                            placeholder="Ex: Turma A"
+                                                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-brand-orange outline-none"
+                                                        />
+                                                    </div>
+
+                                                    <div className="sm:col-span-4">
+                                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                                                            Turno
+                                                        </label>
+                                                        <select
+                                                            value={histTurno}
+                                                            onChange={(e) => setHistTurno(e.target.value)}
+                                                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-brand-orange outline-none cursor-pointer"
+                                                        >
+                                                            <option value="Matutino">Matutino</option>
+                                                            <option value="Vespertino">Vespertino</option>
+                                                            <option value="Noturno">Noturno</option>
+                                                            <option value="Integral">Integral</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <div className="sm:col-span-4">
+                                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                                                            Situação Final no Período *
+                                                        </label>
+                                                        <select
+                                                            value={histSituacao}
+                                                            onChange={(e) => setHistSituacao(e.target.value)}
+                                                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-brand-orange outline-none cursor-pointer"
+                                                        >
+                                                            <option value="Concluído">Aprovado / Concluído</option>
+                                                            <option value="Matriculado">Matriculado</option>
+                                                            <option value="Transferido">Transferido</option>
+                                                            <option value="Evadido">Evadido / Abandono</option>
+                                                            <option value="Desistente">Desistente</option>
+                                                            <option value="Reprovado">Reprovado</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <div className="sm:col-span-6">
+                                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                                                            Data de Entrada
+                                                        </label>
+                                                        <input
+                                                            type="date"
+                                                            value={histDataMatricula}
+                                                            onChange={(e) => setHistDataMatricula(e.target.value)}
+                                                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-brand-orange outline-none cursor-pointer"
+                                                        />
+                                                    </div>
+
+                                                    <div className="sm:col-span-6">
+                                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                                                            Data de Término / Saída
+                                                        </label>
+                                                        <input
+                                                            type="date"
+                                                            value={histDataSaida}
+                                                            onChange={(e) => setHistDataSaida(e.target.value)}
+                                                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-brand-orange outline-none cursor-pointer"
+                                                        />
+                                                    </div>
+
+                                                    <div className="sm:col-span-12">
+                                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                                                            Observações do Histórico
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={histObservacoes}
+                                                            onChange={(e) => setHistObservacoes(e.target.value)}
+                                                            placeholder="Ex: Aluno transferido da rede estadual, notas convalidadas..."
+                                                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-brand-orange outline-none"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex justify-end gap-2 pt-2 border-t border-slate-200/80">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setIsFormHistoricoOpen(false);
+                                                            setEditingHistIndex(null);
+                                                        }}
+                                                        className="px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-200 transition-all cursor-pointer"
+                                                    >
+                                                        Cancelar
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleSaveHistoricoItem}
+                                                        className="px-5 py-2 rounded-xl text-xs font-bold bg-brand-orange hover:bg-orange-600 text-white shadow-sm transition-all cursor-pointer"
+                                                    >
+                                                        Salvar no Histórico
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Lista de Registros do Histórico */}
+                                        {historicoMatriculas.length === 0 && !isFormHistoricoOpen ? (
+                                            <div className="bg-slate-50 border border-slate-200 border-dashed rounded-2xl p-6 text-center text-slate-400 text-xs">
+                                                <History className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                                                <p className="font-bold text-slate-600">Nenhum histórico de matrícula anterior registrado.</p>
+                                                <p className="text-[11px] text-slate-400 mt-0.5">
+                                                    Clique no botão acima para adicionar matrículas de anos anteriores, transferências ou registros de evasão.
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-2.5">
+                                                {historicoMatriculas.map((item, idx) => {
+                                                    const isEvad = item.situacao === 'Evadido' || String(item.situacao).toLowerCase().includes('evad');
+                                                    const isTransf = item.situacao === 'Transferido' || String(item.situacao).toLowerCase().includes('transf');
+                                                    const isConcl = item.situacao === 'Concluído' || String(item.situacao).toLowerCase().includes('concl') || String(item.situacao).toLowerCase().includes('aprov');
+
+                                                    return (
+                                                        <div
+                                                            key={item.id || idx}
+                                                            className={`rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all ${
+                                                                isEvad 
+                                                                    ? 'bg-amber-50/60 border-amber-200' 
+                                                                    : isTransf
+                                                                    ? 'bg-sky-50/60 border-sky-200'
+                                                                    : 'bg-white border-slate-200 hover:border-slate-300'
+                                                            }`}
+                                                        >
+                                                            <div className="flex items-start sm:items-center gap-3">
+                                                                <span className="px-2.5 py-1 rounded-xl text-xs font-black bg-slate-900 text-white shrink-0">
+                                                                    {item.ano_letivo}
+                                                                </span>
+                                                                <div>
+                                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                                        <span className="font-bold text-sm text-slate-800">
+                                                                            {item.ano_serie} {item.turma_nome ? `• ${item.turma_nome}` : ''}
+                                                                        </span>
+                                                                        {item.turno && (
+                                                                            <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                                                                                {item.turno}
+                                                                            </span>
+                                                                        )}
+                                                                        <span className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full ${
+                                                                            isEvad
+                                                                                ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                                                                : isTransf
+                                                                                ? 'bg-sky-100 text-sky-800 border border-sky-300'
+                                                                                : isConcl
+                                                                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                                                                : 'bg-slate-100 text-slate-700'
+                                                                        }`}>
+                                                                            {item.situacao}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="text-xs text-slate-500 font-medium mt-0.5">
+                                                                        {item.escola_nome || 'Unidade Escolar não informada'}
+                                                                        {(item.data_matricula || item.data_saida) && (
+                                                                            <span className="ml-2 text-[11px] text-slate-400">
+                                                                                ({item.data_matricula ? new Date(item.data_matricula + 'T12:00:00').toLocaleDateString('pt-BR') : ''}
+                                                                                {item.data_saida ? ` até ${new Date(item.data_saida + 'T12:00:00').toLocaleDateString('pt-BR')}` : ''})
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    {item.observacoes && (
+                                                                        <div className="text-[11px] text-slate-600 mt-1 italic">
+                                                                            Obs: {item.observacoes}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="flex items-center gap-1 self-end sm:self-center">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleEditHistorico(idx)}
+                                                                    className="p-2 text-slate-400 hover:text-brand-orange hover:bg-orange-50 rounded-xl transition-all cursor-pointer"
+                                                                    title="Editar Registro"
+                                                                >
+                                                                    <Edit className="w-4 h-4" />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleRemoveHistoricoItem(idx)}
+                                                                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
+                                                                    title="Excluir Registro"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}

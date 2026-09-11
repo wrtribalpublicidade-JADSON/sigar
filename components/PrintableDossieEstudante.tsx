@@ -475,8 +475,72 @@ export const PrintableDossieEstudante: React.FC<PrintableDossieEstudanteProps> =
                 {student.professor_responsavel || 'Não Atribuído / Equipe Docente Geral'}
               </td>
             </tr>
+            {(student.situacao_vinculo === 'Evadido' || student.data_evasao) && (
+              <>
+                <tr>
+                  <td style={{ padding: '4.5pt 8pt', border: '0.5pt solid #cbd5e1', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#991b1b', background: '#fef2f2' }}>
+                    Data da Evasão Escolar
+                  </td>
+                  <td style={{ padding: '4.5pt 8pt', border: '0.5pt solid #cbd5e1', fontSize: '8.5pt', fontWeight: 800, color: '#991b1b', background: '#fef2f2' }}>
+                    {student.data_evasao ? formatDate(student.data_evasao) : 'Data não registrada'}
+                  </td>
+                  <td style={{ padding: '4.5pt 8pt', border: '0.5pt solid #cbd5e1', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#991b1b', background: '#fef2f2' }}>
+                    Motivo da Evasão
+                  </td>
+                  <td style={{ padding: '4.5pt 8pt', border: '0.5pt solid #cbd5e1', fontSize: '8.5pt', fontWeight: 700, color: '#991b1b', background: '#fef2f2' }}>
+                    {student.motivo_evasao || 'Abandono Escolar'}
+                  </td>
+                </tr>
+                {student.acoes_busca_ativa && student.acoes_busca_ativa.length > 0 && (
+                  <tr>
+                    <td style={{ padding: '4.5pt 8pt', border: '0.5pt solid #cbd5e1', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#991b1b', background: '#fef2f2' }}>
+                      Ações de Busca Ativa
+                    </td>
+                    <td style={{ padding: '4.5pt 8pt', border: '0.5pt solid #cbd5e1', fontSize: '8pt', fontWeight: 600, color: '#7f1d1d', background: '#fef2f2' }} colSpan={3}>
+                      {student.acoes_busca_ativa.join(' • ')}
+                    </td>
+                  </tr>
+                )}
+              </>
+            )}
           </tbody>
         </table>
+
+        {/* Histórico de Matrículas Anteriores no Dossiê */}
+        {Array.isArray(student.historico_matriculas) && student.historico_matriculas.length > 0 && (
+          <div style={{ marginTop: '8pt' }}>
+            <div style={{ fontSize: '7pt', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#475569', marginBottom: '3pt' }}>
+              Histórico de Matrículas e Vínculos Anteriores
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '7.5pt' }}>
+              <thead>
+                <tr style={{ background: '#f1f5f9' }}>
+                  <th style={{ padding: '3pt 6pt', border: '0.5pt solid #cbd5e1', textAlign: 'center', width: '10%' }}>Ano</th>
+                  <th style={{ padding: '3pt 6pt', border: '0.5pt solid #cbd5e1', textAlign: 'left', width: '30%' }}>Unidade Escolar</th>
+                  <th style={{ padding: '3pt 6pt', border: '0.5pt solid #cbd5e1', textAlign: 'left', width: '22%' }}>Turma / Ano / Série</th>
+                  <th style={{ padding: '3pt 6pt', border: '0.5pt solid #cbd5e1', textAlign: 'center', width: '13%' }}>Turno</th>
+                  <th style={{ padding: '3pt 6pt', border: '0.5pt solid #cbd5e1', textAlign: 'center', width: '15%' }}>Situação</th>
+                  <th style={{ padding: '3pt 6pt', border: '0.5pt solid #cbd5e1', textAlign: 'left', width: '10%' }}>Período</th>
+                </tr>
+              </thead>
+              <tbody>
+                {student.historico_matriculas.map((h, i) => (
+                  <tr key={h.id || i}>
+                    <td style={{ padding: '3pt 6pt', border: '0.5pt solid #cbd5e1', textAlign: 'center', fontWeight: 700 }}>{h.ano_letivo}</td>
+                    <td style={{ padding: '3pt 6pt', border: '0.5pt solid #cbd5e1' }}>{h.escola_nome || '---'}</td>
+                    <td style={{ padding: '3pt 6pt', border: '0.5pt solid #cbd5e1' }}>{h.ano_serie} {h.turma_nome ? `(${h.turma_nome})` : ''}</td>
+                    <td style={{ padding: '3pt 6pt', border: '0.5pt solid #cbd5e1', textAlign: 'center' }}>{h.turno || '---'}</td>
+                    <td style={{ padding: '3pt 6pt', border: '0.5pt solid #cbd5e1', textAlign: 'center', fontWeight: 700 }}>{h.situacao}</td>
+                    <td style={{ padding: '3pt 6pt', border: '0.5pt solid #cbd5e1', fontSize: '7pt' }}>
+                      {h.data_matricula ? formatDate(h.data_matricula) : ''}
+                      {h.data_saida ? ` a ${formatDate(h.data_saida)}` : ''}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* ====== 7. REGISTROS PEDAGÓGICOS E OBSERVAÇÕES ====== */}

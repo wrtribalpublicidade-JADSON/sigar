@@ -154,6 +154,25 @@ export interface RecursoHumano {
   anosIniciaisAtuacao?: ('1º ano' | '2º ano' | '3º ano' | '4º ano' | '5º ano')[];
 }
  
+// Interface para Registro no Histórico de Matrículas do Estudante
+export interface HistoricoMatriculaItem {
+  id: string;
+  ano_letivo: number;
+  escola_id?: string;
+  escola_nome?: string;
+  turma_id?: string;
+  turma_nome?: string;
+  etapa?: string;
+  ano_serie?: string;
+  turno?: string;
+  modalidade?: string;
+  data_matricula?: string;
+  data_saida?: string;
+  situacao: 'Matriculado' | 'Transferido' | 'Evadido' | 'Concluído' | 'Desistente' | 'Inativo' | string;
+  motivo_saida?: string;
+  observacoes?: string;
+}
+
  // Interface para Alunos
  export interface Aluno {
    id: number;
@@ -165,7 +184,7 @@ export interface RecursoHumano {
    escola_id: string;
    class_id?: string;
    stage: string;
-   status: 'Ativo' | 'Inativo' | 'Transferido' | 'Desistente' | string;
+   status: 'Ativo' | 'Inativo' | 'Transferido' | 'Desistente' | 'Evadido' | string;
    observations?: string;
    professor_responsavel?: string;
    ano_matricula?: number;
@@ -211,6 +230,13 @@ export interface RecursoHumano {
    data_matricula?: string;
    situacao_vinculo?: string;
    ano_serie?: string;
+
+   // Histórico de Matrículas e Evasão Escolar
+   historico_matriculas?: HistoricoMatriculaItem[];
+   data_evasao?: string;
+   motivo_evasao?: string;
+   observacoes_evasao?: string;
+   acoes_busca_ativa?: string[];
  }
  
  // Interface para Transferência de Estudante

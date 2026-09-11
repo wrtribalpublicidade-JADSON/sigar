@@ -224,7 +224,18 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
         }
       }
 
-      const matchStatus = statusFilter === 'ALL' || s.status === statusFilter;
+      const isStudentEvadido = s.status === 'Evadido' || s.situacao_vinculo === 'Evadido' || Boolean(s.motivo_evasao);
+      let matchStatus = true;
+      if (statusFilter === 'Ativo') {
+        matchStatus = (s.status === 'Ativo' || s.status === 'active') && !isStudentEvadido;
+      } else if (statusFilter === 'Evadido') {
+        matchStatus = isStudentEvadido;
+      } else if (statusFilter === 'Inativo') {
+        matchStatus = (s.status === 'Inativo' || s.status === 'inactive') && !isStudentEvadido;
+      } else if (statusFilter !== 'ALL') {
+        matchStatus = s.status === statusFilter;
+      }
+
       return matchSearch && matchSchool && matchStage && matchStatus;
     });
   }, [students, searchTerm, schoolFilter, stageFilter, statusFilter, escolas, turmas]);
@@ -431,6 +442,17 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
                     <option value="ALL">Todos os Anos / Séries</option>
                     {stages.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
+
+                <select 
+                    value={statusFilter}
+                    onChange={e => setStatusFilter(e.target.value)}
+                    className="px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-600 outline-none focus:border-orange-500 focus:bg-white transition-all"
+                >
+                    <option value="ALL">Todos os Status</option>
+                    <option value="Ativo">Ativos</option>
+                    <option value="Evadido">Evadidos</option>
+                    <option value="Inativo">Inativos</option>
+                </select>
             </div>
         </div>
 
@@ -515,11 +537,32 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({ escolas, i
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-center">
-                                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase
-                                            ${(student.status as string === 'Ativo' || student.status as string === 'active') ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                                            <span className={`w-1.5 h-1.5 rounded-full ${(student.status as string === 'Ativo' || student.status as string === 'active') ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                                            {(student.status as string === 'Ativo' || student.status as string === 'active') ? 'Ativo' : student.status}
-                                        </span>
+                                         {(() => {
+                                             const isEvadido = student.status === 'Evadido' || student.situacao_vinculo === 'Evadido' || Boolean(student.motivo_evasao);
+                                             const isAtivo = (student.status as string === 'Ativo' || student.status as string === 'active') && !isEvadido;
+                                             if (isEvadido) {
+                                                 return (
+                                                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase bg-amber-100 text-amber-800 border border-amber-200">
+                                                         <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                                         Evadido
+                                                     </span>
+                                                 );
+                                             }
+                                             if (isAtivo) {
+                                                 return (
+                                                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-700">
+                                                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                                         Ativo
+                                                     </span>
+                                                 );
+                                             }
+                                             return (
+                                                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase bg-red-100 text-red-700">
+                                                     <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                                                     {student.status || 'Inativo'}
+                                                 </span>
+                                             );
+                                         })()}
                                     </td>
                                     <td className="px-6 py-4 text-right">
                                         <div className="flex items-center justify-end gap-1 opacity-20 group-hover:opacity-100 transition-opacity">
