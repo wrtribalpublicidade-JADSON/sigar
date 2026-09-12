@@ -1141,7 +1141,9 @@ export default function App() {
         const alerts = await pendenciasEngineService.getUserActiveAlerts(
           userEmail, 
           loggedInCoordId, 
-          effectiveUser?.escolasIds || []
+          effectiveUser?.escolasIds || [],
+          effectiveUser,
+          isAdmin
         );
         if (alerts.length > 0) {
           setUserActiveAlerts(alerts);

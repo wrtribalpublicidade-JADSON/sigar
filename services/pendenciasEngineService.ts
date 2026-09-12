@@ -107,12 +107,19 @@ export const pendenciasEngineService = {
   },
 
   /**
-   * Busca alertas ativos de um usuário (para popup no login)
+   * Busca alertas ativos de um usuário (para popup de regularização no login).
+   * Garante que o popup seja exibido EXCLUSIVAMENTE ao usuário notificado:
+   * - Responsável Direto (docente titular da pendência)
+   * - Gestão Escolar (se o fluxo foi direcionado à gestão da escola)
+   * - Ambos (se direcionado a ambos)
+   * - Emissores (gerado_por) e administradores gerais NÃO recebem o popup das pendências de terceiros.
    */
   getUserActiveAlerts: async (
     userEmail?: string | null,
     coordenadorId?: string | null,
-    escolasIds?: string[]
+    escolasIds?: string[],
+    currentUser?: Coordenador | null,
+    isAdmin?: boolean
   ): Promise<AlertaPendencia[]> => {
     try {
       let query = supabase
@@ -120,14 +127,17 @@ export const pendenciasEngineService = {
         .select('*')
         .in('status', ['EM_ALERTA', 'VENCIDA', 'ESCALONADA']);
 
+      // Se o usuário tiver escolas vinculadas, restringir a busca às suas escolas ou usuário
       if (escolasIds && escolasIds.length > 0) {
         if (userEmail || coordenadorId) {
           query = query.or(`usuario_email.eq.${userEmail || 'none'},usuario_id.eq.${coordenadorId || 'none'},escola_id.in.(${escolasIds.join(',')})`);
         } else {
           query = query.in('escola_id', escolasIds);
         }
+      } else if (userEmail && coordenadorId) {
+        query = query.or(`usuario_email.eq.${userEmail},usuario_id.eq.${coordenadorId}`);
       } else if (userEmail) {
-        query = query.or(`usuario_email.eq.${userEmail},usuario_id.eq.${coordenadorId || ''}`);
+        query = query.eq('usuario_email', userEmail);
       } else if (coordenadorId) {
         query = query.eq('usuario_id', coordenadorId);
       } else {
@@ -136,7 +146,73 @@ export const pendenciasEngineService = {
 
       const { data, error } = await query;
       if (error) throw error;
-      return (data as AlertaPendencia[]) || [];
+      const rawAlerts = (data as AlertaPendencia[]) || [];
+
+      // Filtro rigoroso em memória para garantir que apenas o DESTINATÁRIO NOTIFICADO receba o popup
+      const cleanEmail = (userEmail || currentUser?.contato || '').toLowerCase().trim();
+      const cleanCoordId = String(coordenadorId || currentUser?.id || '').trim();
+      const cleanName = (currentUser?.nome || '').toLowerCase().trim();
+      const userRole = (currentUser?.funcao || '').toLowerCase();
+      const isTeacher = userRole.includes('professor') || userRole.includes('docente');
+      const isGestor = userRole.includes('coordenador pedagógico') || userRole.includes('coordenador pedagogico') || 
+                       userRole.includes('gestor') || userRole.includes('diretor');
+      const isSystemAdmin = Boolean(isAdmin) || userRole.includes('administrador') || userRole.includes('regional');
+
+      return rawAlerts.filter(a => {
+        // 1. O usuário que emitiu o alerta (gerado_por) é o EMISSOR, NUNCA o notificado
+        const geradoPor = (a.gerado_por || '').toLowerCase().trim();
+        if (cleanName && geradoPor && (geradoPor === cleanName || cleanName.includes(geradoPor) || geradoPor.includes(cleanName))) {
+          return false;
+        }
+
+        const alertEmail = (a.usuario_email || '').toLowerCase().trim();
+        const alertUserId = String(a.usuario_id || '').trim();
+        const alertUserName = (a.usuario_nome || '').toLowerCase().trim();
+        const dest = a.destinatario_alerta || 'RESPONSAVEL_DIRETO';
+
+        // Verifica se o usuário logado é o responsável direto (docente ou autor do lançamento)
+        const isDirectTarget = Boolean(
+          (cleanEmail && alertEmail && cleanEmail === alertEmail) ||
+          (cleanCoordId && alertUserId && cleanCoordId === alertUserId) ||
+          (cleanName && alertUserName && (cleanName === alertUserName || cleanName.includes(alertUserName) || alertUserName.includes(cleanName)))
+        );
+
+        // Se o alerta foi direcionado EXCLUSIVAMENTE ao RESPONSAVEL_DIRETO:
+        if (dest === 'RESPONSAVEL_DIRETO') {
+          // Apenas o docente/responsável direto recebe o popup
+          return isDirectTarget;
+        }
+
+        // Se o alerta foi direcionado à GESTAO_ESCOLAR:
+        if (dest === 'GESTAO_ESCOLAR') {
+          // O professor comum não deve receber o popup da gestão
+          if (isTeacher && !isGestor) return false;
+          // O administrador geral que monitora não deve receber popup operacional
+          if (isSystemAdmin) return false;
+          // Gestor/coordenador daquela escola recebe
+          if (isGestor) {
+            const matchesSchool = escolasIds && a.escola_id && escolasIds.includes(a.escola_id);
+            const inCoResp = (a.co_responsaveis_nomes || '').toLowerCase().includes(cleanName) ||
+                             (Array.isArray(a.co_responsaveis_ids) && a.co_responsaveis_ids.includes(cleanCoordId));
+            return Boolean(matchesSchool || inCoResp);
+          }
+          return false;
+        }
+
+        // Se o alerta foi direcionado a AMBOS (Gestão + Professor):
+        if (dest === 'AMBOS') {
+          if (isDirectTarget) return true;
+          if (isGestor) {
+            const matchesSchool = escolasIds && a.escola_id && escolasIds.includes(a.escola_id);
+            const inCoResp = (a.co_responsaveis_nomes || '').toLowerCase().includes(cleanName) ||
+                             (Array.isArray(a.co_responsaveis_ids) && a.co_responsaveis_ids.includes(cleanCoordId));
+            return Boolean(matchesSchool || inCoResp);
+          }
+          return false;
+        }
+
+        return isDirectTarget;
+      });
     } catch (e) {
       console.error('Erro ao buscar alertas ativos do usuário:', e);
       return [];
@@ -163,7 +239,8 @@ export const pendenciasEngineService = {
   },
 
   /**
-   * Gera um alerta individual com prazo, observação e fluxo hierárquico
+   * Gera um alerta individual com prazo, observação e fluxo hierárquico,
+   * gravando expressamente o histórico de envio do usuário notificado.
    */
   gerarAlertaIndividual: async (
     pendenciaId: string,
@@ -176,6 +253,27 @@ export const pendenciasEngineService = {
     try {
       const now = new Date().toISOString();
       const nivel = destinatario === 'GESTAO_ESCOLAR' ? 2 : (destinatario === 'AMBOS' ? 2 : 1);
+
+      // Obter dados da pendência para detalhar com precisão o destinatário notificado
+      const { data: pendenciaData } = await supabase
+        .from('alertas_pendencias')
+        .select('*')
+        .eq('id', pendenciaId)
+        .maybeSingle();
+
+      const userTargetName = pendenciaData?.usuario_nome || 'Servidor Responsável';
+      const userTargetPerfil = pendenciaData?.usuario_perfil || 'Docente';
+      const userTargetId = pendenciaData?.usuario_id || null;
+      const coResponsaveis = pendenciaData?.co_responsaveis_nomes || 'Gestão da Unidade Escolar';
+
+      let notificadoPara = '';
+      if (destinatario === 'RESPONSAVEL_DIRETO') {
+        notificadoPara = `${userTargetName} (${userTargetPerfil})`;
+      } else if (destinatario === 'GESTAO_ESCOLAR') {
+        notificadoPara = `Gestão Escolar: ${coResponsaveis}`;
+      } else {
+        notificadoPara = `${userTargetName} (${userTargetPerfil}) e Gestão Escolar (${coResponsaveis})`;
+      }
       
       const { error: updateErr } = await supabase
         .from('alertas_pendencias')
@@ -185,6 +283,7 @@ export const pendenciasEngineService = {
           observacao_alerta: observacao,
           prioridade,
           destinatario_alerta: destinatario,
+          alerta_notificado_para: notificadoPara,
           gerado_em: now,
           gerado_por: executadoPor,
           nivel_escalonamento: nivel,
@@ -195,17 +294,27 @@ export const pendenciasEngineService = {
       if (updateErr) throw updateErr;
 
       const dataFormatada = new Date(prazo + 'T00:00:00').toLocaleDateString('pt-BR');
-      const destinoDesc = destinatario === 'GESTAO_ESCOLAR' 
-        ? 'Gestão Escolar (Coordenadores Pedagógicos e Gestores)' 
-        : destinatario === 'RESPONSAVEL_DIRETO'
-          ? 'Professor / Servidor Responsável'
-          : 'Gestão Escolar e Docente';
 
+      // Gravar histórico com o usuário notificado identificado
       await supabase.from('alertas_pendencias_historico').insert([{
         pendencia_id: pendenciaId,
-        acao: 'ALERTA_GERADO',
-        descricao: `Alerta emitido para [${destinoDesc}] com prazo até ${dataFormatada}. Prioridade: ${prioridade}.${observacao ? ` Obs: ${observacao}` : ''}`,
-        executado_por: executadoPor
+        acao: 'ENVIO_ALERTA',
+        descricao: `Alerta e Notificação formal emitido para [${notificadoPara}] com prazo de regularização até ${dataFormatada}. Prioridade: ${prioridade}.${observacao ? ` Mensagem: "${observacao}"` : ''}`,
+        usuario_id: userTargetId,
+        executado_por: executadoPor,
+        dados_extras: {
+          destinatario_tipo: destinatario,
+          notificado_para: notificadoPara,
+          usuario_nome: userTargetName,
+          usuario_email: pendenciaData?.usuario_email || null,
+          usuario_perfil: userTargetPerfil,
+          escola_nome: pendenciaData?.escola_nome || null,
+          prazo,
+          prioridade,
+          observacao,
+          gerado_em: now,
+          gerado_por: executadoPor
+        }
       }]);
 
       await logAudit('UPDATE', 'GERAR_ALERTA_PENDENCIA', pendenciaId, {
@@ -213,6 +322,7 @@ export const pendenciasEngineService = {
         prioridade,
         observacao,
         destinatario,
+        notificadoPara,
         executadoPor
       });
 

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { X, History, Clock, CheckCircle, AlertTriangle, Send, ShieldAlert, ArrowUpRight, RefreshCw, FileText, User } from 'lucide-react';
+import { X, History, Clock, CheckCircle, AlertTriangle, Send, ShieldAlert, ArrowUpRight, RefreshCw, FileText, User, Printer } from 'lucide-react';
 import { AlertaPendencia, AlertaPendenciaHistorico } from '../../types';
 import { pendenciasEngineService } from '../../services/pendenciasEngineService';
+import { PrintableAlertasPendenciasReport } from '../PrintableAlertasPendenciasReport';
 
 interface HistoricoPendenciaModalProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ export const HistoricoPendenciaModal: React.FC<HistoricoPendenciaModalProps> = (
 }) => {
   const [historico, setHistorico] = useState<AlertaPendenciaHistorico[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPrintOpen, setIsPrintOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen && item) {
@@ -74,16 +76,26 @@ export const HistoricoPendenciaModal: React.FC<HistoricoPendenciaModalProps> = (
               </p>
             </div>
           </div>
-          <button 
-            onClick={onClose}
-            className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsPrintOpen(true)}
+              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center gap-1.5 text-xs font-bold transition-colors border border-slate-700"
+              title="Imprimir Notificação em PDF"
+            >
+              <Printer className="w-3.5 h-3.5 text-orange-400" />
+              <span>Imprimir / PDF</span>
+            </button>
+            <button 
+              onClick={onClose}
+              className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Info Card */}
-        <div className="p-4 bg-slate-50 border-b border-slate-200 text-xs grid grid-cols-2 gap-2 text-slate-600">
+        <div className="p-4 bg-slate-50 border-b border-slate-200 text-xs grid grid-cols-2 gap-2.5 text-slate-600">
           <div>
             <span className="font-bold text-slate-400 block text-[10px] uppercase">Responsável</span>
             <span className="font-bold text-slate-800">{item.usuario_nome || 'Não vinculado'}</span> ({item.usuario_perfil || 'Geral'})
@@ -100,6 +112,15 @@ export const HistoricoPendenciaModal: React.FC<HistoricoPendenciaModalProps> = (
             <span className="font-bold text-slate-400 block text-[10px] uppercase">Prazo Fixado</span>
             <span className="font-bold text-slate-800">{item.prazo ? new Date(item.prazo + 'T00:00:00').toLocaleDateString('pt-BR') : 'Não definido'}</span>
           </div>
+          {item.alerta_notificado_para && (
+            <div className="col-span-2 pt-2 border-t border-slate-200/80 flex items-center justify-between">
+              <span className="font-bold text-slate-500 text-[10px] uppercase">Destinatário Notificado:</span>
+              <span className="font-black text-amber-800 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200 flex items-center gap-1.5 text-[11px]">
+                <Send className="w-3 h-3 text-amber-600" />
+                {item.alerta_notificado_para}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Timeline Content */}
@@ -142,6 +163,13 @@ export const HistoricoPendenciaModal: React.FC<HistoricoPendenciaModalProps> = (
                         {h.descricao}
                       </p>
 
+                      {h.dados_extras?.notificado_para && (
+                        <div className="text-[10px] text-amber-800 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200/80 flex items-center gap-1.5 font-bold">
+                          <Send className="w-3 h-3 text-amber-600 shrink-0" />
+                          <span>Notificado para: <strong className="text-amber-950">{h.dados_extras.notificado_para}</strong></span>
+                        </div>
+                      )}
+
                       {h.executado_por && (
                         <div className="text-[10px] text-slate-400 font-bold flex items-center gap-1 pt-1 border-t border-slate-100">
                           <User className="w-3 h-3" />
@@ -157,7 +185,15 @@ export const HistoricoPendenciaModal: React.FC<HistoricoPendenciaModalProps> = (
         </div>
 
         {/* Footer */}
-        <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
+        <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => setIsPrintOpen(true)}
+            className="px-4 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 flex items-center gap-2 transition-colors shadow-sm"
+          >
+            <Printer className="w-4 h-4 text-orange-600" />
+            <span>Imprimir Notificação (PDF)</span>
+          </button>
           <button
             onClick={onClose}
             className="px-5 py-2 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 transition-colors uppercase tracking-wider"
@@ -166,6 +202,18 @@ export const HistoricoPendenciaModal: React.FC<HistoricoPendenciaModalProps> = (
           </button>
         </div>
       </div>
+
+      {/* Printable Report Modal (Ofício Mode) */}
+      {isPrintOpen && (
+        <PrintableAlertasPendenciasReport
+          items={[item]}
+          initialMode="oficio"
+          escolaNome={item.escola_nome}
+          currentUserName={item.gerado_por || 'Coordenação Escolar'}
+          currentUserRole="Emissor da Notificação"
+          onClose={() => setIsPrintOpen(false)}
+        />
+      )}
     </div>
   );
 };

@@ -7,7 +7,7 @@ import {
   BookOpen, Plus, Search, Edit2, Trash2, Printer, 
   X, Calendar, School as SchoolIcon, Bookmark, Save,
   Check, Info, Layers, CheckCircle2, AlertCircle, Clock, MessageSquare, Eye, FileText,
-  ListFilter, RotateCcw, ChevronLeft, ChevronRight
+  ListFilter, RotateCcw, ChevronLeft, ChevronRight, User
 } from 'lucide-react';
 import { Escola, Coordenador, Segmento } from '../types';
 import { supabase } from '../services/supabase';
@@ -762,6 +762,10 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
       ? (existingPlan.dataCriacao || (existingPlan.criadoEm ? existingPlan.criadoEm.split('T')[0] : existingPlan.data))
       : new Date().toISOString().split('T')[0];
 
+    const currentTeacherName = currentUser?.funcao === 'Professor' 
+      ? (currentUser.nome || userEmail || 'Professor') 
+      : (findTeacherForTurma(selectedTurmaId) || currentUser?.nome || 'Professor');
+
     const payload: LessonPlanInfantil = {
       id: editingId || crypto.randomUUID(),
       data: dataInicio || dataPlan || criacaoDate,
@@ -782,6 +786,7 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
       anoSerie,
       periodo,
       criadoEm: new Date().toISOString(),
+      professor: existingPlan?.professor || currentTeacherName,
       status: 'Em Análise',
       observacaoCoordenacao: editingId ? (plans.find(p => p.id === editingId)?.observacaoCoordenacao || '') : ''
     };
@@ -1164,12 +1169,20 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
         const matchesEscola = (plan.escolaNome || '').toLowerCase().includes(term);
         const matchesTurma = (plan.turmaNome || '').toLowerCase().includes(term);
         const matchesCampo = (plan.campoExperiencia || '').toLowerCase().includes(term);
-        if (!matchesTitulo && !matchesObjetivos && !matchesEscola && !matchesTurma && !matchesCampo) return false;
+
+        // Busca por professor responsável
+        const profName = getTeacherName(plan.professor);
+        const fallbackProf = findTeacherForTurma(plan.turmaId) || '';
+        const matchesProfessor = (profName || '').toLowerCase().includes(term) ||
+                                 (plan.professor || '').toLowerCase().includes(term) ||
+                                 fallbackProf.toLowerCase().includes(term);
+
+        if (!matchesTitulo && !matchesObjetivos && !matchesEscola && !matchesTurma && !matchesCampo && !matchesProfessor) return false;
       }
 
       return true;
     });
-  }, [plans, historyFilterEscola, historyFilterFaixaEtaria, historyFilterTurma, historyFilterCampoExperiencia, historyFilterBimestre, historyFilterStatus, searchTerm]);
+  }, [plans, historyFilterEscola, historyFilterFaixaEtaria, historyFilterTurma, historyFilterCampoExperiencia, historyFilterBimestre, historyFilterStatus, searchTerm, coordMap, teachersAssignments]);
 
   // Reset pagination to page 1 whenever any filter changes
   useEffect(() => {
@@ -1786,11 +1799,11 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
             <p className="text-xs text-slate-500 mt-0.5 font-medium">Consulte, edite ou exporte as guias já elaboradas</p>
           </div>
 
-          <div className="relative w-full md:w-72">
+          <div className="relative w-full md:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
             <input 
               type="text" 
-              placeholder="Buscar por tema..."
+              placeholder="Buscar por tema ou professor responsável..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-white outline-none focus:border-brand-orange transition-all text-xs font-semibold"
@@ -1951,6 +1964,14 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
                         <div className="text-[10px] text-brand-orange font-bold uppercase mt-0.5">
                           {plan.campoExperiencia}
                         </div>
+                        {((plan.professor && plan.professor !== 'Professor(a) de Educação Infantil' && plan.professor !== 'Professor') || findTeacherForTurma(plan.turmaId)) && (
+                          <div className="text-[10px] text-slate-500 font-medium mt-1 flex items-center gap-1">
+                            <User className="w-3 h-3 text-slate-400 shrink-0" />
+                            <span className="truncate max-w-[200px]" title={(plan.professor && plan.professor !== 'Professor(a) de Educação Infantil' && plan.professor !== 'Professor') ? plan.professor : (findTeacherForTurma(plan.turmaId) || '')}>
+                              Prof: {(plan.professor && plan.professor !== 'Professor(a) de Educação Infantil' && plan.professor !== 'Professor') ? plan.professor : findTeacherForTurma(plan.turmaId)}
+                            </span>
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-3">
                         <div className="font-bold text-slate-700">{plan.anoSerie || '---'}</div>

@@ -7,7 +7,7 @@ import {
   BookOpen, Plus, Search, Edit2, Trash2, Printer, 
   X, Calendar, School as SchoolIcon, Bookmark, Save,
   Layers, Check, Maximize2, Minimize2, ListFilter, RotateCcw, ChevronLeft, ChevronRight,
-  CheckCircle2, AlertCircle, Clock, MessageSquare, Eye, FileText
+  CheckCircle2, AlertCircle, Clock, MessageSquare, Eye, FileText, User
 } from 'lucide-react';
 import { Escola, Coordenador } from '../types';
 import { supabase } from '../services/supabase';
@@ -1203,12 +1203,19 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
         const matchesEscola = (plan.escolaNome || '').toLowerCase().includes(term);
         const matchesTurma = (plan.turmaNome || '').toLowerCase().includes(term);
         const matchesComp = normComp.toLowerCase().includes(term);
-        if (!matchesTitulo && !matchesObjetivos && !matchesEscola && !matchesTurma && !matchesComp) return false;
+
+        // Busca por professor responsável
+        const turmaProf = findTeacherForTurmaAndComponente(plan.turmaId, plan.componente) || '';
+        const matchesProfessor = (profName || '').toLowerCase().includes(term) ||
+                                 (plan.professor || '').toLowerCase().includes(term) ||
+                                 turmaProf.toLowerCase().includes(term);
+
+        if (!matchesTitulo && !matchesObjetivos && !matchesEscola && !matchesTurma && !matchesComp && !matchesProfessor) return false;
       }
 
       return true;
     });
-  }, [plans, historyFilterEscola, historyFilterAnoSerie, historyFilterTurma, historyFilterComponente, historyFilterBimestre, historyFilterProfessor, historyFilterStatus, searchTerm, coordMap]);
+  }, [plans, historyFilterEscola, historyFilterAnoSerie, historyFilterTurma, historyFilterComponente, historyFilterBimestre, historyFilterProfessor, historyFilterStatus, searchTerm, coordMap, teachersAssignments]);
 
   // Reset pagination to page 1 whenever any filter changes
   useEffect(() => {
@@ -2001,11 +2008,11 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
             <p className="text-xs text-slate-500 mt-0.5 font-medium">Consulte, edite ou exporte as guias já elaboradas</p>
           </div>
 
-          <div className="relative w-full md:w-72">
+          <div className="relative w-full md:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
             <input 
               type="text" 
-              placeholder="Buscar por tema..."
+              placeholder="Buscar por tema ou professor responsável..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-white outline-none focus:border-brand-orange transition-all text-xs font-semibold"
@@ -2166,6 +2173,14 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
                         <div className="text-[10px] text-brand-orange font-bold uppercase mt-0.5">
                           {normalizeSubjectName(plan.componente)}
                         </div>
+                        {((plan.professor && plan.professor !== 'Docente Responsável' && plan.professor !== 'Professor') || findTeacherForTurmaAndComponente(plan.turmaId, plan.componente)) && (
+                          <div className="text-[10px] text-slate-500 font-medium mt-1 flex items-center gap-1">
+                            <User className="w-3 h-3 text-slate-400 shrink-0" />
+                            <span className="truncate max-w-[200px]" title={(plan.professor && plan.professor !== 'Docente Responsável' && plan.professor !== 'Professor') ? plan.professor : (findTeacherForTurmaAndComponente(plan.turmaId, plan.componente) || '')}>
+                              Prof: {(plan.professor && plan.professor !== 'Docente Responsável' && plan.professor !== 'Professor') ? plan.professor : findTeacherForTurmaAndComponente(plan.turmaId, plan.componente)}
+                            </span>
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-3">
                         <div className="font-bold text-slate-700">{plan.anoSerie || '---'}</div>
