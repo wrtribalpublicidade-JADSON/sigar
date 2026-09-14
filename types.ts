@@ -224,6 +224,16 @@ export interface HistoricoMatriculaItem {
    recursos_sala_saeb?: string[];
    recebe_aee?: string;
 
+   // Contato
+   contato_telefone?: string;
+   contato_telefone2?: string;
+   contato_email?: string;
+   contato_whatsapp?: string;
+   contato_responsavel_nome?: string;
+   contato_responsavel_parentesco?: string;
+   contato_responsavel_telefone?: string;
+   contato_observacoes?: string;
+
    // Matrícula Escolar
    turno?: string;
    modalidade?: string;

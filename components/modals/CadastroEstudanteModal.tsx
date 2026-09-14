@@ -29,7 +29,7 @@ interface CadastroEstudanteModalProps {
     initialStudent?: any;
 }
 
-type TabType = 'identificacao' | 'caracteristicas' | 'endereco' | 'especial' | 'matricula';
+type TabType = 'identificacao' | 'caracteristicas' | 'endereco' | 'contato' | 'especial' | 'matricula';
 
 const UFS_BRASIL = [
     'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 
@@ -107,6 +107,14 @@ export const formatCEP = (val: string): string => {
     const nums = (val || '').replace(/\D/g, '').slice(0, 8);
     if (nums.length <= 5) return nums;
     return `${nums.slice(0, 5)}-${nums.slice(5, 8)}`;
+};
+
+export const formatTelefone = (val: string): string => {
+    const nums = (val || '').replace(/\D/g, '').slice(0, 11);
+    if (nums.length <= 2) return nums;
+    if (nums.length <= 6) return `(${nums.slice(0, 2)}) ${nums.slice(2)}`;
+    if (nums.length <= 10) return `(${nums.slice(0, 2)}) ${nums.slice(2, 6)}-${nums.slice(6)}`;
+    return `(${nums.slice(0, 2)}) ${nums.slice(2, 7)}-${nums.slice(7, 11)}`;
 };
 
 export const formatCertidao = (val: string): string => {
@@ -256,6 +264,16 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
     const [enderecoComplemento, setEnderecoComplemento] = useState('');
     const [enderecoZona, setEnderecoZona] = useState<'Urbana' | 'Rural'>('Urbana');
     const [isSearchingCep, setIsSearchingCep] = useState(false);
+
+    // Form state - Contato
+    const [contatoTelefone, setContatoTelefone] = useState('');
+    const [contatoTelefone2, setContatoTelefone2] = useState('');
+    const [contatoEmail, setContatoEmail] = useState('');
+    const [contatoWhatsapp, setContatoWhatsapp] = useState('');
+    const [contatoResponsavelNome, setContatoResponsavelNome] = useState('');
+    const [contatoResponsavelParentesco, setContatoResponsavelParentesco] = useState('');
+    const [contatoResponsavelTelefone, setContatoResponsavelTelefone] = useState('');
+    const [contatoObservacoes, setContatoObservacoes] = useState('');
 
     // Form state - Educação Especial
     const [possuiDeficiencia, setPossuiDeficiencia] = useState<'Sim' | 'Não'>('Não');
@@ -620,6 +638,16 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
             endereco_complemento: enderecoComplemento.trim() || undefined,
             endereco_zona: enderecoZona || 'Urbana',
 
+            // Contato
+            contato_telefone: contatoTelefone.trim() || undefined,
+            contato_telefone2: contatoTelefone2.trim() || undefined,
+            contato_email: contatoEmail.trim() || undefined,
+            contato_whatsapp: contatoWhatsapp.trim() || undefined,
+            contato_responsavel_nome: contatoResponsavelNome.trim() || undefined,
+            contato_responsavel_parentesco: contatoResponsavelParentesco.trim() || undefined,
+            contato_responsavel_telefone: contatoResponsavelTelefone.trim() || undefined,
+            contato_observacoes: contatoObservacoes.trim() || undefined,
+
             // Educação Especial
             possui_deficiencia: possuiDeficiencia,
             deficiencia_tipos: possuiDeficiencia === 'Sim' ? deficienciaTipos : [],
@@ -690,6 +718,15 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
         setEnderecoNumero(student.endereco_numero || '');
         setEnderecoComplemento(student.endereco_complemento || '');
         setEnderecoZona((student.endereco_zona as any) || 'Urbana');
+
+        setContatoTelefone(student.contato_telefone ? formatTelefone(student.contato_telefone) : '');
+        setContatoTelefone2(student.contato_telefone2 ? formatTelefone(student.contato_telefone2) : '');
+        setContatoEmail(student.contato_email || '');
+        setContatoWhatsapp(student.contato_whatsapp ? formatTelefone(student.contato_whatsapp) : '');
+        setContatoResponsavelNome(student.contato_responsavel_nome || '');
+        setContatoResponsavelParentesco(student.contato_responsavel_parentesco || '');
+        setContatoResponsavelTelefone(student.contato_responsavel_telefone ? formatTelefone(student.contato_responsavel_telefone) : '');
+        setContatoObservacoes(student.contato_observacoes || '');
 
         setPossuiDeficiencia((student.possui_deficiencia as any) || 'Não');
         setDeficienciaTipos(Array.isArray(student.deficiencia_tipos) ? student.deficiencia_tipos : []);
@@ -768,6 +805,15 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
         setEnderecoComplemento('');
         setEnderecoZona('Urbana');
 
+        setContatoTelefone('');
+        setContatoTelefone2('');
+        setContatoEmail('');
+        setContatoWhatsapp('');
+        setContatoResponsavelNome('');
+        setContatoResponsavelParentesco('');
+        setContatoResponsavelTelefone('');
+        setContatoObservacoes('');
+
         setPossuiDeficiencia('Não');
         setDeficienciaTipos([]);
         setRecursosSalaSaeb([]);
@@ -805,11 +851,12 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
     };
 
     const tabsConfig = [
-        { id: 'identificacao' as TabType, label: '1. Identificação', icon: User, desc: 'Dados Pessoais & Documentos' },
-        { id: 'caracteristicas' as TabType, label: '2. Características', icon: Sparkles, desc: 'Cor/Raça & Origem' },
-        { id: 'endereco' as TabType, label: '3. Endereço', icon: MapPin, desc: 'Residência & Localização' },
-        { id: 'especial' as TabType, label: '4. Educação Especial', icon: HeartHandshake, desc: 'Deficiências, SAEB & AEE' },
-        { id: 'matricula' as TabType, label: '5. Matrícula Escolar', icon: GraduationCap, desc: 'Turma, Turno & Vínculo' }
+        { id: 'identificacao' as TabType, label: '1. Identificação', shortLabel: '1. Identificação', icon: User, desc: 'Dados Pessoais & Documentos' },
+        { id: 'caracteristicas' as TabType, label: '2. Características', shortLabel: '2. Características', icon: Sparkles, desc: 'Cor/Raça & Origem' },
+        { id: 'endereco' as TabType, label: '3. Endereço', shortLabel: '3. Endereço', icon: MapPin, desc: 'Residência & Localização' },
+        { id: 'contato' as TabType, label: '4. Contato', shortLabel: '4. Contato', icon: Phone, desc: 'Telefone, E-mail & Responsável' },
+        { id: 'especial' as TabType, label: '5. Educação Especial', shortLabel: '5. Ed. Especial', icon: HeartHandshake, desc: 'Deficiências, SAEB & AEE' },
+        { id: 'matricula' as TabType, label: '6. Matrícula Escolar', shortLabel: '6. Matrícula', icon: GraduationCap, desc: 'Turma, Turno & Vínculo' }
     ];
 
     const currentTabIndex = tabsConfig.findIndex(t => t.id === activeTab);
@@ -836,7 +883,7 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/70 backdrop-blur-md animate-fade-in">
-            <div className="bg-white rounded-[2rem] sm:rounded-[2.5rem] w-full max-w-5xl h-[96vh] shadow-2xl overflow-hidden flex flex-col border border-white/20 animate-scale-up">
+            <div className="bg-white rounded-[2rem] sm:rounded-[2.5rem] w-full max-w-6xl xl:max-w-7xl h-[96vh] shadow-2xl overflow-hidden flex flex-col border border-white/20 animate-scale-up">
                 
                 {/* Header */}
                 <div className="bg-[#1a1f26] p-6 sm:p-8 text-white relative flex justify-between items-center shrink-0 border-b border-slate-800">
@@ -857,8 +904,8 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
                     </button>
                 </div>
 
-                {/* Tab Navigation Strip */}
-                <div className="bg-slate-100/90 border-b border-slate-200 px-4 sm:px-8 py-3 flex gap-2 overflow-x-auto shrink-0 scrollbar-none">
+                {/* Tab Navigation Strip - Linha única sem quebra e sem rolagem horizontal */}
+                <div className="bg-slate-100/90 border-b border-slate-200 px-3 sm:px-6 py-2.5 grid grid-cols-6 gap-1.5 sm:gap-2 shrink-0">
                     {tabsConfig.map((tab) => {
                         const Icon = tab.icon;
                         const isActive = activeTab === tab.id;
@@ -867,21 +914,24 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
                                 key={tab.id}
                                 type="button"
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`flex items-center gap-2.5 px-4 py-2.5 rounded-2xl text-xs font-black transition-all shrink-0 cursor-pointer border ${
+                                title={tab.label}
+                                className={`flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl text-[11px] xl:text-xs font-black transition-all cursor-pointer border min-w-0 select-none ${
                                     isActive
                                         ? 'bg-brand-orange text-white border-brand-orange shadow-md shadow-orange-500/20'
                                         : 'bg-white border-slate-200/80 text-slate-600 hover:border-orange-300 hover:bg-orange-50/50 hover:text-brand-orange'
                                 }`}
                             >
-                                <Icon size={16} className={isActive ? 'text-white' : 'text-slate-400'} />
-                                <span>{tab.label}</span>
+                                <Icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                                <span className="truncate whitespace-nowrap hidden xl:inline">{tab.label}</span>
+                                <span className="truncate whitespace-nowrap hidden sm:inline xl:hidden">{tab.shortLabel}</span>
+                                <span className="truncate whitespace-nowrap sm:hidden">{tab.id === 'identificacao' ? '1' : tab.id === 'caracteristicas' ? '2' : tab.id === 'endereco' ? '3' : tab.id === 'contato' ? '4' : tab.id === 'especial' ? '5' : '6'}</span>
                             </button>
                         );
                     })}
                 </div>
 
                 {/* Body Content */}
-                <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-8 custom-scrollbar bg-slate-50/40">
+                <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 sm:p-8 space-y-8 custom-scrollbar bg-slate-50/40">
 
                     {/* Error Banner */}
                     {error && (
@@ -1402,7 +1452,171 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
                             )}
 
                             {/* ======================================================== */}
-                            {/* ABA 4: EDUCAÇÃO ESPECIAL                                 */}
+                            {/* ABA 4: CONTATO                                            */}
+                            {/* ======================================================== */}
+                            {activeTab === 'contato' && (
+                                <div className="space-y-6 animate-in fade-in duration-300">
+
+                                    {/* Info Banner */}
+                                    <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-start gap-3">
+                                        <Phone className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="text-xs font-bold text-blue-800">Informações de contato do estudante e/ou responsável</p>
+                                            <p className="text-[11px] text-blue-600 mt-0.5">Registre telefone, e-mail e dados do responsável para comunicação com a família.</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Telefone Principal e Secundário */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                        <div>
+                                            <label className="block text-[11px] font-black tracking-widest text-slate-400 uppercase mb-2 ml-1">
+                                                Telefone Principal
+                                            </label>
+                                            <div className="relative">
+                                                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                                <input
+                                                    type="text"
+                                                    value={contatoTelefone}
+                                                    onChange={(e) => setContatoTelefone(formatTelefone(e.target.value))}
+                                                    placeholder="(00) 00000-0000"
+                                                    maxLength={15}
+                                                    className="w-full bg-white border border-slate-200 rounded-2xl pl-11 pr-5 py-3.5 text-sm font-bold text-slate-800 focus:ring-4 focus:ring-brand-orange/15 focus:border-brand-orange outline-none transition-all placeholder:text-slate-300"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-[11px] font-black tracking-widest text-slate-400 uppercase mb-2 ml-1">
+                                                Telefone Secundário
+                                            </label>
+                                            <div className="relative">
+                                                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                                <input
+                                                    type="text"
+                                                    value={contatoTelefone2}
+                                                    onChange={(e) => setContatoTelefone2(formatTelefone(e.target.value))}
+                                                    placeholder="(00) 00000-0000"
+                                                    maxLength={15}
+                                                    className="w-full bg-white border border-slate-200 rounded-2xl pl-11 pr-5 py-3.5 text-sm font-bold text-slate-800 focus:ring-4 focus:ring-brand-orange/15 focus:border-brand-orange outline-none transition-all placeholder:text-slate-300"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* E-mail e WhatsApp */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                        <div>
+                                            <label className="block text-[11px] font-black tracking-widest text-slate-400 uppercase mb-2 ml-1">
+                                                E-mail
+                                            </label>
+                                            <div className="relative">
+                                                <MessageSquare className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                                <input
+                                                    type="email"
+                                                    value={contatoEmail}
+                                                    onChange={(e) => setContatoEmail(e.target.value)}
+                                                    placeholder="exemplo@email.com"
+                                                    className="w-full bg-white border border-slate-200 rounded-2xl pl-11 pr-5 py-3.5 text-sm font-bold text-slate-800 focus:ring-4 focus:ring-brand-orange/15 focus:border-brand-orange outline-none transition-all placeholder:text-slate-300"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-[11px] font-black tracking-widest text-slate-400 uppercase mb-2 ml-1">
+                                                WhatsApp
+                                            </label>
+                                            <div className="relative">
+                                                <MessageSquare className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                                <input
+                                                    type="text"
+                                                    value={contatoWhatsapp}
+                                                    onChange={(e) => setContatoWhatsapp(formatTelefone(e.target.value))}
+                                                    placeholder="(00) 00000-0000"
+                                                    maxLength={15}
+                                                    className="w-full bg-white border border-slate-200 rounded-2xl pl-11 pr-5 py-3.5 text-sm font-bold text-slate-800 focus:ring-4 focus:ring-brand-orange/15 focus:border-brand-orange outline-none transition-all placeholder:text-slate-300"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Responsável pelo Contato */}
+                                    <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/80 space-y-4">
+                                        <label className="block text-xs font-black tracking-wide text-slate-800 uppercase">
+                                            Responsável pelo Contato
+                                        </label>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-5">
+                                            <div className="sm:col-span-5">
+                                                <label className="block text-[11px] font-black tracking-widest text-slate-400 uppercase mb-2 ml-1">
+                                                    Nome do Responsável
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={contatoResponsavelNome}
+                                                    onChange={(e) => setContatoResponsavelNome(e.target.value)}
+                                                    placeholder="Nome completo do responsável..."
+                                                    className="w-full bg-white border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold text-slate-800 focus:ring-4 focus:ring-brand-orange/15 focus:border-brand-orange outline-none transition-all placeholder:text-slate-300"
+                                                />
+                                            </div>
+
+                                            <div className="sm:col-span-3">
+                                                <label className="block text-[11px] font-black tracking-widest text-slate-400 uppercase mb-2 ml-1">
+                                                    Parentesco
+                                                </label>
+                                                <select
+                                                    value={contatoResponsavelParentesco}
+                                                    onChange={(e) => setContatoResponsavelParentesco(e.target.value)}
+                                                    className="w-full bg-white border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold text-slate-800 focus:ring-4 focus:ring-brand-orange/15 focus:border-brand-orange outline-none transition-all cursor-pointer appearance-none"
+                                                >
+                                                    <option value="">Selecione...</option>
+                                                    <option value="Mãe">Mãe</option>
+                                                    <option value="Pai">Pai</option>
+                                                    <option value="Avó/Avô">Avó / Avô</option>
+                                                    <option value="Tio(a)">Tio(a)</option>
+                                                    <option value="Irmão(ã)">Irmão(ã)</option>
+                                                    <option value="Padrasto/Madrasta">Padrasto / Madrasta</option>
+                                                    <option value="Tutor Legal">Tutor Legal</option>
+                                                    <option value="Outro">Outro</option>
+                                                </select>
+                                            </div>
+
+                                            <div className="sm:col-span-4">
+                                                <label className="block text-[11px] font-black tracking-widest text-slate-400 uppercase mb-2 ml-1">
+                                                    Telefone do Responsável
+                                                </label>
+                                                <div className="relative">
+                                                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                                    <input
+                                                        type="text"
+                                                        value={contatoResponsavelTelefone}
+                                                        onChange={(e) => setContatoResponsavelTelefone(formatTelefone(e.target.value))}
+                                                        placeholder="(00) 00000-0000"
+                                                        maxLength={15}
+                                                        className="w-full bg-white border border-slate-200 rounded-2xl pl-11 pr-5 py-3.5 text-sm font-bold text-slate-800 focus:ring-4 focus:ring-brand-orange/15 focus:border-brand-orange outline-none transition-all placeholder:text-slate-300"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Observações de Contato */}
+                                    <div>
+                                        <label className="block text-[11px] font-black tracking-widest text-slate-400 uppercase mb-2 ml-1">
+                                            Observações de Contato
+                                        </label>
+                                        <textarea
+                                            value={contatoObservacoes}
+                                            onChange={(e) => setContatoObservacoes(e.target.value)}
+                                            placeholder="Informações adicionais sobre contato, horários preferenciais, restrições..."
+                                            rows={3}
+                                            className="w-full bg-white border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold text-slate-800 focus:ring-4 focus:ring-brand-orange/15 focus:border-brand-orange outline-none transition-all placeholder:text-slate-300 resize-none"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ======================================================== */}
+                            {/* ABA 5: EDUCAÇÃO ESPECIAL                                 */}
                             {/* ======================================================== */}
                             {activeTab === 'especial' && (
                                 <div className="space-y-6 animate-in fade-in duration-300">
@@ -1521,7 +1735,7 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
                             )}
 
                             {/* ======================================================== */}
-                            {/* ABA 5: MATRÍCULA ESCOLAR                                 */}
+                            {/* ABA 6: MATRÍCULA ESCOLAR                                 */}
                             {/* ======================================================== */}
                             {activeTab === 'matricula' && (
                                 <div className="space-y-6 animate-in fade-in duration-300">
@@ -2396,6 +2610,14 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
                         recebe_aee: possuiDeficiencia === 'Sim' ? recebeAee : 'Não recebe AEE',
                         turno: turno || 'Matutino',
                         modalidade: modalidade || 'Ensino Regular',
+                        contato_telefone: contatoTelefone.trim() || undefined,
+                        contato_telefone2: contatoTelefone2.trim() || undefined,
+                        contato_email: contatoEmail.trim() || undefined,
+                        contato_whatsapp: contatoWhatsapp || undefined,
+                        contato_responsavel_nome: contatoResponsavelNome.trim() || undefined,
+                        contato_responsavel_parentesco: contatoResponsavelParentesco || undefined,
+                        contato_responsavel_telefone: contatoResponsavelTelefone.trim() || undefined,
+                        contato_observacoes: contatoObservacoes.trim() || undefined,
                         data_matricula: dataMatricula || undefined,
                         situacao_vinculo: situacaoVinculo || 'Matriculado',
                         ano_serie: anoSerie || undefined

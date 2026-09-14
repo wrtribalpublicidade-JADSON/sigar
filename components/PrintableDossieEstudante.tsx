@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Aluno, Escola } from '../types';
-import { formatCPF, formatNIS, formatCEP, formatCertidao } from './modals/CadastroEstudanteModal';
+import { formatCPF, formatNIS, formatCEP, formatCertidao, formatTelefone } from './modals/CadastroEstudanteModal';
 
 interface PrintableDossieEstudanteProps {
   student: Aluno;
@@ -354,10 +354,69 @@ export const PrintableDossieEstudante: React.FC<PrintableDossieEstudanteProps> =
         </table>
       </div>
 
-      {/* ====== 5. EDUCAÇÃO ESPECIAL, AEE E ACESSIBILIDADE ====== */}
+      {/* ====== 5. INFORMAÇÕES DE CONTATO ====== */}
       <div className="print-avoid-break" style={{ marginBottom: '8pt' }}>
         <div style={{ fontSize: '7.5pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', background: '#0f172a', color: '#fff', padding: '4pt 8pt' }}>
-          5. Educação Especial, AEE e Acessibilidade
+          5. Informações de Contato
+        </div>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <tbody>
+            <tr>
+              <td style={{ padding: '4.5pt 8pt', border: '0.5pt solid #cbd5e1', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', width: '22%', background: '#f8fafc' }}>
+                Telefone Principal
+              </td>
+              <td style={{ padding: '4.5pt 8pt', border: '0.5pt solid #cbd5e1', fontSize: '8.5pt', fontWeight: 700, color: '#1e293b', width: '28%' }}>
+                {student.contato_telefone ? formatTelefone(student.contato_telefone) : '---'}
+              </td>
+              <td style={{ padding: '4.5pt 8pt', border: '0.5pt solid #cbd5e1', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', width: '22%', background: '#f8fafc' }}>
+                Telefone Secundário
+              </td>
+              <td style={{ padding: '4.5pt 8pt', border: '0.5pt solid #cbd5e1', fontSize: '8.5pt', fontWeight: 700, color: '#1e293b', width: '28%' }}>
+                {student.contato_telefone2 ? formatTelefone(student.contato_telefone2) : '---'}
+              </td>
+            </tr>
+            <tr>
+              <td style={{ padding: '4.5pt 8pt', border: '0.5pt solid #cbd5e1', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', background: '#f8fafc' }}>
+                E-mail
+              </td>
+              <td style={{ padding: '4.5pt 8pt', border: '0.5pt solid #cbd5e1', fontSize: '8.5pt', fontWeight: 700, color: '#1e293b' }}>
+                {student.contato_email || '---'}
+              </td>
+              <td style={{ padding: '4.5pt 8pt', border: '0.5pt solid #cbd5e1', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', background: '#f8fafc' }}>
+                WhatsApp
+              </td>
+              <td style={{ padding: '4.5pt 8pt', border: '0.5pt solid #cbd5e1', fontSize: '8.5pt', fontWeight: 700, color: '#1e293b' }}>
+                {student.contato_whatsapp ? formatTelefone(student.contato_whatsapp) : '---'}
+              </td>
+            </tr>
+            <tr>
+              <td style={{ padding: '4.5pt 8pt', border: '0.5pt solid #cbd5e1', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', background: '#f8fafc' }}>
+                Responsável pelo Contato
+              </td>
+              <td style={{ padding: '4.5pt 8pt', border: '0.5pt solid #cbd5e1', fontSize: '8.5pt', fontWeight: 700, color: '#1e293b' }} colSpan={3}>
+                {student.contato_responsavel_nome 
+                  ? `${student.contato_responsavel_nome}${student.contato_responsavel_parentesco ? ` (${student.contato_responsavel_parentesco})` : ''}${student.contato_responsavel_telefone ? ` — Tel: ${formatTelefone(student.contato_responsavel_telefone)}` : ''}`
+                  : '---'}
+              </td>
+            </tr>
+            {student.contato_observacoes && (
+              <tr>
+                <td style={{ padding: '4.5pt 8pt', border: '0.5pt solid #cbd5e1', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', background: '#f8fafc' }}>
+                  Observações de Contato
+                </td>
+                <td style={{ padding: '4.5pt 8pt', border: '0.5pt solid #cbd5e1', fontSize: '8.5pt', fontWeight: 700, color: '#1e293b' }} colSpan={3}>
+                  {student.contato_observacoes}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* ====== 6. EDUCAÇÃO ESPECIAL, AEE E ACESSIBILIDADE ====== */}
+      <div className="print-avoid-break" style={{ marginBottom: '8pt' }}>
+        <div style={{ fontSize: '7.5pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', background: '#0f172a', color: '#fff', padding: '4pt 8pt' }}>
+          6. Educação Especial, AEE e Acessibilidade
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <tbody>
@@ -410,10 +469,10 @@ export const PrintableDossieEstudante: React.FC<PrintableDossieEstudanteProps> =
         </table>
       </div>
 
-      {/* ====== 6. VÍNCULO ESCOLAR E MATRÍCULA ====== */}
+      {/* ====== 7. VÍNCULO ESCOLAR E MATRÍCULA ====== */}
       <div className="print-avoid-break" style={{ marginBottom: '8pt' }}>
         <div style={{ fontSize: '7.5pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', background: '#0f172a', color: '#fff', padding: '4pt 8pt' }}>
-          6. Vínculo Escolar e Matrícula
+          7. Vínculo Escolar e Matrícula
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <tbody>
@@ -543,20 +602,20 @@ export const PrintableDossieEstudante: React.FC<PrintableDossieEstudanteProps> =
         )}
       </div>
 
-      {/* ====== 7. REGISTROS PEDAGÓGICOS E OBSERVAÇÕES ====== */}
+      {/* ====== 8. REGISTROS PEDAGÓGICOS E OBSERVAÇÕES ====== */}
       <div className="print-avoid-break" style={{ marginBottom: '8pt' }}>
         <div style={{ fontSize: '7.5pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', background: '#0f172a', color: '#fff', padding: '4pt 8pt' }}>
-          7. Registros Pedagógicos, Laudos e Observações Complementares
+          8. Registros Pedagógicos, Laudos e Observações Complementares
         </div>
         <div style={{ padding: '8pt 10pt', border: '0.5pt solid #cbd5e1', borderTop: 'none', fontSize: '8.5pt', color: '#334155', lineHeight: '1.5', minHeight: '36pt' }}>
           <p className="whitespace-pre-line">{student.observations || 'Sem observações ou ressalvas pedagógicas cadastradas até a presente data.'}</p>
         </div>
       </div>
 
-      {/* ====== 8. CONTROLE DO REGISTRO ESCOLAR E AUDITORIA ====== */}
+      {/* ====== 9. CONTROLE DO REGISTRO ESCOLAR E AUDITORIA ====== */}
       <div className="print-avoid-break" style={{ marginBottom: '12pt' }}>
         <div style={{ fontSize: '7.5pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', background: '#0f172a', color: '#fff', padding: '4pt 8pt' }}>
-          8. Controle do Registro Escolar e Auditoria
+          9. Controle do Registro Escolar e Auditoria
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <tbody>
