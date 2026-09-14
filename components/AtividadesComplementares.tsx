@@ -3,7 +3,7 @@ import {
     BookOpen, Trophy, Music, Palette, Code, Users, 
     Calendar, Search, Plus, Filter, ChevronRight, 
     Clock, MapPin, Star, Pencil, Trash2, Heart, Brain, Leaf,
-    UserPlus, X, CheckCircle2, Printer, AlertTriangle, Sparkles
+    UserPlus, X, CheckCircle2, Printer, AlertTriangle, Sparkles, ShieldCheck
 } from 'lucide-react';
 import { AtividadeModal } from './AtividadeModal';
 import { DiarioAtividadeModal } from './DiarioAtividadeModal';
@@ -98,6 +98,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
     const [selectedSchoolIdForTurmaFilter, setSelectedSchoolIdForTurmaFilter] = useState<string>('todas');
 
     const selectedTurma = turmasComp.find(t => t.id === selectedTurmaId) || null;
+    const isUserAdmin = currentUser?.funcao === 'Administrador';
 
     const handleSelectTurma = async (id: string) => {
         setSelectedTurmaId(id);
@@ -626,16 +627,21 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                     value={newTurmaNome}
                                     onChange={e => setNewTurmaNome(e.target.value)}
                                     className={`w-full border-none rounded-xl px-4 py-3 text-sm font-bold outline-none ${
-                                        editingTurma && !/^EDUCA \+AÇÃO - TURMA \d+/i.test(newTurmaNome)
+                                        (editingTurma && isUserAdmin) || (editingTurma && !/^EDUCA \+AÇÃO - TURMA \d+/i.test(newTurmaNome))
                                             ? 'bg-slate-50 focus:ring-2 focus:ring-brand-orange/20 text-slate-800' 
                                             : 'bg-slate-100 cursor-not-allowed text-slate-500'
                                     }`}
-                                    readOnly={!editingTurma || /^EDUCA \+AÇÃO - TURMA \d+/i.test(newTurmaNome)}
+                                    readOnly={!editingTurma || (!isUserAdmin && /^EDUCA \+AÇÃO - TURMA \d+/i.test(newTurmaNome))}
                                     required
                                 />
-                                {editingTurma && /^EDUCA \+AÇÃO - TURMA \d+/i.test(newTurmaNome) && (
+                                {editingTurma && /^EDUCA \+AÇÃO - TURMA \d+/i.test(newTurmaNome) && !isUserAdmin && (
                                     <p className="text-[10px] text-slate-400 font-bold mt-1">
                                         * O nome de turmas do projeto EDUCA +AÇÃO não pode ser editado.
+                                    </p>
+                                )}
+                                {editingTurma && isUserAdmin && (
+                                    <p className="text-[10px] text-indigo-500 font-bold mt-1 flex items-center gap-1">
+                                        <ShieldCheck size={10} /> Edição do nome habilitada para Administrador.
                                     </p>
                                 )}
                                 {editingTurma && !/^EDUCA \+AÇÃO - TURMA \d+/i.test(newTurmaNome) && (
