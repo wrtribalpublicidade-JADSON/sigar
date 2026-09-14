@@ -117,7 +117,7 @@ export const RegionalPendenciesOverview: React.FC<RegionalPendenciesOverviewProp
         safeFetchSet('avaliacao_docente_infantil', ['escola_id']),
         safeFetchSet('acompanhamento_docente', ['escola_id']),
         safeFetchSet('encaminhamentos', ['escola_id']),
-        safeFetchArray('coordenadores', 'id, funcao, escolas_ids, turmas_ids'),
+        safeFetchArray('coordenadores', 'id, funcao'),
         safeFetchArray('coordenador_escolas', 'coordenador_id, escola_id'),
         safeFetchArray('coordenador_turmas', 'coordenador_id, turma_id')
       ]);

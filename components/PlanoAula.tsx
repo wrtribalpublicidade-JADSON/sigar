@@ -401,46 +401,74 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
     const fetchCoordenadoresAndTeachers = async () => {
       if (isDemoMode) return;
       try {
-        const { data: coordData, error: coordError } = await supabase
-          .from('coordenadores')
-          .select('id, contato, nome, funcao, escolas_ids');
+        let allCoords: any[] = [];
+        let hasMoreCoords = true;
+        let fromCoords = 0;
+        while (hasMoreCoords) {
+          const { data: coordData, error: coordError } = await supabase
+            .from('coordenadores')
+            .select('id, contato, nome, funcao')
+            .range(fromCoords, fromCoords + 999);
 
-        if (!coordError && coordData) {
-          setCoordenadoresList(coordData);
-
-          const { data: ctData, error: ctError } = await supabase
-            .from('coordenadores_turmas')
-            .select('coordenador_id, turma_id, componentes');
-
-          const mapAssignments: Record<string, { turmasIds: string[], turmaComponentes: Record<string, string[]> }> = {};
-          if (!ctError && ctData) {
-            ctData.forEach((row: any) => {
-              const cid = String(row.coordenador_id);
-              if (!mapAssignments[cid]) {
-                mapAssignments[cid] = { turmasIds: [], turmaComponentes: {} };
-              }
-              const tid = String(row.turma_id);
-              if (!mapAssignments[cid].turmasIds.includes(tid)) {
-                mapAssignments[cid].turmasIds.push(tid);
-              }
-              if (row.componentes && Array.isArray(row.componentes)) {
-                mapAssignments[cid].turmaComponentes[tid] = row.componentes;
-              }
-            });
+          if (coordError) throw coordError;
+          if (coordData && coordData.length > 0) {
+            allCoords = allCoords.concat(coordData);
+            hasMoreCoords = coordData.length === 1000;
+            fromCoords += 1000;
+          } else {
+            hasMoreCoords = false;
           }
-
-          const teachersList = coordData
-            .filter((c: any) => c.funcao === 'Professor' || !c.funcao)
-            .map((c: any) => ({
-              id: String(c.id),
-              nome: c.nome,
-              contato: c.contato || '',
-              turmasIds: mapAssignments[String(c.id)]?.turmasIds || [],
-              turmaComponentes: mapAssignments[String(c.id)]?.turmaComponentes || {}
-            }));
-
-          setTeachersAssignments(teachersList);
         }
+        setCoordenadoresList(allCoords);
+
+        let allCt: any[] = [];
+        let hasMoreCt = true;
+        let fromCt = 0;
+        while (hasMoreCt) {
+          const { data: ctData, error: ctError } = await supabase
+            .from('coordenador_turmas')
+            .select('coordenador_id, turma_id, componentes')
+            .range(fromCt, fromCt + 999);
+
+          if (ctError) {
+            console.warn('Erro ao carregar coordenador_turmas:', ctError);
+            break;
+          }
+          if (ctData && ctData.length > 0) {
+            allCt = allCt.concat(ctData);
+            hasMoreCt = ctData.length === 1000;
+            fromCt += 1000;
+          } else {
+            hasMoreCt = false;
+          }
+        }
+
+        const mapAssignments: Record<string, { turmasIds: string[], turmaComponentes: Record<string, string[]> }> = {};
+        allCt.forEach((row: any) => {
+          const cid = String(row.coordenador_id);
+          if (!mapAssignments[cid]) {
+            mapAssignments[cid] = { turmasIds: [], turmaComponentes: {} };
+          }
+          const tid = String(row.turma_id);
+          if (!mapAssignments[cid].turmasIds.includes(tid)) {
+            mapAssignments[cid].turmasIds.push(tid);
+          }
+          if (row.componentes && Array.isArray(row.componentes)) {
+            mapAssignments[cid].turmaComponentes[tid] = row.componentes;
+          }
+        });
+
+        const teachersList = allCoords
+          .filter((c: any) => c.funcao === 'Professor' || !c.funcao)
+          .map((c: any) => ({
+            id: String(c.id),
+            nome: c.nome,
+            contato: c.contato || '',
+            turmasIds: mapAssignments[String(c.id)]?.turmasIds || [],
+            turmaComponentes: mapAssignments[String(c.id)]?.turmaComponentes || {}
+          }));
+
+        setTeachersAssignments(teachersList);
       } catch (err) {
         console.error('Erro ao carregar coordenadores e professores:', err);
       }
@@ -476,6 +504,24 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
     return map;
   }, [coordenadoresList, teachersAssignments, currentUser]);
 
+  const isEmail = (str?: string | null): boolean => {
+    return !!str && str.includes('@');
+  };
+
+  const isGenericTeacher = (str?: string | null): boolean => {
+    if (!str) return true;
+    const lower = str.trim().toLowerCase();
+    return (
+      lower === 'professor' ||
+      lower === 'professor(a)' ||
+      lower === 'docente responsável' ||
+      lower === 'docente responsavel' ||
+      lower === 'docente' ||
+      lower === '---' ||
+      lower === 'user'
+    );
+  };
+
   const getTeacherName = (emailOrName: string | undefined): string => {
     if (!emailOrName) return '';
     const clean = emailOrName.trim();
@@ -504,6 +550,35 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
     if (turmaTeacher) return turmaTeacher.nome;
 
     return null;
+  };
+
+  const getDisplayTeacher = (prof?: string, turmaId?: string, compName?: string): string => {
+    // 1. Se prof já é um nome real (não é e-mail e não é genérico), utiliza diretamente
+    if (prof && !isEmail(prof) && !isGenericTeacher(prof)) {
+      return prof.trim();
+    }
+    // 2. Se prof é um e-mail, tenta resolver via coordMap
+    if (prof && isEmail(prof)) {
+      const resolved = getTeacherName(prof);
+      if (resolved && !isEmail(resolved) && !isGenericTeacher(resolved)) {
+        return resolved.trim();
+      }
+    }
+    // 3. Tenta obter o professor vinculado à turma e componente
+    if (turmaId) {
+      const fromTurma = findTeacherForTurmaAndComponente(turmaId, compName);
+      if (fromTurma) return fromTurma.trim();
+    }
+    // 4. Se prof não for genérico, retorna formatado ou o próprio texto
+    if (prof && !isGenericTeacher(prof)) {
+      if (isEmail(prof)) {
+        const resolved = getTeacherName(prof);
+        if (resolved && !isEmail(resolved)) return resolved.trim();
+      } else {
+        return prof.trim();
+      }
+    }
+    return 'Docente Responsável';
   };
 
   const fetchRealPlans = async () => {
@@ -578,26 +653,58 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
         const escolaNome = escolaObj ? escolaObj.nome : (p.escola_nome || 'Unidade');
         const turmaNome = turmaMap.get(String(p.turma_id)) || p.turma_nome || p.turmaNome || 'Turma';
         const criacaoData = p.data_criacao || (p.created_at ? p.created_at.split('T')[0] : (p.data || new Date().toISOString().split('T')[0]));
-        const criadorRaw = p.created_by || p.professor || '';
-        const avaliadorRaw = p.avaliado_por || p.avaliadoPor || '';
+        const criadorRaw = p.created_by || '';
+        const avaliadorRaw = (p.avaliado_por || p.avaliadoPor || '').trim();
+        const avaliadorLower = avaliadorRaw.toLowerCase();
 
         let resolvedProfessor = '';
 
-        if (criadorRaw && getTeacherName(criadorRaw).toLowerCase().trim() !== avaliadorRaw.toLowerCase().trim()) {
-          resolvedProfessor = getTeacherName(criadorRaw);
-        } else if (p.professor && getTeacherName(p.professor).toLowerCase().trim() !== avaliadorRaw.toLowerCase().trim()) {
-          resolvedProfessor = getTeacherName(p.professor);
-        }
-
-        if (!resolvedProfessor || resolvedProfessor.toLowerCase().trim() === avaliadorRaw.toLowerCase().trim()) {
-          const teacherFromTurma = findTeacherForTurmaAndComponente(String(p.turma_id), p.componente);
-          if (teacherFromTurma && teacherFromTurma.toLowerCase().trim() !== avaliadorRaw.toLowerCase().trim()) {
-            resolvedProfessor = teacherFromTurma;
+        // 1. Prioriza p.professor se já contiver o nome real do docente
+        if (p.professor && !isEmail(p.professor) && !isGenericTeacher(p.professor)) {
+          if (!avaliadorLower || p.professor.trim().toLowerCase() !== avaliadorLower) {
+            resolvedProfessor = p.professor.trim();
           }
         }
 
+        // 2. Se p.professor for e-mail, tenta resolver via getTeacherName
+        if (!resolvedProfessor && p.professor && isEmail(p.professor)) {
+          const fromProf = getTeacherName(p.professor);
+          if (fromProf && !isEmail(fromProf) && !isGenericTeacher(fromProf) && fromProf.toLowerCase().trim() !== avaliadorLower) {
+            resolvedProfessor = fromProf.trim();
+          }
+        }
+
+        // 3. Tenta resolver o criador (p.created_by)
+        if (!resolvedProfessor && criadorRaw) {
+          if (!isEmail(criadorRaw) && !isGenericTeacher(criadorRaw) && criadorRaw.toLowerCase().trim() !== avaliadorLower) {
+            resolvedProfessor = criadorRaw.trim();
+          } else {
+            const fromCreated = getTeacherName(criadorRaw);
+            if (fromCreated && !isEmail(fromCreated) && !isGenericTeacher(fromCreated) && fromCreated.toLowerCase().trim() !== avaliadorLower) {
+              resolvedProfessor = fromCreated.trim();
+            }
+          }
+        }
+
+        // 4. Tenta resolver updated_by
+        if (!resolvedProfessor && p.updated_by) {
+          const fromUpdated = getTeacherName(p.updated_by);
+          if (fromUpdated && !isEmail(fromUpdated) && !isGenericTeacher(fromUpdated) && fromUpdated.toLowerCase().trim() !== avaliadorLower) {
+            resolvedProfessor = fromUpdated.trim();
+          }
+        }
+
+        // 5. Tenta professor vinculado à turma e componente
         if (!resolvedProfessor) {
-          resolvedProfessor = getTeacherName(p.created_by || (p.updated_by !== avaliadorRaw ? p.updated_by : '') || p.professor || 'Docente Responsável');
+          const teacherFromTurma = findTeacherForTurmaAndComponente(String(p.turma_id), p.componente);
+          if (teacherFromTurma && teacherFromTurma.toLowerCase().trim() !== avaliadorLower) {
+            resolvedProfessor = teacherFromTurma.trim();
+          }
+        }
+
+        // 6. Fallback final
+        if (!resolvedProfessor) {
+          resolvedProfessor = (p.professor && !isEmail(p.professor)) ? p.professor.trim() : 'Docente Responsável';
         }
 
         return {
@@ -851,7 +958,9 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
         created_by: editingId 
           ? (plans.find(p => p.id === editingId)?.professor || userEmail || currentUser?.contato || 'user') 
           : (userEmail || currentUser?.contato || 'user'),
-        professor: payload.professor || currentUser?.nome || 'Professor',
+        professor: (payload.professor && !isEmail(payload.professor) && !isGenericTeacher(payload.professor))
+          ? payload.professor
+          : (getDisplayTeacher(payload.professor, payload.turmaId, payload.componente) || currentUser?.nome || 'Professor'),
         updated_at: new Date().toISOString(),
         updated_by: userEmail || currentUser?.contato || 'user'
       };
@@ -898,7 +1007,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
         componente: payload.componente,
         periodo: payload.periodo,
         titulo: payload.titulo,
-        professor: payload.professor || getTeacherName(userEmail || currentUser?.contato)
+        professor: getDisplayTeacher(payload.professor, payload.turmaId, payload.componente) || currentUser?.nome || 'Professor'
       }
     );
 
@@ -1001,7 +1110,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       if (plan.componente && isCampoExperienciaInfantil(plan.componente)) return;
 
       const normComp = normalizeSubjectName(plan.componente);
-      const profName = getTeacherName(plan.professor);
+      const profName = getDisplayTeacher(plan.professor, plan.turmaId, plan.componente);
 
       const matchEscola = !historyFilterEscola || String(plan.escolaId) === String(historyFilterEscola);
       const matchAno = !historyFilterAnoSerie || plan.anoSerie === historyFilterAnoSerie;
@@ -1046,7 +1155,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       }
 
       // Professores
-      if (profName) {
+      if (profName && profName !== 'Docente Responsável') {
         if (matchEscola && matchAno && matchTurma && matchComp && matchBimestre) {
           professoresSet.add(profName);
         }
@@ -1087,9 +1196,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
     const avaliadorNome = currentUser?.nome || userEmail || 'Coordenador';
     const nowIso = new Date().toISOString();
 
-    const resolvedDocente = evaluatingPlan.professor && evaluatingPlan.professor.toLowerCase().trim() !== avaliadorNome.toLowerCase().trim()
-      ? evaluatingPlan.professor
-      : (findTeacherForTurmaAndComponente(evaluatingPlan.turmaId, evaluatingPlan.componente) || evaluatingPlan.professor || 'Docente Responsável');
+    const resolvedDocente = getDisplayTeacher(evaluatingPlan.professor, evaluatingPlan.turmaId, evaluatingPlan.componente);
 
     const updatedPlan: LessonPlan = {
       ...evaluatingPlan,
@@ -1186,7 +1293,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       if (plan.componente && isCampoExperienciaInfantil(plan.componente)) return false;
 
       const normComp = normalizeSubjectName(plan.componente);
-      const profName = getTeacherName(plan.professor);
+      const profName = getDisplayTeacher(plan.professor, plan.turmaId, plan.componente);
 
       if (historyFilterEscola && String(plan.escolaId) !== String(historyFilterEscola)) return false;
       if (historyFilterAnoSerie && plan.anoSerie !== historyFilterAnoSerie) return false;
@@ -1205,10 +1312,8 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
         const matchesComp = normComp.toLowerCase().includes(term);
 
         // Busca por professor responsável
-        const turmaProf = findTeacherForTurmaAndComponente(plan.turmaId, plan.componente) || '';
         const matchesProfessor = (profName || '').toLowerCase().includes(term) ||
-                                 (plan.professor || '').toLowerCase().includes(term) ||
-                                 turmaProf.toLowerCase().includes(term);
+                                 (plan.professor || '').toLowerCase().includes(term);
 
         if (!matchesTitulo && !matchesObjetivos && !matchesEscola && !matchesTurma && !matchesComp && !matchesProfessor) return false;
       }
@@ -1538,9 +1643,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
             <div style={{ textAlign: 'center' }}>
               <div style={{ borderTop: '1.5pt solid #0f172a', width: '100%', marginBottom: '6pt' }} />
               <p style={{ fontSize: '9pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#0f172a', marginBottom: '2pt' }}>
-                {printPlan.professor && printPlan.professor !== printPlan.avaliadoPor
-                  ? printPlan.professor
-                  : (findTeacherForTurmaAndComponente(printPlan.turmaId, printPlan.componente) || printPlan.professor || 'Docente Responsável')}
+                {getDisplayTeacher(printPlan.professor, printPlan.turmaId, printPlan.componente)}
               </p>
               <p style={{ fontSize: '7pt', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#64748b', fontFamily: "'JetBrains Mono', monospace", marginBottom: '2pt' }}>
                 ASSINATURA DO(A) PROFESSOR(A)
@@ -2173,11 +2276,11 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
                         <div className="text-[10px] text-brand-orange font-bold uppercase mt-0.5">
                           {normalizeSubjectName(plan.componente)}
                         </div>
-                        {((plan.professor && plan.professor !== 'Docente Responsável' && plan.professor !== 'Professor') || findTeacherForTurmaAndComponente(plan.turmaId, plan.componente)) && (
+                        {getDisplayTeacher(plan.professor, plan.turmaId, plan.componente) !== 'Docente Responsável' && (
                           <div className="text-[10px] text-slate-500 font-medium mt-1 flex items-center gap-1">
                             <User className="w-3 h-3 text-slate-400 shrink-0" />
-                            <span className="truncate max-w-[200px]" title={(plan.professor && plan.professor !== 'Docente Responsável' && plan.professor !== 'Professor') ? plan.professor : (findTeacherForTurmaAndComponente(plan.turmaId, plan.componente) || '')}>
-                              Prof: {(plan.professor && plan.professor !== 'Docente Responsável' && plan.professor !== 'Professor') ? plan.professor : findTeacherForTurmaAndComponente(plan.turmaId, plan.componente)}
+                            <span className="truncate max-w-[200px]" title={getDisplayTeacher(plan.professor, plan.turmaId, plan.componente)}>
+                              Prof: {getDisplayTeacher(plan.professor, plan.turmaId, plan.componente)}
                             </span>
                           </div>
                         )}
@@ -2622,9 +2725,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
                     <div>
                       <div className="border-t border-slate-800 w-4/5 mx-auto mb-2" />
                       <p className="font-black text-slate-800 uppercase text-[10px]">
-                        {viewingPlan.professor && viewingPlan.professor !== viewingPlan.avaliadoPor
-                          ? viewingPlan.professor
-                          : (findTeacherForTurmaAndComponente(viewingPlan.turmaId, viewingPlan.componente) || viewingPlan.professor || 'Docente Responsável')}
+                        {getDisplayTeacher(viewingPlan.professor, viewingPlan.turmaId, viewingPlan.componente)}
                       </p>
                       <p className="text-[9px] text-slate-500 uppercase font-medium">Assinatura do(a) Professor(a)</p>
                     </div>
