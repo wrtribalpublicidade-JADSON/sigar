@@ -204,7 +204,6 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
         const escolaObj = escolas.find(esc => esc.id === d.escola_id);
         const escolaNome = escolaObj ? escolaObj.nome : 'Unidade';
         const turmaNome = turmaMap.get(d.turma_id) || d.ano_serie || 'Turma';
-        const profName = getTeacherName(d.updated_by || d.created_by || d.professor);
 
         return {
           id: d.id,
@@ -223,7 +222,7 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
           selectedHabilidadeIds: d.selected_habilidade_ids || [],
           selectedObjetoIds: d.selected_objeto_ids || [],
           criadoEm: d.created_at,
-          professor: profName
+          professor: d.updated_by || d.created_by || d.professor || ''
         };
       });
       setLogs(formatted);
@@ -1562,7 +1561,7 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
                         </div>
                         {log.professor && log.professor !== '---' && (
                           <div className="text-[9px] text-slate-400 mt-0.5 uppercase tracking-tight truncate max-w-[200px]">
-                            Prof: {log.professor}
+                            Prof: {getTeacherName(log.professor)}
                           </div>
                         )}
                       </td>

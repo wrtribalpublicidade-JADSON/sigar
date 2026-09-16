@@ -315,7 +315,9 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
     setLoading(true);
     try {
       if (!isDemoMode) {
-        const { data, error } = await supabase
+        // Build query – restrict to user's linked schools when not admin
+        const linkedIds = escolasInfantil.map(e => e.id);
+        let query = supabase
           .from('portfolio_visual_infantil')
           .select(`
             *,
@@ -328,8 +330,18 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
               shift
             )
           `)
-          .eq('ativo', true)
-          .order('data', { ascending: false });
+          .eq('ativo', true);
+
+        if (!isAdmin && linkedIds.length > 0) {
+          query = query.in('escola_id', linkedIds);
+        } else if (!isAdmin && linkedIds.length === 0) {
+          // User has no linked schools – return empty
+          setEntries([]);
+          setLoading(false);
+          return;
+        }
+
+        const { data, error } = await query.order('data', { ascending: false });
 
         if (error) throw error;
 
@@ -438,7 +450,7 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
 
   useEffect(() => {
     loadEntries();
-  }, [isDemoMode, selectedTurmaId, students]);
+  }, [isDemoMode, selectedTurmaId, students, escolasInfantil]);
 
   // Image Compressor Helper
   const compressImage = (file: File): Promise<string> => {
