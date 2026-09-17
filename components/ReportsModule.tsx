@@ -9,6 +9,7 @@ import { PrintableGerencialReport, TipoRelatorio, FiltroVinculo, SubtipoGestor }
 import { PrintableMatriculaReport } from './PrintableMatriculaReport';
 import { PrintableMatriculaDetalhadaReport } from './PrintableMatriculaDetalhadaReport';
 import { PrintableServidoresReport } from './PrintableServidoresReport';
+import { PrintableProfessoresReport } from './PrintableProfessoresReport';
 import { PrintableAtividadesReport } from './PrintableAtividadesReport';
 import { CoordinatorReportTab } from './reports/CoordinatorReportTab';
 import { PrintableCoordinatorReport } from './PrintableCoordinatorReport';
@@ -21,7 +22,7 @@ interface ReportsModuleProps {
    userRole?: string;
 }
 
-type ReportTab = 'visita' | 'gerenciais' | 'matriculas' | 'servidores' | 'atividades' | 'coordenador';
+type ReportTab = 'visita' | 'gerenciais' | 'matriculas' | 'servidores' | 'professores' | 'atividades' | 'coordenador';
 
 interface ServidorCompleto extends RecursoHumano {
    escolaNome: string;
@@ -40,6 +41,7 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
          { id: 'gerenciais' as ReportTab, icon: BarChart3, label: 'Relatórios Gerenciais' },
          { id: 'matriculas' as ReportTab, icon: GraduationCap, label: 'Controle de Matrículas' },
          { id: 'servidores' as ReportTab, icon: Briefcase, label: 'Controle de Servidores' },
+         { id: 'professores' as ReportTab, icon: GraduationCap, label: 'Controle de Professores' },
          { id: 'atividades' as ReportTab, icon: BookOpen, label: 'Ativ. Complementares' },
       ];
       return allTabs.filter(tab => hasTabAccess('relatorios', tab.id, userRole));
@@ -82,6 +84,15 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
    const [servidorEscolaFilter, setServidorEscolaFilter] = useState<string>('Todas');
    const [servidorSearchTerm, setServidorSearchTerm] = useState<string>('');
    const [isPrintingServidores, setIsPrintingServidores] = useState(false);
+
+   // === Professores Tab State ===
+   const [profVinculoFilter, setProfVinculoFilter] = useState<string>('Todos');
+   const [profEtapaFilter, setProfEtapaFilter] = useState<string>('Todas');
+   const [profComponenteFilter, setProfComponenteFilter] = useState<string>('Todos');
+   const [profEscolaFilter, setProfEscolaFilter] = useState<string>('Todas');
+   const [profSearchTerm, setProfSearchTerm] = useState<string>('');
+   const [profAnoSerieFilter, setProfAnoSerieFilter] = useState<string>('Todos');
+   const [isPrintingProfessores, setIsPrintingProfessores] = useState(false);
 
    // === Atividades Tab State ===
    const [atividadesData, setAtividadesData] = useState<(Atividade & { alunosList?: any[] })[]>([]);
@@ -262,6 +273,93 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
       return { total: servidoresFiltrados.length, efetivos, contratados, permutados, escolasComServidor, funcoes };
    }, [servidoresFiltrados]);
 
+   // === Professores: Only Professor(a) from todosServidores ===
+   const todosProfessores = useMemo(() => {
+      return todosServidores.filter(s => s.funcao === 'Professor(a)');
+   }, [todosServidores]);
+
+   const profEtapasDisponiveis = useMemo(() => {
+      const set = new Set(todosProfessores.map(p => p.etapaAtuacao).filter(Boolean) as string[]);
+      return Array.from(set).sort();
+   }, [todosProfessores]);
+
+   const profComponentesDisponiveis = useMemo(() => {
+      const set = new Set(todosProfessores.map(p => p.componenteCurricular).filter(Boolean) as string[]);
+      return Array.from(set).sort();
+   }, [todosProfessores]);
+
+   const profAnoSeriesDisponiveis = useMemo(() => {
+      const set = new Set<string>();
+      todosProfessores.forEach(p => {
+         (p.modalidadeInfantil || []).forEach(m => set.add(m));
+         (p.anosIniciaisAtuacao || []).forEach(a => set.add(a));
+      });
+      // Add standard values for Anos Finais and EJA teachers
+      const anosFinaisLabels = ['6º ano', '7º ano', '8º ano', '9º ano'];
+      todosProfessores.forEach(p => {
+         if (p.etapaAtuacao === 'Anos Finais') anosFinaisLabels.forEach(a => set.add(a));
+         if (p.etapaAtuacao === 'EJA') set.add('EJA');
+      });
+      return Array.from(set).sort((a, b) => {
+         // Custom sort: Creche, Pré-Escola, 1º-9º ano, EJA
+         const order = ['Creche', 'Pré-Escola', '1º ano', '2º ano', '3º ano', '4º ano', '5º ano', '6º ano', '7º ano', '8º ano', '9º ano', 'EJA'];
+         const ia = order.indexOf(a);
+         const ib = order.indexOf(b);
+         if (ia >= 0 && ib >= 0) return ia - ib;
+         if (ia >= 0) return -1;
+         if (ib >= 0) return 1;
+         return a.localeCompare(b);
+      });
+   }, [todosProfessores]);
+
+   const professoresFiltrados = useMemo(() => {
+      let filtered = todosProfessores;
+      if (profVinculoFilter !== 'Todos') {
+         filtered = filtered.filter(p => p.tipoVinculo === profVinculoFilter);
+      }
+      if (profEtapaFilter !== 'Todas') {
+         filtered = filtered.filter(p => p.etapaAtuacao === profEtapaFilter);
+      }
+      if (profComponenteFilter !== 'Todos') {
+         filtered = filtered.filter(p => p.componenteCurricular === profComponenteFilter);
+      }
+      if (profEscolaFilter !== 'Todas') {
+         filtered = filtered.filter(p => p.escolaId === profEscolaFilter);
+      }
+      if (profAnoSerieFilter !== 'Todos') {
+         filtered = filtered.filter(p => {
+            const infantil = p.modalidadeInfantil || [];
+            const iniciais = p.anosIniciaisAtuacao || [];
+            if (infantil.includes(profAnoSerieFilter as any)) return true;
+            if (iniciais.includes(profAnoSerieFilter as any)) return true;
+            // Match Anos Finais teachers for 6º-9º ano
+            if (['6º ano', '7º ano', '8º ano', '9º ano'].includes(profAnoSerieFilter) && p.etapaAtuacao === 'Anos Finais') return true;
+            // Match EJA teachers
+            if (profAnoSerieFilter === 'EJA' && p.etapaAtuacao === 'EJA') return true;
+            return false;
+         });
+      }
+      if (profSearchTerm.trim()) {
+         const term = profSearchTerm.toLowerCase().trim();
+         filtered = filtered.filter(p =>
+            p.nome.toLowerCase().includes(term) ||
+            (p.email && p.email.toLowerCase().includes(term)) ||
+            (p.cpf && p.cpf.includes(term))
+         );
+      }
+      return filtered.sort((a, b) => a.nome.localeCompare(b.nome));
+   }, [todosProfessores, profVinculoFilter, profEtapaFilter, profComponenteFilter, profEscolaFilter, profAnoSerieFilter, profSearchTerm]);
+
+   const professoresStats = useMemo(() => {
+      const efetivos = professoresFiltrados.filter(p => p.tipoVinculo === 'Efetivo').length;
+      const contratados = professoresFiltrados.filter(p => p.tipoVinculo === 'Contratado').length;
+      const permutados = professoresFiltrados.filter(p => p.tipoVinculo === 'Permutado').length;
+      const escolasComProf = new Set(professoresFiltrados.map(p => p.escolaId)).size;
+      const etapas = new Set(professoresFiltrados.map(p => p.etapaAtuacao).filter(Boolean)).size;
+      const componentes = new Set(professoresFiltrados.map(p => p.componenteCurricular).filter(Boolean)).size;
+      return { total: professoresFiltrados.length, efetivos, contratados, permutados, escolasComProf, etapas, componentes };
+   }, [professoresFiltrados]);
+
    // === Atividades: load from Supabase ===
    const fetchAtividadesReport = useCallback(async () => {
       setIsLoadingAtividades(true);
@@ -419,6 +517,36 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
       }));
       exportToCSV(dataToExport, 'controle_geral_servidores');
       showNotification('success', 'Relatório de servidores exportado com sucesso');
+   };
+
+   const handlePrintProfessores = () => {
+      setIsPrintingProfessores(true);
+      setTimeout(() => {
+         window.print();
+         setIsPrintingProfessores(false);
+      }, 300);
+   };
+
+   const handleExportProfessoresCSV = () => {
+      const dataToExport = professoresFiltrados.map((p, i) => ({
+         'Nº': i + 1,
+         'NOME': p.nome,
+         'CPF': p.cpf || '',
+         'DATA NASCIMENTO': p.dataNascimento ? new Date(p.dataNascimento + 'T12:00:00').toLocaleDateString('pt-BR') : '',
+         'ETAPA ATUAÇÃO': p.etapaAtuacao || '',
+         'COMPONENTE CURRICULAR': p.componenteCurricular || '',
+         'VÍNCULO': p.tipoVinculo,
+         'CARGA HORÁRIA': p.cargaHoraria || '',
+         'UNIDADE ESCOLAR': p.escolaNome,
+         'LOCALIZAÇÃO': p.escolaLocalizacao,
+         'TELEFONE': p.telefone || '',
+         'E-MAIL': p.email || '',
+         'DATA NOMEAÇÃO': p.dataNomeacao ? new Date(p.dataNomeacao + 'T12:00:00').toLocaleDateString('pt-BR') : '',
+         'MODALIDADE INFANTIL': p.modalidadeInfantil?.join(', ') || '',
+         'ANOS INICIAIS': p.anosIniciaisAtuacao?.join(', ') || '',
+      }));
+      exportToCSV(dataToExport, 'controle_professores');
+      showNotification('success', 'Relatório de professores exportado com sucesso');
    };
 
    const handleExport = () => {
@@ -1394,6 +1522,254 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
             </div>
          )}
 
+         {/* ====== PROFESSORES TAB ====== */}
+         {activeTab === 'professores' && (
+            <div className="space-y-8 animate-fade-in">
+               {/* Filters */}
+               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-6">
+                     {/* Busca por nome */}
+                     <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                           <Search className="w-4 h-4 text-blue-500" /> Buscar Professor
+                        </label>
+                        <div className="relative">
+                           <input
+                              type="text"
+                              value={profSearchTerm}
+                              onChange={e => setProfSearchTerm(e.target.value)}
+                              placeholder="Nome, e-mail ou CPF..."
+                              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 shadow-sm"
+                           />
+                        </div>
+                     </div>
+
+                     {/* Filtro por Vínculo */}
+                     <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                           <Users className="w-4 h-4 text-blue-500" /> Tipo de Vínculo
+                        </label>
+                        <div className="relative">
+                           <select
+                              value={profVinculoFilter}
+                              onChange={e => setProfVinculoFilter(e.target.value)}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 pr-10 text-sm font-medium text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 appearance-none shadow-sm"
+                           >
+                              <option value="Todos">Todos os Vínculos</option>
+                              <option value="Efetivo">Efetivo</option>
+                              <option value="Contratado">Contratado</option>
+                              <option value="Permutado">Permutado</option>
+                           </select>
+                           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        </div>
+                     </div>
+
+                     {/* Filtro por Etapa de Atuação */}
+                     <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                           <BookOpen className="w-4 h-4 text-blue-500" /> Etapa de Atuação
+                        </label>
+                        <div className="relative">
+                           <select
+                              value={profEtapaFilter}
+                              onChange={e => setProfEtapaFilter(e.target.value)}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 pr-10 text-sm font-medium text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 appearance-none shadow-sm"
+                           >
+                              <option value="Todas">Todas as Etapas</option>
+                              {profEtapasDisponiveis.map(e => <option key={e} value={e}>{e}</option>)}
+                           </select>
+                           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        </div>
+                     </div>
+
+                     {/* Filtro por Ano/Série/Grupo/Faixa Etária */}
+                     <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                           <GraduationCap className="w-4 h-4 text-blue-500" /> Ano / Série / Faixa
+                        </label>
+                        <div className="relative">
+                           <select
+                              value={profAnoSerieFilter}
+                              onChange={e => setProfAnoSerieFilter(e.target.value)}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 pr-10 text-sm font-medium text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 appearance-none shadow-sm"
+                           >
+                              <option value="Todos">Todos</option>
+                              {profAnoSeriesDisponiveis.map(a => <option key={a} value={a}>{a}</option>)}
+                           </select>
+                           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        </div>
+                     </div>
+
+                     {/* Filtro por Componente Curricular */}
+                     <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                           <Layout className="w-4 h-4 text-blue-500" /> Componente Curricular
+                        </label>
+                        <div className="relative">
+                           <select
+                              value={profComponenteFilter}
+                              onChange={e => setProfComponenteFilter(e.target.value)}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 pr-10 text-sm font-medium text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 appearance-none shadow-sm"
+                           >
+                              <option value="Todos">Todos os Componentes</option>
+                              {profComponentesDisponiveis.map(c => <option key={c} value={c}>{c}</option>)}
+                           </select>
+                           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        </div>
+                     </div>
+
+                     {/* Filtro por Escola */}
+                     <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                           <Building2 className="w-4 h-4 text-blue-500" /> Unidade Escolar
+                        </label>
+                        <div className="relative">
+                           <select
+                              value={profEscolaFilter}
+                              onChange={e => setProfEscolaFilter(e.target.value)}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 pr-10 text-sm font-medium text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 appearance-none shadow-sm"
+                           >
+                              <option value="Todas">Todas as Unidades</option>
+                              {escolas.sort((a, b) => a.nome.localeCompare(b.nome)).map(e => (
+                                 <option key={e.id} value={e.id}>{e.nome}</option>
+                              ))}
+                           </select>
+                           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        </div>
+                     </div>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex gap-3 justify-end">
+                     {canEditTab && (
+                        <button
+                           onClick={handleExportProfessoresCSV}
+                           className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-6 py-3 rounded-xl font-bold shadow-sm transition-all flex items-center gap-2"
+                        >
+                           <Download className="w-5 h-5" /> Exportar CSV
+                        </button>
+                     )}
+                     <button
+                        onClick={handlePrintProfessores}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2 whitespace-nowrap"
+                     >
+                        <Printer className="w-5 h-5" /> Imprimir Relatório
+                     </button>
+                  </div>
+               </div>
+
+               {/* KPI Cards */}
+               <div className="grid grid-cols-2 lg:grid-cols-7 gap-4">
+                  {[
+                     { label: 'Total Geral', val: professoresStats.total, color: 'bg-slate-900', textColor: 'text-white' },
+                     { label: 'Efetivos', val: professoresStats.efetivos, color: 'bg-emerald-500', textColor: 'text-white' },
+                     { label: 'Contratados', val: professoresStats.contratados, color: 'bg-orange-500', textColor: 'text-white' },
+                     { label: 'Permutados', val: professoresStats.permutados, color: 'bg-blue-500', textColor: 'text-white' },
+                     { label: 'Unidades', val: professoresStats.escolasComProf, color: 'bg-white', textColor: 'text-blue-600' },
+                     { label: 'Etapas', val: professoresStats.etapas, color: 'bg-white', textColor: 'text-blue-600' },
+                     { label: 'Componentes', val: professoresStats.componentes, color: 'bg-white', textColor: 'text-blue-600' },
+                  ].map((k, i) => (
+                     <div key={i} className={`${k.color} rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col items-center justify-center text-center hover:shadow-md transition-all`}>
+                        <p className={`text-[10px] font-bold ${k.textColor} opacity-70 uppercase tracking-wider mb-1`}>{k.label}</p>
+                        <p className={`text-2xl font-black ${k.textColor}`}>{k.val.toLocaleString()}</p>
+                     </div>
+                  ))}
+               </div>
+
+               {/* Table */}
+               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                  <div className="bg-blue-50 p-6 flex items-center justify-between border-b border-blue-100">
+                     <div className="flex items-center gap-3">
+                        <GraduationCap className="w-5 h-5 text-blue-600" />
+                        <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide">
+                           Controle de Professores — Corpo Docente
+                        </h3>
+                     </div>
+                     <span className="text-xs font-bold text-slate-500 bg-blue-100 px-2 py-1 rounded-md">
+                        {professoresFiltrados.length} registros
+                     </span>
+                  </div>
+                  <div className="overflow-x-auto">
+                     {professoresFiltrados.length === 0 ? (
+                        <div className="p-20 text-center flex flex-col items-center justify-center text-slate-400">
+                           <GraduationCap className="w-12 h-12 mb-4 opacity-20" />
+                           <p className="font-medium">Nenhum professor encontrado com os filtros selecionados.</p>
+                        </div>
+                     ) : (
+                        <table className="w-full text-left">
+                           <thead className="bg-slate-50 border-b border-slate-200">
+                              <tr className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                 <th className="px-4 py-4 w-12">Nº</th>
+                                 <th className="px-4 py-4">Nome / Contato</th>
+                                 <th className="px-4 py-4">Unidade Escolar</th>
+                                 <th className="px-4 py-4">Etapa de Atuação</th>
+                                 <th className="px-4 py-4">Componente Curricular</th>
+                                 <th className="px-4 py-4 text-center">Vínculo</th>
+                                 <th className="px-4 py-4 text-center">C. Horária</th>
+                                 <th className="px-4 py-4 text-center">Nomeação</th>
+                              </tr>
+                           </thead>
+                           <tbody className="divide-y divide-slate-100">
+                              {professoresFiltrados.map((prof, i) => (
+                                 <tr key={`${prof.id}-${prof.escolaId}-${i}`} className="group hover:bg-blue-50/30 transition-all">
+                                    <td className="px-4 py-3 text-xs font-bold text-slate-400">{i + 1}</td>
+                                    <td className="px-4 py-3">
+                                       <div className="font-bold text-slate-800 text-sm">{prof.nome}</div>
+                                       <div className="flex items-center gap-3 mt-1">
+                                          {prof.email && (
+                                             <span className="text-xs text-blue-500 flex items-center gap-1">
+                                                <Mail className="w-3 h-3" /> {prof.email}
+                                             </span>
+                                          )}
+                                          {prof.telefone && (
+                                             <span className="text-xs text-slate-400 flex items-center gap-1">
+                                                <Phone className="w-3 h-3" /> {prof.telefone}
+                                             </span>
+                                          )}
+                                       </div>
+                                       {prof.cpf && <div className="text-[10px] text-slate-400 mt-0.5">CPF: {prof.cpf}</div>}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                       <div className="text-sm font-medium text-slate-700">{prof.escolaNome}</div>
+                                       <div className="text-[10px] text-slate-400 font-bold uppercase">{prof.escolaLocalizacao}</div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                       <div className="text-sm font-medium text-slate-700">{prof.etapaAtuacao || '-'}</div>
+                                       {prof.modalidadeInfantil && prof.modalidadeInfantil.length > 0 && (
+                                          <div className="text-[10px] text-blue-500 mt-0.5">{prof.modalidadeInfantil.join(', ')}</div>
+                                       )}
+                                       {prof.anosIniciaisAtuacao && prof.anosIniciaisAtuacao.length > 0 && (
+                                          <div className="text-[10px] text-emerald-500 mt-0.5">{prof.anosIniciaisAtuacao.join(', ')}</div>
+                                       )}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                       <div className="text-sm font-medium text-slate-700">{prof.componenteCurricular || '-'}</div>
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                       <span className={`inline-block px-3 py-1 rounded-lg text-xs font-bold ${
+                                          prof.tipoVinculo === 'Efetivo' ? 'bg-emerald-100 text-emerald-700' :
+                                          prof.tipoVinculo === 'Permutado' ? 'bg-blue-100 text-blue-700' :
+                                          'bg-orange-100 text-orange-700'
+                                       }`}>
+                                          {prof.tipoVinculo}
+                                       </span>
+                                    </td>
+                                    <td className="px-4 py-3 text-center text-sm text-slate-600 font-medium">
+                                       {prof.cargaHoraria || '-'}
+                                    </td>
+                                    <td className="px-4 py-3 text-center text-sm text-slate-600">
+                                       {prof.dataNomeacao ? new Date(prof.dataNomeacao + 'T12:00:00').toLocaleDateString('pt-BR') : '-'}
+                                    </td>
+                                 </tr>
+                              ))}
+                           </tbody>
+                        </table>
+                     )}
+                  </div>
+               </div>
+            </div>
+         )}
+
          {/* ====== ATIVIDADES COMPLEMENTARES TAB ====== */}
          {activeTab === 'atividades' && (
             <div className="space-y-8 animate-fade-in">
@@ -1704,6 +2080,17 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({ visitas, escolas, 
                filtroFuncao={servidorFuncaoFilter}
                filtroVinculo={servidorVinculoFilter}
                filtroEscola={servidorEscolaFilter !== 'Todas' ? escolas.find(e => e.id === servidorEscolaFilter)?.nome || 'Todas' : 'Todas'}
+            />
+         )}
+
+         {isPrintingProfessores && (
+            <PrintableProfessoresReport
+               professores={professoresFiltrados}
+               filtroVinculo={profVinculoFilter}
+               filtroEtapa={profEtapaFilter}
+               filtroAnoSerie={profAnoSerieFilter}
+               filtroComponente={profComponenteFilter}
+               filtroEscola={profEscolaFilter !== 'Todas' ? escolas.find(e => e.id === profEscolaFilter)?.nome || 'Todas' : 'Todas'}
             />
          )}
 

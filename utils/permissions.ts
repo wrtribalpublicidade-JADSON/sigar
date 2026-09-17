@@ -95,6 +95,7 @@ export const ALL_MODULES = [
             { id: 'gerenciais', name: 'Relatórios Gerenciais' },
             { id: 'matriculas', name: 'Controle de Matrículas' },
             { id: 'servidores', name: 'Controle de Servidores' },
+            { id: 'professores', name: 'Controle de Professores' },
             { id: 'atividades', name: 'Atividades Complementares' }
         ]
     },
