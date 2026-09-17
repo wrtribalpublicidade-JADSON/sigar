@@ -109,6 +109,7 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
   const [historyFilterTurma, setHistoryFilterTurma] = useState<string>('');
   const [historyFilterCampoExperiencia, setHistoryFilterCampoExperiencia] = useState<string>('');
   const [historyFilterBimestre, setHistoryFilterBimestre] = useState<string>('');
+  const [historyFilterProfessor, setHistoryFilterProfessor] = useState<string>('');
   const [historyFilterStatus, setHistoryFilterStatus] = useState<string>('');
 
   // Pagination State
@@ -1172,7 +1173,7 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
   };
 
   const hasActiveHistoryFilters = Boolean(
-    historyFilterEscola || historyFilterFaixaEtaria || historyFilterTurma || historyFilterCampoExperiencia || historyFilterBimestre || historyFilterStatus
+    historyFilterEscola || historyFilterFaixaEtaria || historyFilterTurma || historyFilterCampoExperiencia || historyFilterBimestre || historyFilterProfessor || historyFilterStatus
   );
 
   const handleClearHistoryFilters = () => {
@@ -1181,6 +1182,7 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
     setHistoryFilterTurma('');
     setHistoryFilterCampoExperiencia('');
     setHistoryFilterBimestre('');
+    setHistoryFilterProfessor('');
     setHistoryFilterStatus('');
   };
 
@@ -1191,46 +1193,63 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
     const turmasSet = new Set<string>();
     const camposSet = new Set<string>();
     const bimestresSet = new Set<string>();
+    const professoresSet = new Set<string>();
 
     plans.forEach(plan => {
+      const profName = getDisplayTeacher(plan.professor, plan.turmaId);
+      const rawProf = plan.professor?.trim();
+      const resolvedProf = (profName && profName !== 'Professor(a) de Educação Infantil' && !isGenericTeacher(profName))
+        ? profName
+        : (rawProf && !isGenericTeacher(rawProf) && !isEmail(rawProf) ? rawProf : null);
+
       const matchEscola = !historyFilterEscola || String(plan.escolaId) === String(historyFilterEscola);
       const matchFaixa = !historyFilterFaixaEtaria || plan.anoSerie === historyFilterFaixaEtaria;
       const matchTurma = !historyFilterTurma || plan.turmaNome === historyFilterTurma || String(plan.turmaId) === String(historyFilterTurma);
       const matchCampo = !historyFilterCampoExperiencia || plan.campoExperiencia === historyFilterCampoExperiencia;
       const matchBimestre = !historyFilterBimestre || plan.periodo === historyFilterBimestre;
+      const matchProf = !historyFilterProfessor ||
+        profName?.toLowerCase() === historyFilterProfessor.toLowerCase() ||
+        (rawProf && rawProf.toLowerCase() === historyFilterProfessor.toLowerCase());
 
       // Escolas
       if (plan.escolaId && plan.escolaNome) {
-        if (matchFaixa && matchTurma && matchCampo && matchBimestre) {
+        if (matchFaixa && matchTurma && matchCampo && matchBimestre && matchProf) {
           escolasMap.set(String(plan.escolaId), plan.escolaNome);
         }
       }
 
       // Faixas Etárias
       if (plan.anoSerie) {
-        if (matchEscola && matchTurma && matchCampo && matchBimestre) {
+        if (matchEscola && matchTurma && matchCampo && matchBimestre && matchProf) {
           faixasSet.add(plan.anoSerie);
         }
       }
 
       // Turmas
       if (plan.turmaNome) {
-        if (matchEscola && matchFaixa && matchCampo && matchBimestre) {
+        if (matchEscola && matchFaixa && matchCampo && matchBimestre && matchProf) {
           turmasSet.add(plan.turmaNome);
         }
       }
 
       // Campos de Experiência
       if (plan.campoExperiencia) {
-        if (matchEscola && matchFaixa && matchTurma && matchBimestre) {
+        if (matchEscola && matchFaixa && matchTurma && matchBimestre && matchProf) {
           camposSet.add(plan.campoExperiencia);
         }
       }
 
       // Bimestres
       if (plan.periodo) {
-        if (matchEscola && matchFaixa && matchTurma && matchCampo) {
+        if (matchEscola && matchFaixa && matchTurma && matchCampo && matchProf) {
           bimestresSet.add(plan.periodo);
+        }
+      }
+
+      // Professores
+      if (resolvedProf) {
+        if (matchEscola && matchFaixa && matchTurma && matchCampo && matchBimestre) {
+          professoresSet.add(resolvedProf);
         }
       }
     });
@@ -1250,24 +1269,33 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
     const turmasList = Array.from(turmasSet).sort((a, b) => a.localeCompare(b));
     const camposList = Array.from(camposSet).sort((a, b) => a.localeCompare(b));
     const bimestresList = Array.from(bimestresSet).sort();
+    const professoresList = Array.from(professoresSet).sort((a, b) => a.localeCompare(b));
 
     return {
       escolas: escolasList,
       faixasEtarias: faixasList,
       turmas: turmasList,
       camposExperiencia: camposList,
-      bimestres: bimestresList
+      bimestres: bimestresList,
+      professores: professoresList
     };
-  }, [plans, historyFilterEscola, historyFilterFaixaEtaria, historyFilterTurma, historyFilterCampoExperiencia, historyFilterBimestre, escolasInfantil]);
+  }, [plans, historyFilterEscola, historyFilterFaixaEtaria, historyFilterTurma, historyFilterCampoExperiencia, historyFilterBimestre, historyFilterProfessor, escolasInfantil, coordMap, teachersAssignments]);
 
   // Filtered plans for historical view
   const filteredPlans = useMemo(() => {
     return plans.filter(plan => {
+      const profName = getDisplayTeacher(plan.professor, plan.turmaId);
+
       if (historyFilterEscola && String(plan.escolaId) !== String(historyFilterEscola)) return false;
       if (historyFilterFaixaEtaria && plan.anoSerie !== historyFilterFaixaEtaria) return false;
       if (historyFilterTurma && plan.turmaNome !== historyFilterTurma && String(plan.turmaId) !== String(historyFilterTurma)) return false;
       if (historyFilterCampoExperiencia && plan.campoExperiencia !== historyFilterCampoExperiencia) return false;
       if (historyFilterBimestre && plan.periodo !== historyFilterBimestre) return false;
+      if (historyFilterProfessor && 
+          profName?.toLowerCase() !== historyFilterProfessor.toLowerCase() && 
+          (!plan.professor || plan.professor.toLowerCase() !== historyFilterProfessor.toLowerCase())) {
+        return false;
+      }
       if (historyFilterStatus && (plan.status || 'Em Análise') !== historyFilterStatus) return false;
 
       if (searchTerm.trim()) {
@@ -1279,7 +1307,7 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
         const matchesCampo = (plan.campoExperiencia || '').toLowerCase().includes(term);
 
         // Busca por professor responsável
-        const profDisplay = getDisplayTeacher(plan.professor, plan.turmaId);
+        const profDisplay = profName;
         const matchesProfessor = (profDisplay || '').toLowerCase().includes(term) ||
                                  (plan.professor || '').toLowerCase().includes(term);
 
@@ -1288,12 +1316,19 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
 
       return true;
     });
-  }, [plans, historyFilterEscola, historyFilterFaixaEtaria, historyFilterTurma, historyFilterCampoExperiencia, historyFilterBimestre, historyFilterStatus, searchTerm, coordMap, teachersAssignments]);
+  }, [plans, historyFilterEscola, historyFilterFaixaEtaria, historyFilterTurma, historyFilterCampoExperiencia, historyFilterBimestre, historyFilterProfessor, historyFilterStatus, searchTerm, coordMap, teachersAssignments]);
+
+  // Auto-reset professor filter if selected professor is not in available options
+  useEffect(() => {
+    if (historyFilterProfessor && !historyOptions.professores.includes(historyFilterProfessor)) {
+      setHistoryFilterProfessor('');
+    }
+  }, [historyOptions.professores, historyFilterProfessor]);
 
   // Reset pagination to page 1 whenever any filter changes
   useEffect(() => {
     setHistoryCurrentPage(1);
-  }, [historyFilterEscola, historyFilterFaixaEtaria, historyFilterTurma, historyFilterCampoExperiencia, historyFilterBimestre, historyFilterStatus, searchTerm]);
+  }, [historyFilterEscola, historyFilterFaixaEtaria, historyFilterTurma, historyFilterCampoExperiencia, historyFilterBimestre, historyFilterProfessor, historyFilterStatus, searchTerm]);
 
   // Pagination Math
   const totalHistoryItems = filteredPlans.length;
@@ -1933,7 +1968,7 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
             {/* Unidade Escolar */}
             <div>
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Unidade Escolar</label>
@@ -2005,6 +2040,21 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
                 <option value="">Todos os Bimestres</option>
                 {historyOptions.bimestres.map(b => (
                   <option key={b} value={b}>{b}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Professor */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Professor</label>
+              <select
+                value={historyFilterProfessor}
+                onChange={e => setHistoryFilterProfessor(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todos os Professores</option>
+                {historyOptions.professores.map(p => (
+                  <option key={p} value={p}>{p}</option>
                 ))}
               </select>
             </div>

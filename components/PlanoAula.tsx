@@ -1112,12 +1112,19 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       const normComp = normalizeSubjectName(plan.componente);
       const profName = getDisplayTeacher(plan.professor, plan.turmaId, plan.componente);
 
+      const rawProf = plan.professor?.trim();
+      const resolvedProf = (profName && profName !== 'Docente Responsável' && !isGenericTeacher(profName)) 
+        ? profName 
+        : (rawProf && !isGenericTeacher(rawProf) && !isEmail(rawProf) ? rawProf : null);
+
       const matchEscola = !historyFilterEscola || String(plan.escolaId) === String(historyFilterEscola);
       const matchAno = !historyFilterAnoSerie || plan.anoSerie === historyFilterAnoSerie;
       const matchTurma = !historyFilterTurma || plan.turmaNome === historyFilterTurma || String(plan.turmaId) === String(historyFilterTurma);
       const matchComp = !historyFilterComponente || normComp === historyFilterComponente;
       const matchBimestre = !historyFilterBimestre || plan.periodo === historyFilterBimestre;
-      const matchProf = !historyFilterProfessor || profName === historyFilterProfessor || plan.professor === historyFilterProfessor;
+      const matchProf = !historyFilterProfessor || 
+        profName?.toLowerCase() === historyFilterProfessor.toLowerCase() || 
+        (rawProf && rawProf.toLowerCase() === historyFilterProfessor.toLowerCase());
 
       // Escolas
       if (plan.escolaId && plan.escolaNome) {
@@ -1155,9 +1162,9 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       }
 
       // Professores
-      if (profName && profName !== 'Docente Responsável') {
+      if (resolvedProf) {
         if (matchEscola && matchAno && matchTurma && matchComp && matchBimestre) {
-          professoresSet.add(profName);
+          professoresSet.add(resolvedProf);
         }
       }
     });
@@ -1300,7 +1307,11 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       if (historyFilterTurma && plan.turmaNome !== historyFilterTurma && String(plan.turmaId) !== String(historyFilterTurma)) return false;
       if (historyFilterComponente && normComp !== historyFilterComponente) return false;
       if (historyFilterBimestre && plan.periodo !== historyFilterBimestre) return false;
-      if (historyFilterProfessor && profName !== historyFilterProfessor && plan.professor !== historyFilterProfessor) return false;
+      if (historyFilterProfessor && 
+          profName?.toLowerCase() !== historyFilterProfessor.toLowerCase() && 
+          (!plan.professor || plan.professor.toLowerCase() !== historyFilterProfessor.toLowerCase())) {
+        return false;
+      }
       if (historyFilterStatus && (plan.status || 'Em Análise') !== historyFilterStatus) return false;
 
       if (searchTerm.trim()) {
@@ -1321,6 +1332,13 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       return true;
     });
   }, [plans, historyFilterEscola, historyFilterAnoSerie, historyFilterTurma, historyFilterComponente, historyFilterBimestre, historyFilterProfessor, historyFilterStatus, searchTerm, coordMap, teachersAssignments]);
+
+  // Auto-reset professor filter if selected professor is not in available options
+  useEffect(() => {
+    if (historyFilterProfessor && !historyOptions.professores.includes(historyFilterProfessor)) {
+      setHistoryFilterProfessor('');
+    }
+  }, [historyOptions.professores, historyFilterProfessor]);
 
   // Reset pagination to page 1 whenever any filter changes
   useEffect(() => {
@@ -2141,7 +2159,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
             {/* Unidade Escolar */}
             <div>
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Unidade Escolar</label>
@@ -2213,6 +2231,21 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
                 <option value="">Todos os Bimestres</option>
                 {historyOptions.bimestres.map(b => (
                   <option key={b} value={b}>{b}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Professor */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Professor</label>
+              <select
+                value={historyFilterProfessor}
+                onChange={e => setHistoryFilterProfessor(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
+              >
+                <option value="">Todos os Professores</option>
+                {historyOptions.professores.map(p => (
+                  <option key={p} value={p}>{p}</option>
                 ))}
               </select>
             </div>

@@ -10,6 +10,7 @@ import { PrintableCartaApresentacao } from './PrintableCartaApresentacao';
 import { PrintableSchoolDocument } from './PrintableSchoolDocument';
 import { PrintableTurmaMatriculasReport } from './PrintableTurmaMatriculasReport';
 import { PrintableBoletimIndividualEstudante } from './PrintableBoletimIndividualEstudante';
+import { PrintableSchoolTeachersReport } from './PrintableSchoolTeachersReport';
 import { AtasFinaisTab } from './AtasFinaisTab';
 import { FrequenciaAlunosTab } from './FrequenciaAlunosTab';
 import { QuadroHorarioDocente } from './QuadroHorarioDocente';
@@ -618,6 +619,16 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
     setTimeout(() => {
       window.print();
       setIsPrintingChecklist(false);
+    }, 500);
+  };
+
+  const [isPrintingProfessores, setIsPrintingProfessores] = useState(false);
+
+  const handlePrintProfessores = () => {
+    setIsPrintingProfessores(true);
+    setTimeout(() => {
+      window.print();
+      setIsPrintingProfessores(false);
     }, 500);
   };
 
@@ -3033,6 +3044,14 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                       Gerenciamento dos professores vinculados a esta unidade escolar, suas turmas e quadro de horários.
                     </p>
                   </div>
+                  {schoolTeachers.length > 0 && (
+                    <button
+                      onClick={handlePrintProfessores}
+                      className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl font-semibold shadow-sm transition-all flex items-center gap-2 whitespace-nowrap"
+                    >
+                      <Printer size={18} /> Imprimir Relatório
+                    </button>
+                  )}
                 </div>
 
                 {/* Sub-Tabs: Vínculos | Quadro de Horários */}
@@ -3335,6 +3354,15 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
       {isPrintingRh && (
         <PrintableRhReport
           escola={escola}
+          coordenador={regionalCoordinator}
+        />
+      )}
+
+      {isPrintingProfessores && (
+        <PrintableSchoolTeachersReport
+          escola={escola}
+          teachers={schoolTeachers}
+          turmas={schoolTurmas}
           coordenador={regionalCoordinator}
         />
       )}
