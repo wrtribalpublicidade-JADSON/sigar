@@ -4,7 +4,7 @@ import {
     Info, Lock, Plus, User, Sparkles, MapPin, HeartHandshake, 
     GraduationCap, ChevronLeft, ChevronRight, FileText, Globe, 
     Building2, CheckCircle2, Loader2, ShieldAlert, CheckCircle, AlertCircle,
-    Printer, History, UserX, Clock, Phone, Home, MessageSquare
+    Printer, History, UserX, Clock, Phone, Home, MessageSquare, Bus
 } from 'lucide-react';
 import { ccEstudanteService } from '../../services/gestaoConselhoService';
 import { supabase } from '../../services/supabase';
@@ -263,6 +263,7 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
     const [enderecoNumero, setEnderecoNumero] = useState('');
     const [enderecoComplemento, setEnderecoComplemento] = useState('');
     const [enderecoZona, setEnderecoZona] = useState<'Urbana' | 'Rural'>('Urbana');
+    const [transporteEscolar, setTransporteEscolar] = useState<'Sim' | 'Não'>('Não');
     const [isSearchingCep, setIsSearchingCep] = useState(false);
 
     // Form state - Contato
@@ -637,6 +638,7 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
             endereco_numero: enderecoNumero.trim() || undefined,
             endereco_complemento: enderecoComplemento.trim() || undefined,
             endereco_zona: enderecoZona || 'Urbana',
+            transporte_escolar: transporteEscolar || 'Não',
 
             // Contato
             contato_telefone: contatoTelefone.trim() || undefined,
@@ -718,6 +720,7 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
         setEnderecoNumero(student.endereco_numero || '');
         setEnderecoComplemento(student.endereco_complemento || '');
         setEnderecoZona((student.endereco_zona as any) || 'Urbana');
+        setTransporteEscolar((student.transporte_escolar as any) || 'Não');
 
         setContatoTelefone(student.contato_telefone ? formatTelefone(student.contato_telefone) : '');
         setContatoTelefone2(student.contato_telefone2 ? formatTelefone(student.contato_telefone2) : '');
@@ -804,6 +807,7 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
         setEnderecoNumero('');
         setEnderecoComplemento('');
         setEnderecoZona('Urbana');
+        setTransporteEscolar('Não');
 
         setContatoTelefone('');
         setContatoTelefone2('');
@@ -1289,9 +1293,9 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
                             {activeTab === 'endereco' && (
                                 <div className="space-y-6 animate-in fade-in duration-300">
                                     
-                                    {/* CEP com busca automática e Localização Urbana/Rural */}
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 items-end">
-                                        <div>
+                                    {/* CEP com busca automática, UF, Localização e Transporte Escolar */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-5 items-end">
+                                        <div className="lg:col-span-4">
                                             <label className="block text-[11px] font-black tracking-widest text-slate-400 uppercase mb-2 ml-1">
                                                 CEP (Busca Automática)
                                             </label>
@@ -1319,7 +1323,7 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
                                             </div>
                                         </div>
 
-                                        <div>
+                                        <div className="lg:col-span-2">
                                             <label className="block text-[11px] font-black tracking-widest text-slate-400 uppercase mb-2 ml-1">
                                                 UF
                                             </label>
@@ -1334,7 +1338,7 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
                                             </select>
                                         </div>
 
-                                        <div>
+                                        <div className="lg:col-span-3">
                                             <label className="block text-[11px] font-black tracking-widest text-slate-400 uppercase mb-2 ml-1">
                                                 Localização
                                             </label>
@@ -1363,7 +1367,46 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
                                                 </button>
                                             </div>
                                         </div>
+
+                                        <div className="lg:col-span-3">
+                                            <label className="block text-[11px] font-black tracking-widest text-slate-400 uppercase mb-2 ml-1 flex items-center gap-1.5">
+                                                <Bus className="w-3.5 h-3.5 text-brand-orange" />
+                                                Transporte Escolar
+                                            </label>
+                                            <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 h-[50px]">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setTransporteEscolar('Não')}
+                                                    className={`flex-1 py-1.5 text-xs font-black rounded-xl transition-all flex items-center justify-center cursor-pointer ${
+                                                        transporteEscolar === 'Não' 
+                                                            ? 'bg-brand-orange text-white shadow-md' 
+                                                            : 'text-slate-500 hover:text-slate-700'
+                                                    }`}
+                                                >
+                                                    NÃO
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setTransporteEscolar('Sim')}
+                                                    className={`flex-1 py-1.5 text-xs font-black rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                                                        transporteEscolar === 'Sim' 
+                                                            ? 'bg-brand-orange text-white shadow-md' 
+                                                            : 'text-slate-500 hover:text-slate-700'
+                                                    }`}
+                                                >
+                                                    <Bus className="w-3.5 h-3.5" />
+                                                    SIM
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
+
+                                    {transporteEscolar === 'Sim' && (
+                                        <div className="bg-orange-50/80 border border-orange-200/80 rounded-2xl px-4 py-2.5 flex items-center gap-2.5 text-xs text-brand-orange font-bold animate-in fade-in duration-200">
+                                            <Bus className="w-4 h-4 shrink-0 text-brand-orange" />
+                                            <span>Estudante cadastrado como usuário do Transporte Escolar Público.</span>
+                                        </div>
+                                    )}
 
                                     {/* Município, Distrito e Bairro */}
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
@@ -2494,8 +2537,13 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
                                                                 </div>
                                                                 <div>
                                                                     <div className={`font-black text-xs uppercase ${id === student.id ? 'text-orange-950' : 'text-slate-800'}`}>{student.name}</div>
-                                                                    <div className="text-[10px] text-slate-400 font-bold tracking-tight">
-                                                                        CPF: {student.cpf ? formatCPF(student.cpf) : 'Não inf.'} {student.nis ? `• NIS: ${formatNIS(student.nis)}` : ''}
+                                                                    <div className="text-[10px] text-slate-400 font-bold tracking-tight flex items-center gap-1.5 flex-wrap">
+                                                                        <span>CPF: {student.cpf ? formatCPF(student.cpf) : 'Não inf.'} {student.nis ? `• NIS: ${formatNIS(student.nis)}` : ''}</span>
+                                                                        {student.transporte_escolar === 'Sim' && (
+                                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 text-[9px] font-bold">
+                                                                                <Bus className="w-2.5 h-2.5" /> Transporte
+                                                                            </span>
+                                                                        )}
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -2604,6 +2652,7 @@ export const CadastroEstudanteModal: React.FC<CadastroEstudanteModalProps> = ({
                         endereco_numero: enderecoNumero.trim() || undefined,
                         endereco_complemento: enderecoComplemento.trim() || undefined,
                         endereco_zona: enderecoZona || 'Urbana',
+                        transporte_escolar: transporteEscolar || 'Não',
                         possui_deficiencia: possuiDeficiencia,
                         deficiencia_tipos: possuiDeficiencia === 'Sim' ? deficienciaTipos : [],
                         recursos_sala_saeb: possuiDeficiencia === 'Sim' ? recursosSalaSaeb : [],

@@ -344,10 +344,10 @@ export const PrintableDossieEstudante: React.FC<PrintableDossieEstudanteProps> =
                 {student.endereco_municipio ? `${student.endereco_municipio} / ${student.endereco_uf || 'MA'}` : 'Humberto de Campos / MA'}
               </td>
               <td style={{ padding: '4.5pt 8pt', border: '0.5pt solid #cbd5e1', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', background: '#f8fafc' }}>
-                CEP / Localização Residencial
+                CEP / Localização / Transporte
               </td>
               <td style={{ padding: '4.5pt 8pt', border: '0.5pt solid #cbd5e1', fontSize: '8.5pt', fontWeight: 700, color: '#1e293b' }}>
-                CEP: {student.cep ? formatCEP(student.cep) : '---'} • Zona: <strong style={{ textTransform: 'uppercase' }}>{student.endereco_zona || 'Urbana'}</strong>
+                CEP: {student.cep ? formatCEP(student.cep) : '---'} • Zona: <strong style={{ textTransform: 'uppercase' }}>{student.endereco_zona || 'Urbana'}</strong> • Transporte: <strong style={{ color: student.transporte_escolar === 'Sim' ? '#c2410c' : '#475569', textTransform: 'uppercase' }}>{student.transporte_escolar || 'Não'}</strong>
               </td>
             </tr>
           </tbody>

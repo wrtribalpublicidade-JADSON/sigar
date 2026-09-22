@@ -217,6 +217,7 @@ export interface HistoricoMatriculaItem {
    endereco_numero?: string;
    endereco_complemento?: string;
    endereco_zona?: string;
+   transporte_escolar?: 'Sim' | 'Não' | string;
 
    // Educação Especial
    possui_deficiencia?: string;
