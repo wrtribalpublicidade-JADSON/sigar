@@ -7,7 +7,7 @@ import {
   BookOpen, Plus, Search, Edit2, Trash2, Printer, 
   X, Calendar, School as SchoolIcon, Bookmark, Save,
   Layers, Check, Maximize2, Minimize2, ListFilter, RotateCcw, ChevronLeft, ChevronRight,
-  CheckCircle2, AlertCircle, Clock, MessageSquare, Eye, FileText, User
+  CheckCircle2, AlertCircle, Clock, MessageSquare, Eye, FileText, User, Info
 } from 'lucide-react';
 import { Escola, Coordenador } from '../types';
 import { supabase } from '../services/supabase';
@@ -2462,98 +2462,184 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
 
       {/* Evaluation Modal for Coordinators */}
       {evaluatingPlan && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 animate-scale-up space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <Bookmark className="w-5 h-5 text-brand-orange" />
-                <h3 className="text-base font-bold text-slate-800">
-                  Avaliar Guia de Aprendizagem
-                </h3>
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-hidden animate-fade-in">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-4xl lg:max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-scale-up">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0 bg-slate-50/50">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-orange-100/80 text-brand-orange">
+                  <Bookmark className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-800">
+                    Avaliar Guia de Aprendizagem
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Parecer e validação pedagógica do planejamento docente
+                  </p>
+                </div>
               </div>
               <button
                 onClick={() => setEvaluatingPlan(null)}
-                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors"
+                title="Fechar"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3.5 space-y-1 text-xs text-slate-700">
-              <div><span className="font-bold text-slate-500 uppercase text-[10px]">Guia / Tema:</span> <span className="font-bold text-slate-800">{evaluatingPlan.titulo}</span></div>
-              <div><span className="font-bold text-slate-500 uppercase text-[10px]">Escola / Turma:</span> {evaluatingPlan.escolaNome} — {evaluatingPlan.turmaNome} ({evaluatingPlan.anoSerie})</div>
-              <div><span className="font-bold text-slate-500 uppercase text-[10px]">Componente:</span> {evaluatingPlan.componente} ({evaluatingPlan.periodo})</div>
-              <div>
-                <span className="font-bold text-slate-500 uppercase text-[10px]">Período de Utilização:</span>{' '}
-                <span className="font-bold text-brand-orange">
-                  {evaluatingPlan.dataInicio && evaluatingPlan.dataTermino
-                    ? `${new Date(evaluatingPlan.dataInicio + 'T12:00:00').toLocaleDateString()} a ${new Date(evaluatingPlan.dataTermino + 'T12:00:00').toLocaleDateString()}`
-                    : new Date(evaluatingPlan.data + 'T12:00:00').toLocaleDateString()}
+            {/* Scrollable Content Body with Horizontal Split on md/lg */}
+            <div className="flex-1 overflow-y-auto p-5 sm:p-6 min-h-0 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-stretch">
+                
+                {/* Left Column: Guia Details (Expanded horizontally) */}
+                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex flex-col justify-between space-y-3">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-200/70">
+                      <span className="text-[11px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                        <Info className="w-3.5 h-3.5 text-brand-orange" /> Dados da Guia
+                      </span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">
+                        {evaluatingPlan.periodo}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2 text-xs text-slate-700">
+                      <div>
+                        <span className="font-bold text-slate-500 uppercase text-[10px] block mb-0.5">Escola & Turma</span>
+                        <div className="font-semibold text-slate-800 bg-white border border-slate-200/60 rounded-xl px-2.5 py-1.5">
+                          {evaluatingPlan.escolaNome} — {evaluatingPlan.turmaNome} <span className="text-slate-500 font-normal">({evaluatingPlan.anoSerie})</span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <span className="font-bold text-slate-500 uppercase text-[10px] block mb-0.5">Componente Curricular</span>
+                        <div className="font-medium text-slate-800 bg-white border border-slate-200/60 rounded-xl px-2.5 py-1.5">
+                          {evaluatingPlan.componente}
+                        </div>
+                      </div>
+
+                      <div>
+                        <span className="font-bold text-slate-500 uppercase text-[10px] block mb-0.5">Período de Utilização</span>
+                        <div className="font-bold text-brand-orange bg-white border border-slate-200/60 rounded-xl px-2.5 py-1.5 flex items-center justify-between text-[11px]">
+                          <span>
+                            {evaluatingPlan.dataInicio && evaluatingPlan.dataTermino
+                              ? `${new Date(evaluatingPlan.dataInicio + 'T12:00:00').toLocaleDateString('pt-BR')} a ${new Date(evaluatingPlan.dataTermino + 'T12:00:00').toLocaleDateString('pt-BR')}`
+                              : new Date(evaluatingPlan.data + 'T12:00:00').toLocaleDateString('pt-BR')}
+                          </span>
+                          <span className="text-slate-400 font-medium text-[10px]">
+                            Criado: {new Date((evaluatingPlan.dataCriacao || (evaluatingPlan.criadoEm ? evaluatingPlan.criadoEm.split('T')[0] : evaluatingPlan.data)) + 'T12:00:00').toLocaleDateString('pt-BR')}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="font-bold text-slate-500 uppercase text-[10px] block mb-1">
+                        Guia / Tema (Conteúdo)
+                      </span>
+                      <div className="bg-white border border-slate-200/80 rounded-xl p-3 text-xs text-slate-700 font-medium leading-relaxed max-h-52 sm:max-h-60 overflow-y-auto whitespace-pre-wrap shadow-inner">
+                        {evaluatingPlan.titulo}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column: Decision & Observations */}
+                <div className="flex flex-col justify-between space-y-4">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">
+                        Selecione a Decisão
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setEvalTargetStatus('Aprovado')}
+                          className={`p-3 rounded-2xl border-2 flex items-center justify-center gap-2 font-bold text-xs transition-all cursor-pointer ${
+                            evalTargetStatus === 'Aprovado'
+                              ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm'
+                              : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                          }`}
+                        >
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          Aprovar Guia
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEvalTargetStatus('Devolvido para Correção')}
+                          className={`p-3 rounded-2xl border-2 flex items-center justify-center gap-2 font-bold text-xs transition-all cursor-pointer ${
+                            evalTargetStatus === 'Devolvido para Correção'
+                              ? 'border-rose-500 bg-rose-50 text-rose-700 shadow-sm'
+                              : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                          }`}
+                        >
+                          <AlertCircle className="w-4 h-4 text-rose-600" />
+                          Devolver p/ Correção
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex-1 flex flex-col">
+                      <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">
+                        Observações da Coordenação {evalTargetStatus === 'Devolvido para Correção' ? <span className="text-rose-500 font-bold">* (Obrigatório)</span> : <span className="text-slate-400 font-normal">(Opcional)</span>}
+                      </label>
+                      <textarea
+                        value={evalObsText}
+                        onChange={e => setEvalObsText(e.target.value)}
+                        placeholder={evalTargetStatus === 'Devolvido para Correção' 
+                          ? "Descreva detalhadamente o que o professor deve ajustar na guia..." 
+                          : "Observações ou orientações pedagógicas complementares..."}
+                        rows={6}
+                        className={`w-full p-3 border rounded-2xl text-xs outline-none transition-all font-medium resize-none ${
+                          evalTargetStatus === 'Devolvido para Correção' && !evalObsText.trim()
+                            ? 'border-rose-300 focus:border-rose-500 focus:ring-1 focus:ring-rose-200 bg-rose-50/20'
+                            : 'border-slate-200 focus:border-brand-orange'
+                        }`}
+                      />
+                      {evalTargetStatus === 'Devolvido para Correção' && (
+                        <p className="text-[11px] text-amber-700 mt-1.5 flex items-center gap-1 font-medium">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0 text-amber-600" />
+                          A justificativa é fundamental para orientar os ajustes do docente.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            {/* Sticky / Always-Visible Footer */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-6 py-3.5 border-t border-slate-100 bg-slate-50/90 shrink-0">
+              <div className="text-xs text-slate-500 flex items-center gap-2">
+                <span className="font-semibold text-slate-600">Ação Selecionada:</span>
+                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold text-[11px] ${
+                  evalTargetStatus === 'Aprovado' 
+                    ? 'bg-emerald-100 text-emerald-800' 
+                    : 'bg-rose-100 text-rose-800'
+                }`}>
+                  {evalTargetStatus === 'Aprovado' ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                  {evalTargetStatus === 'Aprovado' ? 'Aprovação' : 'Devolução para Correção'}
                 </span>
-                {' '}&bull;{' '}
-                <span className="font-bold text-slate-500 uppercase text-[10px]">Criado em:</span>{' '}
-                {new Date((evaluatingPlan.dataCriacao || (evaluatingPlan.criadoEm ? evaluatingPlan.criadoEm.split('T')[0] : evaluatingPlan.data)) + 'T12:00:00').toLocaleDateString('pt-BR')}
               </div>
-            </div>
-
-            <div className="space-y-3">
-              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider">
-                Selecione a Decisão
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setEvalTargetStatus('Aprovado')}
-                  className={`p-3 rounded-2xl border-2 flex items-center justify-center gap-2 font-bold text-xs transition-all ${
-                    evalTargetStatus === 'Aprovado'
-                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm'
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+              <div className="flex items-center justify-end gap-2.5">
+                <Button variant="ghost" onClick={() => setEvaluatingPlan(null)}>
+                  Cancelar
+                </Button>
+                <Button 
+                  variant="primary" 
+                  onClick={handleSaveEvaluation}
+                  className={`font-bold transition-all shadow-md active:scale-95 ${
+                    evalTargetStatus === 'Aprovado' 
+                      ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20' 
+                      : 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/20'
                   }`}
                 >
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  Aprovar Guia
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEvalTargetStatus('Devolvido para Correção')}
-                  className={`p-3 rounded-2xl border-2 flex items-center justify-center gap-2 font-bold text-xs transition-all ${
-                    evalTargetStatus === 'Devolvido para Correção'
-                      ? 'border-rose-500 bg-rose-50 text-rose-700 shadow-sm'
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                  }`}
-                >
-                  <AlertCircle className="w-4 h-4 text-rose-600" />
-                  Devolver p/ Correção
-                </button>
+                  {evalTargetStatus === 'Aprovado' ? 'Confirmar Aprovação' : 'Confirmar Devolução'}
+                </Button>
               </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
-                  Observações da Coordenação {evalTargetStatus === 'Devolvido para Correção' ? <span className="text-rose-500">*</span> : <span className="text-slate-400 font-normal">(Opcional)</span>}
-                </label>
-                <textarea
-                  value={evalObsText}
-                  onChange={e => setEvalObsText(e.target.value)}
-                  placeholder={evalTargetStatus === 'Devolvido para Correção' 
-                    ? "Descreva detalhadamente o que o professor deve ajustar na guia..." 
-                    : "Observações ou orientações pedagógicas complementares..."}
-                  rows={4}
-                  className="w-full p-3 border border-slate-200 rounded-2xl text-xs outline-none focus:border-brand-orange transition-all font-medium"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-              <Button variant="ghost" onClick={() => setEvaluatingPlan(null)}>
-                Cancelar
-              </Button>
-              <Button 
-                variant="primary" 
-                onClick={handleSaveEvaluation}
-                className={evalTargetStatus === 'Aprovado' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'}
-              >
-                {evalTargetStatus === 'Aprovado' ? 'Confirmar Aprovação' : 'Confirmar Devolução'}
-              </Button>
             </div>
           </div>
         </div>

@@ -965,8 +965,8 @@ export const DiarioAtividadeModal: React.FC<{
             {/* Coordinator Evaluation Modal */}
             {evaluatingLog && (
                 <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-                    <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 animate-scale-up space-y-4">
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full max-h-[92vh] flex flex-col overflow-hidden animate-scale-up">
+                        <div className="flex items-center justify-between border-b border-slate-100 p-6 pb-3 shrink-0">
                             <div className="flex items-center gap-2">
                                 <Bookmark className="w-5 h-5 text-brand-orange" />
                                 <h3 className="text-base font-black text-slate-800 uppercase tracking-tight">
@@ -981,75 +981,77 @@ export const DiarioAtividadeModal: React.FC<{
                             </button>
                         </div>
 
-                        <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3.5 space-y-1.5 text-xs text-slate-700">
-                            <div>
-                                <span className="font-bold text-slate-400 uppercase text-[10px] block">Atividade / Oficina</span>
-                                <span className="font-extrabold text-slate-800">{atividade?.nome}</span>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/50">
+                        <div className="p-6 pt-3 space-y-4 overflow-y-auto flex-1 min-h-0">
+                            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3.5 space-y-1.5 text-xs text-slate-700">
                                 <div>
-                                    <span className="font-bold text-slate-400 uppercase text-[10px] block">Data da Aula</span>
-                                    <span className="font-bold text-slate-700">{new Date(evaluatingLog.data + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
+                                    <span className="font-bold text-slate-400 uppercase text-[10px] block">Atividade / Oficina</span>
+                                    <span className="font-extrabold text-slate-800">{atividade?.nome}</span>
                                 </div>
-                                <div>
-                                    <span className="font-bold text-slate-400 uppercase text-[10px] block">Período</span>
-                                    <span className="font-bold text-slate-700">{evaluatingLog.periodo || '1º Bimestre'}</span>
+                                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/50">
+                                    <div>
+                                        <span className="font-bold text-slate-400 uppercase text-[10px] block">Data da Aula</span>
+                                        <span className="font-bold text-slate-700">{new Date(evaluatingLog.data + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
+                                    </div>
+                                    <div>
+                                        <span className="font-bold text-slate-400 uppercase text-[10px] block">Período</span>
+                                        <span className="font-bold text-slate-700">{evaluatingLog.periodo || '1º Bimestre'}</span>
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="pt-1 border-t border-slate-200/50">
-                                <span className="font-bold text-slate-400 uppercase text-[10px] block">Conteúdo Registrado</span>
-                                <p className="text-slate-600 font-medium line-clamp-2 italic">"{evaluatingLog.conteudo}"</p>
-                            </div>
-                        </div>
-
-                        <div className="space-y-3">
-                            <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider">
-                                Decisão da Coordenação
-                            </label>
-                            <div className="grid grid-cols-2 gap-3">
-                                <button
-                                    type="button"
-                                    onClick={() => setEvalTargetStatus('Aprovado')}
-                                    className={`p-3 rounded-2xl border-2 flex items-center justify-center gap-2 font-black text-xs uppercase tracking-wider transition-all cursor-pointer ${
-                                        evalTargetStatus === 'Aprovado'
-                                            ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm'
-                                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                                    }`}
-                                >
-                                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                                    Aprovar
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setEvalTargetStatus('Devolvido para Correção')}
-                                    className={`p-3 rounded-2xl border-2 flex items-center justify-center gap-2 font-black text-xs uppercase tracking-wider transition-all cursor-pointer ${
-                                        evalTargetStatus === 'Devolvido para Correção'
-                                            ? 'border-rose-500 bg-rose-50 text-rose-700 shadow-sm'
-                                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                                    }`}
-                                >
-                                    <AlertCircle className="w-4 h-4 text-rose-600" />
-                                    Devolver p/ Correção
-                                </button>
+                                <div className="pt-1 border-t border-slate-200/50">
+                                    <span className="font-bold text-slate-400 uppercase text-[10px] block">Conteúdo Registrado</span>
+                                    <p className="text-slate-600 font-medium italic max-h-32 overflow-y-auto whitespace-pre-wrap">"{evaluatingLog.conteudo}"</p>
+                                </div>
                             </div>
 
-                            <div>
-                                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
-                                    Observações da Coordenação {evalTargetStatus === 'Devolvido para Correção' ? <span className="text-rose-500">*</span> : <span className="text-slate-400 font-normal">(Opcional)</span>}
+                            <div className="space-y-3">
+                                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider">
+                                    Decisão da Coordenação
                                 </label>
-                                <textarea
-                                    value={evalObsText}
-                                    onChange={e => setEvalObsText(e.target.value)}
-                                    placeholder={evalTargetStatus === 'Devolvido para Correção' 
-                                        ? "Descreva detalhadamente o que o instrutor/professor deve ajustar no registro deste conteúdo..." 
-                                        : "Observações ou orientações pedagógicas complementares..."}
-                                    rows={4}
-                                    className="w-full p-3 border border-slate-200 rounded-2xl text-xs outline-none focus:border-brand-orange transition-all font-medium resize-none"
-                                />
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setEvalTargetStatus('Aprovado')}
+                                        className={`p-3 rounded-2xl border-2 flex items-center justify-center gap-2 font-black text-xs uppercase tracking-wider transition-all cursor-pointer ${
+                                            evalTargetStatus === 'Aprovado'
+                                                ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm'
+                                                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                                        }`}
+                                    >
+                                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                        Aprovar
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setEvalTargetStatus('Devolvido para Correção')}
+                                        className={`p-3 rounded-2xl border-2 flex items-center justify-center gap-2 font-black text-xs uppercase tracking-wider transition-all cursor-pointer ${
+                                            evalTargetStatus === 'Devolvido para Correção'
+                                                ? 'border-rose-500 bg-rose-50 text-rose-700 shadow-sm'
+                                                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                                        }`}
+                                    >
+                                        <AlertCircle className="w-4 h-4 text-rose-600" />
+                                        Devolver p/ Correção
+                                    </button>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
+                                        Observações da Coordenação {evalTargetStatus === 'Devolvido para Correção' ? <span className="text-rose-500">*</span> : <span className="text-slate-400 font-normal">(Opcional)</span>}
+                                    </label>
+                                    <textarea
+                                        value={evalObsText}
+                                        onChange={e => setEvalObsText(e.target.value)}
+                                        placeholder={evalTargetStatus === 'Devolvido para Correção' 
+                                            ? "Descreva detalhadamente o que o instrutor/professor deve ajustar no registro deste conteúdo..." 
+                                            : "Observações ou orientações pedagógicas complementares..."}
+                                        rows={4}
+                                        className="w-full p-3 border border-slate-200 rounded-2xl text-xs outline-none focus:border-brand-orange transition-all font-medium resize-none"
+                                    />
+                                </div>
                             </div>
                         </div>
 
-                        <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                        <div className="flex justify-end gap-2 p-6 pt-3 border-t border-slate-100 shrink-0 bg-slate-50/50">
                             <button 
                                 type="button"
                                 onClick={() => setEvaluatingLog(null)}
