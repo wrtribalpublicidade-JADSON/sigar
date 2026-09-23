@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { ArrowLeft, Target, TrendingUp, History, FileText, Save, Users, Calculator, Briefcase, Plus, Trash2, Edit, ClipboardCheck, AlertCircle, AlertTriangle, CheckCircle2, School as SchoolIcon, LayoutDashboard, GraduationCap, Clock, Activity, Award, BookOpen, UserPlus, X, MapPin, ChevronRight, CheckSquare, Printer, Loader2, Search, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Target, TrendingUp, History, FileText, Save, Users, Calculator, Briefcase, Plus, Trash2, Edit, ClipboardCheck, AlertCircle, AlertTriangle, CheckCircle2, School as SchoolIcon, LayoutDashboard, GraduationCap, Clock, Activity, Award, BookOpen, UserPlus, X, MapPin, ChevronRight, CheckSquare, Printer, Loader2, Search, RefreshCw, FileSpreadsheet } from 'lucide-react';
 import { PageHeader } from './ui/PageHeader';
 import { PrintableVisitReport } from './PrintableVisitReport';
 import { PrintableRhReport } from './PrintableRhReport';
@@ -11,6 +11,8 @@ import { PrintableSchoolDocument } from './PrintableSchoolDocument';
 import { PrintableTurmaMatriculasReport } from './PrintableTurmaMatriculasReport';
 import { PrintableBoletimIndividualEstudante } from './PrintableBoletimIndividualEstudante';
 import { PrintableSchoolTeachersReport } from './PrintableSchoolTeachersReport';
+import { ExportTurmasExcelModal } from './modals/ExportTurmasExcelModal';
+import { exportTurmasToExcel } from '../utils/exportTurmasExcel';
 import { AtasFinaisTab } from './AtasFinaisTab';
 import { FrequenciaAlunosTab } from './FrequenciaAlunosTab';
 import { QuadroHorarioDocente } from './QuadroHorarioDocente';
@@ -188,6 +190,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
 
   // Class report printing states
   const [isPrintTurmaModalOpen, setIsPrintTurmaModalOpen] = useState(false);
+  const [isExportTurmasModalOpen, setIsExportTurmasModalOpen] = useState(false);
   const [selectedTurmaForReport, setSelectedTurmaForReport] = useState<any>(null);
   const [reportStatusFilter, setReportStatusFilter] = useState<'ALL' | 'Ativo' | 'Inativo'>('ALL');
   
@@ -2819,6 +2822,19 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                       <Printer size={18} className="text-orange-500" /> Relatório de Turma
                     </button>
 
+                    <button
+                      onClick={() => {
+                        if (schoolTurmas.length > 0 && !selectedTurmaForReport) {
+                          setSelectedTurmaForReport(schoolTurmas[0]);
+                        }
+                        setIsExportTurmasModalOpen(true);
+                      }}
+                      className="bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 px-5 py-2.5 rounded-xl font-semibold shadow-sm border border-slate-200 hover:border-emerald-300 transition-all flex items-center gap-2"
+                      title="Exportar turmas e matrículas para planilha Excel (.xlsx)"
+                    >
+                      <FileSpreadsheet size={18} className="text-emerald-600" /> Exportar Turmas (Excel)
+                    </button>
+
                     {canEditTab && (
                       <button
                         onClick={() => { setSelectedStudent(null); setIsCadastroModalOpen(true); }}
@@ -3549,29 +3565,64 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
               )}
             </div>
 
-            <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+            <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-between items-center gap-3">
               <Button
                 variant="ghost"
                 onClick={() => setIsPrintTurmaModalOpen(false)}
               >
                 Cancelar
               </Button>
-              <Button
-                variant="primary"
-                disabled={!selectedTurmaForReport}
-                onClick={() => {
-                  setIsPrintTurmaModalOpen(false);
-                  setIsPrintingTurmaReport(true);
-                }}
-                className="flex items-center gap-2"
-              >
-                <Printer className="w-4 h-4" />
-                Imprimir Relatório
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  disabled={!selectedTurmaForReport}
+                  onClick={() => {
+                    if (selectedTurmaForReport) {
+                      exportTurmasToExcel({
+                        escola,
+                        turmas: schoolTurmas,
+                        students,
+                        schoolTeachers,
+                        mode: 'single_turma',
+                        selectedTurmaId: selectedTurmaForReport.id,
+                        statusFilter: reportStatusFilter
+                      });
+                    }
+                  }}
+                  className="flex items-center gap-2 border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-400"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                  Exportar Excel
+                </Button>
+                <Button
+                  variant="primary"
+                  disabled={!selectedTurmaForReport}
+                  onClick={() => {
+                    setIsPrintTurmaModalOpen(false);
+                    setIsPrintingTurmaReport(true);
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <Printer className="w-4 h-4" />
+                  Imprimir Relatório
+                </Button>
+              </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Export Turmas Excel Modal */}
+      <ExportTurmasExcelModal
+        isOpen={isExportTurmasModalOpen}
+        onClose={() => setIsExportTurmasModalOpen(false)}
+        escola={escola}
+        turmas={schoolTurmas}
+        students={students}
+        schoolTeachers={schoolTeachers}
+        filteredStudents={filteredStudentsMatriculas}
+        defaultTurmaId={selectedTurmaForReport?.id}
+      />
       {/* Printable Individual Boletim Component */}
       {printBoletimStudent && (
         <PrintableBoletimIndividualEstudante

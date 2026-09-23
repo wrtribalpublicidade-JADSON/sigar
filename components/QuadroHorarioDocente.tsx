@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { 
   Clock, Plus, X, Save, Trash2, Edit, Loader2, Printer, 
-  Sun, Moon, Sunset, GraduationCap, BookOpen, Users, ChevronDown, Sparkles 
+  Sun, Moon, Sunset, GraduationCap, BookOpen, Users, ChevronDown, Sparkles, Filter, Layers 
 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Coordenador, Escola, Segmento } from '../types';
@@ -13,6 +13,7 @@ import {
   DEFAULT_HORARIOS_CONFIG 
 } from '../services/configuracaoService';
 import { normalizeSubjectName, isEducaInfantilYear } from '../utils';
+import { PrintableQuadroHorarioDocente } from './PrintableQuadroHorarioDocente';
 
 interface QuadroHorarioDocenteProps {
   escolaId: string;
@@ -83,7 +84,6 @@ const TEACHER_COLORS = [
 ];
 
 const isEtapaOfertadaPelaEscola = (etapaId: string, escola?: Escola, schoolTurmas: any[] = []): boolean => {
-  // 1. Verificar segmentos declarados na escola
   const hasSegment = escola?.segmentos?.some(s => {
     const sStr = String(s).trim().toLowerCase();
     if (etapaId === 'Educação Infantil') {
@@ -98,7 +98,6 @@ const isEtapaOfertadaPelaEscola = (etapaId: string, escola?: Escola, schoolTurma
     return false;
   });
 
-  // 2. Verificar turmas ativas da escola
   const hasTurma = schoolTurmas.some(t => {
     const stage = (t.stage || '').toLowerCase();
     const level = (t.level || '').toLowerCase();
@@ -136,7 +135,6 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
   const { configuracao } = useConfiguracao();
   const hc = configuracao?.horarios_config || DEFAULT_HORARIOS_CONFIG;
 
-  // Filtrar apenas etapas que a escola oferta (por segmentos cadastrados ou turmas ativas)
   const etapasOfertadas = useMemo(() => {
     const filtradas = ETAPAS_DISPONIVEIS.filter(etapa =>
       isEtapaOfertadaPelaEscola(etapa.id, escola, schoolTurmas)
@@ -152,7 +150,12 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
     return filtradas.length > 0 ? filtradas[0].id : 'Anos Iniciais';
   });
 
-  // Manter activeEtapa sincronizada caso a lista de etapas ofertadas mude
+  // Filtro de turma para visualização na grade
+  const [selectedTurmaFilter, setSelectedTurmaFilter] = useState<string>('ALL');
+
+  // Estado para impressão em folha/PDF
+  const [isPrintingSchedule, setIsPrintingSchedule] = useState(false);
+
   useEffect(() => {
     if (etapasOfertadas.length > 0 && !etapasOfertadas.some(e => e.id === activeEtapa)) {
       setActiveEtapa(etapasOfertadas[0].id);
@@ -162,17 +165,21 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
   const [horarios, setHorarios] = useState<HorarioSlot[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Estado do slot em edição/criação
   const [editingSlot, setEditingSlot] = useState<{ 
     dia: string; 
     numero: number; 
     turno: string; 
     horarioInfo: { inicio: string; fim: string };
-    existing?: HorarioSlot 
+    existing?: HorarioSlot;
   } | null>(null);
 
   const [formTeacher, setFormTeacher] = useState('');
   const [formTurma, setFormTurma] = useState('');
   const [formComponente, setFormComponente] = useState('');
+  const [isMultiseriada, setIsMultiseriada] = useState(false);
+  const [selectedMultiseriadaTurmas, setSelectedMultiseriadaTurmas] = useState<string[]>([]);
 
   const teacherColorMap = useMemo(() => {
     const map: Record<string, typeof TEACHER_COLORS[0]> = {};
@@ -182,7 +189,6 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
     return map;
   }, [schoolTeachers]);
 
-  // Obter duração em minutos da aula da etapa selecionada
   const getDuracaoAulaMinutos = useCallback((etapa: string): number => {
     if (etapa === 'Educação Infantil') {
       return hc.duracaoAulas?.educacaoInfantil || 50;
@@ -197,7 +203,6 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
     return getDuracaoAulaMinutos(activeEtapa);
   }, [getDuracaoAulaMinutos, activeEtapa]);
 
-  // Obter a configuração do turno selecionado
   const currentTurnoKey = useMemo(() => {
     return (activeTurno.toLowerCase()) as 'matutino' | 'vespertino' | 'noturno';
   }, [activeTurno]);
@@ -206,7 +211,6 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
     return hc.turnos[currentTurnoKey] || hc.turnos.matutino;
   }, [hc, currentTurnoKey]);
 
-  // Grade dinâmica calculada com base na configuração da rede
   const currentTurnoHorarios: SlotHorarioCalculado[] = useMemo(() => {
     return calcularGradeHorarios(currentTurnoConfig, duracaoAulaAtiva);
   }, [currentTurnoConfig, duracaoAulaAtiva]);
@@ -215,13 +219,32 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
     return TURNOS.find(t => t.id === activeTurno)!;
   }, [activeTurno]);
 
+  // Turmas da etapa ativa
+  const etapaTurmas = useMemo(() => {
+    return schoolTurmas.filter(t => {
+      const stage = (t.stage || '').toLowerCase();
+      const level = (t.level || '').toLowerCase();
+      const year = (t.year || t.anoSerie || '').toLowerCase();
+
+      if (activeEtapa === 'Educação Infantil') {
+        return stage.includes('infantil') || stage.includes('creche') || stage.includes('pré') || level === 'infantil' || isEducaInfantilYear(year);
+      }
+      if (activeEtapa === 'Anos Iniciais') {
+        return stage.includes('iniciais') || (!stage.includes('finais') && (/^[1-5]º?\s*ano/i.test(year) || /fundamental\s*i\b/i.test(stage)));
+      }
+      if (activeEtapa === 'Anos Finais') {
+        return stage.includes('finais') || /^[6-9]º?\s*ano/i.test(year) || /fundamental\s*ii\b/i.test(stage);
+      }
+      return true;
+    });
+  }, [schoolTurmas, activeEtapa]);
+
   // Carregar dados de horários
   const loadHorarios = useCallback(async () => {
     if (!escolaId) return;
     setIsLoading(true);
     try {
       if (isDemoMode) {
-        // Dados demonstrativos
         const demo: HorarioSlot[] = [];
         if (schoolTeachers.length > 0 && schoolTurmas.length > 0) {
           const t1 = schoolTeachers[0];
@@ -236,7 +259,7 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
               dia_semana: 'SEGUNDA', 
               turno: 'MATUTINO', 
               horario_inicio: currentTurnoConfig.inicio, 
-              horario_fim: '08:20', 
+              horario_fim: '08:05', 
               numero_aula: 1,
               etapa: turma1?.stage || 'Anos Iniciais'
             },
@@ -249,7 +272,7 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
               dia_semana: 'QUARTA', 
               turno: 'MATUTINO', 
               horario_inicio: currentTurnoConfig.inicio, 
-              horario_fim: '08:20', 
+              horario_fim: '08:05', 
               numero_aula: 1,
               etapa: turma1?.stage || 'Anos Iniciais'
             },
@@ -257,6 +280,7 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
           if (schoolTeachers.length > 1) {
             const t2 = schoolTeachers[1];
             const turma2 = schoolTurmas[1] || schoolTurmas[0];
+            // Exemplo de turma B no mesmo horário (Segunda 1ª aula)
             demo.push(
               { 
                 id: 'demo-3', 
@@ -266,9 +290,9 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
                 componente: 'Matemática', 
                 dia_semana: 'SEGUNDA', 
                 turno: 'MATUTINO', 
-                horario_inicio: '08:20', 
-                horario_fim: '09:10', 
-                numero_aula: 2,
+                horario_inicio: currentTurnoConfig.inicio, 
+                horario_fim: '08:05', 
+                numero_aula: 1,
                 etapa: turma2?.stage || 'Anos Iniciais'
               },
               { 
@@ -280,7 +304,7 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
                 dia_semana: 'TERCA', 
                 turno: 'MATUTINO', 
                 horario_inicio: currentTurnoConfig.inicio, 
-                horario_fim: '08:20', 
+                horario_fim: '08:05', 
                 numero_aula: 1,
                 etapa: turma2?.stage || 'Anos Iniciais'
               },
@@ -307,31 +331,158 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
     loadHorarios();
   }, [loadHorarios]);
 
-  // Recupera o slot alocado para o dia, número de aula, turno e etapa selecionados
-  const getSlot = (dia: string, numero: number): HorarioSlot | undefined => {
-    return horarios.find(h => 
-      h.dia_semana === dia && 
-      h.numero_aula === numero && 
-      h.turno === activeTurno &&
-      (!h.etapa || h.etapa === activeEtapa)
-    );
-  };
+  // Recupera TODOS os slots alocados para o dia e número da aula (suporta múltiplas turmas por horário)
+  const getSlots = useCallback((dia: string, numero: number): HorarioSlot[] => {
+    return horarios.filter(h => {
+      if (h.dia_semana !== dia) return false;
+      if (h.numero_aula !== numero) return false;
+      if (h.turno !== activeTurno) return false;
+      if (h.etapa && h.etapa !== activeEtapa) return false;
 
-  const openEditor = (dia: string, numero: number, horarioInfo: { inicio: string; fim: string }) => {
+      if (selectedTurmaFilter !== 'ALL') {
+        const ids = (h.turma_id || '').split(',').map(s => s.trim());
+        if (!ids.includes(selectedTurmaFilter)) return false;
+      }
+
+      return true;
+    });
+  }, [horarios, activeTurno, activeEtapa, selectedTurmaFilter]);
+
+  // Recupera slots filtrados por grupo de turmas (usado na visão "Todas as Turmas" empilhada)
+  const getSlotsForTurmaGroup = useCallback((dia: string, numero: number, turmaIds: string[]): HorarioSlot[] => {
+    return horarios.filter(h => {
+      if (h.dia_semana !== dia) return false;
+      if (h.numero_aula !== numero) return false;
+      if (h.turno !== activeTurno) return false;
+      if (h.etapa && h.etapa !== activeEtapa) return false;
+      const ids = (h.turma_id || '').split(',').map(s => s.trim());
+      // Corresponde se qualquer ID do slot pertence ao grupo
+      return ids.some(id => turmaIds.includes(id));
+    });
+  }, [horarios, activeTurno, activeEtapa]);
+
+  // Agrupa turmas multisseriadas em um único grupo para a visão empilhada
+  const turmaGroups = useMemo(() => {
+    type TurmaGroup = {
+      id: string;
+      turmaIds: string[];
+      label: string;
+      isMulti: boolean;
+      shift: string;
+    };
+
+    // Encontrar grupos multisseriados a partir dos slots de horário
+    const multiGroupSets: Set<string>[] = [];
+    const turmaToGroup = new Map<string, number>();
+
+    horarios.forEach(h => {
+      if (h.turno !== activeTurno) return;
+      if (h.etapa && h.etapa !== activeEtapa) return;
+
+      const ids = (h.turma_id || '').split(',').map(s => s.trim()).filter(Boolean);
+      if (ids.length <= 1) return; // Não é multisseriada
+
+      // Verificar se algum desses IDs já pertence a um grupo
+      let existingIdx = -1;
+      for (const id of ids) {
+        if (turmaToGroup.has(id)) {
+          existingIdx = turmaToGroup.get(id)!;
+          break;
+        }
+      }
+
+      if (existingIdx >= 0) {
+        // Unir ao grupo existente
+        for (const id of ids) {
+          multiGroupSets[existingIdx].add(id);
+          turmaToGroup.set(id, existingIdx);
+        }
+      } else {
+        // Criar novo grupo
+        const newIdx = multiGroupSets.length;
+        multiGroupSets.push(new Set(ids));
+        for (const id of ids) {
+          turmaToGroup.set(id, newIdx);
+        }
+      }
+    });
+
+    const groups: TurmaGroup[] = [];
+    const processedIds = new Set<string>();
+
+    // 1) Grupos multisseriados
+    for (const groupSet of multiGroupSets) {
+      const ids = Array.from(groupSet);
+      const turmas = ids.map(id => etapaTurmas.find(t => String(t.id) === id)).filter(Boolean);
+      if (turmas.length === 0) continue;
+
+      const labels = turmas.map((t: any) => `${t.year || t.anoSerie || ''} ${t.name || ''}`.trim());
+      groups.push({
+        id: `multi-${ids.sort().join('-')}`,
+        turmaIds: ids,
+        label: labels.join(' + '),
+        isMulti: true,
+        shift: turmas[0]?.shift || turmas[0]?.turno || '',
+      });
+
+      ids.forEach(id => processedIds.add(id));
+    }
+
+    // 2) Turmas individuais (não pertencem a nenhum grupo multisseriado)
+    for (const turma of etapaTurmas) {
+      if (processedIds.has(String(turma.id))) continue;
+      groups.push({
+        id: String(turma.id),
+        turmaIds: [String(turma.id)],
+        label: `${turma.year || turma.anoSerie || ''} - ${turma.name || ''}`.trim(),
+        isMulti: false,
+        shift: turma.shift || turma.turno || '',
+      });
+    }
+
+    return groups;
+  }, [etapaTurmas, horarios, activeTurno, activeEtapa]);
+
+  // Abrir o editor para um slot existente ou para adicionar nova turma no horário
+  const openEditor = (
+    dia: string, 
+    numero: number, 
+    horarioInfo: { inicio: string; fim: string }, 
+    existing?: HorarioSlot
+  ) => {
     if (!canEdit) return;
-    const existing = getSlot(dia, numero);
     setEditingSlot({ dia, numero, turno: activeTurno, horarioInfo, existing });
     setFormTeacher(existing?.teacher_id || '');
-    setFormTurma(existing?.turma_id || '');
+
+    const existingTurmaStr = existing?.turma_id || '';
+    const ids = existingTurmaStr.split(',').map(s => s.trim()).filter(Boolean);
+    const hasMultiple = ids.length > 1;
+    const isRegisteredMulti = schoolTurmas.find(t => String(t.id) === String(existingTurmaStr))?.modality === 'MULTISSERIADA';
+
+    setIsMultiseriada(hasMultiple || Boolean(isRegisteredMulti));
+    setSelectedMultiseriadaTurmas(hasMultiple ? ids : (existingTurmaStr ? [existingTurmaStr] : []));
+    setFormTurma(ids[0] || (selectedTurmaFilter !== 'ALL' ? selectedTurmaFilter : ''));
     setFormComponente(existing?.componente ? normalizeSubjectName(existing.componente) : '');
   };
 
   const handleSaveSlot = async () => {
-    if (!editingSlot || !formTeacher || !formTurma) return;
-    setIsSaving(true);
+    if (!editingSlot || !formTeacher) return;
 
+    let finalTurmaId = formTurma;
+    if (isMultiseriada) {
+      if (selectedMultiseriadaTurmas.length === 0 && formTurma) {
+        finalTurmaId = formTurma;
+      } else if (selectedMultiseriadaTurmas.length > 0) {
+        finalTurmaId = selectedMultiseriadaTurmas.join(',');
+      }
+    }
+
+    if (!finalTurmaId) return;
+
+    setIsSaving(true);
     const slotHorario = currentTurnoHorarios.find(h => h.numero === editingSlot.numero);
-    const turmaObj = schoolTurmas.find(t => String(t.id) === String(formTurma));
+    const firstId = finalTurmaId.split(',')[0];
+    const turmaObj = schoolTurmas.find(t => String(t.id) === String(firstId));
     const slotEtapa = turmaObj?.stage || (turmaObj?.level === 'Infantil' ? 'Educação Infantil' : activeEtapa);
     const normalizedComp = normalizeSubjectName(formComponente);
 
@@ -341,7 +492,7 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
           id: editingSlot.existing?.id || `demo-${Date.now()}`,
           school_id: escolaId,
           teacher_id: formTeacher,
-          turma_id: formTurma,
+          turma_id: finalTurmaId,
           componente: normalizedComp,
           dia_semana: editingSlot.dia,
           turno: editingSlot.turno,
@@ -361,7 +512,7 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
             .from('horarios_docentes')
             .update({
               teacher_id: formTeacher,
-              turma_id: formTurma,
+              turma_id: finalTurmaId,
               componente: normalizedComp,
               etapa: slotEtapa,
               horario_inicio: slotHorario?.inicio || editingSlot.horarioInfo.inicio,
@@ -376,7 +527,7 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
             .insert({
               school_id: escolaId,
               teacher_id: formTeacher,
-              turma_id: formTurma,
+              turma_id: finalTurmaId,
               componente: normalizedComp,
               dia_semana: editingSlot.dia,
               turno: editingSlot.turno,
@@ -388,9 +539,6 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
           if (error) throw error;
         }
         await loadHorarios();
-      }
-      if (slotEtapa && slotEtapa !== activeEtapa && etapasOfertadas.some(e => e.id === slotEtapa)) {
-        setActiveEtapa(slotEtapa);
       }
       setEditingSlot(null);
     } catch (err) {
@@ -423,34 +571,46 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
   };
 
   const handlePrint = () => {
-    window.print();
+    setIsPrintingSchedule(true);
   };
 
   const getTeacherName = (id: string) => schoolTeachers.find(t => t.id === id)?.nome || '—';
-  const getTurmaLabel = (id: string) => {
-    const t = schoolTurmas.find(t => String(t.id) === String(id));
-    if (!t) return '—';
-    return `${t.year || t.anoSerie || ''} - ${t.name || ''}`.trim();
+
+  // Helper para exibir nome e badge de multisseriada
+  const getTurmaDisplay = (turmaIdStr: string): { label: string; isMulti: boolean } => {
+    if (!turmaIdStr) return { label: '—', isMulti: false };
+    const ids = turmaIdStr.split(',').map(s => s.trim()).filter(Boolean);
+
+    if (ids.length > 1) {
+      const labels = ids.map(id => {
+        const t = schoolTurmas.find(item => String(item.id) === String(id));
+        if (!t) return 'Turma';
+        return `${t.year || t.anoSerie || ''} ${t.name || ''}`.trim();
+      });
+      return { label: labels.join(' + '), isMulti: true };
+    }
+
+    const t = schoolTurmas.find(item => String(item.id) === String(turmaIdStr));
+    if (!t) return { label: '—', isMulti: false };
+    const isMulti = t.modality === 'MULTISSERIADA' || t.tipo === 'MULTISSERIADA' || t.modality === 'MULTIETAPA';
+    const base = `${t.year || t.anoSerie || ''} - ${t.name || ''}`.trim();
+    return { label: base, isMulti };
   };
 
-  // Professor atualmente selecionado no modal
   const selectedTeacher = useMemo(() => {
     return schoolTeachers.find(t => t.id === formTeacher);
   }, [schoolTeachers, formTeacher]);
 
-  // Apenas as turmas da unidade escolar às quais o professor esteja vinculado
   const teacherVinculatedTurmas = useMemo(() => {
     if (!selectedTeacher) return [];
     const vinculatedIds = (selectedTeacher.turmasIds || []).map(String);
     return schoolTurmas.filter(t => vinculatedIds.includes(String(t.id)));
   }, [selectedTeacher, schoolTurmas]);
 
-  // Turma atualmente selecionada no formulário
   const selectedTurmaObj = useMemo(() => {
     return schoolTurmas.find(t => String(t.id) === String(formTurma));
   }, [schoolTurmas, formTurma]);
 
-  // Identificar se a turma selecionada pertence à Educação Infantil
   const isSelectedTurmaInfantil = useMemo(() => {
     if (selectedTurmaObj) {
       const stage = (selectedTurmaObj.stage || '').toLowerCase();
@@ -461,16 +621,14 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
     return activeEtapa === 'Educação Infantil';
   }, [selectedTurmaObj, activeEtapa]);
 
-  // Apenas o Campo de Experiência / componente curricular aos quais o professor esteja vinculado
   const selectedTurmaForComponents = useMemo(() => {
-    if (!formTeacher || !formTurma) {
+    if (!formTeacher || (!formTurma && selectedMultiseriadaTurmas.length === 0)) {
       return [];
     }
 
-    const assignedComps = selectedTeacher?.turmaComponentes?.[formTurma] || [];
+    const activeTurmaKey = formTurma || selectedMultiseriadaTurmas[0];
+    const assignedComps = selectedTeacher?.turmaComponentes?.[activeTurmaKey] || [];
 
-    // Se o professor possui componentes vinculados a esta turma na unidade escolar:
-    // Exibir APENAS esses componentes vinculados!
     if (assignedComps.length > 0) {
       const seen = new Set<string>();
       const uniqueList: string[] = [];
@@ -491,8 +649,6 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
       return uniqueList;
     }
 
-    // Fallback: se o professor estiver vinculado à turma mas sem disciplinas específicas no perfil
-    // (ex: docente regente polivalente da Educação Infantil ou Anos Iniciais):
     let fallbackList: string[] = [];
     if (isSelectedTurmaInfantil) {
       const matrizInfantil = configuracao?.matrizes_curriculares?.infantil?.itens?.map(i => i.componente) || [];
@@ -524,14 +680,19 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
       }
     }
     return uniqueList;
-  }, [formTeacher, formTurma, selectedTeacher, isSelectedTurmaInfantil, selectedTurmaObj, configuracao, activeEtapa]);
+  }, [formTeacher, formTurma, selectedMultiseriadaTurmas, selectedTeacher, isSelectedTurmaInfantil, selectedTurmaObj, configuracao, activeEtapa]);
 
-  // Estatísticas filtradas por turno e etapa
   const turnoHorarios = useMemo(() => {
-    return horarios.filter(h => 
-      h.turno === activeTurno && (!h.etapa || h.etapa === activeEtapa)
-    );
-  }, [horarios, activeTurno, activeEtapa]);
+    return horarios.filter(h => {
+      if (h.turno !== activeTurno) return false;
+      if (h.etapa && h.etapa !== activeEtapa) return false;
+      if (selectedTurmaFilter !== 'ALL') {
+        const ids = (h.turma_id || '').split(',').map(s => s.trim());
+        if (!ids.includes(selectedTurmaFilter)) return false;
+      }
+      return true;
+    });
+  }, [horarios, activeTurno, activeEtapa, selectedTurmaFilter]);
 
   const totalSlots = currentTurnoHorarios.filter(h => !h.intervalo).length * DIAS_SEMANA.length;
   const filledSlots = turnoHorarios.length;
@@ -594,7 +755,10 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
               <button
                 key={etapa.id}
                 type="button"
-                onClick={() => setActiveEtapa(etapa.id)}
+                onClick={() => {
+                  setActiveEtapa(etapa.id);
+                  setSelectedTurmaFilter('ALL');
+                }}
                 className={`
                   flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200
                   ${isCurrent
@@ -627,53 +791,66 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
         </div>
       </div>
 
-      {/* Turno Tabs */}
-      <div className="flex flex-wrap gap-2 print:hidden">
-        {TURNOS.map(turno => {
-          const TurnoIcon = turno.icon;
-          const isActive = activeTurno === turno.id;
-          const turnoCount = horarios.filter(h => 
-            h.turno === turno.id && (!h.etapa || h.etapa === activeEtapa)
-          ).length;
-          const turnoCfg = hc.turnos[turno.key] || hc.turnos.matutino;
+      {/* Turno Tabs & Seletor de Turma */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 print:hidden">
+        {/* Turnos */}
+        <div className="flex flex-wrap gap-2">
+          {TURNOS.map(turno => {
+            const TurnoIcon = turno.icon;
+            const isActive = activeTurno === turno.id;
+            const turnoCount = horarios.filter(h => 
+              h.turno === turno.id && (!h.etapa || h.etapa === activeEtapa)
+            ).length;
+            const turnoCfg = hc.turnos[turno.key] || hc.turnos.matutino;
 
-          return (
-            <button
-              key={turno.id}
-              onClick={() => setActiveTurno(turno.id as any)}
-              className={`
-                flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200
-                ${isActive
-                  ? turno.id === 'MATUTINO' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/25'
-                  : turno.id === 'VESPERTINO' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/25'
-                  : 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25'
-                  : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50 hover:border-slate-300'
-                }
-              `}
-            >
-              <TurnoIcon className="w-4 h-4" />
-              <span>{turno.label}</span>
-              <span className={`text-[10px] font-medium opacity-90 ${isActive ? 'text-white' : 'text-slate-400'}`}>
-                (Início: {turnoCfg.inicio})
-              </span>
-              {turnoCount > 0 && (
-                <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-black ${isActive ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                  {turnoCount}
+            return (
+              <button
+                key={turno.id}
+                onClick={() => setActiveTurno(turno.id as any)}
+                className={`
+                  flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200
+                  ${isActive
+                    ? turno.id === 'MATUTINO' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/25'
+                    : turno.id === 'VESPERTINO' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/25'
+                    : 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25'
+                    : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                  }
+                `}
+              >
+                <TurnoIcon className="w-4 h-4" />
+                <span>{turno.label}</span>
+                <span className={`text-[10px] font-medium opacity-90 ${isActive ? 'text-white' : 'text-slate-400'}`}>
+                  (Início: {turnoCfg.inicio})
                 </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+                {turnoCount > 0 && (
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-black ${isActive ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                    {turnoCount}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
 
-      {/* Header Info for Print */}
-      <div className="hidden print:block border-b border-slate-200 pb-3 mb-4">
-        <h3 className="text-xl font-black text-slate-900 uppercase">
-          Quadro de Horário Docente — {activeEtapa}
-        </h3>
-        <p className="text-sm text-slate-600 font-bold mt-1">
-          Turno: {currentTurnoDef.label} (Início: {currentTurnoConfig.inicio}) • Duração da Aula: {duracaoAulaAtiva} min • Intervalo: {currentTurnoConfig.duracaoIntervalo} min
-        </p>
+        {/* Filtro de Visualização de Turma */}
+        <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-2xl border border-slate-200 shadow-sm">
+          <Filter className="w-4 h-4 text-orange-500 shrink-0" />
+          <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider whitespace-nowrap">
+            Filtrar Turma:
+          </span>
+          <select
+            value={selectedTurmaFilter}
+            onChange={(e) => setSelectedTurmaFilter(e.target.value)}
+            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-orange-500 focus:bg-white transition-all cursor-pointer"
+          >
+            <option value="ALL">Todas as Turmas ({etapaTurmas.length})</option>
+            {etapaTurmas.map(t => (
+              <option key={t.id} value={t.id}>
+                {(t.year || t.anoSerie) ? `${t.year || t.anoSerie} - ` : ''}{t.name} ({t.shift || 'MANHÃ'})
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Stats Bar */}
@@ -683,7 +860,9 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
             <Clock className="w-4 h-4 text-orange-500" />
           </div>
           <div>
-            <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Alocações ({activeEtapa})</span>
+            <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              {selectedTurmaFilter === 'ALL' ? `Alocações (${activeEtapa})` : 'Aulas da Turma'}
+            </span>
             <span className="text-sm font-black text-slate-800">{filledSlots}/{totalSlots}</span>
           </div>
         </div>
@@ -717,91 +896,298 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
       </div>
 
       {/* Schedule Grid */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse min-w-[700px]">
-            <thead>
-              <tr className="bg-slate-50">
-                <th className="text-left px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-r border-slate-200 w-[130px]">
-                  Horário
-                </th>
-                {DIAS_SEMANA.map(dia => (
-                  <th key={dia.id} className="text-center px-3 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-r border-slate-200 last:border-r-0">
-                    <span className="hidden sm:inline">{dia.label}</span>
-                    <span className="sm:hidden">{dia.short}</span>
+      {selectedTurmaFilter === 'ALL' && turmaGroups.length > 0 ? (
+        /* ====== VISÃO EMPILHADA: Uma grade por turma/grupo multisseriado ====== */
+        <div className="flex flex-col gap-6">
+          {turmaGroups.map(group => {
+            // Verifica se este grupo tem pelo menos um slot neste turno/etapa
+            const hasSlots = horarios.some(h => {
+              if (h.turno !== activeTurno) return false;
+              if (h.etapa && h.etapa !== activeEtapa) return false;
+              const ids = (h.turma_id || '').split(',').map(s => s.trim());
+              return ids.some(id => group.turmaIds.includes(id));
+            });
+
+            return (
+              <div key={group.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                {/* Cabeçalho da Turma / Grupo */}
+                <div className={`flex items-center gap-3 px-5 py-3 border-b border-slate-200 ${
+                  group.isMulti 
+                    ? 'bg-gradient-to-r from-purple-50 to-violet-50' 
+                    : 'bg-gradient-to-r from-orange-50 to-amber-50'
+                }`}>
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                    group.isMulti ? 'bg-purple-100' : 'bg-orange-100'
+                  }`}>
+                    {group.isMulti 
+                      ? <Layers className="w-4 h-4 text-purple-600" />
+                      : <GraduationCap className="w-4 h-4 text-orange-600" />
+                    }
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-slate-800">{group.label}</h4>
+                    <div className="flex items-center gap-2">
+                      {group.shift && (
+                        <span className={`text-[10px] font-bold uppercase tracking-wider ${
+                          group.isMulti ? 'text-purple-600' : 'text-orange-600'
+                        }`}>{group.shift}</span>
+                      )}
+                      {group.isMulti && (
+                        <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-purple-200 text-purple-800 tracking-tight">
+                          Multisseriada
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {!hasSlots && (
+                    <span className="ml-auto text-[10px] font-bold text-slate-400 italic">Sem alocações neste turno</span>
+                  )}
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse min-w-[750px]">
+                    <thead>
+                      <tr className="bg-slate-50">
+                        <th className="text-left px-4 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-r border-slate-200 w-[125px]">
+                          Horário
+                        </th>
+                        {DIAS_SEMANA.map(dia => (
+                          <th key={dia.id} className="text-center px-3 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-r border-slate-200 last:border-r-0">
+                            <span className="hidden sm:inline">{dia.label}</span>
+                            <span className="sm:hidden">{dia.short}</span>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {currentTurnoHorarios.map((horario, idx) => {
+                        if (horario.intervalo) {
+                          return (
+                            <tr key={`intervalo-${idx}`} className="bg-amber-50/50">
+                              <td
+                                colSpan={6}
+                                className="text-center py-2 text-[10px] font-black text-amber-700 uppercase tracking-widest border-b border-slate-200"
+                              >
+                                ☕ Intervalo / Recreio — {horario.inicio} às {horario.fim} ({currentTurnoConfig.duracaoIntervalo} min)
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return (
+                          <tr key={`aula-${horario.numero}`} className="hover:bg-slate-50/20 transition-colors">
+                            <td className="px-4 py-2 border-b border-r border-slate-200 bg-slate-50/50 align-top">
+                              <div className="flex flex-col">
+                                <span className="text-[10px] font-black text-slate-600 uppercase tracking-wider">{horario.numero}ª Aula</span>
+                                <span className="text-[10px] text-slate-500 font-bold">{horario.inicio} - {horario.fim}</span>
+                                <span className="text-[9px] text-slate-400 font-medium">{duracaoAulaAtiva} min</span>
+                              </div>
+                            </td>
+
+                            {DIAS_SEMANA.map(dia => {
+                              const cellSlots = getSlotsForTurmaGroup(dia.id, horario.numero, group.turmaIds);
+
+                              return (
+                                <td
+                                  key={dia.id}
+                                  className="px-1.5 py-1.5 border-b border-r border-slate-200 last:border-r-0 align-top min-w-[140px]"
+                                >
+                                  <div className="flex flex-col gap-1.5 min-h-[56px]">
+                                    {cellSlots.map(slot => {
+                                      const colors = teacherColorMap[slot.teacher_id] || TEACHER_COLORS[0];
+                                      const turmaDisplay = getTurmaDisplay(slot.turma_id);
+
+                                      return (
+                                        <div
+                                          key={slot.id}
+                                          onClick={() => openEditor(dia.id, horario.numero, horario, slot)}
+                                          className={`${colors.bg} ${colors.border} ${turmaDisplay.isMulti ? 'ring-1 ring-purple-300' : ''} border rounded-xl p-2 transition-all hover:shadow-md group relative cursor-pointer`}
+                                          title="Clique para editar este horário"
+                                        >
+                                          <div className={`text-[11px] font-black ${colors.text} leading-tight truncate`}>
+                                            {getTeacherName(slot.teacher_id).split(' ').slice(0, 2).join(' ')}
+                                          </div>
+                                          <div className="flex items-center gap-1 mt-0.5">
+                                            {turmaDisplay.isMulti && (
+                                              <span className="text-[8px] font-black uppercase px-1 py-0.2 rounded bg-purple-200 text-purple-800 tracking-tighter shrink-0">
+                                                Multi
+                                              </span>
+                                            )}
+                                            <span className="text-[10px] text-slate-700 font-bold truncate">
+                                              {turmaDisplay.label}
+                                            </span>
+                                          </div>
+                                          {slot.componente && (
+                                            <span className={`inline-block mt-1 text-[8.5px] font-bold px-1.5 py-0.5 rounded-md ${colors.badge} truncate max-w-full`}>
+                                              {normalizeSubjectName(slot.componente)}
+                                            </span>
+                                          )}
+                                          {canEdit && (
+                                            <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 p-0.5 rounded">
+                                              <Edit className="w-3 h-3 text-slate-500" />
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+
+                                    {canEdit && (
+                                      <button
+                                        type="button"
+                                        onClick={() => openEditor(dia.id, horario.numero, horario, undefined)}
+                                        className={`w-full py-1 rounded-xl border border-dashed text-[10px] font-bold transition-all flex items-center justify-center gap-1 ${
+                                          cellSlots.length === 0
+                                            ? 'h-full min-h-[48px] border-slate-200 text-slate-400 hover:border-orange-400 hover:text-orange-500 hover:bg-orange-50/40'
+                                            : 'border-slate-200 text-slate-400 hover:border-orange-400 hover:text-orange-600 hover:bg-orange-50/50 py-1.5'
+                                        }`}
+                                        title="Incluir turma neste horário"
+                                      >
+                                        <Plus className="w-3 h-3" />
+                                        <span>{cellSlots.length === 0 ? 'Alocar Turma' : 'Incluir turma'}</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        /* ====== VISÃO INDIVIDUAL: Grade única para turma selecionada ====== */
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse min-w-[750px]">
+              <thead>
+                <tr className="bg-slate-50">
+                  <th className="text-left px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-r border-slate-200 w-[125px]">
+                    Horário
                   </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {currentTurnoHorarios.map((horario, idx) => {
-                if (horario.intervalo) {
+                  {DIAS_SEMANA.map(dia => (
+                    <th key={dia.id} className="text-center px-3 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-r border-slate-200 last:border-r-0">
+                      <span className="hidden sm:inline">{dia.label}</span>
+                      <span className="sm:hidden">{dia.short}</span>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {currentTurnoHorarios.map((horario, idx) => {
+                  if (horario.intervalo) {
+                    return (
+                      <tr key={`intervalo-${idx}`} className="bg-amber-50/50">
+                        <td
+                          colSpan={6}
+                          className="text-center py-2.5 text-[10px] font-black text-amber-700 uppercase tracking-widest border-b border-slate-200"
+                        >
+                          ☕ Intervalo / Recreio — {horario.inicio} às {horario.fim} ({currentTurnoConfig.duracaoIntervalo} min)
+                        </td>
+                      </tr>
+                    );
+                  }
+
                   return (
-                    <tr key={`intervalo-${idx}`} className="bg-amber-50/50">
-                      <td
-                        colSpan={6}
-                        className="text-center py-2.5 text-[10px] font-black text-amber-700 uppercase tracking-widest border-b border-slate-200"
-                      >
-                        ☕ Intervalo / Recreio — {horario.inicio} às {horario.fim} ({currentTurnoConfig.duracaoIntervalo} min)
+                    <tr key={`aula-${horario.numero}`} className="hover:bg-slate-50/20 transition-colors">
+                      {/* Coluna Horário */}
+                      <td className="px-4 py-2 border-b border-r border-slate-200 bg-slate-50/50 align-top">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-black text-slate-600 uppercase tracking-wider">{horario.numero}ª Aula</span>
+                          <span className="text-[10px] text-slate-500 font-bold">{horario.inicio} - {horario.fim}</span>
+                          <span className="text-[9px] text-slate-400 font-medium">{duracaoAulaAtiva} min</span>
+                        </div>
                       </td>
+
+                      {/* Colunas Dias da Semana */}
+                      {DIAS_SEMANA.map(dia => {
+                        const cellSlots = getSlots(dia.id, horario.numero);
+
+                        return (
+                          <td
+                            key={dia.id}
+                            className="px-1.5 py-1.5 border-b border-r border-slate-200 last:border-r-0 align-top min-w-[140px]"
+                          >
+                            <div className="flex flex-col gap-1.5 min-h-[70px]">
+                              {/* Cards de cada turma alocada neste horário */}
+                              {cellSlots.map(slot => {
+                                const colors = teacherColorMap[slot.teacher_id] || TEACHER_COLORS[0];
+                                const turmaDisplay = getTurmaDisplay(slot.turma_id);
+
+                                return (
+                                  <div
+                                    key={slot.id}
+                                    onClick={() => openEditor(dia.id, horario.numero, horario, slot)}
+                                    className={`${colors.bg} ${colors.border} ${turmaDisplay.isMulti ? 'ring-1 ring-purple-300' : ''} border rounded-xl p-2 transition-all hover:shadow-md group relative cursor-pointer`}
+                                    title="Clique para editar este horário"
+                                  >
+                                    {/* Professor */}
+                                    <div className={`text-[11px] font-black ${colors.text} leading-tight truncate`}>
+                                      {getTeacherName(slot.teacher_id).split(' ').slice(0, 2).join(' ')}
+                                    </div>
+
+                                    {/* Turma / Multisseriada */}
+                                    <div className="flex items-center gap-1 mt-0.5">
+                                      {turmaDisplay.isMulti && (
+                                        <span className="text-[8px] font-black uppercase px-1 py-0.2 rounded bg-purple-200 text-purple-800 tracking-tighter shrink-0">
+                                          Multi
+                                        </span>
+                                      )}
+                                      <span className="text-[10px] text-slate-700 font-bold truncate">
+                                        {turmaDisplay.label}
+                                      </span>
+                                    </div>
+
+                                    {/* Componente Curricular */}
+                                    {slot.componente && (
+                                      <span className={`inline-block mt-1 text-[8.5px] font-bold px-1.5 py-0.5 rounded-md ${colors.badge} truncate max-w-full`}>
+                                        {normalizeSubjectName(slot.componente)}
+                                      </span>
+                                    )}
+
+                                    {/* Edit indicator */}
+                                    {canEdit && (
+                                      <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 p-0.5 rounded">
+                                        <Edit className="w-3 h-3 text-slate-500" />
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+
+                              {/* Botão para incluir nova turma ou primeiro slot */}
+                              {canEdit && (
+                                <button
+                                  type="button"
+                                  onClick={() => openEditor(dia.id, horario.numero, horario, undefined)}
+                                  className={`w-full py-1 rounded-xl border border-dashed text-[10px] font-bold transition-all flex items-center justify-center gap-1 ${
+                                    cellSlots.length === 0
+                                      ? 'h-full min-h-[60px] border-slate-200 text-slate-400 hover:border-orange-400 hover:text-orange-500 hover:bg-orange-50/40'
+                                      : 'border-slate-200 text-slate-400 hover:border-orange-400 hover:text-orange-600 hover:bg-orange-50/50 py-1.5'
+                                  }`}
+                                  title="Incluir turma neste horário"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                  <span>{cellSlots.length === 0 ? 'Alocar Turma' : 'Incluir turma'}</span>
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        );
+                      })}
                     </tr>
                   );
-                }
-
-                return (
-                  <tr key={`aula-${horario.numero}`} className="hover:bg-slate-50/30 transition-colors">
-                    <td className="px-4 py-2 border-b border-r border-slate-200 bg-slate-50/50">
-                      <div className="flex flex-col">
-                        <span className="text-[10px] font-black text-slate-600 uppercase tracking-wider">{horario.numero}ª Aula</span>
-                        <span className="text-[10px] text-slate-500 font-bold">{horario.inicio} - {horario.fim}</span>
-                        <span className="text-[9px] text-slate-400 font-medium">{duracaoAulaAtiva} min</span>
-                      </div>
-                    </td>
-                    {DIAS_SEMANA.map(dia => {
-                      const slot = getSlot(dia.id, horario.numero);
-                      const colors = slot ? teacherColorMap[slot.teacher_id] || TEACHER_COLORS[0] : null;
-                      return (
-                        <td
-                          key={dia.id}
-                          className={`px-1.5 py-1.5 border-b border-r border-slate-200 last:border-r-0 align-top ${canEdit ? 'cursor-pointer' : ''}`}
-                          onClick={() => openEditor(dia.id, horario.numero, horario)}
-                        >
-                          {slot ? (
-                            <div className={`${colors!.bg} ${colors!.border} border rounded-xl p-2.5 h-full min-h-[64px] transition-all hover:shadow-sm group relative`}>
-                              <div className={`text-[11px] font-bold ${colors!.text} leading-tight truncate`}>
-                                {getTeacherName(slot.teacher_id).split(' ').slice(0, 2).join(' ')}
-                              </div>
-                              <div className="text-[10px] text-slate-600 font-bold truncate mt-0.5">
-                                {getTurmaLabel(slot.turma_id)}
-                              </div>
-                              {slot.componente && (
-                                <span className={`inline-block mt-1 text-[8.5px] font-bold px-1.5 py-0.5 rounded-md ${colors!.badge} truncate max-w-full`}>
-                                  {normalizeSubjectName(slot.componente)}
-                                </span>
-                              )}
-                              {canEdit && (
-                                <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <Edit className="w-3 h-3 text-slate-400" />
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <div className={`rounded-xl h-full min-h-[64px] flex items-center justify-center border border-dashed transition-all ${canEdit ? 'border-slate-200 hover:border-orange-300 hover:bg-orange-50/30' : 'border-slate-100'}`}>
-                              {canEdit && (
-                                <Plus className="w-4 h-4 text-slate-300 hover:text-orange-400 transition-colors" />
-                              )}
-                            </div>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Legend */}
       {schoolTeachers.length > 0 && turnoHorarios.length > 0 && (
@@ -832,18 +1218,18 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
         </div>
       )}
 
-      {/* Edit Modal */}
+      {/* Edit / Add Slot Modal */}
       {editingSlot && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 print:hidden">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden animate-scale-up">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden animate-scale-up max-h-[90vh] flex flex-col">
             {/* Modal Header */}
-            <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+            <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center shrink-0">
               <div>
                 <h4 className="text-lg font-bold text-slate-800">
-                  {editingSlot.existing ? 'Editar Horário' : 'Novo Horário'}
+                  {editingSlot.existing ? 'Editar Horário da Turma' : 'Incluir Turma no Horário'}
                 </h4>
                 <p className="text-xs text-slate-500 mt-1">
-                  {DIAS_SEMANA.find(d => d.id === editingSlot.dia)?.label} — {editingSlot.numero}ª Aula ({editingSlot.horarioInfo.inicio} - {editingSlot.horarioInfo.fim}) • {activeEtapa}
+                  {DIAS_SEMANA.find(d => d.id === editingSlot.dia)?.label} — {editingSlot.numero}ª Aula ({editingSlot.horarioInfo.inicio} - {editingSlot.horarioInfo.fim}) • {activeTurno}
                 </p>
               </div>
               <button
@@ -855,11 +1241,11 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 space-y-5">
+            <div className="p-6 space-y-5 overflow-y-auto">
               {/* Professor */}
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
-                  Professor
+                  Professor(a)
                 </label>
                 <div className="relative">
                   <select
@@ -872,6 +1258,7 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
                       if (tTurmas.length === 1) {
                         const singleTurmaId = String(tTurmas[0].id);
                         setFormTurma(singleTurmaId);
+                        setSelectedMultiseriadaTurmas([singleTurmaId]);
                         const comps = teacher?.turmaComponentes?.[singleTurmaId] || [];
                         if (comps.length === 1) {
                           setFormComponente(normalizeSubjectName(comps[0]));
@@ -880,6 +1267,7 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
                         }
                       } else {
                         setFormTurma('');
+                        setSelectedMultiseriadaTurmas([]);
                         setFormComponente('');
                       }
                     }}
@@ -899,70 +1287,141 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
                 </div>
               </div>
 
-              {/* Turma (Apenas as turmas vinculadas ao professor na unidade escolar) */}
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                    Turma {selectedTeacher ? `(${selectedTeacher.nome.split(' ').slice(0, 2).join(' ')})` : ''}
-                  </label>
-                  <span className={`text-[10px] font-bold ${!formTeacher ? 'text-slate-400' : teacherVinculatedTurmas.length === 0 ? 'text-rose-500' : 'text-brand-orange'}`}>
-                    {!formTeacher 
-                      ? 'Selecione o professor' 
-                      : `${teacherVinculatedTurmas.length} turma(s) vinculada(s)`
-                    }
-                  </span>
-                </div>
-                <div className="relative">
-                  <select
-                    value={formTurma}
-                    disabled={!formTeacher || teacherVinculatedTurmas.length === 0}
+              {/* OPÇÃO DE TURMA MULTISSERIADA */}
+              <div className="bg-purple-50/70 border border-purple-100 rounded-2xl p-4 space-y-3">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isMultiseriada}
                     onChange={(e) => {
-                      const newTurmaId = e.target.value;
-                      setFormTurma(newTurmaId);
-                      const comps = selectedTeacher?.turmaComponentes?.[newTurmaId] || [];
-                      if (comps.length === 1) {
-                        setFormComponente(normalizeSubjectName(comps[0]));
-                      } else {
-                        setFormComponente('');
+                      const checked = e.target.checked;
+                      setIsMultiseriada(checked);
+                      if (checked && formTurma && !selectedMultiseriadaTurmas.includes(formTurma)) {
+                        setSelectedMultiseriadaTurmas([formTurma]);
                       }
                     }}
-                    className={`w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-medium outline-none appearance-none pr-10 ${
-                      !formTeacher || teacherVinculatedTurmas.length === 0
-                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                        : 'bg-white text-slate-700 focus:ring-2 focus:ring-orange-500 focus:border-orange-500'
-                    }`}
-                  >
-                    {!formTeacher ? (
-                      <option value="">Selecione primeiro um professor...</option>
-                    ) : teacherVinculatedTurmas.length === 0 ? (
-                      <option value="">Nenhuma turma vinculada a este professor</option>
+                    className="w-4 h-4 rounded text-purple-600 border-purple-300 focus:ring-purple-500 mt-0.5"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-purple-950 flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-purple-600" />
+                      Turma Multisseriada / Compartilhada
+                    </span>
+                    <span className="text-[11px] text-purple-700 block mt-0.5">
+                      Ative quando mais de um ano/série funciona na mesma sala de aula com o mesmo professor.
+                    </span>
+                  </div>
+                </label>
+
+                {isMultiseriada && (
+                  <div className="pt-2 border-t border-purple-200/60 space-y-2 animate-fade-in">
+                    <label className="block text-[10px] font-black text-purple-900 uppercase tracking-wider">
+                      Selecione as turmas / anos que compartilham este horário:
+                    </label>
+
+                    {teacherVinculatedTurmas.length === 0 ? (
+                      <p className="text-xs text-purple-600 italic">
+                        Selecione primeiro um professor com turmas vinculadas.
+                      </p>
                     ) : (
-                      <>
-                        <option value="">Selecione uma turma...</option>
-                        {teacherVinculatedTurmas.map(t => (
-                          <option key={t.id} value={t.id}>
-                            {(t.year || t.anoSerie) ? `${t.year || t.anoSerie} - ` : ''}{t.name || ''} • {t.shift || 'MANHÃ'}
-                          </option>
-                        ))}
-                      </>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-44 overflow-y-auto pr-1">
+                        {teacherVinculatedTurmas.map(t => {
+                          const isChecked = selectedMultiseriadaTurmas.includes(String(t.id));
+                          return (
+                            <label
+                              key={t.id}
+                              className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-xs font-semibold cursor-pointer transition-all ${
+                                isChecked
+                                  ? 'bg-purple-100 border-purple-300 text-purple-950 shadow-sm ring-1 ring-purple-300'
+                                  : 'bg-white border-purple-100 text-slate-700 hover:bg-purple-50'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedMultiseriadaTurmas(prev => [...prev, String(t.id)]);
+                                    if (!formTurma) setFormTurma(String(t.id));
+                                  } else {
+                                    setSelectedMultiseriadaTurmas(prev => prev.filter(id => id !== String(t.id)));
+                                  }
+                                }}
+                                className="w-3.5 h-3.5 rounded text-purple-600 border-purple-300 focus:ring-purple-500"
+                              />
+                              <span className="truncate">
+                                {(t.year || t.anoSerie) ? `${t.year || t.anoSerie} - ` : ''}{t.name}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
                     )}
-                  </select>
-                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
-                {formTeacher && teacherVinculatedTurmas.length === 0 && (
-                  <p className="text-[11px] text-rose-600 font-medium mt-1">
-                    Este professor não possui turmas vinculadas nesta unidade escolar.
-                  </p>
+                  </div>
                 )}
               </div>
 
-              {/* Componente Curricular / Campo de Experiência (Apenas aos quais o professor está vinculado) */}
+              {/* SELEÇÃO DE TURMA ÚNICA (Caso não seja multisseriada) */}
+              {!isMultiseriada && (
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      Turma {selectedTeacher ? `(${selectedTeacher.nome.split(' ').slice(0, 2).join(' ')})` : ''}
+                    </label>
+                    <span className={`text-[10px] font-bold ${!formTeacher ? 'text-slate-400' : teacherVinculatedTurmas.length === 0 ? 'text-rose-500' : 'text-brand-orange'}`}>
+                      {!formTeacher 
+                        ? 'Selecione o professor' 
+                        : `${teacherVinculatedTurmas.length} turma(s) vinculada(s)`
+                      }
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <select
+                      value={formTurma}
+                      disabled={!formTeacher || teacherVinculatedTurmas.length === 0}
+                      onChange={(e) => {
+                        const newTurmaId = e.target.value;
+                        setFormTurma(newTurmaId);
+                        const comps = selectedTeacher?.turmaComponentes?.[newTurmaId] || [];
+                        if (comps.length === 1) {
+                          setFormComponente(normalizeSubjectName(comps[0]));
+                        } else {
+                          setFormComponente('');
+                        }
+                      }}
+                      className={`w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-medium outline-none appearance-none pr-10 ${
+                        !formTeacher || teacherVinculatedTurmas.length === 0
+                          ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                          : 'bg-white text-slate-700 focus:ring-2 focus:ring-orange-500 focus:border-orange-500'
+                      }`}
+                    >
+                      {!formTeacher ? (
+                        <option value="">Selecione primeiro um professor...</option>
+                      ) : teacherVinculatedTurmas.length === 0 ? (
+                        <option value="">Nenhuma turma vinculada a este professor</option>
+                      ) : (
+                        <>
+                          <option value="">Selecione uma turma...</option>
+                          {teacherVinculatedTurmas.map(t => (
+                            <option key={t.id} value={t.id}>
+                              {(t.year || t.anoSerie) ? `${t.year || t.anoSerie} - ` : ''}{t.name || ''} • {t.shift || 'MANHÃ'}
+                            </option>
+                          ))}
+                        </>
+                      )}
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                </div>
+              )}
+
+              {/* Componente Curricular / Campo de Experiência */}
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
                     {isSelectedTurmaInfantil ? 'Campo de Experiência' : 'Componente Curricular'}
                   </label>
-                  {formTurma && (
+                  {(formTurma || selectedMultiseriadaTurmas.length > 0) && (
                     <span className="text-[10px] font-bold text-slate-400">
                       {selectedTurmaForComponents.length} vinculado(s)
                     </span>
@@ -971,15 +1430,15 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
                 <div className="relative">
                   <select
                     value={normalizeSubjectName(formComponente)}
-                    disabled={!formTurma || selectedTurmaForComponents.length === 0}
+                    disabled={(!formTurma && selectedMultiseriadaTurmas.length === 0) || selectedTurmaForComponents.length === 0}
                     onChange={(e) => setFormComponente(normalizeSubjectName(e.target.value))}
                     className={`w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-medium outline-none appearance-none pr-10 ${
-                      !formTurma
+                      !formTurma && selectedMultiseriadaTurmas.length === 0
                         ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
                         : 'bg-white text-slate-700 focus:ring-2 focus:ring-orange-500 focus:border-orange-500'
                     }`}
                   >
-                    {!formTurma ? (
+                    {!formTurma && selectedMultiseriadaTurmas.length === 0 ? (
                       <option value="">Selecione primeiro a turma...</option>
                     ) : selectedTurmaForComponents.length === 0 ? (
                       <option value="">Nenhum componente vinculado a este professor</option>
@@ -998,7 +1457,7 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
             </div>
 
             {/* Modal Footer */}
-            <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-between gap-3">
+            <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-between gap-3 shrink-0">
               <div>
                 {editingSlot.existing && (
                   <Button
@@ -1026,7 +1485,11 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
                   variant="primary"
                   size="sm"
                   onClick={handleSaveSlot}
-                  disabled={isSaving || !formTeacher || !formTurma}
+                  disabled={
+                    isSaving || 
+                    !formTeacher || 
+                    (!formTurma && selectedMultiseriadaTurmas.length === 0)
+                  }
                   className="bg-brand-orange hover:bg-orange-600 text-white flex items-center gap-2"
                 >
                   {isSaving ? (
@@ -1040,6 +1503,24 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Printable Schedule Portal Component */}
+      {isPrintingSchedule && (
+        <PrintableQuadroHorarioDocente
+          escola={escola}
+          activeEtapa={activeEtapa}
+          activeTurno={activeTurno}
+          currentTurnoDef={currentTurnoDef}
+          currentTurnoConfig={currentTurnoConfig}
+          duracaoAulaAtiva={duracaoAulaAtiva}
+          currentTurnoHorarios={currentTurnoHorarios}
+          horarios={horarios}
+          schoolTeachers={schoolTeachers}
+          schoolTurmas={schoolTurmas}
+          selectedTurmaFilter={selectedTurmaFilter}
+          onClose={() => setIsPrintingSchedule(false)}
+        />
       )}
     </div>
   );
