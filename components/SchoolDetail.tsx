@@ -3574,7 +3574,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
               </Button>
               <div className="flex items-center gap-2">
                 <Button
-                  variant="outline"
+                  variant="secondary"
                   disabled={!selectedTurmaForReport}
                   onClick={() => {
                     if (selectedTurmaForReport) {

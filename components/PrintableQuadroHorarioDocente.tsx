@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Escola, Coordenador } from '../types';
-import { SlotHorarioCalculado } from '../services/configuracaoService';
+import { SlotHorarioCalculado, HorariosTurnoConfig } from '../services/configuracaoService';
 
 export interface HorarioSlotData {
   id: string;
@@ -22,7 +22,7 @@ interface PrintableQuadroHorarioDocenteProps {
   activeEtapa: string;
   activeTurno: 'MATUTINO' | 'VESPERTINO' | 'NOTURNO';
   currentTurnoDef: { id: string; label: string };
-  currentTurnoConfig: { inicio: string; fim: string; duracaoIntervalo: number; intervaloAposAula: number };
+  currentTurnoConfig: HorariosTurnoConfig;
   duracaoAulaAtiva: number;
   currentTurnoHorarios: SlotHorarioCalculado[];
   horarios: HorarioSlotData[];
