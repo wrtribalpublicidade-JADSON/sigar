@@ -164,7 +164,7 @@ export default function App() {
     setIsAdmin(isUserAdmin);
 
     try {
-      const [coordData, schoolAssoc, classAssoc] = await Promise.all([
+      const [coordData, schoolAssoc, classAssoc, turmaCompAssoc] = await Promise.all([
         (async () => {
           let list: any[] = [];
           let hasMore = true;
@@ -203,6 +203,15 @@ export default function App() {
             from += 1000;
           }
           return list;
+        })(),
+        (async () => {
+          try {
+            const { data, error } = await supabase.from('coordenador_turmas_comp').select('coordenador_id, turma_comp_id');
+            if (error) throw error;
+            return data || [];
+          } catch {
+            return [];
+          }
         })()
       ]);
 
@@ -220,6 +229,7 @@ export default function App() {
           funcao: normalizeRole(c.funcao), // Map function from DB
           escolasIds: schoolAssoc.filter(sa => sa.coordenador_id === c.id).map(sa => sa.escola_id),
           turmasIds: cTurmas.map(ca => ca.turma_id),
+          turmasCompIds: turmaCompAssoc.filter(tc => tc.coordenador_id === c.id).map(tc => tc.turma_comp_id),
           turmaComponentes,
           created_at: c.created_at
         };
@@ -1105,7 +1115,7 @@ export default function App() {
         status: 'Ativo'
       } as Coordenador;
     }
-    return coordenadores.find(c => c.contato === userEmail);
+    return coordenadores.find(c => c.contato?.toLowerCase() === userEmail?.toLowerCase());
   }, [coordenadores, userEmail, isAdmin, userName, escolas]);
 
   const handleNavigate = (

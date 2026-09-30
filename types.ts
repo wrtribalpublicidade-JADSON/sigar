@@ -471,6 +471,7 @@ export interface Coordenador {
   status?: 'Ativo' | 'Inativo'; // Controle de acesso
   escolasIds: string[]; // Vínculo com escolas
   turmasIds?: string[]; // Vínculo com turmas
+  turmasCompIds?: string[]; // Vínculo com turmas de atividades complementares
   turmaComponentes?: Record<string, string[]>; // Mapeamento turma_id -> componentes/campos de experiência
   created_at?: string;
 }

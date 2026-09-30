@@ -13,6 +13,7 @@ import { turmaCompService, TurmaComp } from '../services/turmaCompService';
 import { PrintableTurmaCompReport } from './PrintableTurmaCompReport';
 import { Coordenador } from '../types';
 import { ConfirmModal } from './ui/ConfirmModal';
+import { getAccessForTab, normalizeRole } from '../utils/permissions';
 
 interface Student {
     id: number;
@@ -97,14 +98,113 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
     const [turmaStudentSearch, setTurmaStudentSearch] = useState('');
     const [selectedSchoolIdForTurmaFilter, setSelectedSchoolIdForTurmaFilter] = useState<string>('todas');
 
+    // Monitors for the selected turma
+    const [turmaMonitors, setTurmaMonitors] = useState<Coordenador[]>([]);
+    const [availableMonitors, setAvailableMonitors] = useState<Coordenador[]>([]);
+    const [isManageMonitorsOpen, setIsManageMonitorsOpen] = useState(false);
+    const [selectedMonitorIdsForTurma, setSelectedMonitorIdsForTurma] = useState<string[]>([]);
+    const [isSavingMonitors, setIsSavingMonitors] = useState(false);
+
     const selectedTurma = turmasComp.find(t => t.id === selectedTurmaId) || null;
     const isUserAdmin = currentUser?.funcao === 'Administrador';
+    const isMonitor = currentUser?.funcao === 'Monitor de Atividade Complementar';
+
+    // Permission checks for sub-tabs
+    const canCadastrarAtividade = getAccessForTab('atividades_comp', 'cadastrar_atividade', currentUser?.funcao) === 'full';
+    const canCadastrarTurma = getAccessForTab('atividades_comp', 'cadastrar_turma', currentUser?.funcao) === 'full';
+
+    const loadTurmaMonitors = async (turmaId: string) => {
+        try {
+            const { data: links } = await supabase
+                .from('coordenador_turmas_comp')
+                .select('coordenador_id')
+                .eq('turma_comp_id', turmaId);
+            const cIds = (links || []).map((l: any) => l.coordenador_id);
+            if (cIds.length === 0) {
+                setTurmaMonitors([]);
+                setSelectedMonitorIdsForTurma([]);
+                return;
+            }
+            const { data: coords } = await supabase
+                .from('coordenadores')
+                .select('*')
+                .in('id', cIds);
+            setTurmaMonitors((coords || []).map((c: any) => ({
+                ...c,
+                funcao: normalizeRole(c.funcao)
+            })));
+            setSelectedMonitorIdsForTurma(cIds);
+        } catch (err) {
+            console.error('Error loading turma monitors:', err);
+        }
+    };
+
+    const openManageMonitorsModal = async () => {
+        if (!selectedTurma) return;
+        try {
+            const { data: allCoords } = await supabase
+                .from('coordenadores')
+                .select('*')
+                .eq('funcao', 'Monitor de Atividade Complementar');
+            
+            let list = allCoords || [];
+            if (selectedTurma.escola_id) {
+                const { data: schoolLinks } = await supabase
+                    .from('coordenador_escolas')
+                    .select('coordenador_id')
+                    .eq('escola_id', selectedTurma.escola_id);
+                if (schoolLinks && schoolLinks.length > 0) {
+                    const sCoordIds = new Set(schoolLinks.map((sl: any) => sl.coordenador_id));
+                    const filtered = list.filter(m => sCoordIds.has(m.id));
+                    if (filtered.length > 0) list = filtered;
+                }
+            }
+            setAvailableMonitors(list);
+            setIsManageMonitorsOpen(true);
+        } catch (err) {
+            console.error('Error loading available monitors:', err);
+        }
+    };
+
+    const handleSaveTurmaMonitors = async () => {
+        if (!selectedTurma) return;
+        setIsSavingMonitors(true);
+        try {
+            await supabase
+                .from('coordenador_turmas_comp')
+                .delete()
+                .eq('turma_comp_id', selectedTurma.id);
+
+            if (selectedMonitorIdsForTurma.length > 0) {
+                const inserts = selectedMonitorIdsForTurma.map(cId => ({
+                    coordenador_id: cId,
+                    turma_comp_id: selectedTurma.id
+                }));
+                const { error: insErr } = await supabase
+                    .from('coordenador_turmas_comp')
+                    .insert(inserts);
+                if (insErr) throw insErr;
+            }
+
+            await loadTurmaMonitors(selectedTurma.id);
+            await fetchTurmasComp();
+            setIsManageMonitorsOpen(false);
+        } catch (err) {
+            console.error('Error saving monitors:', err);
+            alert('Erro ao salvar vínculos de monitores.');
+        } finally {
+            setIsSavingMonitors(false);
+        }
+    };
 
     const handleSelectTurma = async (id: string) => {
         setSelectedTurmaId(id);
         setIsLoadingTurmaDetails(true);
         try {
-            const details = await turmaCompService.getTurmaDetails(id);
+            const [details] = await Promise.all([
+                turmaCompService.getTurmaDetails(id),
+                loadTurmaMonitors(id)
+            ]);
             setTurmaDetails(details);
             setSelectedActivitiesForTurma(details.activitiesIds);
         } catch (err) {
@@ -220,6 +320,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
     };
 
     const openNewTurmaModal = () => {
+        if (!canCadastrarTurma) return;
         setNewTurmaNome('');
         setEditingTurma(null);
         setTurno('MATUTINO');
@@ -247,6 +348,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
     };
 
     const openEditTurmaModal = (turma: TurmaComp) => {
+        if (!canCadastrarTurma) return;
         setNewTurmaNome(turma.nome);
         setEditingTurma(turma);
         setSelectedSchoolIdForNewTurma(turma.escola_id);
@@ -256,6 +358,10 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
 
     const handleSaveTurma = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!canCadastrarTurma) {
+            alert('Você não tem permissão para cadastrar ou editar turmas.');
+            return;
+        }
         if (!newTurmaNome.trim()) return;
         if (!selectedSchoolIdForNewTurma) {
             alert('Por favor, selecione uma unidade escolar.');
@@ -286,6 +392,10 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
     };
 
     const handleDeleteTurma = async (id: string, nome: string) => {
+        if (!canCadastrarTurma) {
+            alert('Você não tem permissão para excluir turmas.');
+            return;
+        }
         if (confirm(`Tem certeza que deseja excluir a turma "${nome}"? Os estudantes serão desvinculados de suas atividades correspondentes.`)) {
             try {
                 await turmaCompService.deleteTurma(id);
@@ -376,7 +486,27 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
 
     const fetchTurmasComp = async () => {
         try {
-            const data = await turmaCompService.getTurmas(userEscolaIds);
+            let data = await turmaCompService.getTurmas(userEscolaIds);
+            // For monitors, filter to only show turmas they are linked to
+            if (isMonitor) {
+                let allowedIds = currentUser?.turmasCompIds || [];
+                if (currentUser?.id) {
+                    try {
+                        const { data: dbLinks } = await supabase
+                            .from('coordenador_turmas_comp')
+                            .select('turma_comp_id')
+                            .eq('coordenador_id', currentUser.id);
+                        if (dbLinks && dbLinks.length > 0) {
+                            allowedIds = dbLinks.map((l: any) => l.turma_comp_id);
+                        } else if (allowedIds.length === 0) {
+                            allowedIds = [];
+                        }
+                    } catch (err) {
+                        console.error('Error fetching monitor turma links:', err);
+                    }
+                }
+                data = data.filter(t => allowedIds.includes(t.id));
+            }
             setTurmasComp(data);
         } catch (err) {
             console.error('Error fetching complementary classes:', err);
@@ -392,15 +522,54 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
     }, [isAddingStudent, selectedTurmaId]);
 
     React.useEffect(() => {
-        if (activeTab === 'formacao' && !selectedTurmaId && turmasComp.length > 0) {
-            handleSelectTurma(turmasComp[0].id);
+        if (activeTab === 'formacao' && turmasComp.length > 0) {
+            if (!selectedTurmaId || !turmasComp.some(t => t.id === selectedTurmaId)) {
+                handleSelectTurma(turmasComp[0].id);
+            }
+        } else if (activeTab === 'formacao' && turmasComp.length === 0) {
+            setSelectedTurmaId(null);
+            setTurmaDetails({ students: [], activitiesIds: [] });
+            setTurmaMonitors([]);
+            setSelectedMonitorIdsForTurma([]);
         }
     }, [activeTab, turmasComp, selectedTurmaId]);
 
     const fetchAtividades = async () => {
         setIsLoading(true);
         try {
-            const data = await activitiesService.getAtividades(userEscolaIds);
+            let data = await activitiesService.getAtividades(userEscolaIds);
+            // For monitors, filter to only show activities linked to their turmas
+            if (isMonitor) {
+                let allowedTurmas = currentUser?.turmasCompIds || [];
+                if (currentUser?.id) {
+                    try {
+                        const { data: dbLinks } = await supabase
+                            .from('coordenador_turmas_comp')
+                            .select('turma_comp_id')
+                            .eq('coordenador_id', currentUser.id);
+                        if (dbLinks && dbLinks.length > 0) {
+                            allowedTurmas = dbLinks.map((l: any) => l.turma_comp_id);
+                        }
+                    } catch (err) {
+                        console.error('Error fetching monitor turma links:', err);
+                    }
+                }
+
+                if (allowedTurmas.length === 0) {
+                    data = [];
+                } else {
+                    try {
+                        const { data: links } = await supabase
+                            .from('turma_comp_atividades')
+                            .select('atividade_id')
+                            .in('turma_comp_id', allowedTurmas);
+                        const linkedActivityIds = new Set((links || []).map(l => l.atividade_id));
+                        data = data.filter(a => linkedActivityIds.has(a.id));
+                    } catch (err) {
+                        console.error('Error filtering activities for monitor:', err);
+                    }
+                }
+            }
             setAtividades(data);
         } catch (err) {
             console.error('Error fetching activities:', err);
@@ -416,6 +585,10 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
     }, [userEscolaIds]);
 
     const handleSaveAtividade = async (newAtv: Omit<Atividade, 'id' | 'inscritos'>) => {
+        if (!canCadastrarAtividade) {
+            alert('Você não tem permissão para cadastrar ou editar atividades.');
+            return;
+        }
         try {
             if (editingAtividade) {
                 await activitiesService.saveAtividade({ ...newAtv, id: editingAtividade.id });
@@ -432,6 +605,10 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
     };
 
     const handleDeleteAtividade = async (id: string, nome: string) => {
+        if (!canCadastrarAtividade) {
+            alert('Você não tem permissão para excluir atividades.');
+            return;
+        }
         if (confirm(`Tem certeza que deseja excluir a atividade "${nome}"?`)) {
             try {
                 await activitiesService.deleteAtividade(id);
@@ -444,11 +621,13 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
     };
 
     const openEditModal = (atv: Atividade) => {
+        if (!canCadastrarAtividade) return;
         setEditingAtividade(atv);
         setIsModalOpen(true);
     };
 
     const openNewModal = () => {
+        if (!canCadastrarAtividade) return;
         setEditingAtividade(null);
         setIsModalOpen(true);
     };
@@ -816,6 +995,93 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                 </div>
             )}
 
+            {/* Manage Monitors Modal */}
+            {isManageMonitorsOpen && selectedTurma && (
+                <div className="fixed inset-0 z-[120] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
+                    <div className="bg-white w-full max-w-lg rounded-[2rem] shadow-2xl border border-slate-100 flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-300">
+                        <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                            <div>
+                                <h3 className="text-xl font-black text-slate-800 tracking-tight">Vincular Monitores</h3>
+                                <p className="text-slate-400 font-bold text-xs uppercase tracking-widest mt-1">Turma: {selectedTurma.nome}</p>
+                            </div>
+                            <button 
+                                onClick={() => setIsManageMonitorsOpen(false)}
+                                className="p-2 text-slate-400 hover:text-slate-600 rounded-xl transition-all"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-6 overflow-y-auto space-y-4">
+                            <p className="text-slate-500 text-xs font-semibold leading-relaxed">
+                                Selecione os monitores de atividade complementar vinculados a esta turma:
+                            </p>
+                            
+                            <div className="space-y-2">
+                                {availableMonitors.map(mon => {
+                                    const isChecked = selectedMonitorIdsForTurma.includes(mon.id);
+                                    return (
+                                        <button
+                                            key={mon.id}
+                                            type="button"
+                                            onClick={() => {
+                                                if (isChecked) {
+                                                    setSelectedMonitorIdsForTurma(prev => prev.filter(id => id !== mon.id));
+                                                } else {
+                                                    setSelectedMonitorIdsForTurma(prev => [...prev, mon.id]);
+                                                }
+                                            }}
+                                            className={`w-full flex items-center justify-between p-4 border rounded-2xl text-left transition-all ${
+                                                isChecked
+                                                    ? 'bg-orange-50/60 border-orange-300 text-orange-950 font-bold'
+                                                    : 'bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-9 h-9 rounded-xl bg-orange-100 text-brand-orange flex items-center justify-center font-bold text-sm">
+                                                    {mon.nome?.charAt(0) || 'M'}
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-bold text-sm">{mon.nome}</h4>
+                                                    <p className="text-[10px] text-slate-400 font-medium">{mon.contato}</p>
+                                                </div>
+                                            </div>
+                                            <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${
+                                                isChecked 
+                                                    ? 'bg-brand-orange border-brand-orange text-white' 
+                                                    : 'border-slate-300'
+                                            }`}>
+                                                {isChecked && <CheckCircle2 size={12} />}
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                                {availableMonitors.length === 0 && (
+                                    <div className="py-8 text-center text-slate-400 text-xs italic font-bold">
+                                        Nenhum monitor de atividade complementar cadastrado.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="p-6 bg-slate-50 rounded-b-[2rem] flex justify-end gap-3">
+                            <button 
+                                onClick={() => setIsManageMonitorsOpen(false)}
+                                disabled={isSavingMonitors}
+                                className="px-5 py-2.5 rounded-xl text-xs font-black uppercase text-slate-500 hover:bg-slate-100 transition-all"
+                            >
+                                Cancelar
+                            </button>
+                            <button 
+                                onClick={handleSaveTurmaMonitors}
+                                disabled={isSavingMonitors}
+                                className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-orange-500/20 transition-all disabled:opacity-50"
+                            >
+                                {isSavingMonitors ? 'Salvando...' : 'Salvar Monitores'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Header Area */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -827,7 +1093,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                     </h2>
                     <p className="text-slate-500 font-medium mt-1">Gestão de oficinas, esportes e projetos extracurriculares</p>
                 </div>
-                {activeTab === 'cadastro' && (
+                {activeTab === 'cadastro' && canCadastrarAtividade && (
                     <button 
                         onClick={openNewModal}
                         className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 transition-all shadow-lg shadow-orange-500/20 active:scale-95 self-start md:self-center"
@@ -952,28 +1218,30 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                             return (
                                 <div key={atv.id} className="group bg-white rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-orange-500/10 hover:border-orange-200 transition-all duration-300 overflow-hidden flex flex-col relative">
                                     {/* Actions overlay */}
-                                    <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                                        <button 
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                openEditModal(atv);
-                                            }}
-                                            className="p-2 bg-white text-slate-400 hover:text-brand-orange hover:bg-orange-50 rounded-xl transition-all shadow-sm border border-slate-100"
-                                            title="Editar Atividade"
-                                        >
-                                            <Pencil size={16} />
-                                        </button>
-                                        <button 
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDeleteAtividade(atv.id, atv.nome);
-                                            }}
-                                            className="p-2 bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shadow-sm border border-slate-100"
-                                            title="Excluir Atividade"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </div>
+                                    {canCadastrarAtividade && (
+                                        <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                            <button 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    openEditModal(atv);
+                                                }}
+                                                className="p-2 bg-white text-slate-400 hover:text-brand-orange hover:bg-orange-50 rounded-xl transition-all shadow-sm border border-slate-100"
+                                                title="Editar Atividade"
+                                            >
+                                                <Pencil size={16} />
+                                            </button>
+                                            <button 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDeleteAtividade(atv.id, atv.nome);
+                                                }}
+                                                className="p-2 bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shadow-sm border border-slate-100"
+                                                title="Excluir Atividade"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    )}
 
                                     <div className="p-6">
                                         <div className="flex justify-between items-start mb-6">
@@ -1054,13 +1322,15 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                     <div className="lg:col-span-4 bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-4">
                         <div className="flex justify-between items-center pb-2 border-b border-slate-50">
                             <h3 className="font-black text-slate-800 text-base uppercase tracking-tight">Turmas Complementares</h3>
-                            <button 
-                                onClick={openNewTurmaModal}
-                                className="bg-orange-50 hover:bg-orange-100 text-brand-orange p-1.5 rounded-lg transition-all"
-                                title="Cadastrar Nova Turma"
-                            >
-                                <Plus size={16} />
-                            </button>
+                            {canCadastrarTurma && (
+                                <button 
+                                    onClick={openNewTurmaModal}
+                                    className="bg-orange-50 hover:bg-orange-100 text-brand-orange p-1.5 rounded-lg transition-all"
+                                    title="Cadastrar Nova Turma"
+                                >
+                                    <Plus size={16} />
+                                </button>
+                            )}
                         </div>
                         
                         <div className="relative">
@@ -1113,34 +1383,38 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                                 </span>
                                             </div>
                                         </button>
-                                        <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    openEditTurmaModal(t);
-                                                }}
-                                                className="p-1 text-slate-300 hover:text-brand-orange hover:bg-orange-50 rounded-lg transition-all"
-                                                title="Editar Turma"
-                                            >
-                                                <Pencil size={14} />
-                                            </button>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleDeleteTurma(t.id, t.nome);
-                                                }}
-                                                className="p-1 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                                                title="Excluir Turma"
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
-                                        </div>
+                                        {canCadastrarTurma && (
+                                            <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        openEditTurmaModal(t);
+                                                    }}
+                                                    className="p-1 text-slate-300 hover:text-brand-orange hover:bg-orange-50 rounded-lg transition-all"
+                                                    title="Editar Turma"
+                                                >
+                                                    <Pencil size={14} />
+                                                </button>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDeleteTurma(t.id, t.nome);
+                                                    }}
+                                                    className="p-1 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                                                    title="Excluir Turma"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}
                             {filteredTurmasComp.length === 0 && (
                                 <div className="py-8 text-center text-slate-400 text-xs italic font-bold">
-                                    Nenhuma turma complementar cadastrada.
+                                    {isMonitor 
+                                        ? 'Nenhuma turma complementar vinculada ao seu usuário.' 
+                                        : 'Nenhuma turma complementar cadastrada.'}
                                 </div>
                             )}
                         </div>
@@ -1178,15 +1452,42 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                             ) : (
                                                 <span className="text-slate-400 font-bold text-xs italic">Nenhuma atividade vinculada</span>
                                             )}
-                                            <button 
-                                                onClick={() => {
-                                                    setSelectedActivitiesForTurma(turmaDetails.activitiesIds);
-                                                    setIsManageActivitiesOpen(true);
-                                                }}
-                                                className="text-xs text-brand-orange hover:text-orange-700 font-black ml-2 uppercase tracking-widest"
-                                            >
-                                                [ Gerenciar ]
-                                            </button>
+                                            {canCadastrarTurma && (
+                                                <button 
+                                                    onClick={() => {
+                                                        setSelectedActivitiesForTurma(turmaDetails.activitiesIds);
+                                                        setIsManageActivitiesOpen(true);
+                                                    }}
+                                                    className="text-xs text-brand-orange hover:text-orange-700 font-black ml-2 uppercase tracking-widest cursor-pointer"
+                                                >
+                                                    [ Gerenciar ]
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* Monitores Vinculados */}
+                                        <div className="flex flex-wrap gap-2 items-center pt-1">
+                                            <span className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                                                <Users size={14} className="text-brand-orange" />
+                                                Monitores ({turmaMonitors.length}):
+                                            </span>
+                                            {turmaMonitors.length > 0 ? (
+                                                turmaMonitors.map(mon => (
+                                                    <span key={mon.id} className="bg-orange-50 text-orange-800 border border-orange-200 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-tight flex items-center gap-1">
+                                                        {mon.nome}
+                                                    </span>
+                                                ))
+                                            ) : (
+                                                <span className="text-slate-400 font-bold text-xs italic">Nenhum monitor vinculado</span>
+                                            )}
+                                            {canCadastrarTurma && (
+                                                <button 
+                                                    onClick={openManageMonitorsModal}
+                                                    className="text-xs text-brand-orange hover:text-orange-700 font-black ml-2 uppercase tracking-widest cursor-pointer"
+                                                >
+                                                    [ Gerenciar Monitores ]
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="flex flex-col sm:flex-row gap-3 items-center self-stretch md:self-auto">
@@ -1197,12 +1498,14 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                         >
                                             <Printer size={16} /> Imprimir
                                         </button>
-                                        <button
-                                            onClick={handleVincularAlunoClick}
-                                            className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 transition-all shadow-xl shadow-orange-500/20 active:scale-95 self-stretch sm:self-auto text-center justify-center animate-in fade-in"
-                                        >
-                                            <UserPlus size={16} /> Vincular Aluno
-                                        </button>
+                                        {canCadastrarTurma && (
+                                            <button
+                                                onClick={handleVincularAlunoClick}
+                                                className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 transition-all shadow-xl shadow-orange-500/20 active:scale-95 self-stretch sm:self-auto text-center justify-center animate-in fade-in"
+                                            >
+                                                <UserPlus size={16} /> Vincular Aluno
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
 

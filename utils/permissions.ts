@@ -127,7 +127,15 @@ export const ALL_MODULES = [
     { id: 'notificacoes', name: 'Notificações', group: 'Sistema' },
     { id: 'auditoria', name: 'Auditoria', group: 'Sistema' },
     { id: 'registrar_visita', name: 'Registrar Visita', group: 'Sistema' },
-    { id: 'atividades_comp', name: 'Atividades Complementares', group: 'Gestão' },
+    {
+        id: 'atividades_comp',
+        name: 'Atividades Complementares',
+        group: 'Gestão',
+        tabs: [
+            { id: 'cadastrar_atividade', name: 'Cadastrar Nova Atividade' },
+            { id: 'cadastrar_turma', name: 'Cadastrar Nova Turma' }
+        ]
+    },
     { id: 'estudantes', name: 'Gestão de Estudantes', group: 'Menu' },
     { id: 'merenda', name: 'Merenda Escolar', group: 'Gestão' },
     {

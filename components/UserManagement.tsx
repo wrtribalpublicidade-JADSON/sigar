@@ -40,6 +40,8 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
     const [editRole, setEditRole] = useState<string>('');
     const [editStatus, setEditStatus] = useState<'Ativo' | 'Inativo'>('Ativo');
     const [editSchools, setEditSchools] = useState<string[]>([]);
+    const [editTurmasComp, setEditTurmasComp] = useState<string[]>([]);
+    const [turmasComp, setTurmasComp] = useState<{ id: string; nome: string; escola_id: string }[]>([]);
     const [isSaving, setIsSaving] = useState(false);
 
     const loadData = async () => {
@@ -65,7 +67,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
             }
 
             // Fetch coordinators, schools and classes in parallel
-            const [coordData, schoolAssoc, classAssoc] = await Promise.all([
+            const [coordData, schoolAssoc, classAssoc, turmaCompAssoc] = await Promise.all([
                 (async () => {
                     let list: any[] = [];
                     let hasMore = true;
@@ -104,6 +106,23 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
                         from += 1000;
                     }
                     return list;
+                })(),
+                (async () => {
+                    try {
+                        let list: any[] = [];
+                        let hasMore = true;
+                        let from = 0;
+                        while (hasMore) {
+                            const { data, error } = await supabase.from('coordenador_turmas_comp').select('coordenador_id, turma_comp_id').range(from, from + 999);
+                            if (error) break;
+                            list = list.concat(data || []);
+                            hasMore = (data || []).length === 1000;
+                            from += 1000;
+                        }
+                        return list;
+                    } catch {
+                        return [];
+                    }
                 })()
             ]);
 
@@ -116,7 +135,8 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
                 funcao: normalizeRole(c.funcao),
                 status: c.status || 'Ativo',
                 escolasIds: schoolAssoc.filter(sa => sa.coordenador_id === c.id).map(sa => sa.escola_id),
-                turmasIds: classAssoc.filter(ca => ca.coordenador_id === c.id).map(ca => ca.turma_id)
+                turmasIds: classAssoc.filter(ca => ca.coordenador_id === c.id).map(ca => ca.turma_id),
+                turmasCompIds: (turmaCompAssoc || []).filter((tc: any) => tc.coordenador_id === c.id).map((tc: any) => tc.turma_comp_id)
             }));
 
             // Apply RBAC Logic: If not Admin, Coordinator can only see users linked to their schools (or themselves)
@@ -134,10 +154,14 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
             }
             setUsers(mappedUsers);
 
-            const { data: schoolData, error: schoolError } = await supabase.from('escolas').select('id, nome');
-            if (schoolError) throw schoolError;
-            const sortedSchools = ((schoolData as any) || []).sort((a: any, b: any) => a.nome.localeCompare(b.nome));
+            const [schoolRes, turmaCompRes] = await Promise.all([
+                supabase.from('escolas').select('id, nome'),
+                supabase.from('turmas_atividades_comp').select('id, nome, escola_id')
+            ]);
+            if (schoolRes.error) throw schoolRes.error;
+            const sortedSchools = ((schoolRes.data as any) || []).sort((a: any, b: any) => a.nome.localeCompare(b.nome));
             setEscolas(sortedSchools);
+            setTurmasComp(turmaCompRes.data || []);
 
         } catch (error: any) {
             console.error(error);
@@ -233,6 +257,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
         setEditRole(user.funcao || '');
         setEditStatus(user.status || 'Ativo');
         setEditSchools([...user.escolasIds]);
+        setEditTurmasComp(user.turmasCompIds ? [...user.turmasCompIds] : []);
         setIsEditModalOpen(true);
     };
 
@@ -272,7 +297,13 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
         try {
             if (isDemoMode) {
                 showNotification('success', 'Usuário atualizado com sucesso! (Modo Demo - as alterações não são salvas no servidor)');
-                const updatedUsers = users.map(u => u.id === selectedUser.id ? { ...u, funcao: editRole as any, status: editStatus, escolasIds: editSchools } : u);
+                const updatedUsers = users.map(u => u.id === selectedUser.id ? { 
+                    ...u, 
+                    funcao: editRole as any, 
+                    status: editStatus, 
+                    escolasIds: editSchools,
+                    turmasCompIds: editTurmasComp
+                } : u);
                 setUsers(updatedUsers);
                 setIsEditModalOpen(false);
                 setIsSaving(false);
@@ -307,6 +338,23 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
                     .from('coordenador_escolas')
                     .insert(inserts);
                 if (insError) throw insError;
+            }
+
+            // Update Turmas Comp Links for Monitor
+            await supabase
+                .from('coordenador_turmas_comp')
+                .delete()
+                .eq('coordenador_id', selectedUser.id);
+
+            if (editRole === 'Monitor de Atividade Complementar' && editTurmasComp.length > 0) {
+                const compInserts = editTurmasComp.map(tcId => ({
+                    coordenador_id: selectedUser.id,
+                    turma_comp_id: tcId
+                }));
+                const { error: tcError } = await supabase
+                    .from('coordenador_turmas_comp')
+                    .insert(compInserts);
+                if (tcError) console.error('Erro ao vincular turmas complementares:', tcError);
             }
 
             showNotification('success', 'Usuário atualizado com sucesso!');
@@ -604,6 +652,39 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
                                             )
                                         })}
                                         {escolas.length === 0 && <p className="text-sm text-slate-500 italic">Nenhuma escola cadastrada no sistema.</p>}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Complementary Turmas Links for Monitor */}
+                            {editRole === 'Monitor de Atividade Complementar' && (
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-2">Vínculo com Turmas de Atividades Complementares</label>
+                                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 max-h-60 overflow-y-auto space-y-2">
+                                        {turmasComp
+                                            .filter(tc => editSchools.length === 0 || editSchools.includes(tc.escola_id))
+                                            .map(tc => {
+                                                const isLinked = editTurmasComp.includes(tc.id);
+                                                const schoolName = escolas.find(e => e.id === tc.escola_id)?.nome;
+                                                return (
+                                                    <label key={tc.id} className="flex items-center gap-3 p-2 hover:bg-white rounded-lg cursor-pointer transition-colors border border-transparent hover:border-slate-100 hover:shadow-sm">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isLinked}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) setEditTurmasComp(prev => [...prev, tc.id]);
+                                                                else setEditTurmasComp(prev => prev.filter(id => id !== tc.id));
+                                                            }}
+                                                            className="w-4 h-4 text-brand-orange rounded border-slate-300 focus:ring-brand-orange"
+                                                        />
+                                                        <div>
+                                                            <span className="text-sm font-medium text-slate-700 block">{tc.nome}</span>
+                                                            {schoolName && <span className="text-[10px] text-slate-400 block">{schoolName}</span>}
+                                                        </div>
+                                                    </label>
+                                                );
+                                            })}
+                                        {turmasComp.length === 0 && <p className="text-sm text-slate-500 italic">Nenhuma turma complementar cadastrada no sistema.</p>}
                                     </div>
                                 </div>
                             )}
