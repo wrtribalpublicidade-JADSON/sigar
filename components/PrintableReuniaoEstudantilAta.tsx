@@ -217,21 +217,22 @@ export const PrintableReuniaoEstudantilAta: React.FC<PrintableReuniaoEstudantilA
                                 Nome do Estudante
                             </th>
                             <th style={{ padding: '6pt 12pt', border: '0.5pt solid #e2e8f0', fontSize: '8pt', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc', textAlign: 'center', width: '50%' }}>
-                                Assinatura Digital
+                                Assinatura Digital / Biométrica
                             </th>
                         </tr>
                     </thead>
                     <tbody>
                         {estudantes.length > 0 ? estudantes.map((estudante) => {
-                            const hasSignature = reuniao.assinaturas && reuniao.assinaturas[estudante.id];
+                            const rawSignature = reuniao.assinaturas && (reuniao.assinaturas[estudante.id] || reuniao.assinaturas[estudante.id?.toString()]);
+                            const sigSrc = typeof rawSignature === 'string' ? rawSignature : rawSignature?.dataUrl;
                             return (
                                 <tr key={estudante.id}>
                                     <td style={{ padding: '6pt 12pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', color: '#334155' }}>
                                         {estudante.name}
                                     </td>
                                     <td style={{ padding: '2pt', border: '0.5pt solid #e2e8f0', height: '40pt', textAlign: 'center', verticalAlign: 'middle' }}>
-                                        {hasSignature ? (
-                                            <img src={reuniao.assinaturas[estudante.id]} alt="Assinatura" style={{ maxHeight: '35pt', maxWidth: '100%', objectFit: 'contain', margin: '0 auto' }} />
+                                        {sigSrc ? (
+                                            <img src={sigSrc} alt="Assinatura" style={{ maxHeight: '35pt', maxWidth: '100%', objectFit: 'contain', margin: '0 auto' }} />
                                         ) : (
                                             <span style={{ fontSize: '8pt', color: '#cbd5e1', fontStyle: 'italic' }}>Ausente/Não Assinou</span>
                                         )}

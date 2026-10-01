@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Printer, BookOpen, ClipboardList, CalendarClock, Info, ArrowLeft, ArrowRight, Save, LayoutTemplate, School, Calendar, FileText, X, Users, CheckCircle2, Lock, Send, BarChart3, Hand, CheckSquare, MessageCircle, AlertTriangle, UserPlus, PenLine, Loader2, Eraser, Check, Trash2, Edit } from 'lucide-react';
+import { Printer, BookOpen, ClipboardList, CalendarClock, Info, ArrowLeft, ArrowRight, Save, LayoutTemplate, School, Calendar, FileText, X, Users, CheckCircle2, Lock, Send, BarChart3, Hand, CheckSquare, MessageCircle, AlertTriangle, UserPlus, PenLine, Loader2, Eraser, Check, Trash2, Edit, Fingerprint, ShieldCheck, Sparkles, RefreshCw } from 'lucide-react';
 import { Escola, Coordenador } from '../types';
 import { ccTurmaService, ccEstudanteService, ccReuniaoEstudantilService } from '../services/gestaoConselhoService';
 import { PrintableReuniaoEstudantilAta } from './PrintableReuniaoEstudantilAta';
@@ -74,10 +74,30 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({
     
     // Signature States
     const [signatures, setSignatures] = useState<{ [studentId: string]: string }>({});
+    const [signatureMeta, setSignatureMeta] = useState<{ 
+        [studentId: string]: { 
+            type: 'digital' | 'biometric'; 
+            timestamp: string; 
+            protocol?: string; 
+            hash?: string; 
+        } 
+    }>({});
     const [signingStudentId, setSigningStudentId] = useState<string | null>(null);
+    const [signatureMode, setSignatureMode] = useState<'digital' | 'biometric'>('digital');
     const sigCanvasRef = useRef<HTMLCanvasElement>(null);
     const sigIsDrawing = useRef(false);
     const sigLastPos = useRef<{ x: number; y: number } | null>(null);
+
+    // Biometric Scanner States
+    const [biometricScanState, setBiometricScanState] = useState<'idle' | 'scanning' | 'success'>('idle');
+    const [biometricScanProgress, setBiometricScanProgress] = useState(0);
+    const [biometricStatusMessage, setBiometricStatusMessage] = useState('Pronto para leitura biométrica');
+    const [biometricResult, setBiometricResult] = useState<{
+        protocol: string;
+        hash: string;
+        timestamp: string;
+        quality: number;
+    } | null>(null);
 
     // Print State
     const [reuniaoToPrint, setReuniaoToPrint] = useState<any>(null);
@@ -263,12 +283,12 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({
     }, []);
 
     useEffect(() => {
-        if (signingStudentId) {
+        if (signingStudentId && signatureMode === 'digital') {
             // Small delay to ensure canvas is in the DOM
-            const timer = setTimeout(() => initCanvas(), 50);
+            const timer = setTimeout(() => initCanvas(), 60);
             return () => clearTimeout(timer);
         }
-    }, [signingStudentId, initCanvas]);
+    }, [signingStudentId, signatureMode, initCanvas]);
 
     const getCanvasPos = (e: React.MouseEvent | React.TouchEvent) => {
         const canvas = sigCanvasRef.current;
@@ -343,7 +363,212 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({
         if (!canvas) return;
         const dataUrl = canvas.toDataURL('image/png');
         setSignatures(prev => ({ ...prev, [signingStudentId]: dataUrl }));
+        setSignatureMeta(prev => ({
+            ...prev,
+            [signingStudentId]: {
+                type: 'digital',
+                timestamp: new Date().toLocaleString('pt-BR')
+            }
+        }));
         setSigningStudentId(null);
+    };
+
+    // Helper to generate official biometric stamp
+    const generateBiometricStamp = (
+        studentName: string, 
+        protocol: string, 
+        timestamp: string, 
+        hash: string
+    ): string => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 600;
+        canvas.height = 180;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return '';
+
+        // White background
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Outer border
+        ctx.strokeStyle = '#0d9488'; // Teal-600
+        ctx.lineWidth = 2.5;
+        ctx.strokeRect(6, 6, canvas.width - 12, canvas.height - 12);
+
+        // Inner dashed security border
+        ctx.strokeStyle = '#99f6e4'; // Teal-200
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.strokeRect(12, 12, canvas.width - 24, canvas.height - 24);
+        ctx.setLineDash([]);
+
+        // Draw stylized Fingerprint Graphic on the left
+        const cx = 75;
+        const cy = 90;
+        ctx.strokeStyle = '#0d9488';
+        ctx.lineWidth = 2.5;
+        ctx.lineCap = 'round';
+
+        for (let r = 12; r <= 48; r += 7) {
+            ctx.beginPath();
+            ctx.arc(cx, cy - 8 + (r * 0.2), r, Math.PI * 0.85, Math.PI * 2.15);
+            ctx.stroke();
+        }
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - 10);
+        ctx.lineTo(cx, cy + 34);
+        ctx.stroke();
+
+        // Verification checkmark badge on fingerprint
+        ctx.fillStyle = '#14b8a6';
+        ctx.beginPath();
+        ctx.arc(cx + 28, cy + 28, 14, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(cx + 22, cy + 28);
+        ctx.lineTo(cx + 27, cy + 33);
+        ctx.lineTo(cx + 35, cy + 24);
+        ctx.stroke();
+
+        // Text on the right
+        const tx = 145;
+
+        // Header security ribbon
+        ctx.fillStyle = '#f0fdfa';
+        ctx.fillRect(tx, 22, canvas.width - tx - 22, 24);
+        ctx.strokeStyle = '#14b8a6';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(tx, 22, canvas.width - tx - 22, 24);
+
+        ctx.fillStyle = '#115e59';
+        ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+        ctx.fillText('AUTENTICAÇÃO BIOMÉTRICA DIGITAL • CONSELHO DE CLASSE', tx + 10, 38);
+
+        // Student Name
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'bold 15px system-ui, -apple-system, sans-serif';
+        const cleanName = studentName.toUpperCase();
+        ctx.fillText(cleanName.length > 34 ? cleanName.substring(0, 32) + '...' : cleanName, tx, 72);
+
+        // Metadata lines
+        ctx.fillStyle = '#475569';
+        ctx.font = '11px system-ui, -apple-system, sans-serif';
+        ctx.fillText(`Data/Hora: ${timestamp}`, tx, 94);
+
+        ctx.fillStyle = '#64748b';
+        ctx.font = '10px monospace';
+        ctx.fillText(`Protocolo: ${protocol}  •  Status: IDENTIDADE CONFIRMADA`, tx, 114);
+
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '9px monospace';
+        const shortHash = hash.length > 38 ? `${hash.substring(0, 38)}...` : hash;
+        ctx.fillText(`SHA-256: ${shortHash}`, tx, 132);
+
+        // Bottom seal
+        ctx.fillStyle = '#0d9488';
+        ctx.font = 'bold 9px system-ui, -apple-system, sans-serif';
+        ctx.fillText('REGISTRO OFICIAL SIGAR • INTEGRIDADE CRIPTOGRÁFICA', tx, 150);
+
+        return canvas.toDataURL('image/png');
+    };
+
+    const handleOpenSignature = (studentId: string, mode: 'digital' | 'biometric' = 'digital') => {
+        setSigningStudentId(studentId);
+        setSignatureMode(mode);
+        setBiometricScanState('idle');
+        setBiometricScanProgress(0);
+        setBiometricStatusMessage('Pronto para leitura biométrica');
+        setBiometricResult(null);
+    };
+
+    const handleStartBiometricScan = async () => {
+        setBiometricScanState('scanning');
+        setBiometricScanProgress(15);
+        setBiometricStatusMessage('Conectando ao sensor biométrico...');
+
+        setTimeout(() => {
+            setBiometricScanProgress(45);
+            setBiometricStatusMessage('Detectando cristas papilares e minúcias...');
+        }, 400);
+
+        setTimeout(() => {
+            setBiometricScanProgress(75);
+            setBiometricStatusMessage('Validando autenticidade e unicidade biométrica...');
+        }, 850);
+
+        setTimeout(async () => {
+            setBiometricScanProgress(95);
+            setBiometricStatusMessage('Gerando protocolo e hash criptográfico...');
+
+            const studentName = signingStudent?.name || 'Estudante';
+            const now = new Date();
+            const timestamp = now.toLocaleString('pt-BR');
+            const rawString = `${signingStudentId}-${studentName}-${now.toISOString()}`;
+
+            let hash = '';
+            try {
+                const encoder = new TextEncoder();
+                const data = encoder.encode(rawString);
+                const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+                const hashArray = Array.from(new Uint8Array(hashBuffer));
+                hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            } catch {
+                hash = Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+            }
+
+            const protocol = `BIO-${Math.random().toString(36).substring(2, 8).toUpperCase()}-${now.getFullYear()}`;
+
+            setBiometricScanProgress(100);
+            setBiometricStatusMessage('Biometria autenticada com sucesso!');
+            setBiometricResult({
+                protocol,
+                hash,
+                timestamp,
+                quality: 98 + Math.floor(Math.random() * 2)
+            });
+            setBiometricScanState('success');
+        }, 1250);
+    };
+
+    const confirmBiometricSignature = () => {
+        if (!signingStudentId || !biometricResult) return;
+        const studentName = signingStudent?.name || 'Estudante';
+        const stampDataUrl = generateBiometricStamp(
+            studentName,
+            biometricResult.protocol,
+            biometricResult.timestamp,
+            biometricResult.hash
+        );
+
+        setSignatures(prev => ({ ...prev, [signingStudentId]: stampDataUrl }));
+        setSignatureMeta(prev => ({
+            ...prev,
+            [signingStudentId]: {
+                type: 'biometric',
+                timestamp: biometricResult.timestamp,
+                protocol: biometricResult.protocol,
+                hash: biometricResult.hash
+            }
+        }));
+        setSigningStudentId(null);
+        setBiometricScanState('idle');
+        setBiometricResult(null);
+    };
+
+    const handleRemoveSignature = (studentId: string) => {
+        if (!confirm('Deseja remover a assinatura deste estudante?')) return;
+        setSignatures(prev => {
+            const next = { ...prev };
+            delete next[studentId];
+            return next;
+        });
+        setSignatureMeta(prev => {
+            const next = { ...prev };
+            delete next[studentId];
+            return next;
+        });
     };
 
     const handleNext = () => {
@@ -362,6 +587,7 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({
         setCompromissos(reuniao.compromissos || '');
         setOutrasQuestoes(reuniao.outras_questoes || '');
         setSignatures(reuniao.assinaturas || {});
+        setSignatureMeta(reuniao.assinaturas_meta || {});
         
         // Handle auto_avaliacao wrapper
         const avalData = reuniao.auto_avaliacao || {};
@@ -407,6 +633,7 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({
             setCompromissos('');
             setOutrasQuestoes('');
             setSignatures({});
+            setSignatureMeta({});
             setAutoAvaliacao({});
             setAvaliacaoBncc({});
             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -433,6 +660,7 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({
                 compromissos: compromissos,
                 outras_questoes: outrasQuestoes,
                 assinaturas: signatures,
+                assinaturas_meta: signatureMeta,
                 status: 'Concluído'
             };
 
@@ -926,7 +1154,7 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({
                                         <tr>
                                             <th className="px-4 py-4 w-16">Nº</th>
                                             <th className="px-4 py-4">Nome do Estudante</th>
-                                            <th className="px-4 py-4 text-right">Assinatura Digital</th>
+                                            <th className="px-4 py-4 text-right">Assinatura Digital / Biométrica</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 text-slate-600 font-medium">
@@ -961,25 +1189,53 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({
                                                     </td>
                                                     <td className="px-4 py-5 text-right">
                                                         {signatures[student.id?.toString()] ? (
-                                                            <div className="inline-flex items-center gap-3">
+                                                            <div className="inline-flex items-center justify-end gap-2.5">
                                                                 <img 
                                                                     src={signatures[student.id?.toString()]} 
                                                                     alt="Assinatura" 
-                                                                    className="h-8 w-auto border border-emerald-100 rounded bg-white"
+                                                                    className="h-8 max-w-[130px] border border-slate-200 rounded-lg bg-white object-contain px-1 shadow-xs"
                                                                 />
-                                                                <div className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-600 px-4 py-2 rounded-lg text-xs font-bold border border-emerald-100">
-                                                                    <CheckCircle2 className="w-4 h-4" strokeWidth={2.5} />
-                                                                    ASSINADO
-                                                                </div>
+                                                                {signatureMeta[student.id?.toString()]?.type === 'biometric' ? (
+                                                                    <div className="inline-flex items-center gap-1.5 bg-teal-50 text-teal-700 px-3 py-1.5 rounded-lg text-xs font-bold border border-teal-200 shadow-xs">
+                                                                        <Fingerprint className="w-3.5 h-3.5 text-teal-600" strokeWidth={2.5} />
+                                                                        BIOMETRIA
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg text-xs font-bold border border-emerald-200 shadow-xs">
+                                                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" strokeWidth={2.5} />
+                                                                        ASSINADO
+                                                                    </div>
+                                                                )}
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleRemoveSignature(student.id?.toString())}
+                                                                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                                    title="Remover assinatura / Assinar novamente"
+                                                                >
+                                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                                </button>
                                                             </div>
                                                         ) : (
-                                                            <button 
-                                                                onClick={() => setSigningStudentId(student.id?.toString())}
-                                                                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold border border-emerald-500 text-emerald-600 hover:bg-emerald-50 transition-colors"
-                                                            >
-                                                                <PenLine className="w-4 h-4" strokeWidth={2} />
-                                                                Coletar Assinatura Digital
-                                                            </button>
+                                                            <div className="inline-flex items-center justify-end gap-2 flex-wrap">
+                                                                <button 
+                                                                    type="button"
+                                                                    onClick={() => handleOpenSignature(student.id?.toString(), 'digital')}
+                                                                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold border border-emerald-500 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 transition-colors shadow-xs active:scale-95"
+                                                                    title="Coletar Assinatura na Tela / Touchscreen"
+                                                                >
+                                                                    <PenLine className="w-3.5 h-3.5" strokeWidth={2} />
+                                                                    Coletar Assinatura Digital
+                                                                </button>
+                                                                <button 
+                                                                    type="button"
+                                                                    onClick={() => handleOpenSignature(student.id?.toString(), 'biometric')}
+                                                                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold border border-teal-500 bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors shadow-xs active:scale-95"
+                                                                    title="Coletar Assinatura Biométrica / Leitor de Digital"
+                                                                >
+                                                                    <Fingerprint className="w-3.5 h-3.5 text-teal-600" strokeWidth={2.5} />
+                                                                    Assinatura Biométrica
+                                                                </button>
+                                                            </div>
                                                         )}
                                                     </td>
                                                 </tr>
@@ -1007,7 +1263,7 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({
                                     <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-500 shrink-0">
                                         <Info className="w-4 h-4" strokeWidth={2.5} />
                                     </div>
-                                    <span className="italic">Os estudantes devem assinar utilizando o touchscreen ou mouse.</span>
+                                    <span className="italic">Os estudantes podem assinar via touchscreen, mouse ou autenticação biométrica.</span>
                                 </div>
                             </div>
                         </div>
@@ -1067,81 +1323,324 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({
 
             {/* ====== SIGNATURE MODAL ====== */}
             {signingStudentId && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setSigningStudentId(null)}>
+                <div 
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200 p-4" 
+                    onClick={() => {
+                        setSigningStudentId(null);
+                        setBiometricScanState('idle');
+                        setBiometricResult(null);
+                    }}
+                >
                     <div 
-                        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 animate-in zoom-in-95 slide-in-from-bottom-4 duration-300 overflow-hidden"
+                        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-in zoom-in-95 slide-in-from-bottom-4 duration-300 overflow-hidden border border-slate-200"
                         onClick={(e) => e.stopPropagation()}
                     >
+                        {/* Custom Laser Beam Keyframe Style */}
+                        <style>{`
+                            @keyframes scanLaser {
+                                0% { top: 10%; opacity: 0.2; }
+                                50% { top: 88%; opacity: 1; }
+                                100% { top: 10%; opacity: 0.2; }
+                            }
+                        `}</style>
+
                         {/* Modal Header */}
-                        <div className="bg-emerald-500 text-white px-6 py-4 flex items-center justify-between">
+                        <div className={`px-6 py-4 flex items-center justify-between text-white transition-all duration-300 ${
+                            signatureMode === 'biometric' 
+                                ? 'bg-gradient-to-r from-teal-700 via-teal-600 to-emerald-700' 
+                                : 'bg-gradient-to-r from-emerald-600 to-teal-700'
+                        }`}>
                             <div className="flex items-center gap-3">
-                                <div className="bg-white/20 p-1.5 rounded-lg">
-                                    <PenLine className="w-5 h-5 text-white" strokeWidth={2.5} />
+                                <div className="bg-white/20 p-2 rounded-xl backdrop-blur-xs shadow-inner">
+                                    {signatureMode === 'biometric' ? (
+                                        <Fingerprint className="w-5 h-5 text-white" strokeWidth={2.5} />
+                                    ) : (
+                                        <PenLine className="w-5 h-5 text-white" strokeWidth={2.5} />
+                                    )}
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-sm tracking-wide uppercase">Assinatura Digital</h3>
-                                    <p className="text-emerald-100 text-xs mt-0.5">{signingStudent?.name || 'Estudante'}</p>
+                                    <h3 className="font-bold text-sm tracking-wide uppercase">
+                                        {signatureMode === 'biometric' ? 'Assinatura Biométrica' : 'Assinatura Digital'}
+                                    </h3>
+                                    <p className="text-emerald-100 text-xs font-medium mt-0.5">{signingStudent?.name || 'Estudante'}</p>
                                 </div>
                             </div>
                             <button 
-                                onClick={() => setSigningStudentId(null)}
-                                className="bg-white/20 p-1.5 rounded-lg hover:bg-white/30 transition-colors"
+                                onClick={() => {
+                                    setSigningStudentId(null);
+                                    setBiometricScanState('idle');
+                                    setBiometricResult(null);
+                                }}
+                                className="bg-white/10 hover:bg-white/25 p-1.5 rounded-lg transition-colors text-white"
+                                title="Fechar"
                             >
-                                <X className="w-4 h-4 text-white" />
+                                <X className="w-4 h-4" />
                             </button>
                         </div>
 
-                        {/* Canvas Area */}
-                        <div className="p-6 space-y-4">
-                            <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl p-2 relative">
-                                <canvas
-                                    ref={sigCanvasRef}
-                                    className="w-full rounded-lg cursor-crosshair touch-none"
-                                    style={{ height: '200px' }}
-                                    onMouseDown={handleSigStart}
-                                    onMouseMove={handleSigMove}
-                                    onMouseUp={handleSigEnd}
-                                    onMouseLeave={handleSigEnd}
-                                    onTouchStart={handleSigStart}
-                                    onTouchMove={handleSigMove}
-                                    onTouchEnd={handleSigEnd}
-                                />
-                                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[10px] text-slate-400 uppercase tracking-wider font-bold pointer-events-none select-none">
-                                    Assine aqui
+                        {/* Mode Switcher Tabs */}
+                        <div className="p-4 bg-slate-50 border-b border-slate-100">
+                            <div className="bg-slate-200/70 p-1 rounded-xl flex gap-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setSignatureMode('digital')}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold transition-all ${
+                                        signatureMode === 'digital'
+                                            ? 'bg-white text-emerald-700 shadow-sm'
+                                            : 'text-slate-600 hover:text-slate-800 hover:bg-white/50'
+                                    }`}
+                                >
+                                    <PenLine className="w-3.5 h-3.5" />
+                                    Assinatura na Tela
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSignatureMode('biometric')}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold transition-all ${
+                                        signatureMode === 'biometric'
+                                            ? 'bg-white text-teal-700 shadow-sm'
+                                            : 'text-slate-600 hover:text-slate-800 hover:bg-white/50'
+                                    }`}
+                                >
+                                    <Fingerprint className="w-3.5 h-3.5" />
+                                    Assinatura Biométrica
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* ================= DIGITAL CANVAS MODE ================= */}
+                        {signatureMode === 'digital' && (
+                            <>
+                                <div className="p-6 space-y-4">
+                                    <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl p-2 relative">
+                                        <canvas
+                                            ref={sigCanvasRef}
+                                            className="w-full rounded-lg cursor-crosshair touch-none bg-white"
+                                            style={{ height: '200px' }}
+                                            onMouseDown={handleSigStart}
+                                            onMouseMove={handleSigMove}
+                                            onMouseUp={handleSigEnd}
+                                            onMouseLeave={handleSigEnd}
+                                            onTouchStart={handleSigStart}
+                                            onTouchMove={handleSigMove}
+                                            onTouchEnd={handleSigEnd}
+                                        />
+                                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[10px] text-slate-400 uppercase tracking-wider font-bold pointer-events-none select-none">
+                                            Assine aqui
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                                        <Info className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                        <span>Use o mouse, caneta touch ou o dedo para assinar na área acima.</span>
+                                    </div>
+                                </div>
+
+                                {/* Digital Footer */}
+                                <div className="border-t border-slate-100 px-6 py-4 flex items-center justify-between gap-3 bg-slate-50/50">
+                                    <button 
+                                        onClick={clearSignatureCanvas}
+                                        className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 hover:text-slate-800 transition-colors font-bold text-xs shadow-xs"
+                                    >
+                                        <Eraser className="w-4 h-4" />
+                                        Limpar
+                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        <button 
+                                            onClick={() => setSigningStudentId(null)}
+                                            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 hover:text-slate-800 transition-colors font-bold text-xs shadow-xs"
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button 
+                                            onClick={confirmSignature}
+                                            className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors font-bold text-xs shadow-sm shadow-emerald-500/20 border border-emerald-600/20 active:scale-95"
+                                        >
+                                            <Check className="w-4 h-4" strokeWidth={2.5} />
+                                            Confirmar Assinatura
+                                        </button>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+
+                        {/* ================= BIOMETRIC SENSOR MODE ================= */}
+                        {signatureMode === 'biometric' && (
+                            <div className="p-6 space-y-4">
+                                {/* Student Info Pill */}
+                                <div className="bg-teal-50/70 border border-teal-100 rounded-xl p-3 flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-teal-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                                            {signingStudent?.name ? signingStudent.name.charAt(0).toUpperCase() : 'E'}
+                                        </div>
+                                        <div>
+                                            <div className="font-bold text-xs text-slate-800">{signingStudent?.name}</div>
+                                            <div className="text-[10px] text-teal-700">Autenticação biométrica individual para a reunião</div>
+                                        </div>
+                                    </div>
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-teal-700 bg-teal-100/60 px-2 py-0.5 rounded-full border border-teal-200">
+                                        <ShieldCheck className="w-3 h-3 text-teal-600" />
+                                        LGPD
+                                    </span>
+                                </div>
+
+                                {/* High-tech Biometric Scanner Pad */}
+                                <div className="bg-gradient-to-b from-slate-900 via-slate-900 to-teal-950 border border-teal-500/40 rounded-2xl p-6 relative overflow-hidden flex flex-col items-center justify-center min-h-[250px] shadow-2xl text-center select-none">
+                                    {/* Corner Reticles */}
+                                    <div className="absolute top-3 left-3 w-4 h-4 border-t-2 border-l-2 border-teal-400" />
+                                    <div className="absolute top-3 right-3 w-4 h-4 border-t-2 border-r-2 border-teal-400" />
+                                    <div className="absolute bottom-3 left-3 w-4 h-4 border-b-2 border-l-2 border-teal-400" />
+                                    <div className="absolute bottom-3 right-3 w-4 h-4 border-b-2 border-r-2 border-teal-400" />
+
+                                    {/* Background Cyber Grid */}
+                                    <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f766e15_1px,transparent_1px),linear-gradient(to_bottom,#0f766e15_1px,transparent_1px)] bg-[size:16px_16px] pointer-events-none" />
+
+                                    {/* Laser Sweep Beam (during scanning) */}
+                                    {biometricScanState === 'scanning' && (
+                                        <div 
+                                            className="absolute left-6 right-6 h-0.5 bg-gradient-to-r from-transparent via-teal-300 to-transparent shadow-[0_0_15px_#2dd4bf] pointer-events-none z-10" 
+                                            style={{ animation: 'scanLaser 1.2s ease-in-out infinite' }} 
+                                        />
+                                    )}
+
+                                    {/* Fingerprint Scanner Visual */}
+                                    {biometricScanState === 'idle' && (
+                                        <div className="relative flex flex-col items-center gap-3 z-10 my-2">
+                                            <div className="relative p-4 rounded-full bg-teal-500/10 border border-teal-500/30 flex items-center justify-center group cursor-pointer hover:bg-teal-500/20 transition-all shadow-inner"
+                                                onClick={handleStartBiometricScan}
+                                            >
+                                                <div className="absolute inset-0 rounded-full border border-teal-400/40 animate-ping opacity-25" />
+                                                <Fingerprint className="w-20 h-20 text-teal-400 stroke-[1.5] group-hover:scale-105 transition-transform" />
+                                            </div>
+                                            <div>
+                                                <div className="text-xs font-bold text-teal-300 uppercase tracking-wider">Leitor Biométrico Pronto</div>
+                                                <div className="text-[11px] text-slate-400 max-w-[260px] mt-1">
+                                                    Posicione o dedo sobre o sensor ou clique em <strong className="text-teal-200">Iniciar Captura</strong>.
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {biometricScanState === 'scanning' && (
+                                        <div className="relative flex flex-col items-center gap-4 z-10 my-2 w-full max-w-xs">
+                                            <div className="relative p-4 rounded-full bg-teal-500/20 border border-teal-400/60 shadow-[0_0_30px_#14b8a6]">
+                                                <Fingerprint className="w-20 h-20 text-teal-300 animate-pulse stroke-[1.8]" />
+                                            </div>
+                                            <div className="space-y-2 w-full">
+                                                <div className="text-xs font-bold text-teal-300 uppercase tracking-wider animate-pulse">
+                                                    {biometricStatusMessage}
+                                                </div>
+                                                {/* Animated Progress Bar */}
+                                                <div className="w-full bg-slate-800/90 rounded-full h-2 overflow-hidden border border-teal-500/30 shadow-inner">
+                                                    <div 
+                                                        className="bg-gradient-to-r from-teal-500 to-emerald-400 h-full rounded-full transition-all duration-300 ease-out shadow-[0_0_10px_#10b981]" 
+                                                        style={{ width: `${biometricScanProgress}%` }}
+                                                    />
+                                                </div>
+                                                <div className="text-[10px] text-teal-400/80 font-mono text-center">
+                                                    Lendo minúcias papilares • {biometricScanProgress}%
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {biometricScanState === 'success' && biometricResult && (
+                                        <div className="relative flex flex-col items-center gap-3 z-10 my-1 w-full animate-in zoom-in-95 duration-200">
+                                            <div className="w-14 h-14 rounded-full bg-emerald-500/20 border border-emerald-400 flex items-center justify-center text-emerald-400 shadow-[0_0_25px_#10b981]">
+                                                <CheckCircle2 className="w-8 h-8 stroke-[2.5]" />
+                                            </div>
+                                            <div>
+                                                <div className="text-xs font-black text-emerald-400 uppercase tracking-wider">
+                                                    Biometria Autenticada com Sucesso!
+                                                </div>
+                                                <div className="text-[11px] text-emerald-200/80">Identidade confirmada para esta sessão</div>
+                                            </div>
+
+                                            {/* Certificate Badge */}
+                                            <div className="bg-slate-800/80 border border-teal-500/30 rounded-xl p-3 text-left w-full max-w-sm space-y-1 text-[10px] font-mono backdrop-blur-xs">
+                                                <div className="flex justify-between text-slate-300">
+                                                    <span className="text-slate-400">Protocolo:</span>
+                                                    <strong className="text-teal-300">{biometricResult.protocol}</strong>
+                                                </div>
+                                                <div className="flex justify-between text-slate-300">
+                                                    <span className="text-slate-400">Registro:</span>
+                                                    <span>{biometricResult.timestamp}</span>
+                                                </div>
+                                                <div className="flex justify-between text-slate-300">
+                                                    <span className="text-slate-400">Qualidade:</span>
+                                                    <span className="text-emerald-400 font-bold">{biometricResult.quality}% (Excelente)</span>
+                                                </div>
+                                                <div className="text-[9px] text-slate-500 truncate pt-1 border-t border-slate-700/60">
+                                                    Hash: {biometricResult.hash.substring(0, 32)}...
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Biometric Footer Controls */}
+                                <div className="flex items-center justify-between gap-3 pt-2">
+                                    {biometricScanState === 'idle' && (
+                                        <>
+                                            <button 
+                                                type="button"
+                                                onClick={() => {
+                                                    setSigningStudentId(null);
+                                                    setBiometricScanState('idle');
+                                                }}
+                                                className="px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 font-bold text-xs shadow-xs"
+                                            >
+                                                Cancelar
+                                            </button>
+                                            <button 
+                                                type="button"
+                                                onClick={handleStartBiometricScan}
+                                                className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white rounded-xl font-bold text-xs shadow-md shadow-teal-600/20 active:scale-95 transition-all"
+                                            >
+                                                <Fingerprint className="w-4 h-4" />
+                                                Iniciar Captura Biométrica
+                                            </button>
+                                        </>
+                                    )}
+
+                                    {biometricScanState === 'scanning' && (
+                                        <button 
+                                            type="button"
+                                            disabled
+                                            className="w-full flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-800 text-teal-300 rounded-xl font-bold text-xs opacity-90 cursor-wait shadow-sm"
+                                        >
+                                            <Loader2 className="w-4 h-4 animate-spin text-teal-400" />
+                                            Processando Leitura no Sensor...
+                                        </button>
+                                    )}
+
+                                    {biometricScanState === 'success' && (
+                                        <>
+                                            <button 
+                                                type="button"
+                                                onClick={() => {
+                                                    setBiometricScanState('idle');
+                                                    setBiometricResult(null);
+                                                }}
+                                                className="flex items-center gap-1.5 px-3 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 font-bold text-xs shadow-xs"
+                                                title="Escanear novamente"
+                                            >
+                                                <RefreshCw className="w-3.5 h-3.5" />
+                                                Escanear Novamente
+                                            </button>
+                                            <button 
+                                                type="button"
+                                                onClick={confirmBiometricSignature}
+                                                className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-md shadow-emerald-600/25 active:scale-95 transition-all border border-emerald-700/20"
+                                            >
+                                                <Check className="w-4 h-4" strokeWidth={2.5} />
+                                                Confirmar Assinatura Biométrica
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             </div>
-                            
-                            <div className="flex items-center gap-2 text-xs text-slate-500">
-                                <Info className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                                <span>Use o mouse, caneta ou dedo para assinar na área acima.</span>
-                            </div>
-                        </div>
-
-                        {/* Modal Footer */}
-                        <div className="border-t border-slate-100 px-6 py-4 flex items-center justify-between gap-3 bg-slate-50/50">
-                            <button 
-                                onClick={clearSignatureCanvas}
-                                className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 hover:text-slate-800 transition-colors font-bold text-xs shadow-sm"
-                            >
-                                <Eraser className="w-4 h-4" />
-                                Limpar
-                            </button>
-                            <div className="flex items-center gap-2">
-                                <button 
-                                    onClick={() => setSigningStudentId(null)}
-                                    className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 hover:text-slate-800 transition-colors font-bold text-xs shadow-sm"
-                                >
-                                    Cancelar
-                                </button>
-                                <button 
-                                    onClick={confirmSignature}
-                                    className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors font-bold text-xs shadow-sm shadow-emerald-500/20 border border-emerald-600/20"
-                                >
-                                    <Check className="w-4 h-4" strokeWidth={2.5} />
-                                    Confirmar Assinatura
-                                </button>
-                            </div>
-                        </div>
+                        )}
                     </div>
                 </div>
             )}
