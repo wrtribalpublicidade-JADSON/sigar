@@ -344,29 +344,94 @@ export const ccReuniaoEstudantilService = {
         let query = supabase.from(table).select('*').order('created_at', { ascending: false });
         if (escolaId) query = query.eq('escola_id', escolaId);
         if (turmaId) query = query.eq('turma_id', turmaId);
-        const { data, error } = await query;
+        let { data, error } = await query;
+        
+        // If query failed or returned empty and stage might be mismatched, attempt fallback check
+        if (error || (!data || data.length === 0)) {
+            const altStage: EducationalStage = stage === 'fundamental' ? 'infantil' : 'fundamental';
+            const altTable = getTableName('reuniao', altStage);
+            let altQuery = supabase.from(altTable).select('*').order('created_at', { ascending: false });
+            if (escolaId) altQuery = altQuery.eq('escola_id', escolaId);
+            if (turmaId) altQuery = altQuery.eq('turma_id', turmaId);
+            const altResult = await altQuery;
+            if (!altResult.error && altResult.data && altResult.data.length > 0) {
+                return altResult.data;
+            }
+        }
+        
         if (error) throw error;
-        return data;
+        return data || [];
     },
 
     async save(reuniao: any, stage: EducationalStage = 'fundamental') {
         const table = getTableName('reuniao', stage);
-        if (reuniao.id && reuniao.id.length > 20) {
-            const { data, error } = await supabase.from(table).update(reuniao).eq('id', reuniao.id).select().single();
-            if (error) throw error;
-            return data;
+        const altStage: EducationalStage = stage === 'fundamental' ? 'infantil' : 'fundamental';
+        const altTable = getTableName('reuniao', altStage);
+
+        // Normalize payload: keep auto_avaliacao with assinaturas_meta for 100% redundancy
+        const payload: any = { ...reuniao };
+        if (payload.assinaturas_meta) {
+            if (!payload.auto_avaliacao || typeof payload.auto_avaliacao !== 'object') {
+                payload.auto_avaliacao = {};
+            }
+            payload.auto_avaliacao.assinaturas_meta = payload.assinaturas_meta;
+        }
+
+        // Helper to perform safe update/insert with automatic column fallback
+        const executeWithFallback = async (targetTable: string, isUpdate: boolean, dataToSave: any) => {
+            if (isUpdate) {
+                let res = await supabase.from(targetTable).update(dataToSave).eq('id', dataToSave.id).select().maybeSingle();
+                if (res.error && res.error.message?.includes('column "assinaturas_meta"')) {
+                    const { assinaturas_meta, ...stripped } = dataToSave;
+                    res = await supabase.from(targetTable).update(stripped).eq('id', dataToSave.id).select().maybeSingle();
+                }
+                return res;
+            } else {
+                const { id, ...newRecord } = dataToSave;
+                let res = await supabase.from(targetTable).insert(newRecord).select().maybeSingle();
+                if (res.error && res.error.message?.includes('column "assinaturas_meta"')) {
+                    const { assinaturas_meta, ...stripped } = newRecord;
+                    res = await supabase.from(targetTable).insert(stripped).select().maybeSingle();
+                }
+                return res;
+            }
+        };
+
+        if (payload.id && payload.id.length > 20) {
+            // First attempt update on specified table
+            let res = await executeWithFallback(table, true, payload);
+
+            // If 0 rows matched on specified table, try the alternate stage table
+            if (!res.error && !res.data) {
+                const altRes = await executeWithFallback(altTable, true, payload);
+                if (altRes.data) return altRes.data;
+                
+                // If not found in alternate table either, insert as new record
+                const insertRes = await executeWithFallback(table, false, payload);
+                if (insertRes.error) throw insertRes.error;
+                return insertRes.data;
+            }
+
+            if (res.error) throw res.error;
+            return res.data;
         } else {
-            const { id, ...newReuniao } = reuniao;
-            const { data, error } = await supabase.from(table).insert(newReuniao).select().single();
-            if (error) throw error;
-            return data;
+            const res = await executeWithFallback(table, false, payload);
+            if (res.error) throw res.error;
+            return res.data;
         }
     },
 
     async delete(id: string, stage: EducationalStage = 'fundamental') {
         const table = getTableName('reuniao', stage);
-        const { error } = await supabase.from(table).delete().eq('id', id);
-        if (error) throw error;
+        const altTable = getTableName('reuniao', stage === 'fundamental' ? 'infantil' : 'fundamental');
+        
+        // Try deleting from primary table
+        const { error, count } = await supabase.from(table).delete({ count: 'exact' }).eq('id', id);
+        if (error || count === 0) {
+            // Try deleting from alternate table
+            const altRes = await supabase.from(altTable).delete({ count: 'exact' }).eq('id', id);
+            if (altRes.error && error) throw error;
+        }
         return true;
     }
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Printer, BookOpen, ClipboardList, CalendarClock, Info, ArrowLeft, ArrowRight, Save, LayoutTemplate, School, Calendar, FileText, X, Users, CheckCircle2, Lock, Send, BarChart3, Hand, CheckSquare, MessageCircle, AlertTriangle, UserPlus, PenLine, Loader2, Eraser, Check, Trash2, Edit, Fingerprint, ShieldCheck, Sparkles, RefreshCw } from 'lucide-react';
+import { Printer, BookOpen, ClipboardList, CalendarClock, Info, ArrowLeft, ArrowRight, Save, LayoutTemplate, School, Calendar, FileText, X, Users, CheckCircle2, Lock, Send, BarChart3, Hand, CheckSquare, MessageCircle, AlertTriangle, UserPlus, PenLine, Loader2, Eraser, Check, Trash2, Edit, Fingerprint, ShieldCheck, Sparkles, RefreshCw, AlertCircle, FileCheck } from 'lucide-react';
 import { Escola, Coordenador } from '../types';
 import { ccTurmaService, ccEstudanteService, ccReuniaoEstudantilService } from '../services/gestaoConselhoService';
 import { PrintableReuniaoEstudantilAta } from './PrintableReuniaoEstudantilAta';
@@ -98,6 +98,13 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({
         timestamp: string;
         quality: number;
     } | null>(null);
+
+    // Confirmation & Result Modal States
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [showErrorModal, setShowErrorModal] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
+    const [savedReuniaoResult, setSavedReuniaoResult] = useState<any>(null);
 
     // Print State
     const [reuniaoToPrint, setReuniaoToPrint] = useState<any>(null);
@@ -640,23 +647,31 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({
         }
     };
 
-    const handleFinish = async () => {
+    const handleRequestFinish = () => {
         if (!selectedEscolaId || !selectedTurmaId || !periodoLetivo) {
-            alert('Por favor, preencha a Unidade Escolar, Turma e Período Letivo na Etapa 1.');
+            setErrorMessage('Por favor, certifique-se de preencher a Unidade Escolar, Turma e Período Letivo na Etapa 1 antes de finalizar a reunião.');
+            setShowErrorModal(true);
             return;
         }
+        setShowConfirmModal(true);
+    };
 
+    const executeSave = async () => {
         setIsSubmitting(true);
         try {
             const reuniao = {
                 ...(editingReuniaoId ? { id: editingReuniaoId } : {}),
                 escola_id: selectedEscolaId,
                 turma_id: selectedTurmaId,
-                turma_nome: activeTurma?.identificacao || '',
+                turma_nome: activeTurma?.identificacao || activeTurma?.anoSerie || '',
                 ano_letivo: anoLetivo,
                 periodo_letivo: periodoLetivo,
                 pauta: pauta,
-                auto_avaliacao: { turma: autoAvaliacao, bncc: avaliacaoBncc },
+                auto_avaliacao: { 
+                    turma: autoAvaliacao, 
+                    bncc: avaliacaoBncc,
+                    assinaturas_meta: signatureMeta 
+                },
                 compromissos: compromissos,
                 outras_questoes: outrasQuestoes,
                 assinaturas: signatures,
@@ -673,16 +688,35 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({
                 setReunioesRealizadas(prev => [savedData, ...prev]);
             }
             
-            setEditingReuniaoId(null);
-            alert('Reunião Estudantil salva e finalizada com sucesso!');
-            handlePrintReuniao(savedData);
-            // if (onClose) onClose();
-        } catch (error) {
+            setSavedReuniaoResult(savedData);
+            setShowConfirmModal(false);
+            setShowSuccessModal(true);
+        } catch (error: any) {
             console.error('Erro ao salvar reunião:', error);
-            alert('Erro ao finalizar a reunião. Tente novamente.');
+            setShowConfirmModal(false);
+            const detailedMsg = error?.message || error?.error_description || error?.details || 'Erro ao finalizar a reunião. Verifique a conexão com o servidor e tente novamente.';
+            setErrorMessage(detailedMsg);
+            setShowErrorModal(true);
         } finally {
             setIsSubmitting(false);
         }
+    };
+
+    const handleCloseSuccessModal = () => {
+        setShowSuccessModal(false);
+        setSavedReuniaoResult(null);
+        setEditingReuniaoId(null);
+        setCurrentStep(1);
+        setAnoLetivo('2024');
+        setPeriodoLetivo('');
+        setPauta('Conselho de Classe Participativo');
+        setCompromissos('');
+        setOutrasQuestoes('');
+        setSignatures({});
+        setSignatureMeta({});
+        setAutoAvaliacao({});
+        setAvaliacaoBncc({});
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     return (
@@ -1294,10 +1328,10 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({
                         Cancelar
                     </button>
                     <button
-                        onClick={currentStep < 4 ? handleNext : handleFinish}
+                        onClick={currentStep < 4 ? handleNext : handleRequestFinish}
                         disabled={isSubmitting}
                         className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-8 py-2.5 rounded-xl font-bold text-sm transition-all text-white shadow-sm
-                            ${currentStep < 4 ? 'bg-emerald-500 hover:bg-emerald-600 hover:-translate-y-0.5 shadow-emerald-500/20 border border-emerald-600/20' : 'bg-slate-800 hover:bg-slate-900'}
+                            ${currentStep < 4 ? 'bg-emerald-500 hover:bg-emerald-600 hover:-translate-y-0.5 shadow-emerald-500/20 border border-emerald-600/20' : (editingReuniaoId ? 'bg-teal-600 hover:bg-teal-700 shadow-teal-600/20' : 'bg-slate-800 hover:bg-slate-900')}
                             disabled:opacity-50 disabled:cursor-not-allowed
                         `}
                     >
@@ -1310,6 +1344,11 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({
                             <>
                                 Próximo
                                 <ArrowRight className="w-4 h-4" />
+                            </>
+                        ) : editingReuniaoId ? (
+                            <>
+                                <Save className="w-4 h-4" />
+                                Salvar Alterações da Reunião
                             </>
                         ) : (
                             <>
@@ -1713,6 +1752,254 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({
                     </table>
                 </div>
             </div>
+
+            {/* ====== CONFIRMATION MODAL ====== */}
+            {showConfirmModal && (
+                <div 
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+                    onClick={() => !isSubmitting && setShowConfirmModal(false)}
+                >
+                    <div 
+                        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Modal Header */}
+                        <div className={`px-6 py-4 flex items-center justify-between text-white transition-colors ${
+                            editingReuniaoId ? 'bg-gradient-to-r from-teal-700 to-emerald-700' : 'bg-gradient-to-r from-emerald-600 via-teal-700 to-slate-800'
+                        }`}>
+                            <div className="flex items-center gap-3">
+                                <div className="bg-white/20 p-2 rounded-xl backdrop-blur-xs">
+                                    <FileCheck className="w-5 h-5 text-white" strokeWidth={2.5} />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-sm tracking-wide uppercase">
+                                        {editingReuniaoId ? 'Confirmar Edição da Reunião' : 'Confirmar Registro da Reunião'}
+                                    </h3>
+                                    <p className="text-emerald-100 text-xs font-medium mt-0.5">
+                                        Conselho de Classe Participativo • {anoLetivo}
+                                    </p>
+                                </div>
+                            </div>
+                            {!isSubmitting && (
+                                <button 
+                                    onClick={() => setShowConfirmModal(false)}
+                                    className="bg-white/10 hover:bg-white/20 p-1.5 rounded-lg transition-colors text-white"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Modal Content */}
+                        <div className="p-6 space-y-4">
+                            <p className="text-slate-600 text-sm">
+                                {editingReuniaoId 
+                                    ? 'Você está prestes a atualizar os dados desta ata de reunião estudantil consolidada.' 
+                                    : 'Tem certeza de que deseja finalizar e registrar oficialmente esta Reunião Estudantil no sistema?'}
+                            </p>
+
+                            {/* Summary Card */}
+                            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2.5 text-xs text-slate-700">
+                                <div className="flex justify-between items-center py-1 border-b border-slate-200/60">
+                                    <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Unidade Escolar</span>
+                                    <span className="font-bold text-slate-800 text-right truncate max-w-[240px]">
+                                        {escolas.find(e => e.id === selectedEscolaId)?.nome || 'Não informada'}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-center py-1 border-b border-slate-200/60">
+                                    <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Turma</span>
+                                    <span className="font-bold text-slate-800">
+                                        {activeTurma ? `${activeTurma.anoSerie || ''} - ${activeTurma.identificacao || ''}` : 'Turma selecionada'}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-center py-1 border-b border-slate-200/60">
+                                    <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Período Letivo</span>
+                                    <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                                        {periodoLetivo || '-'}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-center py-1">
+                                    <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Presenças Registradas</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-black text-slate-800 text-sm">
+                                            {estudantes.filter(s => signatures[s.id?.toString()]).length.toString().padStart(2, '0')} / {estudantes.length.toString().padStart(2, '0')}
+                                        </span>
+                                        <span className="text-[10px] text-emerald-600 bg-emerald-100/60 px-2 py-0.5 rounded-full font-bold">
+                                            {estudantes.length > 0 ? Math.round((estudantes.filter(s => signatures[s.id?.toString()]).length / estudantes.length) * 100) : 0}%
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Signature breakdown */}
+                                <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                                    <div className="flex items-center gap-1.5">
+                                        <Fingerprint className="w-3.5 h-3.5 text-teal-600" />
+                                        <span>Biométricas: <strong className="text-slate-700">{estudantes.filter(s => signatures[s.id?.toString()] && signatureMeta[s.id?.toString()]?.type === 'biometric').length}</strong></span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        <PenLine className="w-3.5 h-3.5 text-emerald-600" />
+                                        <span>Digitais (Tela): <strong className="text-slate-700">{estudantes.filter(s => signatures[s.id?.toString()] && signatureMeta[s.id?.toString()]?.type !== 'biometric').length}</strong></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Editing alert if applicable */}
+                            {editingReuniaoId && (
+                                <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-xs">
+                                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                                    <span><strong>Modo de Edição:</strong> Os dados anteriores serão atualizados com as alterações e assinaturas atuais.</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="border-t border-slate-100 px-6 py-4 flex items-center justify-between gap-3 bg-slate-50/50">
+                            <button
+                                type="button"
+                                onClick={() => setShowConfirmModal(false)}
+                                disabled={isSubmitting}
+                                className="px-5 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 font-bold text-xs shadow-xs transition-colors disabled:opacity-50"
+                            >
+                                Voltar ao Formulário
+                            </button>
+                            <button
+                                type="button"
+                                onClick={executeSave}
+                                disabled={isSubmitting}
+                                className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-xs text-white shadow-md transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
+                                    editingReuniaoId 
+                                        ? 'bg-teal-600 hover:bg-teal-700 shadow-teal-600/20' 
+                                        : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
+                                }`}
+                            >
+                                {isSubmitting ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        Gravando Ata no Sistema...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Check className="w-4 h-4" strokeWidth={2.5} />
+                                        {editingReuniaoId ? 'Confirmar e Salvar Edição' : 'Confirmar e Salvar Ata'}
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ====== SUCCESS MODAL ====== */}
+            {showSuccessModal && (
+                <div 
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+                >
+                    <div 
+                        className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200 p-6 text-center"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="w-16 h-16 mx-auto rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-4 shadow-lg shadow-emerald-500/20 ring-8 ring-emerald-50">
+                            <CheckCircle2 className="w-10 h-10 stroke-[2.5]" />
+                        </div>
+                        <h3 className="text-lg font-black text-slate-800 uppercase tracking-wide">
+                            {editingReuniaoId ? 'Ata Atualizada com Sucesso!' : 'Reunião Salva com Sucesso!'}
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-1 mb-4 leading-relaxed">
+                            A ata da Reunião Estudantil do Conselho de Classe foi gravada e consolidada com sucesso no sistema.
+                        </p>
+
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs text-slate-600 text-left space-y-1.5 font-medium mb-5">
+                            <div className="flex justify-between">
+                                <span className="text-slate-400">Turma:</span>
+                                <strong className="text-slate-700">{savedReuniaoResult?.turma_nome || activeTurma?.identificacao}</strong>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-slate-400">Período:</span>
+                                <span className="text-emerald-700 font-bold">{savedReuniaoResult?.periodo_letivo || periodoLetivo}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-slate-400">Presenças Confirmadas:</span>
+                                <span className="text-slate-700 font-bold">{estudantes.filter(s => signatures[s.id?.toString()]).length} estudantes</span>
+                            </div>
+                            <div className="flex justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-200">
+                                <span>Status:</span>
+                                <span className="text-emerald-600 font-bold uppercase">Consolidado / Somente Leitura</span>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={() => savedReuniaoResult && handlePrintReuniao(savedReuniaoResult)}
+                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl font-bold text-xs shadow-xs transition-colors"
+                            >
+                                <Printer className="w-4 h-4 text-emerald-600" />
+                                Imprimir Ata
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleCloseSuccessModal}
+                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-md shadow-emerald-600/20 active:scale-95 transition-all"
+                            >
+                                <Check className="w-4 h-4" strokeWidth={2.5} />
+                                Concluir
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ====== ERROR MODAL ====== */}
+            {showErrorModal && (
+                <div 
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+                    onClick={() => setShowErrorModal(false)}
+                >
+                    <div 
+                        className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200 p-6 text-center"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="w-16 h-16 mx-auto rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-4 shadow-lg shadow-red-500/20 ring-8 ring-red-50">
+                            <AlertTriangle className="w-9 h-9 stroke-[2.5]" />
+                        </div>
+                        <h3 className="text-lg font-black text-slate-800 uppercase tracking-wide">
+                            Não Foi Possível Salvar
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-1 mb-3">
+                            Ocorreu uma falha ao tentar gravar os dados da reunião no sistema:
+                        </p>
+
+                        <div className="bg-red-50 border border-red-200 rounded-xl p-3.5 text-left text-red-700 text-xs font-mono break-all max-h-36 overflow-y-auto mb-4">
+                            {errorMessage || 'Erro inesperado ao gravar no banco de dados.'}
+                        </div>
+
+                        <p className="text-[11px] text-slate-400 italic mb-5 leading-normal">
+                            Suas assinaturas e preenchimentos continuam preservados no formulário. Nenhuma informação foi perdida.
+                        </p>
+
+                        <div className="flex items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setShowErrorModal(false)}
+                                className="flex-1 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 font-bold text-xs shadow-xs transition-colors"
+                            >
+                                Fechar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowErrorModal(false);
+                                    executeSave();
+                                }}
+                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-xs shadow-md shadow-red-600/20 active:scale-95 transition-all"
+                            >
+                                <RefreshCw className="w-3.5 h-3.5" />
+                                Tentar Novamente
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
         </div>
     );
