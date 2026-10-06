@@ -597,7 +597,7 @@ export const pendenciasEngineService = {
       });
 
       // Mapeamento de professores e coordenadores
-      const professores = targetCoordenadores.filter(c => (c.funcao as string) === 'Professor' || (c.funcao as string)?.includes('Monitor') || c.funcao === 'Monitor de Atividade Complementar');
+      const professores = targetCoordenadores.filter(c => (c.funcao as string) === 'Professor' || (c.funcao as string)?.includes('Monitor') || c.funcao === 'Monitor de Atividade Complementar' || (c.funcao as string)?.includes('Recomposição'));
       const coordenadoresPedagogicos = targetCoordenadores.filter(c => c.funcao === 'Coordenador Pedagógico' || c.funcao === 'Gestor Geral');
 
       const detectedList: Array<Omit<AlertaPendencia, 'id' | 'created_at' | 'updated_at'>> = [];

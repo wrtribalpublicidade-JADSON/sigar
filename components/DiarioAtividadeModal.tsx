@@ -66,8 +66,10 @@ export const DiarioAtividadeModal: React.FC<{
         currentUser?.funcao === 'Gestor Pedagógico' || 
         currentUser?.funcao === 'Gestor Geral' || 
         currentUser?.funcao === 'Técnico Pedagógico' || 
-        !currentUser?.funcao || 
-        (currentUser?.funcao !== 'Professor' && currentUser?.funcao !== 'Monitor de Atividade Complementar');
+        (currentUser?.funcao !== 'Professor' && 
+         currentUser?.funcao !== 'Monitor de Atividade Complementar' && 
+         currentUser?.funcao !== 'Professor(a) de Recomposição' && 
+         currentUser?.funcao !== 'Professor de Recomposição');
 
     const loadData = async () => {
         if (!atividade?.id) return;

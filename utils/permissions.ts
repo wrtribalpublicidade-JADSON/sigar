@@ -182,6 +182,7 @@ export const ALL_ROLES = [
     'Gestor Pedagógico',
     'Auxiliar Administrativo',
     'Monitor de Atividade Complementar',
+    'Professor(a) de Recomposição',
 ];
 
 export const DEFAULT_PERMISSIONS: Record<string, Record<string, AccessLevel>> = {
@@ -197,6 +198,10 @@ export const DEFAULT_PERMISSIONS: Record<string, Record<string, AccessLevel>> = 
     'Gestor Pedagógico': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['auditoria', 'equipe', 'gestao_rede'].includes(m.id) ? 'readonly' : 'full'])),
     'Auxiliar Administrativo': Object.fromEntries(ALL_MODULES.map(m => [m.id, ['auditoria', 'equipe', 'indicadores', 'gestao_rede'].includes(m.id) ? 'none' : 'full'])),
     'Monitor de Atividade Complementar': Object.fromEntries(ALL_MODULES.map(m => [
+        m.id,
+        ['atividades_comp', 'suporte'].includes(m.id) ? 'full' : ['dashboard', 'estudantes'].includes(m.id) ? 'readonly' : 'none'
+    ])),
+    'Professor(a) de Recomposição': Object.fromEntries(ALL_MODULES.map(m => [
         m.id,
         ['atividades_comp', 'suporte'].includes(m.id) ? 'full' : ['dashboard', 'estudantes'].includes(m.id) ? 'readonly' : 'none'
     ])),
@@ -303,6 +308,17 @@ export function hasFullTabAccess(parentModuleId: string, tabId: string, userRole
  */
 export function normalizeRole(role?: string): any {
     if (!role) return role;
+    const clean = role.toLowerCase().trim();
+    if (
+        clean === 'professor de recomposição' ||
+        clean === 'professora de recomposição' ||
+        clean === 'professor(a) de recomposição' ||
+        clean === 'professor de recomposicao' ||
+        clean === 'professora de recomposicao' ||
+        clean === 'professor(a) de recomposicao'
+    ) {
+        return 'Professor(a) de Recomposição';
+    }
     const match = ALL_ROLES.find(r => r.toLowerCase() === role.toLowerCase());
     return match || role;
 }

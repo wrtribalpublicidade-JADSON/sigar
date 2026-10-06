@@ -107,7 +107,9 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
 
     const selectedTurma = turmasComp.find(t => t.id === selectedTurmaId) || null;
     const isUserAdmin = currentUser?.funcao === 'Administrador';
-    const isMonitor = currentUser?.funcao === 'Monitor de Atividade Complementar';
+    const isMonitor = currentUser?.funcao === 'Monitor de Atividade Complementar' ||
+                      currentUser?.funcao === 'Professor(a) de Recomposição' ||
+                      currentUser?.funcao === 'Professor de Recomposição';
 
     // Permission checks for sub-tabs
     const canCadastrarAtividade = getAccessForTab('atividades_comp', 'cadastrar_atividade', currentUser?.funcao) === 'full';
@@ -145,7 +147,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
             const { data: allCoords } = await supabase
                 .from('coordenadores')
                 .select('*')
-                .eq('funcao', 'Monitor de Atividade Complementar');
+                .or('funcao.ilike.%recomposi%,funcao.ilike.%monitor%');
             
             let list = allCoords || [];
             if (selectedTurma.escola_id) {

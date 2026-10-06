@@ -302,9 +302,8 @@ export const AtividadeModal: React.FC<AtividadeModalProps> = ({ isOpen, onClose,
                     setEscolasDisponiveis(schools);
                 }
 
-                // Fetch monitors (servidores in recursos_humanos with specific function)
-                // and recomposition teachers
-                const [personnelRes, recomposicaoRes] = await Promise.all([
+                // Fetch monitors and recomposition teachers from both recursos_humanos and coordenadores (Gestão de Usuários)
+                const [personnelRes, recomposicaoEtapaRes, rhRecomposicaoFuncaoRes, coordsMonitoresRes] = await Promise.all([
                     supabase
                         .from('recursos_humanos')
                         .select('nome')
@@ -312,22 +311,40 @@ export const AtividadeModal: React.FC<AtividadeModalProps> = ({ isOpen, onClose,
                     supabase
                         .from('recursos_humanos')
                         .select('nome')
-                        .in('etapa_atuacao', ['Recomposição - Língua Portuguesa', 'Recomposição - Matemática'])
+                        .in('etapa_atuacao', ['Recomposição - Língua Portuguesa', 'Recomposição - Matemática']),
+                    supabase
+                        .from('recursos_humanos')
+                        .select('nome')
+                        .ilike('funcao', '%recomposi%'),
+                    supabase
+                        .from('coordenadores')
+                        .select('nome, funcao')
+                        .or('funcao.ilike.%recomposi%,funcao.ilike.%monitor%')
                 ]);
 
                 const names = new Set<string>();
                 if (personnelRes.data) {
                     personnelRes.data.forEach(p => {
-                        if (p.nome) names.add(p.nome);
+                        if (p.nome) names.add(p.nome.trim());
                     });
                 }
-                if (recomposicaoRes.data) {
-                    recomposicaoRes.data.forEach(p => {
-                        if (p.nome) names.add(p.nome);
+                if (recomposicaoEtapaRes.data) {
+                    recomposicaoEtapaRes.data.forEach(p => {
+                        if (p.nome) names.add(p.nome.trim());
+                    });
+                }
+                if (rhRecomposicaoFuncaoRes.data) {
+                    rhRecomposicaoFuncaoRes.data.forEach(p => {
+                        if (p.nome) names.add(p.nome.trim());
+                    });
+                }
+                if (coordsMonitoresRes.data) {
+                    coordsMonitoresRes.data.forEach(c => {
+                        if (c.nome) names.add(c.nome.trim());
                     });
                 }
                 
-                const sortedNames = Array.from(names).sort((a, b) => a.localeCompare(b));
+                const sortedNames = Array.from(names).filter(Boolean).sort((a, b) => a.localeCompare(b));
                 setMonitoresDisponiveis(sortedNames);
             } catch (error) {
                 console.error('Error fetching modal data:', error);

@@ -346,7 +346,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
                 .delete()
                 .eq('coordenador_id', selectedUser.id);
 
-            if (editRole === 'Monitor de Atividade Complementar' && editTurmasComp.length > 0) {
+            if ((editRole === 'Monitor de Atividade Complementar' || editRole === 'Professor(a) de Recomposição') && editTurmasComp.length > 0) {
                 const compInserts = editTurmasComp.map(tcId => ({
                     coordenador_id: selectedUser.id,
                     turma_comp_id: tcId
@@ -417,6 +417,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
                         <option value="Técnico Pedagógico">Técnico Pedagógico</option>
                         <option value="Auxiliar Administrativo">Auxiliar Administrativo</option>
                         <option value="Monitor de Atividade Complementar">Monitor de Atividade Complementar</option>
+                        <option value="Professor(a) de Recomposição">Professor(a) de Recomposição</option>
                     </select>
 
                     <select
@@ -613,6 +614,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
                                         <option value="Técnico Pedagógico">Técnico Pedagógico</option>
                                         <option value="Auxiliar Administrativo">Auxiliar Administrativo</option>
                                         <option value="Monitor de Atividade Complementar">Monitor de Atividade Complementar</option>
+                                        <option value="Professor(a) de Recomposição">Professor(a) de Recomposição</option>
                                     </select>
                                 </div>
 
@@ -656,8 +658,8 @@ export const UserManagement: React.FC<UserManagementProps> = ({ userEmail, isAdm
                                 </div>
                             )}
 
-                            {/* Complementary Turmas Links for Monitor */}
-                            {editRole === 'Monitor de Atividade Complementar' && (
+                            {/* Complementary Turmas Links for Monitor and Recomposição */}
+                            {(editRole === 'Monitor de Atividade Complementar' || editRole === 'Professor(a) de Recomposição') && (
                                 <div>
                                     <label className="block text-sm font-bold text-slate-700 mb-2">Vínculo com Turmas de Atividades Complementares</label>
                                     <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 max-h-60 overflow-y-auto space-y-2">
