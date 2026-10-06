@@ -252,10 +252,13 @@ export const SchoolList: React.FC<SchoolListProps> = ({ escolas, onSelectEscola,
                 <input type="text" required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-lg font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all placeholder-slate-300" placeholder="Nome completo da escola" value={formData.nome} onChange={e => setFormData({ ...formData, nome: e.target.value })} />
               </div>
 
-              {[{ key: 'gestor', label: 'Gestor(a) Geral' }, { key: 'coordenador', label: 'Coordenador(a)' }].map(f => (
+              {[
+                { key: 'gestor', label: 'Gestor(a) Geral', required: true, placeholder: 'Nome completo do(a) Gestor(a)' },
+                { key: 'coordenador', label: 'Coordenador(a) Pedagógico(a)', required: false, placeholder: 'Nome do(a) Coordenador(a) Pedagógico(a) (opcional)' }
+              ].map(f => (
                 <div key={f.key} className="space-y-2">
                   <label className="text-sm font-bold text-slate-500">{f.label}</label>
-                  <input type="text" required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all" value={(formData as any)[f.key]} onChange={e => setFormData({ ...formData, [f.key]: e.target.value })} />
+                  <input type="text" required={f.required} placeholder={f.placeholder} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all" value={(formData as any)[f.key]} onChange={e => setFormData({ ...formData, [f.key]: e.target.value })} />
                 </div>
               ))}
 

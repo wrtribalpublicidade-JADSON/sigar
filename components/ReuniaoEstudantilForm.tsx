@@ -177,6 +177,16 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({
                 } else if (forcedEtapa === 'fundamental') {
                     filtered = filtered.filter(t => !isTurmaInfantil(t));
                 }
+                if (currentUser && currentUser.funcao === 'Professor') {
+                    const assignedTurmasIds = new Set([
+                        ...(currentUser.turmasIds || []).map(String),
+                        ...Object.keys(currentUser.turmaComponentes || {}).map(String)
+                    ]);
+                    filtered = filtered.filter((t: any) => 
+                        assignedTurmasIds.has(String(t.id)) ||
+                        (currentUser.turmasIds || []).some(tid => tid === t.id || tid === t.name)
+                    );
+                }
                 setTurmas(filtered);
                 // If initialTurmaId matches one of the new turmas, keep it, otherwise select first or clear
                 if (initialTurmaId && filtered.some((t: any) => t.id === initialTurmaId)) {
@@ -193,7 +203,7 @@ export const ReuniaoEstudantilForm: React.FC<ReuniaoEstudantilFormProps> = ({
             }
         };
         loadTurmas();
-    }, [selectedEscolaId, initialTurmaId, forcedEtapa]);
+    }, [selectedEscolaId, initialTurmaId, forcedEtapa, currentUser]);
 
     // Fetch Students when Turma changes
     useEffect(() => {

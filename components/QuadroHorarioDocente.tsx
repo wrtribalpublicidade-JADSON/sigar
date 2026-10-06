@@ -14,14 +14,18 @@ import {
 } from '../services/configuracaoService';
 import { normalizeSubjectName, isEducaInfantilYear } from '../utils';
 import { PrintableQuadroHorarioDocente } from './PrintableQuadroHorarioDocente';
+import { PrintScheduleModal } from './modals/PrintScheduleModal';
+import { buildTeacherColorMap, DEFAULT_TEACHER_COLOR, TEACHER_COLOR_PALETTE, TeacherColorConfig } from '../utils/teacherColors';
 
 interface QuadroHorarioDocenteProps {
   escolaId: string;
   escola?: Escola;
+  coordenadores?: Coordenador[];
   schoolTeachers: Coordenador[];
   schoolTurmas: any[];
   isDemoMode: boolean;
   canEdit: boolean;
+  onUpdate?: (escola: Escola) => void;
 }
 
 interface HorarioSlot {
@@ -70,18 +74,7 @@ const DEFAULT_CAMPOS_INFANTIL = [
 ];
 
 // Color palette for teachers
-const TEACHER_COLORS = [
-  { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-800', badge: 'bg-blue-100 text-blue-700' },
-  { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-800', badge: 'bg-emerald-100 text-emerald-700' },
-  { bg: 'bg-violet-50', border: 'border-violet-200', text: 'text-violet-800', badge: 'bg-violet-100 text-violet-700' },
-  { bg: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-800', badge: 'bg-rose-100 text-rose-700' },
-  { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-800', badge: 'bg-amber-100 text-amber-700' },
-  { bg: 'bg-cyan-50', border: 'border-cyan-200', text: 'text-cyan-800', badge: 'bg-cyan-100 text-cyan-700' },
-  { bg: 'bg-pink-50', border: 'border-pink-200', text: 'text-pink-800', badge: 'bg-pink-100 text-pink-700' },
-  { bg: 'bg-teal-50', border: 'border-teal-200', text: 'text-teal-800', badge: 'bg-teal-100 text-teal-700' },
-  { bg: 'bg-indigo-50', border: 'border-indigo-200', text: 'text-indigo-800', badge: 'bg-indigo-100 text-indigo-700' },
-  { bg: 'bg-lime-50', border: 'border-lime-200', text: 'text-lime-800', badge: 'bg-lime-100 text-lime-700' },
-];
+const TEACHER_COLORS = TEACHER_COLOR_PALETTE;
 
 const isEtapaOfertadaPelaEscola = (etapaId: string, escola?: Escola, schoolTurmas: any[] = []): boolean => {
   const hasSegment = escola?.segmentos?.some(s => {
@@ -127,10 +120,12 @@ const isEtapaOfertadaPelaEscola = (etapaId: string, escola?: Escola, schoolTurma
 export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
   escolaId,
   escola,
+  coordenadores = [],
   schoolTeachers,
   schoolTurmas,
   isDemoMode,
-  canEdit
+  canEdit,
+  onUpdate
 }) => {
   const { configuracao } = useConfiguracao();
   const hc = configuracao?.horarios_config || DEFAULT_HORARIOS_CONFIG;
@@ -155,6 +150,16 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
 
   // Estado para impressão em folha/PDF
   const [isPrintingSchedule, setIsPrintingSchedule] = useState(false);
+  const [isPrintConfigModalOpen, setIsPrintConfigModalOpen] = useState(false);
+  const [printConfig, setPrintConfig] = useState<{
+    coordenadorNome: string;
+    diretorNome: string;
+    enableTeacherColors: boolean;
+  }>({
+    coordenadorNome: '',
+    diretorNome: '',
+    enableTeacherColors: true,
+  });
 
   useEffect(() => {
     if (etapasOfertadas.length > 0 && !etapasOfertadas.some(e => e.id === activeEtapa)) {
@@ -182,11 +187,7 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
   const [selectedMultiseriadaTurmas, setSelectedMultiseriadaTurmas] = useState<string[]>([]);
 
   const teacherColorMap = useMemo(() => {
-    const map: Record<string, typeof TEACHER_COLORS[0]> = {};
-    schoolTeachers.forEach((t, i) => {
-      map[t.id] = TEACHER_COLORS[i % TEACHER_COLORS.length];
-    });
-    return map;
+    return buildTeacherColorMap(schoolTeachers);
   }, [schoolTeachers]);
 
   const getDuracaoAulaMinutos = useCallback((etapa: string): number => {
@@ -570,7 +571,51 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
     }
   };
 
+  // Docentes ativos no turno atual para o modal e legenda
+  const activeTeachersInTurno = useMemo(() => {
+    const relevantIds = new Set(
+      horarios
+        .filter(h => h.turno === activeTurno && (!h.etapa || h.etapa === activeEtapa))
+        .map(h => h.teacher_id)
+    );
+    return schoolTeachers.filter(t => relevantIds.has(t.id));
+  }, [horarios, activeTurno, activeEtapa, schoolTeachers]);
+
   const handlePrint = () => {
+    setIsPrintConfigModalOpen(true);
+  };
+
+  const handleConfirmPrint = async (params: {
+    coordenadorNome: string;
+    diretorNome: string;
+    enableTeacherColors: boolean;
+    saveToSchool: boolean;
+  }) => {
+    if (params.saveToSchool && escolaId && params.coordenadorNome) {
+      try {
+        if (escola && onUpdate) {
+          onUpdate({
+            ...escola,
+            coordenador: params.coordenadorNome
+          });
+        }
+        if (!isDemoMode) {
+          await supabase
+            .from('escolas')
+            .update({ coordenador: params.coordenadorNome })
+            .eq('id', escolaId);
+        }
+      } catch (err) {
+        console.warn('Erro ao atualizar coordenador no cadastro da escola:', err);
+      }
+    }
+
+    setPrintConfig({
+      coordenadorNome: params.coordenadorNome,
+      diretorNome: params.diretorNome,
+      enableTeacherColors: params.enableTeacherColors
+    });
+    setIsPrintConfigModalOpen(false);
     setIsPrintingSchedule(true);
   };
 
@@ -1116,7 +1161,7 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
                             <div className="flex flex-col gap-1.5 min-h-[70px]">
                               {/* Cards de cada turma alocada neste horário */}
                               {cellSlots.map(slot => {
-                                const colors = teacherColorMap[slot.teacher_id] || TEACHER_COLORS[0];
+                                const colors = teacherColorMap[slot.teacher_id] || DEFAULT_TEACHER_COLOR;
                                 const turmaDisplay = getTurmaDisplay(slot.turma_id);
 
                                 return (
@@ -1505,10 +1550,32 @@ export const QuadroHorarioDocente: React.FC<QuadroHorarioDocenteProps> = ({
         </div>
       )}
 
+      {/* Modal de Configuração de Impressão e Assinaturas */}
+      {isPrintConfigModalOpen && (
+        <PrintScheduleModal
+          isOpen={isPrintConfigModalOpen}
+          onClose={() => setIsPrintConfigModalOpen(false)}
+          escola={escola}
+          activeEtapa={activeEtapa}
+          activeTurnoDef={currentTurnoDef}
+          duracaoAulaAtiva={duracaoAulaAtiva}
+          schoolTurmas={schoolTurmas}
+          selectedTurmaFilter={selectedTurmaFilter}
+          schoolTeachers={schoolTeachers}
+          activeTeachersInTurno={activeTeachersInTurno}
+          coordenadores={coordenadores}
+          canEdit={canEdit}
+          onConfirmPrint={handleConfirmPrint}
+        />
+      )}
+
       {/* Printable Schedule Portal Component */}
       {isPrintingSchedule && (
         <PrintableQuadroHorarioDocente
           escola={escola}
+          coordenadorNome={printConfig.coordenadorNome}
+          diretorNome={printConfig.diretorNome}
+          enableTeacherColors={printConfig.enableTeacherColors}
           activeEtapa={activeEtapa}
           activeTurno={activeTurno}
           currentTurnoDef={currentTurnoDef}

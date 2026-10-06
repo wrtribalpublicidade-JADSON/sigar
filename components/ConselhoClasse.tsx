@@ -14,6 +14,7 @@ import { Escola, Segmento, Coordenador } from '../types';
 import { supabase } from '../services/supabase';
 import { hasTabAccess } from '../utils/permissions';
 import { logNavigation } from '../services/logService';
+import { normalizeSubjectName } from '../utils';
 
 export const isTurmaInfantil = (t: any): boolean => {
     if (!t) return false;
@@ -327,6 +328,125 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
         return matched;
     };
 
+    const normalizeComp = (s: string) => normalizeSubjectName(s).toLowerCase().trim();
+    const normalizeCampo = (s: string) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+
+    // Extrai componentes ou campos vinculados ao professor para uma turma específica (ou todas se turma for null)
+    const getTeacherAssignedForTurma = (turma: TurmaData | null): string[] => {
+        if (!currentUser || currentUser.funcao !== 'Professor' || !currentUser.turmaComponentes) {
+            return [];
+        }
+        if (turma) {
+            if (turma.id && currentUser.turmaComponentes[turma.id]) {
+                return currentUser.turmaComponentes[turma.id];
+            }
+            if (turma.id && currentUser.turmaComponentes[String(turma.id)]) {
+                return currentUser.turmaComponentes[String(turma.id)];
+            }
+            const keys = Object.keys(currentUser.turmaComponentes);
+            for (const key of keys) {
+                if ((turma.id && key === turma.id) || key === (turma as any).name || cleanTurmaName(key) === cleanTurmaName(getTurmaLabel(turma))) {
+                    return currentUser.turmaComponentes[key];
+                }
+            }
+            return [];
+        }
+        // Se nenhuma turma específica estiver selecionada, busca apenas entre as turmas cadastradas do usuário nesta escola/etapa
+        if (turmasCadastradas.length > 0) {
+            const comps: string[] = [];
+            for (const t of turmasCadastradas) {
+                if (t.id && currentUser.turmaComponentes[t.id]) {
+                    comps.push(...currentUser.turmaComponentes[t.id]);
+                } else if (t.id && currentUser.turmaComponentes[String(t.id)]) {
+                    comps.push(...currentUser.turmaComponentes[String(t.id)]);
+                } else {
+                    const keys = Object.keys(currentUser.turmaComponentes);
+                    for (const key of keys) {
+                        if ((t.id && key === t.id) || key === (t as any).name || cleanTurmaName(key) === cleanTurmaName(getTurmaLabel(t))) {
+                            comps.push(...currentUser.turmaComponentes[key]);
+                        }
+                    }
+                }
+            }
+            return Array.from(new Set(comps));
+        }
+        return [];
+    };
+
+    // Componentes curriculares permitidos para o usuário atual (estritamente filtrado se for professor)
+    const allowedComponentesCurriculares = useMemo(() => {
+        if (currentUser && currentUser.funcao === 'Professor') {
+            const teacherComps = getTeacherAssignedForTurma(activeTurma);
+            if (teacherComps.length > 0) {
+                const matched = COMPONENTES_CURRICULARES.filter(c => 
+                    teacherComps.some(tc => normalizeComp(tc) === normalizeComp(c))
+                );
+                teacherComps.forEach(tc => {
+                    if (!matched.some(m => normalizeComp(m) === normalizeComp(tc))) {
+                        matched.push(tc);
+                    }
+                });
+                return matched.length > 0 ? matched : teacherComps;
+            }
+            // Se o professor não possui vínculo com componentes nesta turma/contexto, não exibe nenhum
+            return [];
+        }
+        return COMPONENTES_CURRICULARES;
+    }, [currentUser, activeTurma, turmasCadastradas, COMPONENTES_CURRICULARES]);
+
+    // Campos de experiência permitidos para o usuário atual (estritamente filtrado se for professor)
+    const allowedCamposExperiencia = useMemo(() => {
+        if (currentUser && currentUser.funcao === 'Professor') {
+            const teacherCampos = getTeacherAssignedForTurma(activeTurma);
+            if (teacherCampos.length > 0) {
+                const matched = CAMPOS_EXPERIENCIA_BNCC.filter(c => 
+                    teacherCampos.some(tc => normalizeCampo(tc) === normalizeCampo(c))
+                );
+                teacherCampos.forEach(tc => {
+                    if (!matched.some(m => normalizeCampo(m) === normalizeCampo(tc))) {
+                        matched.push(tc);
+                    }
+                });
+                return matched.length > 0 ? matched : teacherCampos;
+            }
+            // Se o professor não possui vínculo com campos nesta turma/contexto, não exibe nenhum
+            return [];
+        }
+        return CAMPOS_EXPERIENCIA_BNCC;
+    }, [currentUser, activeTurma, turmasCadastradas, CAMPOS_EXPERIENCIA_BNCC]);
+
+    // Sincroniza o componente curricular selecionado com a lista permitida
+    useEffect(() => {
+        if (currentUser?.funcao === 'Professor') {
+            if (allowedComponentesCurriculares.length > 0) {
+                const isCurrentAllowed = allowedComponentesCurriculares.some(
+                    c => normalizeComp(c) === normalizeComp(selectedComponenteCurricular)
+                );
+                if (!isCurrentAllowed) {
+                    setSelectedComponenteCurricular(allowedComponentesCurriculares[0]);
+                }
+            } else if (selectedComponenteCurricular !== '') {
+                setSelectedComponenteCurricular('');
+            }
+        }
+    }, [currentUser, allowedComponentesCurriculares, selectedComponenteCurricular]);
+
+    // Sincroniza o campo de experiência selecionado com a lista permitida
+    useEffect(() => {
+        if (currentUser?.funcao === 'Professor') {
+            if (allowedCamposExperiencia.length > 0) {
+                const isCurrentAllowed = allowedCamposExperiencia.some(
+                    c => normalizeCampo(c) === normalizeCampo(avaliacaoInfantilCampo)
+                );
+                if (!isCurrentAllowed) {
+                    setAvaliacaoInfantilCampo(allowedCamposExperiencia[0]);
+                }
+            } else if (avaliacaoInfantilCampo !== '') {
+                setAvaliacaoInfantilCampo('');
+            }
+        }
+    }, [currentUser, allowedCamposExperiencia, avaliacaoInfantilCampo]);
+
     const isMatchingTurma = (recordTurmaText: string | undefined, filterTurma: TurmaData | null) => {
         if (!filterTurma) return true; // "TODAS AS TURMAS"
         if (!recordTurmaText) return false;
@@ -589,30 +709,42 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                             {effectiveStage === 'infantil' ? 'CAMPO DE EXPERIÊNCIA' : 'COMPONENTE CURRICULAR'}
                         </span>
                         {effectiveStage === 'infantil' ? (
-                            <select
-                                value={selectedCampoExperiencia}
-                                onChange={(e) => setSelectedCampoExperiencia(e.target.value)}
-                                className="bg-transparent text-xs font-bold text-slate-800 border-none p-0 focus:ring-0 focus:outline-none cursor-pointer hover:text-orange-500 transition-colors outline-none appearance-none font-sans"
-                            >
-                                <option value="ALL">TODOS OS CAMPOS</option>
-                                {CAMPOS_EXPERIENCIA_BNCC.map(c => (
-                                    <option key={c} value={c}>{c}</option>
-                                ))}
-                            </select>
+                            allowedCamposExperiencia.length > 0 ? (
+                                <select
+                                    value={selectedCampoExperiencia}
+                                    onChange={(e) => setSelectedCampoExperiencia(e.target.value)}
+                                    className="bg-transparent text-xs font-bold text-slate-800 border-none p-0 focus:ring-0 focus:outline-none cursor-pointer hover:text-orange-500 transition-colors outline-none appearance-none font-sans"
+                                >
+                                    <option value="ALL">TODOS OS CAMPOS</option>
+                                    {allowedCamposExperiencia.map(c => (
+                                        <option key={c} value={c}>{c}</option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <span className="text-xs font-bold text-slate-400 italic">
+                                    {currentUser?.funcao === 'Professor' ? 'Nenhum campo vinculado' : 'Nenhum campo'}
+                                </span>
+                            )
                         ) : (
-                            <select
-                                value={selectedComponenteFiltro}
-                                onChange={(e) => {
-                                    setSelectedComponenteFiltro(e.target.value);
-                                    if (e.target.value !== 'ALL') setSelectedComponenteCurricular(e.target.value);
-                                }}
-                                className="bg-transparent text-xs font-bold text-slate-800 border-none p-0 focus:ring-0 focus:outline-none cursor-pointer hover:text-orange-500 transition-colors outline-none appearance-none font-sans"
-                            >
-                                <option value="ALL">TODOS OS COMPONENTES</option>
-                                {COMPONENTES_CURRICULARES.map(c => (
-                                    <option key={c} value={c}>{c}</option>
-                                ))}
-                            </select>
+                            allowedComponentesCurriculares.length > 0 ? (
+                                <select
+                                    value={selectedComponenteFiltro}
+                                    onChange={(e) => {
+                                        setSelectedComponenteFiltro(e.target.value);
+                                        if (e.target.value !== 'ALL') setSelectedComponenteCurricular(e.target.value);
+                                    }}
+                                    className="bg-transparent text-xs font-bold text-slate-800 border-none p-0 focus:ring-0 focus:outline-none cursor-pointer hover:text-orange-500 transition-colors outline-none appearance-none font-sans"
+                                >
+                                    <option value="ALL">TODOS OS COMPONENTES</option>
+                                    {allowedComponentesCurriculares.map(c => (
+                                        <option key={c} value={c}>{c}</option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <span className="text-xs font-bold text-slate-400 italic">
+                                    {currentUser?.funcao === 'Professor' ? 'Nenhum componente vinculado' : 'Nenhum componente'}
+                                </span>
+                            )
                         )}
                     </div>
 
@@ -640,7 +772,9 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                 ))}
                             </select>
                         ) : (
-                            <span className="text-xs font-bold text-slate-500">Nenhuma turma</span>
+                            <span className="text-xs font-bold text-slate-500">
+                                {currentUser?.funcao === 'Professor' ? 'Nenhuma turma vinculada' : 'Nenhuma turma'}
+                            </span>
                         )}
                     </div>
 
@@ -711,9 +845,14 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             if (!isMatchingCampoOuComponente(a.componente, selectedComponenteFiltro)) return false;
             if (!isMatchingResponsavel(a.professor, selectedResponsavel)) return false;
             if (!isMatchingBimestre(a.periodoLetivo, selectedBimestreFiltro)) return false;
+            if (currentUser && currentUser.funcao === 'Professor') {
+                const isOwn = isMatchingResponsavel(a.professor, currentUser.nome);
+                const isOwnTurma = turmasCadastradas.some(t => isMatchingTurma(a.turma, t));
+                if (!isOwn && !isOwnTurma) return false;
+            }
             return true;
         });
-    }, [mockAcompanhamentos, activeTurma, selectedEscolaId, selectedComponenteFiltro, selectedResponsavel, selectedBimestreFiltro]);
+    }, [mockAcompanhamentos, activeTurma, selectedEscolaId, selectedComponenteFiltro, selectedResponsavel, selectedBimestreFiltro, currentUser, turmasCadastradas]);
 
     const filteredAcompInfantil = useMemo(() => {
         return mockAcompInfantil.filter(a => {
@@ -722,9 +861,14 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             if (!isMatchingCampoOuComponente(a.campoExperiencia, selectedCampoExperiencia)) return false;
             if (!isMatchingResponsavel(a.professor, selectedResponsavel)) return false;
             if (!isMatchingBimestre(a.periodoLetivo, selectedBimestreFiltro)) return false;
+            if (currentUser && currentUser.funcao === 'Professor') {
+                const isOwn = isMatchingResponsavel(a.professor, currentUser.nome);
+                const isOwnTurma = turmasCadastradas.some(t => isMatchingTurma(a.agrupamento, t));
+                if (!isOwn && !isOwnTurma) return false;
+            }
             return true;
         });
-    }, [mockAcompInfantil, activeTurma, selectedEscolaId, selectedCampoExperiencia, selectedResponsavel, selectedBimestreFiltro]);
+    }, [mockAcompInfantil, activeTurma, selectedEscolaId, selectedCampoExperiencia, selectedResponsavel, selectedBimestreFiltro, currentUser, turmasCadastradas]);
 
     const filteredEncaminhamentos = useMemo(() => {
         return mockEncaminhamentos.filter(e => {
@@ -733,9 +877,14 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             if (!isMatchingTurma(e.turma, activeTurma)) return false;
             if (!isMatchingResponsavel(e.responsavel || e.professor, selectedResponsavel)) return false;
             if (!isMatchingBimestre(e.periodoLetivo, selectedBimestreFiltro)) return false;
+            if (currentUser && currentUser.funcao === 'Professor') {
+                const isOwn = isMatchingResponsavel(e.responsavel || e.professor, currentUser.nome);
+                const isOwnTurma = turmasCadastradas.some(t => isMatchingTurma(e.turma, t));
+                if (!isOwn && !isOwnTurma) return false;
+            }
             return true;
         });
-    }, [mockEncaminhamentos, activeTurma, selectedEscolaId, selectedResponsavel, selectedBimestreFiltro]);
+    }, [mockEncaminhamentos, activeTurma, selectedEscolaId, selectedResponsavel, selectedBimestreFiltro, currentUser, turmasCadastradas]);
 
     const filteredEncInfantil = useMemo(() => {
         return mockEncInfantil.filter(e => {
@@ -744,9 +893,14 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             if (!isMatchingCampoOuComponente(e.campoExperiencia, selectedCampoExperiencia)) return false;
             if (!isMatchingResponsavel(e.professor || e.responsavel, selectedResponsavel)) return false;
             if (!isMatchingBimestre(e.periodoLetivo, selectedBimestreFiltro)) return false;
+            if (currentUser && currentUser.funcao === 'Professor') {
+                const isOwn = isMatchingResponsavel(e.professor || e.responsavel, currentUser.nome);
+                const isOwnTurma = turmasCadastradas.some(t => isMatchingTurma(e.agrupamento, t));
+                if (!isOwn && !isOwnTurma) return false;
+            }
             return true;
         });
-    }, [mockEncInfantil, activeTurma, selectedEscolaId, selectedCampoExperiencia, selectedResponsavel, selectedBimestreFiltro]);
+    }, [mockEncInfantil, activeTurma, selectedEscolaId, selectedCampoExperiencia, selectedResponsavel, selectedBimestreFiltro, currentUser, turmasCadastradas]);
 
 
 
@@ -764,6 +918,16 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                     } else if (forcedEtapa === 'fundamental') {
                         allTurmas = allTurmas.filter(isTurmaFundamental);
                     }
+                    if (currentUser && currentUser.funcao === 'Professor') {
+                        const assignedTurmasIds = new Set([
+                            ...(currentUser.turmasIds || []).map(String),
+                            ...Object.keys(currentUser.turmaComponentes || {}).map(String)
+                        ]);
+                        allTurmas = allTurmas.filter(t => 
+                            assignedTurmasIds.has(String(t.id)) ||
+                            (currentUser.turmasIds || []).some(tid => tid === t.id || tid === t.anoSerie || cleanTurmaName(tid) === cleanTurmaName(getTurmaLabel(t)))
+                        );
+                    }
                     setTurmasCadastradas(allTurmas);
                     setActiveTurma(null);
                 } else {
@@ -774,10 +938,22 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                     } else if (forcedEtapa === 'fundamental') {
                         turmas = turmas.filter(isTurmaFundamental);
                     }
+                    if (currentUser && currentUser.funcao === 'Professor') {
+                        const assignedTurmasIds = new Set([
+                            ...(currentUser.turmasIds || []).map(String),
+                            ...Object.keys(currentUser.turmaComponentes || {}).map(String)
+                        ]);
+                        turmas = turmas.filter(t => 
+                            assignedTurmasIds.has(String(t.id)) ||
+                            (currentUser.turmasIds || []).some(tid => tid === t.id || tid === t.anoSerie || cleanTurmaName(tid) === cleanTurmaName(getTurmaLabel(t)))
+                        );
+                    }
                     setTurmasCadastradas(turmas);
                     if (activeTab === 'estudantil' || activeTab === 'avaliacao') {
                         if (turmas.length > 0) {
-                            setActiveTurma(turmas[0]);
+                            if (!activeTurma || !turmas.some(t => t.id === activeTurma.id)) {
+                                setActiveTurma(turmas[0]);
+                            }
                         } else {
                             setActiveTurma(null);
                         }
@@ -793,7 +969,18 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             }
         };
         loadTurmas();
-    }, [selectedEscolaId, currentEscolaId, escolas, forcedEtapa, activeTab]);
+    }, [selectedEscolaId, currentEscolaId, escolas, forcedEtapa, activeTab, currentUser]);
+
+    // Sincronizar activeTurma quando turmasCadastradas mudar
+    useEffect(() => {
+        if (turmasCadastradas.length > 0) {
+            if ((activeTab === 'estudantil' || activeTab === 'avaliacao') && (!activeTurma || !turmasCadastradas.some(t => t.id === activeTurma.id))) {
+                setActiveTurma(turmasCadastradas[0]);
+            }
+        } else if (turmasCadastradas.length === 0 && activeTurma !== null) {
+            setActiveTurma(null);
+        }
+    }, [turmasCadastradas, activeTab]);
     const [showSuccessToast, setShowSuccessToast] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isCadastroEstudanteOpen, setIsCadastroEstudanteOpen] = useState(false);
@@ -837,7 +1024,10 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     };
 
     const loadAvaliacoesDocente = async () => {
-        if (!activeTurma || avaliacaoBimestre === 'Resultado Consolidado' || avaliacaoEtapa !== 'fundamental') return;
+        if (!activeTurma || avaliacaoBimestre === 'Resultado Consolidado' || avaliacaoEtapa !== 'fundamental') {
+            setIsLoading(false);
+            return;
+        }
 
         setIsLoading(true);
         try {
@@ -879,7 +1069,10 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     };
 
     const loadAvaliacoesInfantil = async () => {
-        if (!activeTurma || avaliacaoEtapa !== 'infantil') return;
+        if (!activeTurma || avaliacaoEtapa !== 'infantil') {
+            setIsLoading(false);
+            return;
+        }
 
         setIsLoading(true);
         try {
@@ -938,7 +1131,10 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     };
 
     const loadVisaoGeralFundamental = async () => {
-        if (!activeTurma || avaliacaoEtapa !== 'fundamental') return;
+        if (!activeTurma || avaliacaoEtapa !== 'fundamental') {
+            setIsLoading(false);
+            return;
+        }
 
         setIsLoading(true);
         try {
@@ -996,6 +1192,13 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     };
 
     useEffect(() => {
+        if (!activeTurma) {
+            setIsLoading(false);
+            setStudentsAvaliacao([]);
+            setStudentsAvaliacaoInfantil([]);
+            setVisaoGeralData([]);
+            return;
+        }
         if (avaliacaoBimestre === 'Resultado Consolidado') {
             if (avaliacaoEtapa === 'fundamental') loadVisaoGeralFundamental();
             else loadAvaliacoesInfantil();
@@ -2262,6 +2465,60 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
     const [printingEncaminhamento, setPrintingEncaminhamento] = useState<any | null>(null);
     const [printingAcomp, setPrintingAcomp] = useState<any | null>(null);
 
+    const acompAllowedComponentes = useMemo(() => {
+        if (currentUser && currentUser.funcao === 'Professor') {
+            const matchedTurma = findTurmaMatch(turmasCadastradas, acompForm.turma);
+            const teacherComps = getTeacherAssignedForTurma(matchedTurma || activeTurma);
+            if (teacherComps.length > 0) {
+                const matched = COMPONENTES_CURRICULARES.filter(c => teacherComps.some(tc => normalizeComp(tc) === normalizeComp(c)));
+                teacherComps.forEach(tc => {
+                    if (!matched.some(m => normalizeComp(m) === normalizeComp(tc))) {
+                        matched.push(tc);
+                    }
+                });
+                return matched.length > 0 ? matched : teacherComps;
+            }
+            return [];
+        }
+        return COMPONENTES_CURRICULARES;
+    }, [currentUser, acompForm.turma, activeTurma, turmasCadastradas, COMPONENTES_CURRICULARES]);
+
+    const acompInfantilAllowedCampos = useMemo(() => {
+        if (currentUser && currentUser.funcao === 'Professor') {
+            const matchedTurma = findTurmaMatch(turmasCadastradas, acompInfantilForm.agrupamento);
+            const teacherCampos = getTeacherAssignedForTurma(matchedTurma || activeTurma);
+            if (teacherCampos.length > 0) {
+                const matched = CAMPOS_EXPERIENCIA_BNCC.filter(c => teacherCampos.some(tc => normalizeCampo(tc) === normalizeCampo(c)));
+                teacherCampos.forEach(tc => {
+                    if (!matched.some(m => normalizeCampo(m) === normalizeCampo(tc))) {
+                        matched.push(tc);
+                    }
+                });
+                return matched.length > 0 ? matched : teacherCampos;
+            }
+            return [];
+        }
+        return CAMPOS_EXPERIENCIA_BNCC;
+    }, [currentUser, acompInfantilForm.agrupamento, activeTurma, turmasCadastradas, CAMPOS_EXPERIENCIA_BNCC]);
+
+    const encInfantilAllowedCampos = useMemo(() => {
+        if (currentUser && currentUser.funcao === 'Professor') {
+            const matchedTurma = findTurmaMatch(turmasCadastradas, encInfantilForm.agrupamento);
+            const teacherCampos = getTeacherAssignedForTurma(matchedTurma || activeTurma);
+            if (teacherCampos.length > 0) {
+                const matched = CAMPOS_EXPERIENCIA_BNCC.filter(c => teacherCampos.some(tc => normalizeCampo(tc) === normalizeCampo(c)));
+                teacherCampos.forEach(tc => {
+                    if (!matched.some(m => normalizeCampo(m) === normalizeCampo(tc))) {
+                        matched.push(tc);
+                    }
+                });
+                return matched.length > 0 ? matched : teacherCampos;
+            }
+            return [];
+        }
+        return CAMPOS_EXPERIENCIA_BNCC;
+    }, [currentUser, encInfantilForm.agrupamento, activeTurma, turmasCadastradas, CAMPOS_EXPERIENCIA_BNCC]);
+
     const executeSaveEncInfantil = async () => {
         try {
             let encToSave = {
@@ -2557,27 +2814,39 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                     {avaliacaoEtapa === 'infantil' ? 'Campo de Experiência' : 'Componente Curricular'}
                                 </p>
                                 {avaliacaoEtapa === 'infantil' ? (
-                                    <select
-                                        value={avaliacaoInfantilCampo}
-                                        onChange={(e) => !isEtapaReadOnly && setAvaliacaoInfantilCampo(e.target.value.toUpperCase())}
-                                        disabled={isEtapaReadOnly}
-                                        className={`w-full bg-transparent text-sm font-semibold text-slate-800 focus:outline-none appearance-none truncate transition-colors ${isEtapaReadOnly ? 'cursor-default' : 'cursor-pointer hover:text-blue-600'}`}
-                                    >
-                                        {CAMPOS_EXPERIENCIA_BNCC.map(campo => (
-                                            <option key={campo} value={campo}>{campo}</option>
-                                        ))}
-                                    </select>
+                                    allowedCamposExperiencia.length > 0 ? (
+                                        <select
+                                            value={allowedCamposExperiencia.find(c => c.toUpperCase() === avaliacaoInfantilCampo.toUpperCase()) || avaliacaoInfantilCampo}
+                                            onChange={(e) => !isEtapaReadOnly && setAvaliacaoInfantilCampo(e.target.value)}
+                                            disabled={isEtapaReadOnly}
+                                            className={`w-full bg-transparent text-sm font-semibold text-slate-800 focus:outline-none appearance-none truncate transition-colors ${isEtapaReadOnly ? 'cursor-default' : 'cursor-pointer hover:text-blue-600'}`}
+                                        >
+                                            {allowedCamposExperiencia.map(campo => (
+                                                <option key={campo} value={campo}>{campo}</option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <p className="text-sm font-semibold text-slate-400 italic">
+                                            {currentUser?.funcao === 'Professor' ? 'Nenhum campo vinculado a você' : 'Nenhum campo disponível'}
+                                        </p>
+                                    )
                                 ) : (
-                                    <select
-                                        value={selectedComponenteCurricular}
-                                        onChange={(e) => !isEtapaReadOnly && setSelectedComponenteCurricular(e.target.value)}
-                                        disabled={isEtapaReadOnly}
-                                        className={`w-full bg-transparent text-sm font-semibold text-slate-800 focus:outline-none appearance-none truncate transition-colors ${isEtapaReadOnly ? 'cursor-default' : 'cursor-pointer hover:text-blue-600'}`}
-                                    >
-                                        {COMPONENTES_CURRICULARES.map(comp => (
-                                            <option key={comp} value={comp}>{comp}</option>
-                                        ))}
-                                    </select>
+                                    allowedComponentesCurriculares.length > 0 ? (
+                                        <select
+                                            value={selectedComponenteCurricular}
+                                            onChange={(e) => !isEtapaReadOnly && setSelectedComponenteCurricular(e.target.value)}
+                                            disabled={isEtapaReadOnly}
+                                            className={`w-full bg-transparent text-sm font-semibold text-slate-800 focus:outline-none appearance-none truncate transition-colors ${isEtapaReadOnly ? 'cursor-default' : 'cursor-pointer hover:text-blue-600'}`}
+                                        >
+                                            {allowedComponentesCurriculares.map(comp => (
+                                                <option key={comp} value={comp}>{comp}</option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <p className="text-sm font-semibold text-slate-400 italic">
+                                            {currentUser?.funcao === 'Professor' ? 'Nenhum componente vinculado a você' : 'Nenhum componente disponível'}
+                                        </p>
+                                    )
                                 )}
                             </div>
                             <div className="px-4 flex items-center gap-3">
@@ -2596,12 +2865,14 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                         >
                                             {turmasCadastradas.map(t => (
                                                 <option key={t.id} value={t.id}>
-                                                    {t.anoSerie} {t.identificacao.replace('Turma ', '')} • {t.turno}
+                                                    {t.anoSerie} {t.identificacao ? t.identificacao.replace('Turma ', '') : ''} • {t.turno}
                                                 </option>
                                             ))}
                                         </select>
                                     ) : (
-                                        <p className="text-sm font-semibold text-slate-400 italic">Nenhuma turma cadastrada</p>
+                                        <p className="text-sm font-semibold text-slate-400 italic">
+                                            {currentUser?.funcao === 'Professor' ? 'Nenhuma turma vinculada a você' : 'Nenhuma turma cadastrada'}
+                                        </p>
                                     )}
                                 </div>
                                 {etapaDoc?.status === 'enviada' && (
@@ -2762,17 +3033,26 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                         })()}
 
                                         {/* Campos de Experiência Tabs */}
-                                        <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-2">
-                                            {CAMPOS_EXPERIENCIA_BNCC.map(campo => (
-                                                <button
-                                                    key={campo}
-                                                    onClick={() => setAvaliacaoInfantilCampo(campo)}
-                                                    className={`px-4 py-2 rounded-xl text-sm font-bold min-w-max border transition-all ${avaliacaoInfantilCampo === campo ? 'bg-emerald-500 text-white border-emerald-600 shadow-sm' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
-                                                >
-                                                    {campo}
-                                                </button>
-                                            ))}
-                                        </div>
+                                        {allowedCamposExperiencia.length > 0 ? (
+                                            <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-2">
+                                                {allowedCamposExperiencia.map(campo => {
+                                                    const isActive = avaliacaoInfantilCampo.toUpperCase() === campo.toUpperCase();
+                                                    return (
+                                                        <button
+                                                            key={campo}
+                                                            onClick={() => setAvaliacaoInfantilCampo(campo)}
+                                                            className={`px-4 py-2 rounded-xl text-sm font-bold min-w-max border transition-all ${isActive ? 'bg-emerald-500 text-white border-emerald-600 shadow-sm' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
+                                                        >
+                                                            {campo}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl text-sm font-medium">
+                                                {currentUser?.funcao === 'Professor' ? 'Nenhum campo de experiência vinculado a você para esta turma/etapa.' : 'Nenhum campo de experiência disponível.'}
+                                            </div>
+                                        )}
 
                                         {/* Tabela */}
                                         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -2812,7 +3092,11 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                                 <td colSpan={6} className="p-12 text-center text-slate-400">
                                                                     <div className="flex flex-col items-center gap-4">
                                                                         <Users className="w-12 h-12 opacity-10" />
-                                                                        <p className="text-sm font-medium">Nenhum estudante matriculado nesta turma.</p>
+                                                                        <p className="text-sm font-medium">
+                                                                            {!activeTurma
+                                                                                ? (currentUser?.funcao === 'Professor' ? 'Nenhuma turma vinculada a você.' : 'Selecione uma turma para visualizar os dados.')
+                                                                                : 'Nenhum estudante matriculado nesta turma.'}
+                                                                        </p>
                                                                     </div>
                                                                 </td>
                                                             </tr>
@@ -3076,8 +3360,14 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                                             <Users className="w-7 h-7 text-slate-400" />
                                                                         </div>
                                                                         <div>
-                                                                            <p className="text-sm font-bold text-slate-600 mb-1">Não existe nenhum estudante cadastrado para esta turma.</p>
-                                                                            <p className="text-xs text-slate-400">Cadastre estudantes para visualizar o resultado consolidado.</p>
+                                                                            <p className="text-sm font-bold text-slate-600 mb-1">
+                                                                                {!activeTurma
+                                                                                    ? (currentUser?.funcao === 'Professor' ? 'Nenhuma turma vinculada a você.' : 'Selecione uma turma para visualizar os dados.')
+                                                                                    : 'Não existe nenhum estudante cadastrado para esta turma.'}
+                                                                            </p>
+                                                                            <p className="text-xs text-slate-400">
+                                                                                {!activeTurma ? '' : 'Cadastre estudantes para visualizar o resultado consolidado.'}
+                                                                            </p>
                                                                         </div>
                                                                     </div>
                                                                 </td>
@@ -3278,10 +3568,16 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                                     <Users className="w-7 h-7 text-slate-400" />
                                                                 </div>
                                                                 <div>
-                                                                    <p className="text-sm font-bold text-slate-600 mb-1">Não existe nenhum estudante cadastrado para esta turma.</p>
-                                                                    <p className="text-xs text-slate-400">Cadastre estudantes para iniciar a avaliação docente.</p>
+                                                                    <p className="text-sm font-bold text-slate-600 mb-1">
+                                                                        {!activeTurma
+                                                                            ? (currentUser?.funcao === 'Professor' ? 'Nenhuma turma vinculada a você.' : 'Selecione uma turma para visualizar os dados.')
+                                                                            : 'Não existe nenhum estudante cadastrado para esta turma.'}
+                                                                    </p>
+                                                                    <p className="text-xs text-slate-400">
+                                                                        {!activeTurma ? '' : 'Cadastre estudantes para iniciar a avaliação docente.'}
+                                                                    </p>
                                                                 </div>
-                                                                {!isEtapaReadOnly && (
+                                                                {!isEtapaReadOnly && activeTurma && (
                                                                     <button
                                                                         onClick={() => setIsCadastroEstudanteOpen(true)}
                                                                         className="bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-emerald-700 transition-colors flex items-center gap-2 shadow-md"
@@ -3429,7 +3725,11 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                             <td colSpan={currentObjectives.length + 3} className="p-12 text-center text-slate-400">
                                                                 <div className="flex flex-col items-center gap-4">
                                                                     <Users className="w-12 h-12 opacity-10" />
-                                                                    <p className="text-sm font-medium">Não existe nenhum estudante cadastrado para esta turma.</p>
+                                                                    <p className="text-sm font-medium">
+                                                                        {!activeTurma
+                                                                            ? (currentUser?.funcao === 'Professor' ? 'Nenhuma turma vinculada a você.' : 'Selecione uma turma para visualizar os dados.')
+                                                                            : 'Não existe nenhum estudante cadastrado para esta turma.'}
+                                                                    </p>
                                                                 </div>
                                                             </td>
                                                         </tr>
@@ -3632,9 +3932,13 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                     onChange={e => setAcompForm({ ...acompForm, componente: e.target.value })}
                                                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                                                 >
-                                                    {COMPONENTES_CURRICULARES.map(c => (
-                                                        <option key={c} value={c}>{c}</option>
-                                                    ))}
+                                                    {acompAllowedComponentes.length === 0 ? (
+                                                        <option value="">Nenhum componente vinculado</option>
+                                                    ) : (
+                                                        acompAllowedComponentes.map(c => (
+                                                            <option key={c} value={c}>{c}</option>
+                                                        ))
+                                                    )}
                                                 </select>
                                             </div>
                                             <div>
@@ -3802,8 +4106,8 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                                     onChange={e => setAcompInfantilForm({ ...acompInfantilForm, campoExperiencia: e.target.value })}
                                                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                                                 >
-                                                    <option value="">Selecione o campo...</option>
-                                                    {CAMPOS_EXPERIENCIA_BNCC.map(c => (
+                                                    <option value="">{acompInfantilAllowedCampos.length === 0 ? 'Nenhum campo vinculado' : 'Selecione o campo...'}</option>
+                                                    {acompInfantilAllowedCampos.map(c => (
                                                         <option key={c} value={c}>{c}</option>
                                                     ))}
                                                 </select>
@@ -4290,8 +4594,8 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
                                         <div>
                                             <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Campo de Experiência (BNCC)</label>
                                             <select value={encInfantilForm.campoExperiencia} onChange={e => setEncInfantilForm({ ...encInfantilForm, campoExperiencia: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20">
-                                                <option value="">Selecione o campo...</option>
-                                                {CAMPOS_EXPERIENCIA_BNCC.map(c => <option key={c} value={c}>{c}</option>)}
+                                                <option value="">{encInfantilAllowedCampos.length === 0 ? 'Nenhum campo vinculado' : 'Selecione o campo...'}</option>
+                                                {encInfantilAllowedCampos.map(c => <option key={c} value={c}>{c}</option>)}
                                             </select>
                                         </div>
                                         <div>

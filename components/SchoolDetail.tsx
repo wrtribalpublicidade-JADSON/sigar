@@ -3098,10 +3098,12 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
                   <QuadroHorarioDocente
                     escolaId={escola.id}
                     escola={escola}
+                    coordenadores={coordenadores}
                     schoolTeachers={schoolTeachers}
                     schoolTurmas={schoolTurmas}
                     isDemoMode={isDemoMode}
                     canEdit={canEditTab}
+                    onUpdate={onUpdate}
                   />
                 ) : (
                 <>

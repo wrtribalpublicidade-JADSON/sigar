@@ -1,7 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Escola, Coordenador } from '../types';
 import { SlotHorarioCalculado, HorariosTurnoConfig } from '../services/configuracaoService';
+import { buildTeacherColorMap, DEFAULT_TEACHER_COLOR, isInvalidCoordinatorName } from '../utils/teacherColors';
+import { normalizeSubjectName } from '../utils';
 
 export interface HorarioSlotData {
   id: string;
@@ -19,6 +21,9 @@ export interface HorarioSlotData {
 
 interface PrintableQuadroHorarioDocenteProps {
   escola?: Escola;
+  coordenadorNome?: string;
+  diretorNome?: string;
+  enableTeacherColors?: boolean;
   activeEtapa: string;
   activeTurno: 'MATUTINO' | 'VESPERTINO' | 'NOTURNO';
   currentTurnoDef: { id: string; label: string };
@@ -42,6 +47,9 @@ const DIAS_SEMANA = [
 
 export const PrintableQuadroHorarioDocente: React.FC<PrintableQuadroHorarioDocenteProps> = ({
   escola,
+  coordenadorNome,
+  diretorNome,
+  enableTeacherColors = true,
   activeEtapa,
   activeTurno,
   currentTurnoDef,
@@ -206,6 +214,40 @@ export const PrintableQuadroHorarioDocente: React.FC<PrintableQuadroHorarioDocen
   );
   const activeTeachers = schoolTeachers.filter(t => relevantTeacherIds.has(t.id));
 
+  // Mapa de cores dos professores
+  const teacherColorMap = useMemo(() => {
+    return buildTeacherColorMap(schoolTeachers);
+  }, [schoolTeachers]);
+
+  // Resolução inteligente dos nomes do Coordenador Pedagógico e Diretor Escolar
+  const resolvedCoordenador = useMemo(() => {
+    if (coordenadorNome && !isInvalidCoordinatorName(coordenadorNome)) {
+      return coordenadorNome.trim();
+    }
+    if (escola?.coordenador && !isInvalidCoordinatorName(escola.coordenador)) {
+      return escola.coordenador.trim();
+    }
+    const rhCoord = (escola?.recursosHumanos || []).find(r => 
+      r.funcao && (
+        r.funcao.toLowerCase().includes('coordenad') || 
+        r.funcao.toLowerCase().includes('pedagóg')
+      ) && !isInvalidCoordinatorName(r.nome)
+    );
+    if (rhCoord?.nome) return rhCoord.nome.trim();
+
+    return 'Coordenação Pedagógica';
+  }, [coordenadorNome, escola]);
+
+  const resolvedDiretor = useMemo(() => {
+    if (diretorNome && !isInvalidCoordinatorName(diretorNome)) {
+      return diretorNome.trim();
+    }
+    if (escola?.gestor && !isInvalidCoordinatorName(escola.gestor)) {
+      return escola.gestor.trim();
+    }
+    return 'Direção Escolar';
+  }, [diretorNome, escola]);
+
   // Filtro de turma selecionada para o cabeçalho
   const selectedTurmaObj = selectedTurmaFilter !== 'ALL'
     ? schoolTurmas.find(t => String(t.id) === String(selectedTurmaFilter))
@@ -314,37 +356,73 @@ export const PrintableQuadroHorarioDocente: React.FC<PrintableQuadroHorarioDocen
                             {cellSlots.map((slot, sIdx) => {
                               const turmaInfo = getTurmaLabel(slot.turma_id);
                               const teacherName = getTeacherName(slot.teacher_id);
+                              const teacherColor = teacherColorMap[slot.teacher_id] || DEFAULT_TEACHER_COLOR;
 
                               return (
                                 <div 
                                   key={slot.id || sIdx} 
                                   style={{ 
-                                    padding: '3pt 4pt', 
+                                    padding: '3pt 5pt', 
                                     borderRadius: '4pt', 
-                                    border: '0.5pt solid #e2e8f0', 
-                                    background: turmaInfo.isMulti ? '#faf5ff' : '#f8fafc',
-                                    borderLeft: turmaInfo.isMulti ? '2.5pt solid #9333ea' : '2.5pt solid #ea580c'
+                                    border: enableTeacherColors ? `0.5pt solid ${teacherColor.printBorder}` : '0.5pt solid #cbd5e1', 
+                                    background: enableTeacherColors ? teacherColor.printBg : (turmaInfo.isMulti ? '#faf5ff' : '#f8fafc'),
+                                    borderLeft: enableTeacherColors ? `3pt solid ${teacherColor.printBorderLeft}` : (turmaInfo.isMulti ? '2.5pt solid #9333ea' : '2.5pt solid #ea580c'),
+                                    boxShadow: '0 0.5pt 1pt rgba(0,0,0,0.03)'
                                   }}
                                 >
                                   {/* Professor */}
-                                  <div style={{ fontWeight: 800, fontSize: '7.5pt', color: '#0f172a', lineHeight: 1.2 }}>
+                                  <div style={{ 
+                                    fontWeight: 900, 
+                                    fontSize: '7.5pt', 
+                                    color: enableTeacherColors ? teacherColor.printText : '#0f172a', 
+                                    lineHeight: 1.2 
+                                  }}>
                                     {teacherName}
                                   </div>
 
                                   {/* Turma / Multisseriada */}
-                                  <div style={{ fontSize: '7pt', fontWeight: 700, color: turmaInfo.isMulti ? '#7e22ce' : '#ea580c', marginTop: '1pt' }}>
+                                  <div style={{ 
+                                    fontSize: '6.5pt', 
+                                    fontWeight: 700, 
+                                    color: '#334155', 
+                                    marginTop: '1.5pt', 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: '2pt', 
+                                    flexWrap: 'wrap' 
+                                  }}>
                                     {turmaInfo.isMulti && (
-                                      <span style={{ fontSize: '6pt', fontWeight: 900, background: '#f3e8ff', color: '#6b21a8', padding: '0.5pt 2.5pt', borderRadius: '2pt', marginRight: '2pt', textTransform: 'uppercase' }}>
+                                      <span style={{ 
+                                        fontSize: '5.5pt', 
+                                        fontWeight: 900, 
+                                        background: '#f3e8ff', 
+                                        color: '#6b21a8', 
+                                        border: '0.5pt solid #d8b4fe',
+                                        padding: '0.5pt 3pt', 
+                                        borderRadius: '2pt', 
+                                        textTransform: 'uppercase' 
+                                      }}>
                                         Multisseriada
                                       </span>
                                     )}
-                                    {turmaInfo.label}
+                                    <span>{turmaInfo.label}</span>
                                   </div>
 
                                   {/* Componente */}
                                   {slot.componente && (
-                                    <div style={{ fontSize: '6.5pt', fontWeight: 600, color: '#475569', marginTop: '1pt', textTransform: 'uppercase' }}>
-                                      {slot.componente}
+                                    <div style={{ 
+                                      display: 'inline-block',
+                                      marginTop: '2pt',
+                                      padding: '1pt 3.5pt',
+                                      borderRadius: '2pt',
+                                      fontSize: '6pt', 
+                                      fontWeight: 800, 
+                                      textTransform: 'uppercase', 
+                                      background: enableTeacherColors ? teacherColor.printBadgeBg : '#f1f5f9',
+                                      color: enableTeacherColors ? teacherColor.printBadgeText : '#475569',
+                                      border: enableTeacherColors ? `0.5pt solid ${teacherColor.printBorder}` : '0.5pt solid #e2e8f0'
+                                    }}>
+                                      {normalizeSubjectName(slot.componente)}
                                     </div>
                                   )}
                                 </div>
@@ -378,6 +456,11 @@ export const PrintableQuadroHorarioDocente: React.FC<PrintableQuadroHorarioDocen
           @page {
             size: landscape;
             margin: 8mm 10mm 10mm 10mm;
+          }
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
           }
           #print-report {
             display: block !important;
@@ -441,10 +524,13 @@ export const PrintableQuadroHorarioDocente: React.FC<PrintableQuadroHorarioDocen
             </tr>
             <tr>
               <td style={{ padding: '4pt 8pt', border: '0.5pt solid #cbd5e1', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', color: '#64748b', background: '#f8fafc' }}>
-                Gestão / Coordenação:
+                Gestão & Coordenação:
               </td>
-              <td style={{ padding: '4pt 8pt', border: '0.5pt solid #cbd5e1', fontSize: '8pt', fontWeight: 600, color: '#475569' }}>
-                {escola?.gestor || escola?.coordenador || 'Equipe Gestora'}
+              <td style={{ padding: '4pt 8pt', border: '0.5pt solid #cbd5e1', fontSize: '8pt', fontWeight: 600, color: '#334155' }}>
+                <span style={{ fontWeight: 800, color: '#0f172a' }}>{resolvedDiretor}</span>
+                {resolvedCoordenador && resolvedCoordenador !== 'Coordenação Pedagógica' && (
+                  <span style={{ color: '#64748b' }}> • Coordenação: <strong style={{ color: '#0f172a' }}>{resolvedCoordenador}</strong></span>
+                )}
               </td>
               <td style={{ padding: '4pt 8pt', border: '0.5pt solid #cbd5e1', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', color: '#64748b', background: '#f8fafc' }}>
                 Emissão do Sistema:
@@ -474,16 +560,40 @@ export const PrintableQuadroHorarioDocente: React.FC<PrintableQuadroHorarioDocen
 
       {/* ====== LEGENDA DE DOCENTES ====== */}
       {activeTeachers.length > 0 && (
-        <div className="print-avoid-break" style={{ marginBottom: '14pt', padding: '5pt 8pt', background: '#f8fafc', border: '0.5pt solid #cbd5e1' }}>
-          <p style={{ fontSize: '7pt', fontWeight: 900, textTransform: 'uppercase', color: '#475569', letterSpacing: '0.1em', marginBottom: '3pt' }}>
+        <div className="print-avoid-break" style={{ marginBottom: '14pt', padding: '6pt 10pt', background: '#f8fafc', border: '0.5pt solid #cbd5e1', borderRadius: '4pt' }}>
+          <p style={{ fontSize: '7pt', fontWeight: 900, textTransform: 'uppercase', color: '#475569', letterSpacing: '0.08em', marginBottom: '4pt' }}>
             Docentes Alocados no Turno ({activeTeachers.length}):
           </p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4pt 12pt', fontSize: '7pt', color: '#334155' }}>
-            {activeTeachers.map(t => (
-              <span key={t.id} style={{ fontWeight: 700 }}>
-                • {t.nome}
-              </span>
-            ))}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4pt 8pt', fontSize: '7pt' }}>
+            {activeTeachers.map(t => {
+              const color = teacherColorMap[t.id] || DEFAULT_TEACHER_COLOR;
+              return (
+                <span 
+                  key={t.id} 
+                  style={{ 
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4pt',
+                    padding: '2pt 6pt',
+                    borderRadius: '3pt',
+                    background: enableTeacherColors ? color.printBg : '#ffffff',
+                    border: enableTeacherColors ? `0.75pt solid ${color.printBorder}` : '0.5pt solid #cbd5e1',
+                    color: enableTeacherColors ? color.printText : '#1e293b',
+                    fontWeight: 800,
+                    fontSize: '6.8pt'
+                  }}
+                >
+                  <span style={{ 
+                    width: '6pt', 
+                    height: '6pt', 
+                    borderRadius: '50%', 
+                    background: enableTeacherColors ? color.printBorderLeft : '#475569', 
+                    flexShrink: 0 
+                  }} />
+                  {t.nome}
+                </span>
+              );
+            })}
           </div>
         </div>
       )}
@@ -505,8 +615,8 @@ export const PrintableQuadroHorarioDocente: React.FC<PrintableQuadroHorarioDocen
           <p style={{ fontSize: '7.5pt', fontWeight: 900, textTransform: 'uppercase', color: '#0f172a', marginBottom: '1pt' }}>
             Coordenação Pedagógica
           </p>
-          <p style={{ fontSize: '6.5pt', fontWeight: 600, color: '#64748b' }}>
-            {escola?.coordenador || 'Coordenador(a) da Unidade'}
+          <p style={{ fontSize: '6.5pt', fontWeight: 700, color: '#334155', textTransform: 'uppercase' }}>
+            {resolvedCoordenador}
           </p>
         </div>
 
@@ -515,8 +625,8 @@ export const PrintableQuadroHorarioDocente: React.FC<PrintableQuadroHorarioDocen
           <p style={{ fontSize: '7.5pt', fontWeight: 900, textTransform: 'uppercase', color: '#0f172a', marginBottom: '1pt' }}>
             Direção Escolar
           </p>
-          <p style={{ fontSize: '6.5pt', fontWeight: 600, color: '#64748b' }}>
-            {escola?.gestor || 'Gestor(a) Escolar'}
+          <p style={{ fontSize: '6.5pt', fontWeight: 700, color: '#334155', textTransform: 'uppercase' }}>
+            {resolvedDiretor}
           </p>
         </div>
 
