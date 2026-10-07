@@ -347,5 +347,21 @@ export const activitiesService = {
 
         if (error) throw error;
         return data || [];
+    },
+
+    async getDistinctStudentStats(): Promise<{ total: number; by_school: Record<string, number> }> {
+        try {
+            const { data, error } = await supabase.rpc('get_complementares_student_stats');
+            if (error) throw error;
+            if (data) {
+                return {
+                    total: Number(data.total) || 0,
+                    by_school: (data.by_school || {}) as Record<string, number>
+                };
+            }
+        } catch (err) {
+            console.error('Error fetching distinct student stats via RPC:', err);
+        }
+        return { total: 0, by_school: {} };
     }
 };

@@ -67,6 +67,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
     const [selectedSchoolId, setSelectedSchoolId] = useState<string>('todas');
     const [atividades, setAtividades] = useState<Atividade[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [studentStats, setStudentStats] = useState<{ total: number; by_school: Record<string, number> }>({ total: 0, by_school: {} });
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingAtividade, setEditingAtividade] = useState<Atividade | null>(null);
     const [isDiarioOpen, setIsDiarioOpen] = useState(false);
@@ -536,6 +537,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                 }
                 await fetchTurmasComp();
                 fetchAtividades();
+                fetchStudentStats();
             } catch (err) {
                 console.error('Error deleting class:', err);
                 alert('Erro ao excluir turma.');
@@ -556,6 +558,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
             fetchTurmasComp();
             fetchAtividades();
             fetchMonitorData();
+            fetchStudentStats();
         } catch (err) {
             console.error('Error linking activities to class:', err);
             alert('Erro ao salvar vínculo de atividades.');
@@ -587,6 +590,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
             await handleSelectTurma(selectedTurmaId);
             fetchTurmasComp();
             fetchAtividades();
+            fetchStudentStats();
         } catch (err) {
             console.error('Error adding student to class:', err);
             alert('Erro ao vincular estudante.');
@@ -609,6 +613,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                 await handleSelectTurma(selectedTurmaId);
                 fetchTurmasComp();
                 fetchAtividades();
+                fetchStudentStats();
             } catch (err) {
                 console.error('Error removing student from class:', err);
                 alert('Erro ao desvincular estudante.');
@@ -746,11 +751,21 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
         }
     };
 
+    const fetchStudentStats = async () => {
+        try {
+            const stats = await activitiesService.getDistinctStudentStats();
+            setStudentStats(stats);
+        } catch (err) {
+            console.error('Error fetching student stats:', err);
+        }
+    };
+
     React.useEffect(() => {
         fetchAtividades();
         fetchTurmasComp();
         fetchEscolasComplementares();
         fetchMonitorData();
+        fetchStudentStats();
     }, [userEscolaIds]);
 
     const handleSaveAtividade = async (newAtv: Omit<Atividade, 'id' | 'inscritos'>) => {
@@ -766,6 +781,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
             }
             fetchAtividades();
             fetchMonitorData();
+            fetchStudentStats();
             setEditingAtividade(null);
             setIsModalOpen(false);
         } catch (err) {
@@ -783,6 +799,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
             try {
                 await activitiesService.deleteAtividade(id);
                 fetchAtividades();
+                fetchStudentStats();
             } catch (err) {
                 console.error('Error deleting activity:', err);
                 alert('Erro ao excluir atividade.');
@@ -825,8 +842,20 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
         });
     }, [atividades, selectedSchoolId]);
 
-    // Dynamic Stats Calculation
-    const totalInscritos = schoolFilteredAtividades.reduce((sum: number, atv: Atividade) => sum + (atv?.inscritos || 0), 0);
+    // Dynamic Stats Calculation (Unique students enrolled)
+    const totalInscritos = React.useMemo(() => {
+        if (selectedSchoolId !== 'todas') {
+            return studentStats.by_school[selectedSchoolId] ?? 0;
+        }
+        if (userEscolaIds && userEscolaIds.length > 0) {
+            let sum = 0;
+            userEscolaIds.forEach(id => {
+                sum += studentStats.by_school[id] || 0;
+            });
+            return sum;
+        }
+        return studentStats.total || 0;
+    }, [selectedSchoolId, userEscolaIds, studentStats]);
     const totalOficinasAtivas = schoolFilteredAtividades.filter(a => a?.status === 'Ativa').length;
 
     const selectedSchoolObj = escolasComplementares.find(e => e.id === selectedSchoolId);
