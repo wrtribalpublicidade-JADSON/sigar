@@ -3,7 +3,8 @@ import {
     BookOpen, Trophy, Music, Palette, Code, Users, 
     Calendar, Search, Plus, Filter, ChevronRight, 
     Clock, MapPin, Star, Pencil, Trash2, Heart, Brain, Leaf,
-    UserPlus, X, CheckCircle2, Printer, AlertTriangle, Sparkles, ShieldCheck
+    UserPlus, X, CheckCircle2, Printer, AlertTriangle, Sparkles, ShieldCheck,
+    GraduationCap
 } from 'lucide-react';
 import { AtividadeModal } from './AtividadeModal';
 import { DiarioAtividadeModal } from './DiarioAtividadeModal';
@@ -46,6 +47,14 @@ const CATEGORIAS = [
     { id: '15. Educação para Valorização do Multiculturalismo nas Matrizes Históricas e Culturais Brasileiras', name: 'Multiculturalismo', icon: Users, color: 'text-purple-500', bg: 'bg-purple-50' },
 ];
 
+const normalizeName = (name?: string) =>
+    (name || '')
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ');
+
 interface AtividadesComplementaresProps {
     userEscolaIds?: string[];
     escolaName?: string;
@@ -63,8 +72,33 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
     const [isDiarioOpen, setIsDiarioOpen] = useState(false);
     const [activityForDiario, setActivityForDiario] = useState<Atividade | null>(null);
 
+    const isUserAdmin = currentUser?.funcao === 'Administrador';
+    const isMonitor = currentUser?.funcao === 'Monitor de Atividade Complementar' ||
+                      currentUser?.funcao === 'Professor(a) de Recomposição' ||
+                      normalizeRole(currentUser?.funcao) === 'Professor(a) de Recomposição' ||
+                      normalizeRole(currentUser?.funcao) === 'Monitor de Atividade Complementar';
+
+    // Tabs navigation state
+    const [activeTab, setActiveTab] = useState<'cadastro' | 'formacao' | 'minhas_turmas'>(
+        isMonitor ? 'minhas_turmas' : 'cadastro'
+    );
+
+    React.useEffect(() => {
+        if (isMonitor) {
+            setActiveTab('minhas_turmas');
+        }
+    }, [isMonitor]);
+
+    // Minhas Turmas states
+    const [allMonitorTurmaLinks, setAllMonitorTurmaLinks] = useState<{ coordenador_id: string; turma_comp_id: string }[]>([]);
+    const [allMonitorsList, setAllMonitorsList] = useState<Coordenador[]>([]);
+    const [turmaAtividadesMap, setTurmaAtividadesMap] = useState<{ turma_comp_id: string; atividade_id: string }[]>([]);
+    const [allComplementaryActivities, setAllComplementaryActivities] = useState<{ id: string; nome: string; instrutor: string; escola_id?: string }[]>([]);
+    const [selectedMonitorFilter, setSelectedMonitorFilter] = useState<string>('todos');
+    const [searchMinhasTurmasTerm, setSearchMinhasTurmasTerm] = useState('');
+    const [selectedSchoolIdForMinhasTurmas, setSelectedSchoolIdForMinhasTurmas] = useState<string>('todas');
+
     // Formacao de Turmas (Turmas Complementares) states
-    const [activeTab, setActiveTab] = useState<'cadastro' | 'formacao'>('cadastro');
     const [turmasComp, setTurmasComp] = useState<TurmaComp[]>([]);
     const [selectedTurmaId, setSelectedTurmaId] = useState<string | null>(null);
     const [turmaDetails, setTurmaDetails] = useState<{ students: Student[], activitiesIds: string[] }>({ students: [], activitiesIds: [] });
@@ -106,9 +140,6 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
     const [isSavingMonitors, setIsSavingMonitors] = useState(false);
 
     const selectedTurma = turmasComp.find(t => t.id === selectedTurmaId) || null;
-    const isUserAdmin = currentUser?.funcao === 'Administrador';
-    const isMonitor = currentUser?.funcao === 'Monitor de Atividade Complementar' ||
-                      currentUser?.funcao === 'Professor(a) de Recomposição';
 
     // Permission checks for sub-tabs
     const canCadastrarAtividade = getAccessForTab('atividades_comp', 'cadastrar_atividade', currentUser?.funcao) === 'full';
@@ -116,25 +147,55 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
 
     const loadTurmaMonitors = async (turmaId: string) => {
         try {
-            const { data: links } = await supabase
-                .from('coordenador_turmas_comp')
-                .select('coordenador_id')
-                .eq('turma_comp_id', turmaId);
-            const cIds = (links || []).map((l: any) => l.coordenador_id);
-            if (cIds.length === 0) {
-                setTurmaMonitors([]);
-                setSelectedMonitorIdsForTurma([]);
-                return;
+            const [linksRes, atvLinksRes] = await Promise.all([
+                supabase.from('coordenador_turmas_comp').select('coordenador_id').eq('turma_comp_id', turmaId),
+                supabase.from('turma_comp_atividades').select('atividade_id').eq('turma_comp_id', turmaId)
+            ]);
+
+            const directCIds = (linksRes.data || []).map((l: any) => l.coordenador_id);
+            setSelectedMonitorIdsForTurma(directCIds);
+
+            const atvIds = (atvLinksRes.data || []).map((l: any) => l.atividade_id);
+            let atvInstructors: string[] = [];
+            if (atvIds.length > 0) {
+                const { data: atvs } = await supabase
+                    .from('atividades_complementares')
+                    .select('instrutor')
+                    .in('id', atvIds);
+                atvInstructors = (atvs || []).map((a: any) => a.instrutor?.trim()).filter(Boolean);
             }
-            const { data: coords } = await supabase
-                .from('coordenadores')
-                .select('*')
-                .in('id', cIds);
-            setTurmaMonitors((coords || []).map((c: any) => ({
-                ...c,
-                funcao: normalizeRole(c.funcao)
-            })));
-            setSelectedMonitorIdsForTurma(cIds);
+
+            const monitorsMap = new Map<string, Coordenador>();
+
+            // 1. Direct links from coordenador_turmas_comp
+            if (directCIds.length > 0) {
+                const { data: coords } = await supabase
+                    .from('coordenadores')
+                    .select('*')
+                    .in('id', directCIds);
+                (coords || []).forEach((c: any) => {
+                    monitorsMap.set(c.id, { ...c, funcao: normalizeRole(c.funcao) });
+                });
+            }
+
+            // 2. Activity instructors
+            if (atvInstructors.length > 0) {
+                for (const instName of atvInstructors) {
+                    const normInst = normalizeName(instName);
+                    const found = allMonitorsList.find(m => normalizeName(m.nome) === normInst);
+                    if (found) {
+                        monitorsMap.set(found.id, found);
+                    } else {
+                        monitorsMap.set(`inst_${normInst}`, {
+                            id: `inst_${normInst}`,
+                            nome: instName,
+                            funcao: 'Monitor de Atividade Complementar'
+                        } as Coordenador);
+                    }
+                }
+            }
+
+            setTurmaMonitors(Array.from(monitorsMap.values()));
         } catch (err) {
             console.error('Error loading turma monitors:', err);
         }
@@ -188,6 +249,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
             }
 
             await loadTurmaMonitors(selectedTurma.id);
+            await fetchMonitorData();
             await fetchTurmasComp();
             setIsManageMonitorsOpen(false);
         } catch (err) {
@@ -208,6 +270,24 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
             ]);
             setTurmaDetails(details);
             setSelectedActivitiesForTurma(details.activitiesIds);
+
+            // Ensure all activities for this turma are loaded into state
+            if (details.activitiesIds && details.activitiesIds.length > 0) {
+                const missingIds = details.activitiesIds.filter(aid => !atividades.some(a => a.id === aid));
+                if (missingIds.length > 0) {
+                    const { data: missingAtvs } = await supabase
+                        .from('atividades_complementares')
+                        .select('*')
+                        .in('id', missingIds);
+                    if (missingAtvs && missingAtvs.length > 0) {
+                        setAtividades(prev => {
+                            const existingIds = new Set(prev.map(a => a.id));
+                            const toAdd = missingAtvs.filter((a: any) => !existingIds.has(a.id));
+                            return [...prev, ...toAdd];
+                        });
+                    }
+                }
+            }
         } catch (err) {
             console.error('Error loading class details:', err);
         } finally {
@@ -425,6 +505,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
             await handleSelectTurma(selectedTurmaId);
             fetchTurmasComp();
             fetchAtividades();
+            fetchMonitorData();
         } catch (err) {
             console.error('Error linking activities to class:', err);
             alert('Erro ao salvar vínculo de atividades.');
@@ -485,29 +566,79 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
         }
     };
 
+    const fetchMonitorData = async () => {
+        try {
+            const [linksRes, coordsRes, turmaAtvRes, atvsRes] = await Promise.all([
+                supabase.from('coordenador_turmas_comp').select('coordenador_id, turma_comp_id'),
+                supabase.from('coordenadores').select('*'),
+                supabase.from('turma_comp_atividades').select('turma_comp_id, atividade_id'),
+                supabase.from('atividades_complementares').select('id, nome, instrutor, escola_id')
+            ]);
+
+            if (linksRes.data) {
+                setAllMonitorTurmaLinks(linksRes.data);
+            }
+            if (turmaAtvRes.data) {
+                setTurmaAtividadesMap(turmaAtvRes.data);
+            }
+            if (atvsRes.data) {
+                setAllComplementaryActivities(atvsRes.data);
+            }
+
+            const rawCoords = coordsRes.data || [];
+            const atvsData = atvsRes.data || [];
+
+            // Distinct instructors from activities
+            const distinctInstructors = new Set<string>();
+            atvsData.forEach((a: any) => {
+                if (a.instrutor && a.instrutor.trim()) {
+                    distinctInstructors.add(a.instrutor.trim());
+                }
+            });
+
+            // Filter coordinators that are monitors, recomposers, or match an instructor
+            const monitorsAndInstructors = rawCoords
+                .map((c: any) => ({
+                    ...c,
+                    funcao: normalizeRole(c.funcao)
+                }))
+                .filter((c: any) => {
+                    const r = c.funcao;
+                    if (r === 'Monitor de Atividade Complementar' || r === 'Professor(a) de Recomposição') {
+                        return true;
+                    }
+                    const normCoord = normalizeName(c.nome);
+                    for (const inst of distinctInstructors) {
+                        if (normalizeName(inst) === normCoord) return true;
+                    }
+                    return false;
+                });
+
+            // Ensure any instructor from activities not present in coordenadores is also included
+            const existingCoordNames = new Set(monitorsAndInstructors.map((c: any) => normalizeName(c.nome)));
+            const extraInstructors: Coordenador[] = [];
+            distinctInstructors.forEach(instName => {
+                const normInst = normalizeName(instName);
+                if (!existingCoordNames.has(normInst)) {
+                    extraInstructors.push({
+                        id: `inst_${normInst}`,
+                        nome: instName,
+                        funcao: 'Monitor de Atividade Complementar'
+                    } as Coordenador);
+                    existingCoordNames.add(normInst);
+                }
+            });
+
+            const mergedList = [...monitorsAndInstructors, ...extraInstructors].sort((a, b) => a.nome.localeCompare(b.nome));
+            setAllMonitorsList(mergedList);
+        } catch (err) {
+            console.error('Error fetching monitor links and coords:', err);
+        }
+    };
+
     const fetchTurmasComp = async () => {
         try {
-            let data = await turmaCompService.getTurmas(userEscolaIds);
-            // For monitors, filter to only show turmas they are linked to
-            if (isMonitor) {
-                let allowedIds = currentUser?.turmasCompIds || [];
-                if (currentUser?.id) {
-                    try {
-                        const { data: dbLinks } = await supabase
-                            .from('coordenador_turmas_comp')
-                            .select('turma_comp_id')
-                            .eq('coordenador_id', currentUser.id);
-                        if (dbLinks && dbLinks.length > 0) {
-                            allowedIds = dbLinks.map((l: any) => l.turma_comp_id);
-                        } else if (allowedIds.length === 0) {
-                            allowedIds = [];
-                        }
-                    } catch (err) {
-                        console.error('Error fetching monitor turma links:', err);
-                    }
-                }
-                data = data.filter(t => allowedIds.includes(t.id));
-            }
+            let data = await turmaCompService.getTurmas(isMonitor ? undefined : userEscolaIds);
             setTurmasComp(data);
         } catch (err) {
             console.error('Error fetching complementary classes:', err);
@@ -522,54 +653,40 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
         }
     }, [isAddingStudent, selectedTurmaId]);
 
-    React.useEffect(() => {
-        if (activeTab === 'formacao' && turmasComp.length > 0) {
-            if (!selectedTurmaId || !turmasComp.some(t => t.id === selectedTurmaId)) {
-                handleSelectTurma(turmasComp[0].id);
-            }
-        } else if (activeTab === 'formacao' && turmasComp.length === 0) {
-            setSelectedTurmaId(null);
-            setTurmaDetails({ students: [], activitiesIds: [] });
-            setTurmaMonitors([]);
-            setSelectedMonitorIdsForTurma([]);
-        }
-    }, [activeTab, turmasComp, selectedTurmaId]);
-
     const fetchAtividades = async () => {
         setIsLoading(true);
         try {
-            let data = await activitiesService.getAtividades(userEscolaIds);
-            // For monitors, filter to only show activities linked to their turmas
-            if (isMonitor) {
-                let allowedTurmas = currentUser?.turmasCompIds || [];
-                if (currentUser?.id) {
-                    try {
-                        const { data: dbLinks } = await supabase
-                            .from('coordenador_turmas_comp')
-                            .select('turma_comp_id')
-                            .eq('coordenador_id', currentUser.id);
-                        if (dbLinks && dbLinks.length > 0) {
-                            allowedTurmas = dbLinks.map((l: any) => l.turma_comp_id);
-                        }
-                    } catch (err) {
-                        console.error('Error fetching monitor turma links:', err);
-                    }
-                }
+            let data = await activitiesService.getAtividades(isMonitor ? undefined : userEscolaIds);
+            // If monitor, show activities where they are instructor OR activities in their linked turmas
+            if (isMonitor && currentUser) {
+                const myNorm = normalizeName(currentUser.nome);
 
-                if (allowedTurmas.length === 0) {
-                    data = [];
-                } else {
-                    try {
-                        const { data: links } = await supabase
-                            .from('turma_comp_atividades')
-                            .select('atividade_id')
-                            .in('turma_comp_id', allowedTurmas);
-                        const linkedActivityIds = new Set((links || []).map(l => l.atividade_id));
-                        data = data.filter(a => linkedActivityIds.has(a.id));
-                    } catch (err) {
-                        console.error('Error filtering activities for monitor:', err);
+                const [dbLinksRes, tcaRes] = await Promise.all([
+                    supabase.from('coordenador_turmas_comp').select('turma_comp_id').eq('coordenador_id', currentUser.id),
+                    supabase.from('turma_comp_atividades').select('turma_comp_id, atividade_id')
+                ]);
+
+                const myTurmaIds = new Set((dbLinksRes.data || []).map((l: any) => l.turma_comp_id));
+                (currentUser.turmasCompIds || []).forEach(id => myTurmaIds.add(id));
+
+                const myActivityIds = new Set(
+                    data.filter(a => normalizeName(a.instrutor) === myNorm).map(a => a.id)
+                );
+
+                (tcaRes.data || []).forEach((tca: any) => {
+                    if (myActivityIds.has(tca.atividade_id)) {
+                        myTurmaIds.add(tca.turma_comp_id);
                     }
-                }
+                });
+
+                const allTurmaActivityIds = new Set<string>();
+                (tcaRes.data || []).forEach((tca: any) => {
+                    if (myTurmaIds.has(tca.turma_comp_id)) {
+                        allTurmaActivityIds.add(tca.atividade_id);
+                    }
+                });
+
+                data = data.filter(a => myActivityIds.has(a.id) || allTurmaActivityIds.has(a.id));
             }
             setAtividades(data);
         } catch (err) {
@@ -583,6 +700,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
         fetchAtividades();
         fetchTurmasComp();
         fetchEscolasComplementares();
+        fetchMonitorData();
     }, [userEscolaIds]);
 
     const handleSaveAtividade = async (newAtv: Omit<Atividade, 'id' | 'inscritos'>) => {
@@ -597,6 +715,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                 await activitiesService.saveAtividade(newAtv);
             }
             fetchAtividades();
+            fetchMonitorData();
             setEditingAtividade(null);
             setIsModalOpen(false);
         } catch (err) {
@@ -663,13 +782,183 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
     const selectedSchoolObj = escolasComplementares.find(e => e.id === selectedSchoolId);
     const displayedSchoolName = selectedSchoolObj ? selectedSchoolObj.nome : (escolaName || (userEscolaIds && userEscolaIds.length > 0 ? 'Múltiplas Unidades' : 'Todas as Unidades'));
     
-    // Filter turmas complementares for list
-    const filteredTurmasComp = turmasComp.filter(t => {
+    // Map of activity by ID
+    const atvById = React.useMemo(() => {
+        const map = new Map<string, { id: string; nome: string; instrutor: string; escola_id?: string }>();
+        allComplementaryActivities.forEach(a => map.set(a.id, a));
+        return map;
+    }, [allComplementaryActivities]);
+
+    // Map of turma_comp_id -> Set of normalized instructor names
+    const turmaInstructorNamesMap = React.useMemo(() => {
+        const map = new Map<string, Set<string>>();
+        turmaAtividadesMap.forEach(link => {
+            const atv = atvById.get(link.atividade_id);
+            if (atv?.instrutor?.trim()) {
+                const norm = normalizeName(atv.instrutor);
+                if (!map.has(link.turma_comp_id)) {
+                    map.set(link.turma_comp_id, new Set());
+                }
+                map.get(link.turma_comp_id)!.add(norm);
+            }
+        });
+        return map;
+    }, [turmaAtividadesMap, atvById]);
+
+    // Map of turma_comp_id -> Set of direct coordenador IDs
+    const turmaDirectCoordIdsMap = React.useMemo(() => {
+        const map = new Map<string, Set<string>>();
+        allMonitorTurmaLinks.forEach(link => {
+            if (!map.has(link.turma_comp_id)) {
+                map.set(link.turma_comp_id, new Set());
+            }
+            map.get(link.turma_comp_id)!.add(link.coordenador_id);
+        });
+        return map;
+    }, [allMonitorTurmaLinks]);
+
+    // Helper to get monitors/teachers linked to a turma
+    const getMonitorsForTurma = React.useCallback((turmaId: string): Coordenador[] => {
+        const directIds = turmaDirectCoordIdsMap.get(turmaId) || new Set<string>();
+        const instructorNames = turmaInstructorNamesMap.get(turmaId) || new Set<string>();
+
+        const matched: Coordenador[] = [];
+        const matchedNormNames = new Set<string>();
+
+        // 1. From allMonitorsList
+        allMonitorsList.forEach(m => {
+            const norm = normalizeName(m.nome);
+            if (directIds.has(m.id) || instructorNames.has(norm)) {
+                matched.push(m);
+                matchedNormNames.add(norm);
+            }
+        });
+
+        // 2. Any instructors from activities not yet in allMonitorsList
+        turmaAtividadesMap.forEach(link => {
+            if (link.turma_comp_id === turmaId) {
+                const atv = atvById.get(link.atividade_id);
+                if (atv?.instrutor?.trim()) {
+                    const norm = normalizeName(atv.instrutor);
+                    if (!matchedNormNames.has(norm)) {
+                        matched.push({
+                            id: `inst_${norm}`,
+                            nome: atv.instrutor.trim(),
+                            funcao: 'Monitor de Atividade Complementar'
+                        } as Coordenador);
+                        matchedNormNames.add(norm);
+                    }
+                }
+            }
+        });
+
+        return matched;
+    }, [turmaDirectCoordIdsMap, turmaInstructorNamesMap, allMonitorsList, turmaAtividadesMap, atvById]);
+
+    // Filtered turmas for the Minhas Turmas tab
+    const filteredMinhasTurmas = React.useMemo(() => {
+        let list: TurmaComp[] = [];
+
+        if (isMonitor) {
+            // For monitors / recomposition teachers: show turmas to which THEY are linked
+            const myNormName = normalizeName(currentUser?.nome);
+            const myId = currentUser?.id;
+            const myTurmasCompIds = new Set(currentUser?.turmasCompIds || []);
+
+            list = turmasComp.filter(t => {
+                if (myId && turmaDirectCoordIdsMap.get(t.id)?.has(myId)) return true;
+                if (myTurmasCompIds.has(t.id)) return true;
+                if (myNormName && turmaInstructorNamesMap.get(t.id)?.has(myNormName)) return true;
+                return false;
+            });
+        } else {
+            // For administrators / coordinators / gestores:
+            if (selectedMonitorFilter === 'todos') {
+                // Show all turmas that have any monitor or activity instructor linked
+                list = turmasComp.filter(t => {
+                    const hasDirect = (turmaDirectCoordIdsMap.get(t.id)?.size || 0) > 0;
+                    const hasInstructors = (turmaInstructorNamesMap.get(t.id)?.size || 0) > 0;
+                    return hasDirect || hasInstructors;
+                });
+            } else {
+                // Filter by a specific monitor/instructor
+                const selectedMon = allMonitorsList.find(m => m.id === selectedMonitorFilter);
+                const selectedNormName = selectedMon ? normalizeName(selectedMon.nome) : '';
+
+                list = turmasComp.filter(t => {
+                    if (turmaDirectCoordIdsMap.get(t.id)?.has(selectedMonitorFilter)) return true;
+                    if (selectedNormName && turmaInstructorNamesMap.get(t.id)?.has(selectedNormName)) return true;
+                    return false;
+                });
+            }
+        }
+
+        // Apply school filter
+        if (selectedSchoolIdForMinhasTurmas !== 'todas') {
+            list = list.filter(t => t.escola_id === selectedSchoolIdForMinhasTurmas);
+        }
+
+        // Apply text search
+        if (searchMinhasTurmasTerm.trim()) {
+            const q = searchMinhasTurmasTerm.toLowerCase().trim();
+            list = list.filter(t => {
+                const matchName = t.nome.toLowerCase().includes(q);
+                const matchTurno = (t.turno || '').toLowerCase().includes(q);
+                const assignedMonitors = getMonitorsForTurma(t.id);
+                const matchMonitor = assignedMonitors.some(m => m.nome.toLowerCase().includes(q));
+                return matchName || matchTurno || matchMonitor;
+            });
+        }
+
+        return list;
+    }, [
+        isMonitor,
+        currentUser,
+        turmasComp,
+        turmaDirectCoordIdsMap,
+        turmaInstructorNamesMap,
+        selectedMonitorFilter,
+        allMonitorsList,
+        selectedSchoolIdForMinhasTurmas,
+        searchMinhasTurmasTerm,
+        getMonitorsForTurma
+    ]);
+
+    // Filter turmas complementares for Formação de Turmas tab
+    const filteredTurmasComp = (isMonitor ? filteredMinhasTurmas : turmasComp).filter(t => {
         if (!t) return false;
         const q = searchTurmaTerm.toLowerCase();
         const matchesSchool = selectedSchoolIdForTurmaFilter === 'todas' || t.escola_id === selectedSchoolIdForTurmaFilter;
         return matchesSchool && t.nome.toLowerCase().includes(q);
     });
+
+    // Auto-select class for Minhas Turmas tab
+    React.useEffect(() => {
+        if (activeTab === 'minhas_turmas' && filteredMinhasTurmas.length > 0) {
+            if (!selectedTurmaId || !filteredMinhasTurmas.some(t => t.id === selectedTurmaId)) {
+                handleSelectTurma(filteredMinhasTurmas[0].id);
+            }
+        } else if (activeTab === 'minhas_turmas' && filteredMinhasTurmas.length === 0) {
+            setSelectedTurmaId(null);
+            setTurmaDetails({ students: [], activitiesIds: [] });
+            setTurmaMonitors([]);
+            setSelectedMonitorIdsForTurma([]);
+        }
+    }, [activeTab, filteredMinhasTurmas, selectedTurmaId]);
+
+    // Auto-select class for Formação de Turmas tab
+    React.useEffect(() => {
+        if (activeTab === 'formacao' && filteredTurmasComp.length > 0) {
+            if (!selectedTurmaId || !filteredTurmasComp.some(t => t.id === selectedTurmaId)) {
+                handleSelectTurma(filteredTurmasComp[0].id);
+            }
+        } else if (activeTab === 'formacao' && filteredTurmasComp.length === 0) {
+            setSelectedTurmaId(null);
+            setTurmaDetails({ students: [], activitiesIds: [] });
+            setTurmaMonitors([]);
+            setSelectedMonitorIdsForTurma([]);
+        }
+    }, [activeTab, filteredTurmasComp, selectedTurmaId]);
 
     // Filter students in selected turma
     const filteredTurmaStudents = turmaDetails.students.filter(s => {
@@ -1002,7 +1291,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                     <div className="bg-white w-full max-w-lg rounded-[2rem] shadow-2xl border border-slate-100 flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-300">
                         <div className="p-6 border-b border-slate-100 flex justify-between items-center">
                             <div>
-                                <h3 className="text-xl font-black text-slate-800 tracking-tight">Vincular Monitores</h3>
+                                <h3 className="text-xl font-black text-slate-800 tracking-tight">Vincular Monitores / Professores de Recomposição</h3>
                                 <p className="text-slate-400 font-bold text-xs uppercase tracking-widest mt-1">Turma: {selectedTurma.nome}</p>
                             </div>
                             <button 
@@ -1014,7 +1303,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                         </div>
                         <div className="p-6 overflow-y-auto space-y-4">
                             <p className="text-slate-500 text-xs font-semibold leading-relaxed">
-                                Selecione os monitores de atividade complementar vinculados a esta turma:
+                                Selecione os monitores e professores de recomposição vinculados a esta turma:
                             </p>
                             
                             <div className="space-y-2">
@@ -1043,7 +1332,12 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                                 </div>
                                                 <div>
                                                     <h4 className="font-bold text-sm">{mon.nome}</h4>
-                                                    <p className="text-[10px] text-slate-400 font-medium">{mon.contato}</p>
+                                                    <div className="flex items-center gap-2 mt-0.5">
+                                                        <span className="text-[10px] text-brand-orange font-black uppercase tracking-tight bg-orange-50 px-2 py-0.5 rounded-md border border-orange-100">
+                                                            {mon.funcao === 'Professor(a) de Recomposição' ? 'Prof. Recomposição' : 'Monitor'}
+                                                        </span>
+                                                        <span className="text-[10px] text-slate-400 font-medium truncate max-w-[180px]">{mon.contato}</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${
@@ -1058,7 +1352,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                 })}
                                 {availableMonitors.length === 0 && (
                                     <div className="py-8 text-center text-slate-400 text-xs italic font-bold">
-                                        Nenhum monitor de atividade complementar cadastrado.
+                                        Nenhum monitor ou professor de recomposição cadastrado.
                                     </div>
                                 )}
                             </div>
@@ -1105,21 +1399,21 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
             </div>
 
             {/* Tab Navigation */}
-            <div className="flex gap-2 border-b border-slate-200/60 pb-2">
+            <div className="flex gap-2 border-b border-slate-200/60 pb-2 overflow-x-auto">
                 <button
-                    onClick={() => setActiveTab('cadastro')}
-                    className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl text-sm font-black transition-all border-2 ${
-                        activeTab === 'cadastro' 
+                    onClick={() => setActiveTab('minhas_turmas')}
+                    className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl text-sm font-black transition-all border-2 shrink-0 ${
+                        activeTab === 'minhas_turmas' 
                         ? 'bg-brand-orange border-brand-orange text-white shadow-lg shadow-orange-500/20' 
                         : 'bg-white border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-700'
                     }`}
                 >
-                    <BookOpen size={18} />
-                    Cadastro de Atividades
+                    <GraduationCap size={18} />
+                    Minhas Turmas
                 </button>
                 <button
                     onClick={() => setActiveTab('formacao')}
-                    className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl text-sm font-black transition-all border-2 ${
+                    className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl text-sm font-black transition-all border-2 shrink-0 ${
                         activeTab === 'formacao' 
                         ? 'bg-brand-orange border-brand-orange text-white shadow-lg shadow-orange-500/20' 
                         : 'bg-white border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-700'
@@ -1127,6 +1421,17 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                 >
                     <Users size={18} />
                     Formação de Turmas
+                </button>
+                <button
+                    onClick={() => setActiveTab('cadastro')}
+                    className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl text-sm font-black transition-all border-2 shrink-0 ${
+                        activeTab === 'cadastro' 
+                        ? 'bg-brand-orange border-brand-orange text-white shadow-lg shadow-orange-500/20' 
+                        : 'bg-white border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                    }`}
+                >
+                    <BookOpen size={18} />
+                    Cadastro de Atividades
                 </button>
             </div>
 
@@ -1622,6 +1927,422 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                 </p>
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* Tab: Minhas Turmas */}
+            {activeTab === 'minhas_turmas' && (
+                <div className="space-y-6 animate-in fade-in duration-300">
+                    {/* Header Banner */}
+                    {isMonitor ? (
+                        <div className="bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 rounded-3xl p-6 text-white shadow-xl shadow-orange-500/20 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                            <div className="flex items-center gap-4">
+                                <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white border border-white/30 text-2xl font-black shadow-inner">
+                                    <GraduationCap size={28} />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="bg-white/20 text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border border-white/30">
+                                            {currentUser?.funcao || 'Docente'}
+                                        </span>
+                                        <span className="text-white/80 text-xs font-bold">Painel Docente</span>
+                                    </div>
+                                    <h3 className="text-2xl font-black tracking-tight mt-1">{currentUser?.nome}</h3>
+                                    <p className="text-white/90 text-xs font-semibold mt-0.5">
+                                        Gerencie suas turmas vinculadas, consulte estudantes e acesse o diário de classe de suas oficinas.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md px-5 py-3 rounded-2xl border border-white/20">
+                                <div className="text-right">
+                                    <p className="text-[10px] font-black text-white/70 uppercase tracking-widest">Turmas Vinculadas</p>
+                                    <p className="text-2xl font-black text-white">{filteredMinhasTurmas.length}</p>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-orange-50 text-brand-orange rounded-2xl flex items-center justify-center shadow-sm">
+                                    <GraduationCap size={24} />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+                                        Turmas Vinculadas aos Monitores e Professores de Recomposição
+                                    </h3>
+                                    <p className="text-slate-500 text-xs font-medium mt-0.5">
+                                        Acompanhe as turmas complementares distribuídas entre monitores e professores de recomposição.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="bg-orange-50 text-brand-orange text-xs font-black px-4 py-2 rounded-xl border border-orange-100">
+                                    {filteredMinhasTurmas.length} {filteredMinhasTurmas.length === 1 ? 'turma vinculada' : 'turmas vinculadas'}
+                                </span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Filter Bar */}
+                    <div className="bg-white/70 backdrop-blur-md rounded-3xl border border-white/40 shadow-sm p-4 flex flex-col md:flex-row gap-3 items-center">
+                        <div className="relative flex-1 w-full">
+                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                            <input 
+                                type="text" 
+                                placeholder="Buscar turma por nome, turno ou monitor..." 
+                                value={searchMinhasTurmasTerm}
+                                onChange={e => setSearchMinhasTurmasTerm(e.target.value)}
+                                className="w-full bg-slate-50 border-none rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none"
+                            />
+                        </div>
+
+                        <div className="w-full md:w-auto min-w-[200px]">
+                            <select
+                                value={selectedSchoolIdForMinhasTurmas}
+                                onChange={e => setSelectedSchoolIdForMinhasTurmas(e.target.value)}
+                                className="w-full bg-slate-50 border-none rounded-xl px-3.5 py-2.5 text-xs font-bold focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none text-slate-700 cursor-pointer"
+                            >
+                                <option value="todas">Todas as Unidades Escolares</option>
+                                {escolasComplementares.map(esc => (
+                                    <option key={esc.id} value={esc.id}>{esc.nome}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {!isMonitor && (
+                            <div className="w-full md:w-auto min-w-[260px]">
+                                <select
+                                    value={selectedMonitorFilter}
+                                    onChange={e => setSelectedMonitorFilter(e.target.value)}
+                                    className="w-full bg-slate-50 border-none rounded-xl px-3.5 py-2.5 text-xs font-bold focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none text-slate-700 cursor-pointer"
+                                >
+                                    <option value="todos">Todos os Monitores e Professores ({allMonitorsList.length})</option>
+                                    {allMonitorsList.map(m => (
+                                        <option key={m.id} value={m.id}>
+                                            {m.nome} ({m.funcao === 'Professor(a) de Recomposição' ? 'Recomposição' : m.funcao === 'Professor' ? 'Professor' : 'Monitor'})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Master-Detail Layout */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                        {/* Left Column: Classes List */}
+                        <div className="lg:col-span-4 bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-4">
+                            <div className="flex justify-between items-center pb-2 border-b border-slate-50">
+                                <div>
+                                    <h3 className="font-black text-slate-800 text-base uppercase tracking-tight">Turmas Vinculadas</h3>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{filteredMinhasTurmas.length} turmas</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
+                                {filteredMinhasTurmas.map(t => {
+                                    const isSelected = selectedTurmaId === t.id;
+                                    const monitorsForTurma = getMonitorsForTurma(t.id);
+                                    const schoolObj = escolasComplementares.find(e => e.id === t.escola_id);
+
+                                    return (
+                                        <div 
+                                            key={t.id} 
+                                            onClick={() => handleSelectTurma(t.id)}
+                                            className={`group w-full rounded-2xl border transition-all flex flex-col p-4 gap-2.5 cursor-pointer text-left relative ${
+                                                isSelected 
+                                                ? 'bg-orange-50/60 border-orange-200 ring-2 ring-brand-orange/10 shadow-sm' 
+                                                : 'bg-white border-slate-100 hover:border-orange-200 hover:bg-slate-50/50'
+                                            }`}
+                                        >
+                                            <div className="flex justify-between items-start gap-2">
+                                                <h4 className={`font-black text-sm uppercase tracking-tight truncate ${isSelected ? 'text-orange-950' : 'text-slate-800'}`}>
+                                                    {t.nome}
+                                                </h4>
+                                                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md shrink-0 ${
+                                                    isSelected ? 'bg-brand-orange text-white' : 'bg-slate-100 text-slate-600'
+                                                }`}>
+                                                    {t.turno ? t.turno.toUpperCase() : 'MATUTINO'}
+                                                </span>
+                                            </div>
+
+                                            {schoolObj && (
+                                                <p className="text-[10px] font-bold text-slate-400 truncate flex items-center gap-1">
+                                                    <MapPin size={11} className="shrink-0 text-slate-400" />
+                                                    {schoolObj.nome}
+                                                </p>
+                                            )}
+
+                                            <div className="flex justify-between items-center w-full text-[10px] font-bold text-slate-400 pt-1 border-t border-slate-100/60">
+                                                <span className="flex items-center gap-1">
+                                                    <Users size={12} className={isSelected ? 'text-brand-orange' : 'text-slate-400'} />
+                                                    {t.alunos_count} alunos
+                                                </span>
+                                                <span className={isSelected ? 'text-brand-orange font-black' : 'text-slate-500'}>
+                                                    {t.atividades_count} atividades
+                                                </span>
+                                            </div>
+
+                                            {/* Monitors/Teachers Badges */}
+                                            {monitorsForTurma.length > 0 && (
+                                                <div className="flex flex-wrap gap-1 pt-1">
+                                                    {monitorsForTurma.map(m => (
+                                                        <span 
+                                                            key={m.id} 
+                                                            className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tight flex items-center gap-1 truncate max-w-full ${
+                                                                isSelected 
+                                                                    ? 'bg-orange-100 text-orange-900 border border-orange-200' 
+                                                                    : 'bg-slate-100 text-slate-600'
+                                                            }`}
+                                                            title={`${m.nome} (${m.funcao})`}
+                                                        >
+                                                            <Users size={10} className="shrink-0" />
+                                                            <span className="truncate">{m.nome}</span>
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+
+                                {filteredMinhasTurmas.length === 0 && (
+                                    <div className="py-12 px-4 text-center text-slate-400 text-xs italic font-bold space-y-2">
+                                        <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto text-slate-300">
+                                            <GraduationCap size={24} />
+                                        </div>
+                                        <p>
+                                            {isMonitor 
+                                                ? 'Nenhuma turma complementar vinculada ao seu usuário no momento.' 
+                                                : 'Nenhuma turma complementar vinculada encontrada.'}
+                                        </p>
+                                        {isMonitor && (
+                                            <p className="text-[10px] text-slate-400 not-italic font-normal">
+                                                Solicite à equipe gestora ou coordenação pedagógica da sua unidade para vincular suas turmas.
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Right Column: Turma Details, Activities and Students */}
+                        <div className="lg:col-span-8 space-y-6">
+                            {selectedTurma ? (
+                                <>
+                                    {/* Turma Banner */}
+                                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 flex flex-col md:flex-row justify-between gap-6 items-start md:items-center">
+                                        <div className="space-y-2.5">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="bg-orange-50 text-brand-orange border border-orange-100 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider">
+                                                    Turma Complementar
+                                                </span>
+                                                <span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider">
+                                                    {selectedTurma.turno ? selectedTurma.turno.toUpperCase() : 'MATUTINO'}
+                                                </span>
+                                                <span className="text-slate-400 font-bold text-xs">
+                                                    {turmaDetails.students.length} estudantes matriculados
+                                                </span>
+                                            </div>
+
+                                            <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">
+                                                {selectedTurma.nome}
+                                            </h3>
+
+                                            {escolasComplementares.find(e => e.id === selectedTurma.escola_id) && (
+                                                <p className="text-xs font-bold text-slate-500 flex items-center gap-1.5">
+                                                    <MapPin size={14} className="text-brand-orange" />
+                                                    {escolasComplementares.find(e => e.id === selectedTurma.escola_id)?.nome}
+                                                </p>
+                                            )}
+
+                                            {/* Monitores e Professores de Recomposição Vinculados */}
+                                            <div className="flex flex-wrap gap-2 items-center pt-1">
+                                                <span className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                                                    <Users size={14} className="text-brand-orange" />
+                                                    Docentes / Monitores ({turmaMonitors.length}):
+                                                </span>
+                                                {turmaMonitors.length > 0 ? (
+                                                    turmaMonitors.map(mon => (
+                                                        <span key={mon.id} className="bg-orange-50 text-orange-900 border border-orange-200 px-3 py-1 rounded-xl text-xs font-black uppercase tracking-tight flex items-center gap-1.5">
+                                                            <span>{mon.nome}</span>
+                                                            <span className="text-[9px] font-bold text-orange-600 bg-orange-100/80 px-1.5 py-0.5 rounded">
+                                                                {mon.funcao === 'Professor(a) de Recomposição' ? 'Recomposição' : mon.funcao === 'Professor' ? 'Professor' : 'Monitor'}
+                                                            </span>
+                                                        </span>
+                                                    ))
+                                                ) : (
+                                                    <span className="text-slate-400 font-bold text-xs italic">Nenhum docente/monitor vinculado</span>
+                                                )}
+                                                {canCadastrarTurma && (
+                                                    <button 
+                                                        onClick={openManageMonitorsModal}
+                                                        className="text-xs text-brand-orange hover:text-orange-700 font-black ml-2 uppercase tracking-widest cursor-pointer"
+                                                    >
+                                                        [ Gerenciar ]
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-col sm:flex-row gap-3 items-center self-stretch md:self-auto">
+                                            <button
+                                                onClick={() => setIsPrintingTurma(true)}
+                                                className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 transition-all active:scale-95 self-stretch sm:self-auto text-center justify-center cursor-pointer"
+                                                title="Imprimir Relatório e Frequência"
+                                            >
+                                                <Printer size={16} /> Imprimir Diário
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Activities & Daily Journal Section */}
+                                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-4">
+                                        <div className="flex justify-between items-center pb-3 border-b border-slate-50">
+                                            <div>
+                                                <h4 className="font-black text-slate-800 text-base uppercase tracking-tight">
+                                                    Oficinas da Turma & Diário de Classe
+                                                </h4>
+                                                <p className="text-slate-400 font-bold text-xs uppercase tracking-widest mt-0.5">
+                                                    {linkedActivities.length} oficinas vinculadas a esta turma
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {linkedActivities.length > 0 ? (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                {linkedActivities.map(atv => (
+                                                    <div 
+                                                        key={atv.id} 
+                                                        className="p-5 rounded-2xl border border-slate-100 bg-slate-50/50 hover:bg-orange-50/30 hover:border-orange-200 transition-all flex flex-col justify-between gap-4 group"
+                                                    >
+                                                        <div className="space-y-2">
+                                                            <div className="flex justify-between items-start gap-2">
+                                                                <span className="bg-orange-100/70 text-brand-orange px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider">
+                                                                    {atv.categoria}
+                                                                </span>
+                                                                <span className="text-[10px] font-bold text-slate-400">
+                                                                    {atv.diasSemana ? atv.diasSemana.join(', ') : ''}
+                                                                </span>
+                                                            </div>
+                                                            <h5 className="font-black text-slate-800 text-base group-hover:text-brand-orange transition-colors">
+                                                                {atv.nome}
+                                                            </h5>
+                                                            <div className="flex items-center gap-4 text-xs font-bold text-slate-500">
+                                                                {atv.horarioInicio && (
+                                                                    <span className="flex items-center gap-1">
+                                                                        <Clock size={13} className="text-slate-400" />
+                                                                        {atv.horarioInicio} - {atv.horarioFim}
+                                                                    </span>
+                                                                )}
+                                                                {atv.sala && (
+                                                                    <span className="flex items-center gap-1">
+                                                                        <MapPin size={13} className="text-slate-400" />
+                                                                        {atv.sala}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+
+                                                        <button
+                                                            onClick={() => openDiario(atv)}
+                                                            className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md shadow-orange-500/20 active:scale-95 transition-all cursor-pointer"
+                                                        >
+                                                            <BookOpen size={16} /> Acessar Diário de Classe
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="py-8 text-center text-slate-400 text-xs italic font-bold">
+                                                Nenhuma oficina vinculada a esta turma no momento.
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Students List */}
+                                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-4">
+                                        <div className="flex flex-col md:flex-row justify-between gap-4 items-stretch md:items-center pb-4 border-b border-slate-50">
+                                            <div>
+                                                <h4 className="font-black text-slate-800 text-base uppercase tracking-tight">Estudantes Matriculados</h4>
+                                                <p className="text-slate-400 font-bold text-xs uppercase tracking-widest mt-0.5">
+                                                    Total de {turmaDetails.students.length} estudantes vinculados
+                                                </p>
+                                            </div>
+                                            <div className="relative min-w-[240px]">
+                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                                <input 
+                                                    type="text" 
+                                                    placeholder="Buscar na turma..." 
+                                                    value={turmaStudentSearch}
+                                                    onChange={e => setTurmaStudentSearch(e.target.value)}
+                                                    className="w-full bg-slate-50 border-none rounded-xl pl-9 pr-3 py-2.5 text-xs font-bold focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {filteredTurmaStudents.length > 0 ? (
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-left">
+                                                    <thead>
+                                                        <tr className="border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                                            <th className="pb-3 pl-2">Estudante</th>
+                                                            <th className="pb-3">Ano / Série</th>
+                                                            <th className="pb-3">Unidade Escolar</th>
+                                                            <th className="pb-3 text-right pr-2">Status</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-50">
+                                                        {filteredTurmaStudents.map(student => (
+                                                            <tr key={student.id} className="hover:bg-slate-50/50 transition-colors">
+                                                                <td className="py-4 pl-2">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <div className="w-9 h-9 bg-orange-50 text-brand-orange rounded-lg flex items-center justify-center font-black text-sm italic uppercase">
+                                                                            {student.nome?.charAt(0) || '?'}
+                                                                        </div>
+                                                                        <span className="font-bold text-slate-800 text-sm">{student.nome}</span>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="py-4">
+                                                                    <span className="bg-orange-50/80 text-brand-orange px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider">
+                                                                        {student.anoSerie}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="py-4 text-xs font-bold text-slate-500">
+                                                                    {student.escola}
+                                                                </td>
+                                                                <td className="py-4 text-right pr-2">
+                                                                    <span className="bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider">
+                                                                        {student.status || 'Ativo'}
+                                                                    </span>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        ) : (
+                                            <div className="py-12 text-center text-slate-400/80">
+                                                <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center mx-auto mb-3 text-slate-300">
+                                                    <Users size={24} />
+                                                </div>
+                                                <p className="text-sm font-bold text-slate-500">Nenhum estudante matriculado nesta turma</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="bg-white rounded-3xl border border-dashed border-slate-200 py-24 text-center">
+                                    <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-4 text-slate-400">
+                                        <GraduationCap size={32} />
+                                    </div>
+                                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Minhas Turmas</h3>
+                                    <p className="text-slate-400 font-medium max-w-sm mx-auto mt-1 text-sm">
+                                        Selecione uma turma na lista ao lado para visualizar os detalhes, estudantes e acessar o diário de classe das oficinas.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}

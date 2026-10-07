@@ -133,7 +133,8 @@ export const ALL_MODULES = [
         group: 'Gestão',
         tabs: [
             { id: 'cadastrar_atividade', name: 'Cadastrar Nova Atividade' },
-            { id: 'cadastrar_turma', name: 'Cadastrar Nova Turma' }
+            { id: 'cadastrar_turma', name: 'Cadastrar Nova Turma' },
+            { id: 'minhas_turmas', name: 'Minhas Turmas' }
         ]
     },
     { id: 'estudantes', name: 'Gestão de Estudantes', group: 'Menu' },
