@@ -122,6 +122,8 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
     const [escolasComplementares, setEscolasComplementares] = useState<{ id: string; nome: string }[]>([]);
     const [isManageActivitiesOpen, setIsManageActivitiesOpen] = useState(false);
     const [selectedActivitiesForTurma, setSelectedActivitiesForTurma] = useState<string[]>([]);
+    const [selectedSchoolIdForManageActivities, setSelectedSchoolIdForManageActivities] = useState<string>('todas');
+    const [searchManageActivitiesTerm, setSearchManageActivitiesTerm] = useState('');
     const [isAddingStudent, setIsAddingStudent] = useState(false);
     const [isMinActivitiesAlertOpen, setIsMinActivitiesAlertOpen] = useState(false);
     const [turno, setTurno] = useState<'MATUTINO' | 'VESPERTINO' | 'NOTURNO'>('MATUTINO');
@@ -198,6 +200,54 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
             setTurmaMonitors(Array.from(monitorsMap.values()));
         } catch (err) {
             console.error('Error loading turma monitors:', err);
+        }
+    };
+
+    const openManageActivitiesModal = async () => {
+        if (!selectedTurma) return;
+        setSelectedActivitiesForTurma(turmaDetails.activitiesIds);
+        setSelectedSchoolIdForManageActivities(selectedTurma.escola_id || 'todas');
+        setSearchManageActivitiesTerm('');
+
+        // Ensure activities for this school are loaded
+        if (selectedTurma.escola_id) {
+            try {
+                const { data: schoolAtvs } = await supabase
+                    .from('atividades_complementares')
+                    .select('*')
+                    .eq('escola_id', selectedTurma.escola_id);
+                if (schoolAtvs && schoolAtvs.length > 0) {
+                    setAtividades(prev => {
+                        const existingIds = new Set(prev.map(a => a.id));
+                        const toAdd = schoolAtvs.filter((a: any) => !existingIds.has(a.id));
+                        return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
+                    });
+                }
+            } catch (err) {
+                console.error('Error fetching school activities:', err);
+            }
+        }
+        setIsManageActivitiesOpen(true);
+    };
+
+    const handleManageActivitiesSchoolChange = async (schoolId: string) => {
+        setSelectedSchoolIdForManageActivities(schoolId);
+        if (schoolId !== 'todas') {
+            try {
+                const { data: schoolAtvs } = await supabase
+                    .from('atividades_complementares')
+                    .select('*')
+                    .eq('escola_id', schoolId);
+                if (schoolAtvs && schoolAtvs.length > 0) {
+                    setAtividades(prev => {
+                        const existingIds = new Set(prev.map(a => a.id));
+                        const toAdd = schoolAtvs.filter((a: any) => !existingIds.has(a.id));
+                        return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
+                    });
+                }
+            } catch (err) {
+                console.error('Error fetching school activities on change:', err);
+            }
         }
     };
 
@@ -932,6 +982,38 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
         return matchesSchool && t.nome.toLowerCase().includes(q);
     });
 
+    // Filter activities for Vincular Atividades modal in Formação de Turmas
+    const filteredActivitiesForManage = React.useMemo(() => {
+        let list = atividades;
+
+        // Filter by school
+        if (selectedSchoolIdForManageActivities !== 'todas') {
+            const targetSchoolObj = escolasComplementares.find(e => e.id === selectedSchoolIdForManageActivities);
+            const targetSchoolNorm = targetSchoolObj ? normalizeName(targetSchoolObj.nome) : '';
+
+            list = list.filter(atv => {
+                if (atv.escola_id === selectedSchoolIdForManageActivities) return true;
+                if (!atv.escola_id && targetSchoolNorm && atv.unidadeEscolar) {
+                    return normalizeName(atv.unidadeEscolar) === targetSchoolNorm;
+                }
+                return false;
+            });
+        }
+
+        // Filter by search query
+        if (searchManageActivitiesTerm.trim()) {
+            const q = normalizeName(searchManageActivitiesTerm);
+            list = list.filter(atv => {
+                const matchName = normalizeName(atv.nome).includes(q);
+                const matchInstrutor = normalizeName(atv.instrutor).includes(q);
+                const matchCat = normalizeName(atv.categoria).includes(q);
+                return matchName || matchInstrutor || matchCat;
+            });
+        }
+
+        return list;
+    }, [atividades, selectedSchoolIdForManageActivities, searchManageActivitiesTerm, escolasComplementares]);
+
     // Auto-select class for Minhas Turmas tab
     React.useEffect(() => {
         if (activeTab === 'minhas_turmas' && filteredMinhasTurmas.length > 0) {
@@ -1205,7 +1287,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
             {/* Manage Activities Modal */}
             {isManageActivitiesOpen && selectedTurma && (
                 <div className="fixed inset-0 z-[120] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
-                    <div className="bg-white w-full max-w-lg rounded-[2rem] shadow-2xl border border-slate-100 flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-300">
+                    <div className="bg-white w-full max-w-xl rounded-[2rem] shadow-2xl border border-slate-100 flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-300">
                         <div className="p-6 border-b border-slate-100 flex justify-between items-center">
                             <div>
                                 <h3 className="text-xl font-black text-slate-800 tracking-tight">Vincular Atividades</h3>
@@ -1219,20 +1301,104 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                             </button>
                         </div>
                         <div className="p-6 overflow-y-auto space-y-4">
-                            <div className="flex justify-between items-center bg-orange-50/70 text-orange-900 p-4 rounded-xl text-xs font-black uppercase tracking-wider mb-2 border border-orange-100">
+                            {/* Counter banner */}
+                            <div className="flex justify-between items-center bg-orange-50/70 text-orange-900 p-4 rounded-xl text-xs font-black uppercase tracking-wider border border-orange-100">
                                 <span>Atividades selecionadas</span>
                                 <span className={selectedActivitiesForTurma.length > 5 ? 'text-rose-600 font-black text-sm animate-pulse' : ''}>
                                     {selectedActivitiesForTurma.length} / 5
                                 </span>
                             </div>
+
+                            {/* Selected tags chip list if any */}
+                            {selectedActivitiesForTurma.length > 0 && (
+                                <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-100 space-y-1.5">
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+                                        Atividades já selecionadas ({selectedActivitiesForTurma.length}):
+                                    </span>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {selectedActivitiesForTurma.map(aid => {
+                                            const atv = atividades.find(a => a.id === aid);
+                                            return (
+                                                <span 
+                                                    key={aid} 
+                                                    className="inline-flex items-center gap-1.5 bg-orange-100/90 text-orange-950 border border-orange-200 px-2.5 py-1 rounded-lg text-xs font-bold shadow-xs"
+                                                >
+                                                    <span className="truncate max-w-[200px]">{atv?.nome || 'Atividade'}</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedActivitiesForTurma(prev => prev.filter(id => id !== aid));
+                                                        }}
+                                                        className="text-orange-700 hover:text-rose-600 rounded transition-colors"
+                                                        title="Remover seleção"
+                                                    >
+                                                        <X size={12} />
+                                                    </button>
+                                                </span>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Filters: School Select and Search */}
+                            <div className="space-y-3 bg-slate-50/80 p-4 rounded-2xl border border-slate-100">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                                        <MapPin size={12} className="text-brand-orange" />
+                                        Filtrar por Unidade Escolar
+                                    </label>
+                                    <select
+                                        value={selectedSchoolIdForManageActivities}
+                                        onChange={e => handleManageActivitiesSchoolChange(e.target.value)}
+                                        className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none text-slate-700 cursor-pointer shadow-sm"
+                                    >
+                                        <option value="todas">Todas as Unidades Escolares ({escolasComplementares.length})</option>
+                                        {escolasComplementares.map(esc => (
+                                            <option key={esc.id} value={esc.id}>{esc.nome}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="relative">
+                                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                                    <input 
+                                        type="text" 
+                                        placeholder="Buscar oficina por nome ou instrutor..." 
+                                        value={searchManageActivitiesTerm}
+                                        onChange={e => setSearchManageActivitiesTerm(e.target.value)}
+                                        className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-8 py-2 text-xs font-bold focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none text-slate-700 shadow-sm"
+                                    />
+                                    {searchManageActivitiesTerm && (
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setSearchManageActivitiesTerm('')}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
                             
                             <div className="space-y-2">
-                                {atividades.map(atv => {
+                                <div className="flex justify-between items-center px-1">
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                        Oficinas Disponíveis ({filteredActivitiesForManage.length})
+                                    </span>
+                                </div>
+
+                                {filteredActivitiesForManage.map(atv => {
                                     const isChecked = selectedActivitiesForTurma.includes(atv.id);
                                     const isDisabled = !isChecked && selectedActivitiesForTurma.length >= 5;
+                                    const schoolObj = escolasComplementares.find(e => e.id === atv.escola_id);
+                                    const schoolLabel = schoolObj ? schoolObj.nome : atv.unidadeEscolar;
+
                                     return (
                                         <button
                                             key={atv.id}
+                                            type="button"
                                             onClick={() => {
                                                 if (isChecked) {
                                                     setSelectedActivitiesForTurma(prev => prev.filter(id => id !== atv.id));
@@ -1251,11 +1417,19 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                                         : 'bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50'
                                             }`}
                                         >
-                                            <div>
-                                                <h4 className="font-bold text-sm">{atv.nome}</h4>
-                                                <p className="text-[10px] text-slate-400 font-medium">{atv.instrutor} • {atv.categoria}</p>
+                                            <div className="space-y-0.5 flex-1 pr-3 truncate">
+                                                <h4 className="font-bold text-sm truncate">{atv.nome}</h4>
+                                                <p className="text-[10px] text-slate-400 font-medium truncate">
+                                                    {atv.instrutor || 'Sem instrutor'} • {atv.categoria}
+                                                </p>
+                                                {schoolLabel && (
+                                                    <p className="text-[9px] text-slate-400 font-semibold truncate flex items-center gap-1">
+                                                        <MapPin size={10} className="shrink-0 text-slate-400" />
+                                                        {schoolLabel}
+                                                    </p>
+                                                )}
                                             </div>
-                                            <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${
+                                            <div className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 transition-all ${
                                                 isChecked 
                                                     ? 'bg-brand-orange border-brand-orange text-white' 
                                                     : 'border-slate-300'
@@ -1265,16 +1439,27 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                         </button>
                                     );
                                 })}
+
+                                {filteredActivitiesForManage.length === 0 && (
+                                    <div className="py-10 text-center text-slate-400 text-xs italic font-bold space-y-1 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+                                        <p>Nenhuma oficina encontrada para a unidade escolar ou termo pesquisado.</p>
+                                        <p className="text-[10px] font-normal not-italic text-slate-400">
+                                            Selecione outra unidade escolar ou limpe o filtro de busca para visualizar outras oficinas.
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         </div>
-                        <div className="p-6 bg-slate-50 rounded-b-[2rem] flex justify-end gap-3">
+                        <div className="p-6 bg-slate-50 rounded-b-[2rem] flex justify-end gap-3 border-t border-slate-100/60">
                             <button 
+                                type="button"
                                 onClick={() => setIsManageActivitiesOpen(false)}
                                 className="px-5 py-2.5 rounded-xl text-xs font-black uppercase text-slate-500 hover:bg-slate-100 transition-all"
                             >
                                 Cancelar
                             </button>
                             <button 
+                                type="button"
                                 onClick={handleSaveActivitiesForTurma}
                                 className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-orange-500/20 transition-all"
                             >
@@ -1760,10 +1945,7 @@ export const AtividadesComplementares: React.FC<AtividadesComplementaresProps> =
                                             )}
                                             {canCadastrarTurma && (
                                                 <button 
-                                                    onClick={() => {
-                                                        setSelectedActivitiesForTurma(turmaDetails.activitiesIds);
-                                                        setIsManageActivitiesOpen(true);
-                                                    }}
+                                                    onClick={openManageActivitiesModal}
                                                     className="text-xs text-brand-orange hover:text-orange-700 font-black ml-2 uppercase tracking-widest cursor-pointer"
                                                 >
                                                     [ Gerenciar ]
