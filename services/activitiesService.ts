@@ -306,6 +306,45 @@ export const activitiesService = {
         return res || [];
     },
 
+    async getMonthlyAttendance(atividadeId: string, year: number, month: number): Promise<AtividadePresenca[]> {
+        const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+        const lastDay = new Date(year, month, 0).getDate();
+        const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+        const { data: res, error } = await supabase
+            .from('atividade_presencas')
+            .select('aluno_id, data, presente')
+            .eq('atividade_id', atividadeId)
+            .gte('data', startDate)
+            .lte('data', endDate)
+            .order('data', { ascending: true });
+
+        if (error) throw error;
+        return res || [];
+    },
+
+    async toggleStudentAttendance(atividadeId: string, data: string, alunoId: number, presente: boolean): Promise<void> {
+        const { error } = await supabase
+            .from('atividade_presencas')
+            .upsert({
+                atividade_id: atividadeId,
+                aluno_id: alunoId,
+                data,
+                presente
+            }, { onConflict: 'atividade_id, aluno_id, data' });
+
+        if (error) throw error;
+    },
+
+    async deleteAttendanceForDate(atividadeId: string, data: string): Promise<void> {
+        const { error } = await supabase
+            .from('atividade_presencas')
+            .delete()
+            .match({ atividade_id: atividadeId, data });
+
+        if (error) throw error;
+    },
+
     async saveLog(log: Omit<AtividadeLog, 'id'>): Promise<AtividadeLog> {
         const { data, error } = await supabase
             .from('atividade_logs')

@@ -1,14 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
     X, Users, Calendar, BookOpen, CheckCircle2, XCircle, 
     Plus, Search, UserPlus, Filter, ClipboardList, TrendingUp,
     Pencil, Trash2, Printer, Bookmark, CheckCheck, RotateCcw, MapPin,
-    Clock, AlertCircle, AlertTriangle, ShieldCheck
+    Clock, AlertCircle, AlertTriangle, ShieldCheck, ChevronLeft, ChevronRight,
+    CalendarCheck, MoreVertical, FileText, Check, Loader2
 } from 'lucide-react';
 import { activitiesService, Atividade, AtividadeLog, AtividadePresenca } from '../services/activitiesService';
 import { supabase } from '../services/supabase';
 import { PrintableAtividadePlanejamentoReport } from './PrintableAtividadePlanejamentoReport';
+import { PrintableAtividadeFrequenciaMensalReport, StudentMonthlyRow } from './PrintableAtividadeFrequenciaMensalReport';
 import { Coordenador } from '../types';
+
+const MESES = [
+    { value: 1, label: 'Janeiro' },
+    { value: 2, label: 'Fevereiro' },
+    { value: 3, label: 'Março' },
+    { value: 4, label: 'Abril' },
+    { value: 5, label: 'Maio' },
+    { value: 6, label: 'Junho' },
+    { value: 7, label: 'Julho' },
+    { value: 8, label: 'Agosto' },
+    { value: 9, label: 'Setembro' },
+    { value: 10, label: 'Outubro' },
+    { value: 11, label: 'Novembro' },
+    { value: 12, label: 'Dezembro' }
+];
 
 const PERIODOS_LETIVOS = [
     '1º Bimestre',
@@ -35,7 +52,7 @@ export const DiarioAtividadeModal: React.FC<{
     userEmail?: string | null;
     isAdmin?: boolean;
 }> = ({ isOpen, onClose, atividade, currentUser, userEmail, isAdmin }) => {
-    const [activeTab, setActiveTab] = useState<'chamada' | 'alunos' | 'conteudo'>('chamada');
+    const [activeTab, setActiveTab] = useState<'chamada' | 'frequencia_mensal' | 'alunos' | 'conteudo'>('chamada');
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
     const [selectedPeriod, setSelectedPeriod] = useState(PERIODOS_LETIVOS[0]);
     const [attendance, setAttendance] = useState<Record<number, boolean>>({});
@@ -43,6 +60,26 @@ export const DiarioAtividadeModal: React.FC<{
     const [studentFrequency, setStudentFrequency] = useState<Record<number, number>>({});
     const [logs, setLogs] = useState<AtividadeLog[]>([]);
     const [isAddingStudent, setIsAddingStudent] = useState(false);
+
+    // Monthly Attendance State
+    const [selectedMonth, setSelectedMonth] = useState<number>(() => {
+        const d = new Date();
+        return d.getMonth() + 1;
+    });
+    const [selectedYear, setSelectedYear] = useState<number>(() => {
+        return new Date().getFullYear();
+    });
+    const [monthlyRecords, setMonthlyRecords] = useState<AtividadePresenca[]>([]);
+    const [isLoadingMonthly, setIsLoadingMonthly] = useState(false);
+    const [savingCellKey, setSavingCellKey] = useState<string | null>(null);
+    const [searchMonthlyStudent, setSearchMonthlyStudent] = useState('');
+    const [filterMonthlyRate, setFilterMonthlyRate] = useState<'all' | '100' | 'alert'>('all');
+    const [showAllDaysInMonth, setShowAllDaysInMonth] = useState(false);
+    const [isAddDayModalOpen, setIsAddDayModalOpen] = useState(false);
+    const [newDayToRegister, setNewDayToRegister] = useState('');
+    const [newDayDefaultPresent, setNewDayDefaultPresent] = useState(true);
+    const [isPrintingMonthly, setIsPrintingMonthly] = useState(false);
+    const [activeDateMenu, setActiveDateMenu] = useState<string | null>(null);
     const [allStudents, setAllStudents] = useState<Student[]>([]);
     const [studentSearch, setStudentSearch] = useState('');
     const [isLoadingStudents, setIsLoadingStudents] = useState(false);
@@ -87,10 +124,24 @@ export const DiarioAtividadeModal: React.FC<{
             
             // Trigger loadAttendance with the loaded students to apply defaults
             await loadAttendance(enrolledStudents);
+            await loadMonthlyAttendance(selectedYear, selectedMonth);
         } catch (err) {
             console.error('Error loading diary data:', err);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const loadMonthlyAttendance = async (year = selectedYear, month = selectedMonth) => {
+        if (!atividade?.id) return;
+        setIsLoadingMonthly(true);
+        try {
+            const data = await activitiesService.getMonthlyAttendance(atividade.id, year, month);
+            setMonthlyRecords(data);
+        } catch (err) {
+            console.error('Error loading monthly attendance:', err);
+        } finally {
+            setIsLoadingMonthly(false);
         }
     };
 
@@ -186,6 +237,7 @@ export const DiarioAtividadeModal: React.FC<{
             
             if (!atividade?.id) return;
             await activitiesService.saveAttendance(atividade.id, selectedDate, records);
+            loadMonthlyAttendance(selectedYear, selectedMonth);
         } catch (err) {
             console.error('Error saving attendance:', err);
             alert('Erro ao salvar presença.');
@@ -205,10 +257,247 @@ export const DiarioAtividadeModal: React.FC<{
             }));
             if (!atividade?.id) return;
             await activitiesService.saveAttendance(atividade.id, selectedDate, records);
+            loadMonthlyAttendance(selectedYear, selectedMonth);
         } catch (err) {
             console.error('Error saving attendance:', err);
         }
     };
+
+    // Monthly Attendance Logic & Helpers
+    const handlePrevMonth = () => {
+        if (selectedMonth === 1) {
+            setSelectedMonth(12);
+            setSelectedYear(prev => prev - 1);
+        } else {
+            setSelectedMonth(prev => prev - 1);
+        }
+    };
+
+    const handleNextMonth = () => {
+        if (selectedMonth === 12) {
+            setSelectedMonth(1);
+            setSelectedYear(prev => prev + 1);
+        } else {
+            setSelectedMonth(prev => prev + 1);
+        }
+    };
+
+    const handleCurrentMonth = () => {
+        const now = new Date();
+        setSelectedMonth(now.getMonth() + 1);
+        setSelectedYear(now.getFullYear());
+    };
+
+    React.useEffect(() => {
+        if (isOpen && atividade?.id) {
+            loadMonthlyAttendance(selectedYear, selectedMonth);
+        }
+    }, [isOpen, atividade?.id, selectedMonth, selectedYear, activeTab]);
+
+    // Distinct registered dates for the month
+    const registeredDates = useMemo(() => {
+        const datesSet = new Set<string>();
+        monthlyRecords.forEach(r => {
+            if (r.data) datesSet.add(r.data);
+        });
+        return Array.from(datesSet).sort();
+    }, [monthlyRecords]);
+
+    // All dates of the month (1..lastDay)
+    const allMonthDates = useMemo(() => {
+        const lastDay = new Date(selectedYear, selectedMonth, 0).getDate();
+        const list: string[] = [];
+        for (let d = 1; d <= lastDay; d++) {
+            const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            list.push(dateStr);
+        }
+        return list;
+    }, [selectedYear, selectedMonth]);
+
+    const displayDates = showAllDaysInMonth ? allMonthDates : registeredDates;
+
+    // Monthly Rows for each student
+    const studentsMonthlyRows: StudentMonthlyRow[] = useMemo(() => {
+        return students.map(student => {
+            const daysMap: Record<string, boolean | undefined> = {};
+            monthlyRecords.forEach(r => {
+                if (r.aluno_id === student.id) {
+                    daysMap[r.data] = r.presente;
+                }
+            });
+
+            let presences = 0;
+            let absences = 0;
+            let totalClasses = 0;
+
+            registeredDates.forEach(d => {
+                const status = daysMap[d];
+                if (status === true) {
+                    presences++;
+                    totalClasses++;
+                } else if (status === false) {
+                    absences++;
+                    totalClasses++;
+                }
+            });
+
+            const rate = totalClasses > 0 ? Math.round((presences / totalClasses) * 100) : 100;
+
+            return {
+                id: student.id,
+                nome: student.nome,
+                turma: student.turma,
+                escola: student.escola,
+                anoSerie: student.anoSerie,
+                presencesCount: presences,
+                absencesCount: absences,
+                totalClasses,
+                rate,
+                daysMap
+            };
+        });
+    }, [students, monthlyRecords, registeredDates]);
+
+    // Filtered monthly rows by search and status
+    const filteredStudentsMonthlyRows = useMemo(() => {
+        return studentsMonthlyRows.filter(s => {
+            if (searchMonthlyStudent.trim()) {
+                const q = searchMonthlyStudent.toLowerCase();
+                const matchesName = s.nome.toLowerCase().includes(q);
+                const matchesTurma = s.turma.toLowerCase().includes(q);
+                if (!matchesName && !matchesTurma) return false;
+            }
+            if (filterMonthlyRate === '100') {
+                return s.rate === 100 && s.totalClasses > 0;
+            }
+            if (filterMonthlyRate === 'alert') {
+                return s.rate < 75 && s.totalClasses > 0;
+            }
+            return true;
+        });
+    }, [studentsMonthlyRows, searchMonthlyStudent, filterMonthlyRate]);
+
+    // Summary statistics for the month
+    const monthlyStats = useMemo(() => {
+        const totalRegisteredDays = registeredDates.length;
+        const totalEnrolled = students.length;
+        let totalPresences = 0;
+        let totalAbsences = 0;
+
+        studentsMonthlyRows.forEach(s => {
+            totalPresences += s.presencesCount;
+            totalAbsences += s.absencesCount;
+        });
+
+        const totalEntries = totalPresences + totalAbsences;
+        const avgRate = totalEntries > 0 ? Math.round((totalPresences / totalEntries) * 100) : 100;
+        const alertStudents = studentsMonthlyRows.filter(s => s.rate < 75 && s.totalClasses > 0).length;
+        const perfectStudents = studentsMonthlyRows.filter(s => s.rate === 100 && s.totalClasses > 0).length;
+
+        return {
+            totalRegisteredDays,
+            totalEnrolled,
+            totalPresences,
+            totalAbsences,
+            avgRate,
+            alertStudents,
+            perfectStudents
+        };
+    }, [registeredDates, students, studentsMonthlyRows]);
+
+    const handleToggleCell = async (studentId: number, dateStr: string) => {
+        if (!atividade?.id) return;
+        const cellKey = `${studentId}_${dateStr}`;
+        setSavingCellKey(cellKey);
+
+        const currentRecord = monthlyRecords.find(r => r.aluno_id === studentId && r.data === dateStr);
+        const newStatus = currentRecord ? !currentRecord.presente : true;
+
+        // Optimistic UI update
+        setMonthlyRecords(prev => {
+            const exists = prev.some(r => r.aluno_id === studentId && r.data === dateStr);
+            if (exists) {
+                return prev.map(r => (r.aluno_id === studentId && r.data === dateStr) ? { ...r, presente: newStatus } : r);
+            } else {
+                return [...prev, { aluno_id: studentId, data: dateStr, presente: newStatus }];
+            }
+        });
+
+        try {
+            await activitiesService.toggleStudentAttendance(atividade.id, dateStr, studentId, newStatus);
+            const stats = await activitiesService.getAttendanceStats(atividade.id);
+            setStudentFrequency(stats);
+        } catch (err) {
+            console.error('Error toggling attendance cell:', err);
+            await loadMonthlyAttendance(selectedYear, selectedMonth);
+            alert('Erro ao atualizar presença do aluno.');
+        } finally {
+            setSavingCellKey(null);
+        }
+    };
+
+    const handleSetAllForDate = async (dateStr: string, presente: boolean) => {
+        if (!atividade?.id || students.length === 0) return;
+        try {
+            const records = students.map(s => ({
+                aluno_id: s.id,
+                presente
+            }));
+            await activitiesService.saveAttendance(atividade.id, dateStr, records);
+            await loadMonthlyAttendance(selectedYear, selectedMonth);
+            const stats = await activitiesService.getAttendanceStats(atividade.id);
+            setStudentFrequency(stats);
+            setActiveDateMenu(null);
+        } catch (err) {
+            console.error('Error setting all for date:', err);
+            alert('Erro ao atualizar registros do dia.');
+        }
+    };
+
+    const handleDeleteDateRecords = async (dateStr: string) => {
+        if (!atividade?.id) return;
+        const parts = dateStr.split('-');
+        const formatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
+        if (confirm(`Deseja realmente remover os registros de frequência do dia ${formatted}?`)) {
+            try {
+                await activitiesService.deleteAttendanceForDate(atividade.id, dateStr);
+                await loadMonthlyAttendance(selectedYear, selectedMonth);
+                const stats = await activitiesService.getAttendanceStats(atividade.id);
+                setStudentFrequency(stats);
+                setActiveDateMenu(null);
+            } catch (err) {
+                console.error('Error deleting date records:', err);
+                alert('Erro ao excluir registros do dia.');
+            }
+        }
+    };
+
+    const handleJumpToChamada = (dateStr: string) => {
+        setSelectedDate(dateStr);
+        setActiveTab('chamada');
+        setActiveDateMenu(null);
+    };
+
+    const handleAddNewDayToMonth = async (dateStr: string, defaultPresent: boolean) => {
+        if (!atividade?.id || !dateStr) return;
+        try {
+            const records = students.map(s => ({
+                aluno_id: s.id,
+                presente: defaultPresent
+            }));
+            await activitiesService.saveAttendance(atividade.id, dateStr, records);
+            await loadMonthlyAttendance(selectedYear, selectedMonth);
+            const stats = await activitiesService.getAttendanceStats(atividade.id);
+            setStudentFrequency(stats);
+            setIsAddDayModalOpen(false);
+            setNewDayToRegister('');
+        } catch (err) {
+            console.error('Error adding new attendance day:', err);
+            alert('Erro ao registrar nova data de frequência.');
+        }
+    };
+
+    const selectedMonthObj = MESES.find(m => m.value === selectedMonth) || MESES[0];
 
     const handleAddStudent = async (student: Student) => {
         if (students.find(s => s.id === student.id)) {
@@ -399,7 +688,7 @@ export const DiarioAtividadeModal: React.FC<{
 
     return (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-            <div className="bg-slate-50 w-full max-w-5xl h-[90vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 border border-white/20 relative">
+            <div className="bg-slate-50 w-full max-w-6xl xl:max-w-7xl h-[90vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 border border-white/20 relative">
                 
                 {/* Student Picker Overlay */}
                 {isAddingStudent && (
@@ -535,6 +824,7 @@ export const DiarioAtividadeModal: React.FC<{
                     <div className="flex gap-2 mt-6 sm:mt-8 overflow-x-auto pb-1">
                         {[
                             { id: 'chamada', label: 'Chamada Diária', icon: CheckCircle2 },
+                            { id: 'frequencia_mensal', label: 'Frequência Mensal', icon: Calendar },
                             { id: 'alunos', label: 'Gestão de Alunos', icon: Users },
                             { id: 'conteudo', label: 'Conteúdo Pedagógico', icon: BookOpen },
                         ].map(tab => (
@@ -696,6 +986,573 @@ export const DiarioAtividadeModal: React.FC<{
                                     </tbody>
                                 </table>
                             </div>
+                        </div>
+                    )}
+
+                    {/* Tab: Frequência Mensal */}
+                    {activeTab === 'frequencia_mensal' && (
+                        <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+                            
+                            {/* Monthly Toolbar Card */}
+                            <div className="bg-white p-5 sm:p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col xl:flex-row justify-between items-stretch xl:items-center gap-6">
+                                
+                                {/* Left Info */}
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2.5 h-2.5 rounded-full bg-brand-orange animate-pulse" />
+                                        <span className="text-xs font-black text-slate-800 uppercase tracking-tight">
+                                            Controle e Consulta Mensal de Frequência
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-slate-500 font-bold">
+                                        {atividade?.diasSemana && atividade.diasSemana.length > 0 ? (
+                                            <span>Dias de Atendimento: <strong className="text-brand-orange">{Array.isArray(atividade.diasSemana) ? atividade.diasSemana.join(', ') : atividade.diasSemana}</strong></span>
+                                        ) : (
+                                            <span>Dias de atendimento da oficina</span>
+                                        )}
+                                        {atividade?.cargaHoraria ? ` • ${atividade.cargaHoraria}` : ''}
+                                        {atividade?.horarioInicio ? ` • ${atividade.horarioInicio} às ${atividade.horarioFim}` : ''}
+                                    </p>
+                                </div>
+
+                                {/* Month / Year Controls */}
+                                <div className="flex flex-wrap items-center gap-3">
+                                    <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 p-1.5 rounded-2xl shadow-inner">
+                                        <button
+                                            type="button"
+                                            onClick={handlePrevMonth}
+                                            className="p-2 hover:bg-white text-slate-600 hover:text-slate-900 rounded-xl transition-all hover:shadow-sm cursor-pointer"
+                                            title="Mês Anterior"
+                                        >
+                                            <ChevronLeft size={18} />
+                                        </button>
+                                        <div className="flex items-center gap-1 px-1">
+                                            <select
+                                                value={selectedMonth}
+                                                onChange={e => setSelectedMonth(Number(e.target.value))}
+                                                className="font-black text-xs sm:text-sm text-slate-800 bg-transparent border-none outline-none focus:ring-0 cursor-pointer uppercase py-1"
+                                            >
+                                                {MESES.map(m => (
+                                                    <option key={m.value} value={m.value}>{m.label}</option>
+                                                ))}
+                                            </select>
+                                            <select
+                                                value={selectedYear}
+                                                onChange={e => setSelectedYear(Number(e.target.value))}
+                                                className="font-black text-xs sm:text-sm text-slate-800 bg-transparent border-none outline-none focus:ring-0 cursor-pointer py-1"
+                                            >
+                                                {[2024, 2025, 2026, 2027].map(y => (
+                                                    <option key={y} value={y}>{y}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={handleNextMonth}
+                                            className="p-2 hover:bg-white text-slate-600 hover:text-slate-900 rounded-xl transition-all hover:shadow-sm cursor-pointer"
+                                            title="Próximo Mês"
+                                        >
+                                            <ChevronRight size={18} />
+                                        </button>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={handleCurrentMonth}
+                                        className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                                    >
+                                        Mês Atual
+                                    </button>
+
+                                    {/* Action Buttons */}
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const now = new Date();
+                                                const defaultDate = (now.getFullYear() === selectedYear && (now.getMonth() + 1) === selectedMonth)
+                                                    ? now.toISOString().split('T')[0]
+                                                    : `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
+                                                setNewDayToRegister(defaultDate);
+                                                setIsAddDayModalOpen(true);
+                                            }}
+                                            className="px-4 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-md shadow-orange-500/20 active:scale-95 transition-all cursor-pointer"
+                                        >
+                                            <Plus size={16} />
+                                            <span>Novo Dia</span>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsPrintingMonthly(true)}
+                                            className="px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
+                                            title="Imprimir Mapa Mensal de Frequência"
+                                        >
+                                            <Printer size={16} />
+                                            <span className="hidden sm:inline">Imprimir Mapa</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* KPI Metrics Cards */}
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
+                                    <div className="w-12 h-12 bg-orange-50 text-brand-orange rounded-2xl flex items-center justify-center shrink-0">
+                                        <CalendarCheck size={22} />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Dias com Registro</p>
+                                        <p className="text-xl font-black text-slate-800">
+                                            {registeredDates.length} <span className="text-xs font-bold text-slate-400 font-normal">dia(s)</span>
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
+                                    <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center shrink-0">
+                                        <TrendingUp size={22} />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Média do Mês</p>
+                                        <p className="text-xl font-black text-emerald-700">
+                                            {monthlyStats.avgRate}% <span className="text-xs font-bold text-slate-400 font-normal">presença</span>
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
+                                    <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center shrink-0">
+                                        <CheckCircle2 size={22} />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Alunos 100%</p>
+                                        <p className="text-xl font-black text-slate-800">
+                                            {monthlyStats.perfectStudents} <span className="text-xs font-bold text-slate-400 font-normal">de {students.length}</span>
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
+                                    <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center shrink-0">
+                                        <AlertTriangle size={22} />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Alerta Infrequência</p>
+                                        <p className={`text-xl font-black ${monthlyStats.alertStudents > 0 ? 'text-rose-600' : 'text-slate-800'}`}>
+                                            {monthlyStats.alertStudents} <span className="text-xs font-bold text-slate-400 font-normal">(&lt; 75%)</span>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Filters Bar & View Mode Toggle */}
+                            <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+                                <div className="relative flex-1 w-full max-w-md">
+                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                    <input 
+                                        type="text" 
+                                        placeholder="Filtrar aluno na tabela mensal..." 
+                                        value={searchMonthlyStudent}
+                                        onChange={e => setSearchMonthlyStudent(e.target.value)}
+                                        className="w-full bg-white border border-slate-200/80 rounded-2xl pl-11 pr-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none"
+                                    />
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {/* View Toggle */}
+                                    <div className="flex items-center gap-1 bg-slate-200/60 p-1 rounded-2xl text-xs font-bold">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowAllDaysInMonth(false)}
+                                            className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                                                !showAllDaysInMonth
+                                                    ? 'bg-white text-slate-900 shadow-sm font-black'
+                                                    : 'text-slate-500 hover:text-slate-800'
+                                            }`}
+                                        >
+                                            Dias com Registro ({registeredDates.length})
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowAllDaysInMonth(true)}
+                                            className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                                                showAllDaysInMonth
+                                                    ? 'bg-white text-slate-900 shadow-sm font-black'
+                                                    : 'text-slate-500 hover:text-slate-800'
+                                            }`}
+                                        >
+                                            Todos os Dias ({allMonthDates.length})
+                                        </button>
+                                    </div>
+
+                                    {/* Filter Status Pills */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setFilterMonthlyRate('all')}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                            filterMonthlyRate === 'all'
+                                                ? 'bg-slate-900 text-white shadow-sm'
+                                                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        Todos ({studentsMonthlyRows.length})
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFilterMonthlyRate('100')}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                            filterMonthlyRate === '100'
+                                                ? 'bg-emerald-600 text-white shadow-sm'
+                                                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        100% ({monthlyStats.perfectStudents})
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFilterMonthlyRate('alert')}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                            filterMonthlyRate === 'alert'
+                                                ? 'bg-rose-600 text-white shadow-sm'
+                                                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        Alerta ({monthlyStats.alertStudents})
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Monthly Attendance Table or Empty State */}
+                            {isLoadingMonthly ? (
+                                <div className="bg-white p-12 rounded-[2rem] border border-slate-100 text-center space-y-3">
+                                    <div className="w-8 h-8 border-4 border-brand-orange border-t-transparent rounded-full animate-spin mx-auto" />
+                                    <p className="text-sm font-black text-slate-700">Carregando mapa mensal de frequência...</p>
+                                    <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">{selectedMonthObj.label} / {selectedYear}</p>
+                                </div>
+                            ) : registeredDates.length === 0 && !showAllDaysInMonth ? (
+                                <div className="bg-white p-12 rounded-[2rem] border border-slate-100 shadow-sm text-center max-w-xl mx-auto space-y-4 animate-in fade-in">
+                                    <div className="w-16 h-16 bg-orange-50 text-brand-orange rounded-3xl flex items-center justify-center mx-auto shadow-inner">
+                                        <Calendar size={32} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <h3 className="text-lg font-black text-slate-800 tracking-tight">
+                                            Nenhum registro de frequência em {selectedMonthObj.label} de {selectedYear}
+                                        </h3>
+                                        <p className="text-xs text-slate-500 font-medium max-w-md mx-auto">
+                                            Ainda não há chamadas lançadas para esta oficina neste mês. Você pode registrar um dia de aula agora ou navegar para outros meses.
+                                        </p>
+                                    </div>
+                                    <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const now = new Date();
+                                                const defaultDate = (now.getFullYear() === selectedYear && (now.getMonth() + 1) === selectedMonth)
+                                                    ? now.toISOString().split('T')[0]
+                                                    : `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
+                                                setNewDayToRegister(defaultDate);
+                                                setIsAddDayModalOpen(true);
+                                            }}
+                                            className="px-5 py-2.5 bg-brand-orange hover:bg-orange-600 text-white rounded-xl font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-orange-500/20 active:scale-95 transition-all cursor-pointer"
+                                        >
+                                            <Plus size={16} />
+                                            <span>+ Registrar Novo Dia neste Mês</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowAllDaysInMonth(true)}
+                                            className="px-4 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
+                                        >
+                                            Ver Calendário Completo
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+                                    
+                                    {/* Table Scroll Container */}
+                                    <div className="overflow-x-auto w-full max-h-[60vh] overflow-y-auto">
+                                        <table className="w-full border-collapse text-left">
+                                            <thead className="bg-slate-50/90 backdrop-blur sticky top-0 z-20 border-b border-slate-200">
+                                                <tr>
+                                                    {/* Sticky Left: # and Student */}
+                                                    <th className="p-3.5 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest w-12 sticky left-0 bg-slate-50/95 z-30 border-r border-slate-100">
+                                                        #
+                                                    </th>
+                                                    <th className="p-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest min-w-[200px] sticky left-12 bg-slate-50/95 z-30 border-r border-slate-200 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
+                                                        Estudante ({filteredStudentsMonthlyRows.length})
+                                                    </th>
+
+                                                    {/* Day Headers */}
+                                                    {displayDates.map(d => {
+                                                        const parts = d.split('-');
+                                                        const dayNum = parts[2];
+                                                        const dateObj = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+                                                        const weekday = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'][dateObj.getDay()];
+                                                        const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+                                                        const hasRecords = registeredDates.includes(d);
+
+                                                        const presentsInDay = studentsMonthlyRows.filter(s => s.daysMap[d] === true).length;
+                                                        const absentsInDay = studentsMonthlyRows.filter(s => s.daysMap[d] === false).length;
+                                                        const totalMarked = presentsInDay + absentsInDay;
+
+                                                        return (
+                                                            <th
+                                                                key={d}
+                                                                className={`p-2.5 text-center min-w-[62px] border-r border-slate-100 select-none relative group transition-colors ${
+                                                                    isWeekend ? 'bg-slate-100/50' : hasRecords ? 'bg-orange-50/40 hover:bg-orange-50/70' : 'bg-slate-50/80 hover:bg-slate-100/60'
+                                                                }`}
+                                                            >
+                                                                <div className="flex flex-col items-center gap-0.5">
+                                                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{weekday}</span>
+                                                                    <span className={`text-sm font-black leading-tight ${hasRecords ? 'text-brand-orange' : 'text-slate-700'}`}>
+                                                                        {dayNum}
+                                                                    </span>
+                                                                    {hasRecords && totalMarked > 0 ? (
+                                                                        <span className="text-[8.5px] font-bold text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-100 mt-0.5">
+                                                                            {presentsInDay}/{totalMarked}
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-[8.5px] font-bold text-slate-300 mt-0.5">—</span>
+                                                                    )}
+                                                                </div>
+
+                                                                {/* Day Header Context Menu */}
+                                                                <div className="relative mt-0.5">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setActiveDateMenu(activeDateMenu === d ? null : d)}
+                                                                        className="p-1 text-slate-300 hover:text-slate-600 rounded-lg hover:bg-white/80 transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+                                                                        title="Opções deste dia"
+                                                                    >
+                                                                        <MoreVertical size={12} />
+                                                                    </button>
+
+                                                                    {activeDateMenu === d && (
+                                                                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 z-40 bg-white rounded-2xl shadow-2xl border border-slate-100 py-2 w-48 text-left text-xs font-bold animate-in fade-in zoom-in-95">
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleJumpToChamada(d)}
+                                                                                className="w-full px-3 py-2 text-slate-700 hover:bg-orange-50 hover:text-brand-orange flex items-center gap-2 cursor-pointer"
+                                                                            >
+                                                                                <CheckCircle2 size={14} /> Abrir Chamada Diária
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleSetAllForDate(d, true)}
+                                                                                className="w-full px-3 py-2 text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 cursor-pointer"
+                                                                            >
+                                                                                <CheckCheck size={14} /> Marcar Todos Presentes
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleSetAllForDate(d, false)}
+                                                                                className="w-full px-3 py-2 text-rose-700 hover:bg-rose-50 flex items-center gap-2 cursor-pointer"
+                                                                            >
+                                                                                <XCircle size={14} /> Marcar Todos Ausentes
+                                                                            </button>
+                                                                            {hasRecords && (
+                                                                                <>
+                                                                                    <div className="border-t border-slate-100 my-1" />
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => handleDeleteDateRecords(d)}
+                                                                                        className="w-full px-3 py-2 text-rose-600 hover:bg-rose-50 flex items-center gap-2 cursor-pointer"
+                                                                                    >
+                                                                                        <Trash2 size={14} /> Excluir Registro do Dia
+                                                                                    </button>
+                                                                                </>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </th>
+                                                        );
+                                                    })}
+
+                                                    {/* Sticky Right: Presences, Absences, Rate */}
+                                                    <th className="p-3.5 text-center text-[10px] font-black text-emerald-700 bg-emerald-50/95 uppercase tracking-widest w-16 border-r border-emerald-100">
+                                                        P
+                                                    </th>
+                                                    <th className="p-3.5 text-center text-[10px] font-black text-rose-700 bg-rose-50/95 uppercase tracking-widest w-16 border-r border-rose-100">
+                                                        F
+                                                    </th>
+                                                    <th className="p-3.5 text-center text-[10px] font-black text-slate-700 bg-slate-100/95 uppercase tracking-widest w-16 border-r border-slate-200">
+                                                        Aulas
+                                                    </th>
+                                                    <th className="p-3.5 text-center text-[10px] font-black text-brand-orange bg-orange-50/95 uppercase tracking-widest w-24">
+                                                        % Freq
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100 text-sm">
+                                                {filteredStudentsMonthlyRows.length === 0 ? (
+                                                    <tr>
+                                                        <td colSpan={displayDates.length + 6} className="py-12 text-center text-slate-400 font-bold italic">
+                                                            Nenhum estudante encontrado com o filtro atual.
+                                                        </td>
+                                                    </tr>
+                                                ) : (
+                                                    filteredStudentsMonthlyRows.map((student, idx) => {
+                                                        const isAlert = student.rate < 75 && student.totalClasses > 0;
+                                                        return (
+                                                            <tr key={student.id} className="hover:bg-slate-50/80 transition-colors group">
+                                                                
+                                                                {/* Column 1: Index */}
+                                                                <td className="p-3 text-center text-xs font-black text-slate-400 sticky left-0 bg-white group-hover:bg-slate-50/80 z-10 border-r border-slate-100">
+                                                                    {String(idx + 1).padStart(2, '0')}
+                                                                </td>
+
+                                                                {/* Column 2: Student */}
+                                                                <td className="p-3 sticky left-12 bg-white group-hover:bg-slate-50/80 z-10 border-r border-slate-200 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <div className="w-8 h-8 rounded-xl bg-orange-50 text-brand-orange font-black text-xs flex items-center justify-center shrink-0">
+                                                                            {student.nome?.charAt(0) || '?'}
+                                                                        </div>
+                                                                        <div className="min-w-0">
+                                                                            <p className="font-black text-slate-800 text-xs truncate uppercase">
+                                                                                {student.nome}
+                                                                            </p>
+                                                                            <p className="text-[10px] font-bold text-slate-400 truncate">
+                                                                                {student.turma} • {student.escola}
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+
+                                                                {/* Day Cells */}
+                                                                {displayDates.map(d => {
+                                                                    const status = student.daysMap[d];
+                                                                    const isPresent = status === true;
+                                                                    const isAbsent = status === false;
+                                                                    const isSavingThis = savingCellKey === `${student.id}_${d}`;
+
+                                                                    return (
+                                                                        <td
+                                                                            key={d}
+                                                                            className="p-1.5 text-center border-r border-slate-100"
+                                                                        >
+                                                                            <button
+                                                                                type="button"
+                                                                                disabled={isSavingThis}
+                                                                                onClick={() => handleToggleCell(student.id, d)}
+                                                                                title={
+                                                                                    isPresent ? "Presente (P) • Clique para alterar para Falta" :
+                                                                                    isAbsent ? "Falta (F) • Clique para alterar para Presença" :
+                                                                                    "Sem registro • Clique para marcar Presença"
+                                                                                }
+                                                                                className={`w-8 h-8 rounded-xl font-black text-xs inline-flex items-center justify-center transition-all cursor-pointer active:scale-90 shadow-sm ${
+                                                                                    isPresent
+                                                                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                                                                                        : isAbsent
+                                                                                        ? 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'
+                                                                                        : 'bg-slate-50 text-slate-300 border border-slate-100 hover:bg-orange-50 hover:text-brand-orange hover:border-orange-200'
+                                                                                }`}
+                                                                            >
+                                                                                {isSavingThis ? (
+                                                                                    <span className="w-3.5 h-3.5 border-2 border-brand-orange border-t-transparent rounded-full animate-spin" />
+                                                                                ) : isPresent ? (
+                                                                                    'P'
+                                                                                ) : isAbsent ? (
+                                                                                    'F'
+                                                                                ) : (
+                                                                                    '—'
+                                                                                )}
+                                                                            </button>
+                                                                        </td>
+                                                                    );
+                                                                })}
+
+                                                                {/* Presences Count */}
+                                                                <td className="p-3 text-center font-black text-xs text-emerald-700 bg-emerald-50/40 border-r border-emerald-100">
+                                                                    {student.presencesCount}
+                                                                </td>
+
+                                                                {/* Absences Count */}
+                                                                <td className="p-3 text-center font-black text-xs text-rose-700 bg-rose-50/40 border-r border-rose-100">
+                                                                    {student.absencesCount}
+                                                                </td>
+
+                                                                {/* Total Classes */}
+                                                                <td className="p-3 text-center font-bold text-xs text-slate-600 bg-slate-50/40 border-r border-slate-200">
+                                                                    {student.totalClasses}
+                                                                </td>
+
+                                                                {/* Monthly Rate */}
+                                                                <td className="p-3 text-center">
+                                                                    <div className="inline-flex items-center gap-1">
+                                                                        <span className={`px-2 py-0.5 rounded-full text-xs font-black ${
+                                                                            student.rate >= 75
+                                                                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                                                : student.rate >= 50
+                                                                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                                                                : 'bg-rose-50 text-rose-700 border border-rose-200'
+                                                                        }`}>
+                                                                            {student.rate}%
+                                                                        </span>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })
+                                                )}
+                                            </tbody>
+                                            {filteredStudentsMonthlyRows.length > 0 && (
+                                                <tfoot className="bg-slate-50 border-t-2 border-slate-200 sticky bottom-0 z-20">
+                                                    <tr className="font-black text-xs text-slate-700">
+                                                        <td colSpan={2} className="p-3 text-right uppercase tracking-wider text-slate-500 sticky left-0 bg-slate-50 z-30 border-r border-slate-200">
+                                                            Presentes no Dia:
+                                                        </td>
+                                                        {displayDates.map(d => {
+                                                            const pCount = studentsMonthlyRows.filter(s => s.daysMap[d] === true).length;
+                                                            return (
+                                                                <td key={d} className="p-2 text-center text-emerald-700 font-black border-r border-slate-100">
+                                                                    {pCount}
+                                                                </td>
+                                                            );
+                                                        })}
+                                                        <td className="p-3 text-center text-emerald-700 bg-emerald-50/50 border-r border-emerald-100">
+                                                            {monthlyStats.totalPresences}
+                                                        </td>
+                                                        <td className="p-3 text-center text-rose-700 bg-rose-50/50 border-r border-rose-100">
+                                                            {monthlyStats.totalAbsences}
+                                                        </td>
+                                                        <td className="p-3 text-center text-slate-500 bg-slate-100/50 border-r border-slate-200">
+                                                            —
+                                                        </td>
+                                                        <td className="p-3 text-center text-brand-orange bg-orange-50/50 font-black">
+                                                            {monthlyStats.avgRate}%
+                                                        </td>
+                                                    </tr>
+                                                </tfoot>
+                                            )}
+                                        </table>
+                                    </div>
+
+                                    {/* Bottom Legend */}
+                                    <div className="bg-slate-50 px-6 py-3 border-t border-slate-100 flex flex-wrap items-center justify-between text-xs text-slate-500 gap-4">
+                                        <div className="flex items-center gap-4">
+                                            <span className="font-black uppercase tracking-wider text-[10px] text-slate-400">Legenda:</span>
+                                            <span className="inline-flex items-center gap-1.5 text-emerald-700 font-bold">
+                                                <span className="w-5 h-5 rounded-md bg-emerald-50 border border-emerald-200 text-center font-black leading-5 text-[10px]">P</span>
+                                                Presença
+                                            </span>
+                                            <span className="inline-flex items-center gap-1.5 text-rose-700 font-bold">
+                                                <span className="w-5 h-5 rounded-md bg-rose-50 border border-rose-200 text-center font-black leading-5 text-[10px]">F</span>
+                                                Falta
+                                            </span>
+                                            <span className="inline-flex items-center gap-1.5 text-slate-400 font-medium">
+                                                <span className="w-5 h-5 rounded-md bg-slate-100 border border-slate-200 text-center font-bold leading-5 text-[10px]">—</span>
+                                                Sem Registro
+                                            </span>
+                                        </div>
+                                        <div className="text-[11px] text-slate-400 italic font-medium">
+                                            * Clique em qualquer célula para alternar rapidamente entre Presença (P) e Falta (F).
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -1077,11 +1934,109 @@ export const DiarioAtividadeModal: React.FC<{
                     </div>
                 </div>
             )}
+            {/* Add New Day Modal */}
+            {isAddDayModalOpen && (
+                <div className="fixed inset-0 z-[125] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full border border-slate-100 shadow-2xl flex flex-col gap-5 animate-in zoom-in-95">
+                        <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+                            <div>
+                                <h3 className="text-lg font-black text-slate-800 tracking-tight">Novo Dia de Frequência</h3>
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                                    {selectedMonthObj.label} / {selectedYear}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsAddDayModalOpen(false)}
+                                className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-50 transition-all cursor-pointer"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
+                                    Data da Aula / Chamada
+                                </label>
+                                <input
+                                    type="date"
+                                    value={newDayToRegister}
+                                    onChange={e => setNewDayToRegister(e.target.value)}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-brand-orange/20 cursor-pointer"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
+                                    Lançamento Inicial da Turma
+                                </label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setNewDayDefaultPresent(true)}
+                                        className={`p-3 rounded-2xl border-2 flex items-center justify-center gap-2 font-black text-xs uppercase tracking-wider transition-all cursor-pointer ${
+                                            newDayDefaultPresent
+                                                ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm'
+                                                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                                        }`}
+                                    >
+                                        <CheckCheck size={16} /> Todos Presentes
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setNewDayDefaultPresent(false)}
+                                        className={`p-3 rounded-2xl border-2 flex items-center justify-center gap-2 font-black text-xs uppercase tracking-wider transition-all cursor-pointer ${
+                                            !newDayDefaultPresent
+                                                ? 'border-rose-500 bg-rose-50 text-rose-700 shadow-sm'
+                                                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                                        }`}
+                                    >
+                                        <RotateCcw size={16} /> Todos Ausentes
+                                    </button>
+                                </div>
+                                <p className="text-[11px] text-slate-400 font-medium mt-2">
+                                    Após registrar, você poderá alterar presenças ou faltas individualmente a qualquer momento.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                            <button
+                                type="button"
+                                onClick={() => setIsAddDayModalOpen(false)}
+                                className="px-5 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-all cursor-pointer"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleAddNewDayToMonth(newDayToRegister, newDayDefaultPresent)}
+                                className="px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider bg-brand-orange hover:bg-orange-600 text-white shadow-lg shadow-orange-500/20 active:scale-95 transition-all cursor-pointer"
+                            >
+                                Confirmar e Registrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {isPrinting && atividade && (
                 <PrintableAtividadePlanejamentoReport 
                     atividade={atividade}
                     logs={logsToPrint}
                     onClose={() => setIsPrinting(false)}
+                />
+            )}
+
+            {isPrintingMonthly && atividade && (
+                <PrintableAtividadeFrequenciaMensalReport
+                    atividade={atividade}
+                    monthName={selectedMonthObj.label}
+                    year={selectedYear}
+                    dates={registeredDates}
+                    studentsRows={studentsMonthlyRows}
+                    onClose={() => setIsPrintingMonthly(false)}
                 />
             )}
         </div>
