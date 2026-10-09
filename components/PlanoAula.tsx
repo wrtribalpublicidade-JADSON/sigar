@@ -408,6 +408,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
           const { data: coordData, error: coordError } = await supabase
             .from('coordenadores')
             .select('id, contato, nome, funcao')
+            .order('id', { ascending: true })
             .range(fromCoords, fromCoords + 999);
 
           if (coordError) throw coordError;
@@ -428,6 +429,8 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
           const { data: ctData, error: ctError } = await supabase
             .from('coordenador_turmas')
             .select('coordenador_id, turma_id, componentes')
+            .order('coordenador_id', { ascending: true })
+            .order('turma_id', { ascending: true })
             .range(fromCt, fromCt + 999);
 
           if (ctError) {
@@ -462,8 +465,8 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
           .filter((c: any) => c.funcao === 'Professor' || !c.funcao)
           .map((c: any) => ({
             id: String(c.id),
-            nome: c.nome,
-            contato: c.contato || '',
+            nome: (c.nome || '').trim(),
+            contato: (c.contato || '').trim(),
             turmasIds: mapAssignments[String(c.id)]?.turmasIds || [],
             turmaComponentes: mapAssignments[String(c.id)]?.turmaComponentes || {}
           }));
@@ -543,23 +546,24 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
         t.turmaComponentes[tid] && 
         t.turmaComponentes[tid].some(c => normalizeSubjectName(c) === normComp)
       );
-      if (specificTeacher) return specificTeacher.nome;
+      if (specificTeacher && specificTeacher.nome) return specificTeacher.nome.trim();
     }
 
     const turmaTeacher = teachersAssignments.find(t => t.turmasIds.includes(tid));
-    if (turmaTeacher) return turmaTeacher.nome;
+    if (turmaTeacher && turmaTeacher.nome) return turmaTeacher.nome.trim();
 
     return null;
   };
 
   const getDisplayTeacher = (prof?: string, turmaId?: string, compName?: string): string => {
+    const cleanProf = (prof || '').trim();
     // 1. Se prof já é um nome real (não é e-mail e não é genérico), utiliza diretamente
-    if (prof && !isEmail(prof) && !isGenericTeacher(prof)) {
-      return prof.trim();
+    if (cleanProf && !isEmail(cleanProf) && !isGenericTeacher(cleanProf)) {
+      return cleanProf;
     }
     // 2. Se prof é um e-mail, tenta resolver via coordMap
-    if (prof && isEmail(prof)) {
-      const resolved = getTeacherName(prof);
+    if (cleanProf && isEmail(cleanProf)) {
+      const resolved = getTeacherName(cleanProf);
       if (resolved && !isEmail(resolved) && !isGenericTeacher(resolved)) {
         return resolved.trim();
       }
@@ -570,12 +574,12 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       if (fromTurma) return fromTurma.trim();
     }
     // 4. Se prof não for genérico, retorna formatado ou o próprio texto
-    if (prof && !isGenericTeacher(prof)) {
-      if (isEmail(prof)) {
-        const resolved = getTeacherName(prof);
+    if (cleanProf && !isGenericTeacher(cleanProf)) {
+      if (isEmail(cleanProf)) {
+        const resolved = getTeacherName(cleanProf);
         if (resolved && !isEmail(resolved)) return resolved.trim();
       } else {
-        return prof.trim();
+        return cleanProf;
       }
     }
     return 'Docente Responsável';
@@ -583,8 +587,8 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
 
   const fetchRealPlans = async () => {
     try {
-      // Fetch all records with chunking to surpass Supabase 1000-row limit
-      let allPlansData: any[] = [];
+      // Fetch all records with deterministic chunking to surpass Supabase 1000-row limit without skipping
+      const plansMap = new Map<string, any>();
       let page = 0;
       const pageSize = 1000;
       let hasMore = true;
@@ -595,11 +599,16 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
           .select('*')
           .or('ativo.eq.true,ativo.is.null')
           .order('data', { ascending: false })
+          .order('id', { ascending: false })
           .range(page * pageSize, (page + 1) * pageSize - 1);
 
         if (error) throw error;
         if (data && data.length > 0) {
-          allPlansData = allPlansData.concat(data);
+          data.forEach((item: any) => {
+            if (item && item.id) {
+              plansMap.set(String(item.id), item);
+            }
+          });
           if (data.length < pageSize) {
             hasMore = false;
           } else {
@@ -609,6 +618,8 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
           hasMore = false;
         }
       }
+
+      const allPlansData = Array.from(plansMap.values());
 
       // Also we need to get turmas for all schools to map their names properly
       const { data: allTurmas, error: turmasError } = await supabase
@@ -653,22 +664,23 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
         const escolaNome = escolaObj ? escolaObj.nome : (p.escola_nome || 'Unidade');
         const turmaNome = turmaMap.get(String(p.turma_id)) || p.turma_nome || p.turmaNome || 'Turma';
         const criacaoData = p.data_criacao || (p.created_at ? p.created_at.split('T')[0] : (p.data || new Date().toISOString().split('T')[0]));
-        const criadorRaw = p.created_by || '';
+        const criadorRaw = (p.created_by || '').trim();
         const avaliadorRaw = (p.avaliado_por || p.avaliadoPor || '').trim();
         const avaliadorLower = avaliadorRaw.toLowerCase();
+        const rawProf = (p.professor || '').trim();
 
         let resolvedProfessor = '';
 
         // 1. Prioriza p.professor se já contiver o nome real do docente
-        if (p.professor && !isEmail(p.professor) && !isGenericTeacher(p.professor)) {
-          if (!avaliadorLower || p.professor.trim().toLowerCase() !== avaliadorLower) {
-            resolvedProfessor = p.professor.trim();
+        if (rawProf && !isEmail(rawProf) && !isGenericTeacher(rawProf)) {
+          if (!avaliadorLower || rawProf.toLowerCase() !== avaliadorLower) {
+            resolvedProfessor = rawProf;
           }
         }
 
         // 2. Se p.professor for e-mail, tenta resolver via getTeacherName
-        if (!resolvedProfessor && p.professor && isEmail(p.professor)) {
-          const fromProf = getTeacherName(p.professor);
+        if (!resolvedProfessor && rawProf && isEmail(rawProf)) {
+          const fromProf = getTeacherName(rawProf);
           if (fromProf && !isEmail(fromProf) && !isGenericTeacher(fromProf) && fromProf.toLowerCase().trim() !== avaliadorLower) {
             resolvedProfessor = fromProf.trim();
           }
@@ -676,8 +688,8 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
 
         // 3. Tenta resolver o criador (p.created_by)
         if (!resolvedProfessor && criadorRaw) {
-          if (!isEmail(criadorRaw) && !isGenericTeacher(criadorRaw) && criadorRaw.toLowerCase().trim() !== avaliadorLower) {
-            resolvedProfessor = criadorRaw.trim();
+          if (!isEmail(criadorRaw) && !isGenericTeacher(criadorRaw) && criadorRaw.toLowerCase() !== avaliadorLower) {
+            resolvedProfessor = criadorRaw;
           } else {
             const fromCreated = getTeacherName(criadorRaw);
             if (fromCreated && !isEmail(fromCreated) && !isGenericTeacher(fromCreated) && fromCreated.toLowerCase().trim() !== avaliadorLower) {
@@ -688,7 +700,8 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
 
         // 4. Tenta resolver updated_by
         if (!resolvedProfessor && p.updated_by) {
-          const fromUpdated = getTeacherName(p.updated_by);
+          const cleanUpdated = String(p.updated_by).trim();
+          const fromUpdated = getTeacherName(cleanUpdated);
           if (fromUpdated && !isEmail(fromUpdated) && !isGenericTeacher(fromUpdated) && fromUpdated.toLowerCase().trim() !== avaliadorLower) {
             resolvedProfessor = fromUpdated.trim();
           }
@@ -704,7 +717,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
 
         // 6. Fallback final
         if (!resolvedProfessor) {
-          resolvedProfessor = (p.professor && !isEmail(p.professor)) ? p.professor.trim() : 'Docente Responsável';
+          resolvedProfessor = (rawProf && !isEmail(rawProf)) ? rawProf : 'Docente Responsável';
         }
 
         return {
@@ -1110,7 +1123,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       if (plan.componente && isCampoExperienciaInfantil(plan.componente)) return;
 
       const normComp = normalizeSubjectName(plan.componente);
-      const profName = getDisplayTeacher(plan.professor, plan.turmaId, plan.componente);
+      const profName = getDisplayTeacher(plan.professor, plan.turmaId, plan.componente).trim();
 
       const rawProf = plan.professor?.trim();
       const resolvedProf = (profName && profName !== 'Docente Responsável' && !isGenericTeacher(profName)) 
@@ -1122,9 +1135,16 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       const matchTurma = !historyFilterTurma || plan.turmaNome === historyFilterTurma || String(plan.turmaId) === String(historyFilterTurma);
       const matchComp = !historyFilterComponente || normComp === historyFilterComponente;
       const matchBimestre = !historyFilterBimestre || plan.periodo === historyFilterBimestre;
-      const matchProf = !historyFilterProfessor || 
-        profName?.toLowerCase() === historyFilterProfessor.toLowerCase() || 
-        (rawProf && rawProf.toLowerCase() === historyFilterProfessor.toLowerCase());
+
+      const filterProfNorm = (historyFilterProfessor || '').trim().toLowerCase();
+      const profNameNorm = (profName || '').trim().toLowerCase();
+      const rawProfNorm = (rawProf || '').trim().toLowerCase();
+      const resolvedProfNorm = (resolvedProf || '').trim().toLowerCase();
+
+      const matchProf = !filterProfNorm || 
+        profNameNorm === filterProfNorm || 
+        rawProfNorm === filterProfNorm || 
+        resolvedProfNorm === filterProfNorm;
 
       // Escolas
       if (plan.escolaId && plan.escolaNome) {
@@ -1162,9 +1182,9 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       }
 
       // Professores
-      if (resolvedProf) {
+      if (resolvedProf && resolvedProf.trim()) {
         if (matchEscola && matchAno && matchTurma && matchComp && matchBimestre) {
-          professoresSet.add(resolvedProf);
+          professoresSet.add(resolvedProf.trim());
         }
       }
     });
@@ -1184,7 +1204,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       bimestres: bimestresList,
       professores: professoresList
     };
-  }, [plans, historyFilterEscola, historyFilterAnoSerie, historyFilterTurma, historyFilterComponente, historyFilterBimestre, historyFilterProfessor, coordMap]);
+  }, [plans, historyFilterEscola, historyFilterAnoSerie, historyFilterTurma, historyFilterComponente, historyFilterBimestre, historyFilterProfessor, coordMap, teachersAssignments]);
 
   const openEvaluationModal = (plan: LessonPlan, initialStatus: 'Aprovado' | 'Devolvido para Correção') => {
     setEvaluatingPlan(plan);
@@ -1300,17 +1320,20 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       if (plan.componente && isCampoExperienciaInfantil(plan.componente)) return false;
 
       const normComp = normalizeSubjectName(plan.componente);
-      const profName = getDisplayTeacher(plan.professor, plan.turmaId, plan.componente);
+      const profName = getDisplayTeacher(plan.professor, plan.turmaId, plan.componente).trim();
 
       if (historyFilterEscola && String(plan.escolaId) !== String(historyFilterEscola)) return false;
       if (historyFilterAnoSerie && plan.anoSerie !== historyFilterAnoSerie) return false;
       if (historyFilterTurma && plan.turmaNome !== historyFilterTurma && String(plan.turmaId) !== String(historyFilterTurma)) return false;
       if (historyFilterComponente && normComp !== historyFilterComponente) return false;
       if (historyFilterBimestre && plan.periodo !== historyFilterBimestre) return false;
-      if (historyFilterProfessor && 
-          profName?.toLowerCase() !== historyFilterProfessor.toLowerCase() && 
-          (!plan.professor || plan.professor.toLowerCase() !== historyFilterProfessor.toLowerCase())) {
-        return false;
+      if (historyFilterProfessor) {
+        const filterProfNorm = historyFilterProfessor.trim().toLowerCase();
+        const profNameNorm = (profName || '').trim().toLowerCase();
+        const planProfNorm = (plan.professor || '').trim().toLowerCase();
+        if (profNameNorm !== filterProfNorm && planProfNorm !== filterProfNorm) {
+          return false;
+        }
       }
       if (historyFilterStatus && (plan.status || 'Em Análise') !== historyFilterStatus) return false;
 
