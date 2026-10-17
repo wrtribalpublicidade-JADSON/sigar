@@ -146,6 +146,15 @@ export default function App() {
   const [visitas, setVisitas] = useState<Visita[]>([]);
   const [coordenadores, setCoordenadores] = useState<Coordenador[]>([]);
 
+  const escolasFundamental = useMemo(() => {
+    return escolas.filter(e => {
+      if (e.segmentos && e.segmentos.length > 0 && e.segmentos.every(s => s === Segmento.INFANTIL)) {
+        return false;
+      }
+      return true;
+    });
+  }, [escolas]);
+
   // Function to load all data
   const fetchData = async (isDemo: boolean = false, email: string | null = null) => {
     if (isDemo) {
@@ -1218,12 +1227,6 @@ export default function App() {
       );
     }
 
-    const escolasFundamental = escolas.filter(e => {
-      if (e.segmentos && e.segmentos.length > 0 && e.segmentos.every(s => s === Segmento.INFANTIL)) {
-        return false;
-      }
-      return true;
-    });
 
     switch (currentView) {
       case 'LISTA_ESCOLAS':

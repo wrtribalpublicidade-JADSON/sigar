@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Escola } from '../types';
 import { supabase } from '../services/supabase';
+import { frequenciaGuiasService } from '../services/frequenciaGuiasService';
 import { useNotification } from '../context/NotificationContext';
 import { exportToCSV, getFirstBusinessDayOfMonth, getLastBusinessDayOfMonth } from '../utils';
 
@@ -127,25 +128,35 @@ export const FrequenciaAlunosTab: React.FC<FrequenciaAlunosTabProps> = ({
         }
 
         const targetTurmaIds = targetTurmas.map(t => t.id);
+        const singleTurmaFilter = selectedTurmaId !== 'TODAS' ? selectedTurmaId : undefined;
 
-        // Fetch fundamental sheets
-        const { data: fundSheets, error: fundErr } = await supabase
-          .from('frequencia_sheets')
-          .select('*')
-          .eq('escola_id', escola.id)
-          .gte('data', startDate)
-          .lte('data', endDate);
+        // Fetch fundamental sheets com colunas específicas, filtro por escola/turma e cache de 5 min (Regras 2, 3 e 4)
+        let fundSheets: any[] = [];
+        try {
+          fundSheets = await frequenciaGuiasService.getFrequenciaSheetsAggregation({
+            escolaId: escola.id,
+            turmaId: singleTurmaFilter,
+            startDate,
+            endDate,
+            isInfantil: false
+          });
+        } catch (fundErr) {
+          console.error('Erro ao buscar frequência Fundamental:', fundErr);
+        }
 
         // Fetch ECE sheets
-        const { data: eceSheets, error: eceErr } = await supabase
-          .from('frequencia_sheets_infantil')
-          .select('*')
-          .eq('escola_id', escola.id)
-          .gte('data', startDate)
-          .lte('data', endDate);
-
-        if (fundErr) console.error('Erro ao buscar frequência Fundamental:', fundErr);
-        if (eceErr) console.error('Erro ao buscar frequência Infantil:', eceErr);
+        let eceSheets: any[] = [];
+        try {
+          eceSheets = await frequenciaGuiasService.getFrequenciaSheetsAggregation({
+            escolaId: escola.id,
+            turmaId: singleTurmaFilter,
+            startDate,
+            endDate,
+            isInfantil: true
+          });
+        } catch (eceErr) {
+          console.error('Erro ao buscar frequência Infantil:', eceErr);
+        }
 
         const allSheets = [
           ...(fundSheets || []),

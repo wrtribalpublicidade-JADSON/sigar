@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../services/supabase';
+import { frequenciaGuiasService } from '../services/frequenciaGuiasService';
 import { useConfiguracao } from '../context/ConfiguracaoContext';
 import { 
   FileText, Printer, Download, Users, AlertTriangle, Loader2, CheckCircle, XCircle, ArrowRightLeft, UserX 
@@ -283,13 +284,11 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
               setPreschoolEvals(dbEvals || []);
             }
 
-            // 4. Fetch Frequencies
-            const { data: dbFreq, error: errF } = await supabase
-              .from(isInfantil ? 'frequencia_sheets_infantil' : 'frequencia_sheets')
-              .select('*')
-              .eq('turma_id', selectedTurmaId)
-              .eq('ativo', true);
-            if (errF) throw errF;
+            // 4. Fetch Frequencies com cache de 5 min e colunas específicas (Regras 2, 3 e 4)
+            const dbFreq = await frequenciaGuiasService.getFrequenciaSheetsAggregation({
+              turmaId: String(selectedTurmaId),
+              isInfantil
+            });
             setFrequencias(dbFreq || []);
           }
         }
@@ -301,7 +300,7 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
     };
 
     loadClassData();
-  }, [selectedTurmaId, isDemoMode, isInfantil, listColumnNames]);
+  }, [selectedTurmaId, isDemoMode, isInfantil]);
 
   // Aggregate results per student
   const aggregatedData = useMemo<AlunoAtaData[]>(() => {

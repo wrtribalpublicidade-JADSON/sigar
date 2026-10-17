@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Escola, Coordenador } from '../types';
 import { supabase } from '../services/supabase';
+import { frequenciaGuiasService } from '../services/frequenciaGuiasService';
 import { useNotification } from '../context/NotificationContext';
 import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
 import { isEducaInfantilYear, isCampoExperienciaInfantil, normalizeSubjectName } from '../utils';
@@ -136,7 +137,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       return escolas.filter(e => userSchoolIds.includes(e.id));
     }
     return escolas;
-  }, [escolas, isAdmin, currentUser]);
+  }, [escolas, isAdmin, currentUser?.funcao, currentUser?.escolasIds]);
 
   const allowedComponentes = useMemo(() => {
     if (currentUser && currentUser.funcao === 'Professor') {
@@ -585,47 +586,24 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
     return 'Docente Responsável';
   };
 
-  const fetchRealPlans = async () => {
+  const fetchRealPlans = async (targetEscolaId?: string) => {
+    const escolaIdToFetch = targetEscolaId || selectedEscolaId || (allowedEscolas.length > 0 ? allowedEscolas[0].id : undefined);
+    if (!escolaIdToFetch) return;
+
     try {
-      // Fetch all records with deterministic chunking to surpass Supabase 1000-row limit without skipping
-      const plansMap = new Map<string, any>();
-      let page = 0;
-      const pageSize = 1000;
-      let hasMore = true;
+      // Busca apenas colunas necessárias com filtro por escola_id e cache centralizado de 5 minutos (Regras 2 e 6)
+      const allPlansData = await frequenciaGuiasService.getGuiasAprendizagem({
+        escolaId: String(escolaIdToFetch),
+        rangeFrom: 0,
+        rangeTo: 999
+      });
 
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from('guias_aprendizagem')
-          .select('*')
-          .or('ativo.eq.true,ativo.is.null')
-          .order('data', { ascending: false })
-          .order('id', { ascending: false })
-          .range(page * pageSize, (page + 1) * pageSize - 1);
-
-        if (error) throw error;
-        if (data && data.length > 0) {
-          data.forEach((item: any) => {
-            if (item && item.id) {
-              plansMap.set(String(item.id), item);
-            }
-          });
-          if (data.length < pageSize) {
-            hasMore = false;
-          } else {
-            page++;
-          }
-        } else {
-          hasMore = false;
-        }
-      }
-
-      const allPlansData = Array.from(plansMap.values());
-
-      // Also we need to get turmas for all schools to map their names properly
+      // Busca turmas da escola atual para mapear nomes
       const { data: allTurmas, error: turmasError } = await supabase
         .from('turmas')
         .select('id, name, year, shift')
-        .range(0, 4999);
+        .eq('school_id', escolaIdToFetch)
+        .range(0, 1999);
       
       const turmaMap = new Map<string, string>();
       if (!turmasError && allTurmas) {
@@ -756,6 +734,14 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
   };
 
   // Load from localStorage or Supabase
+  // Define escola inicial padrão uma única vez sem disparar loop
+  useEffect(() => {
+    if (allowedEscolas.length > 0 && !selectedEscolaId) {
+      setSelectedEscolaId(allowedEscolas[0].id);
+    }
+  }, [allowedEscolas, selectedEscolaId]);
+
+  // Carrega guias quando a escola selecionada ou modo alterar
   useEffect(() => {
     if (isDemoMode) {
       const saved = localStorage.getItem('sigar_planos_aula');
@@ -767,17 +753,12 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
         }
       }
     } else {
-      if (allowedEscolas.length > 0) {
-        fetchRealPlans();
+      const targetId = selectedEscolaId || (allowedEscolas.length > 0 ? allowedEscolas[0].id : undefined);
+      if (targetId) {
+        fetchRealPlans(targetId);
       }
     }
-
-    if (allowedEscolas.length > 0) {
-      if (!selectedEscolaId || !allowedEscolas.some(e => e.id === selectedEscolaId)) {
-        setSelectedEscolaId(allowedEscolas[0].id);
-      }
-    }
-  }, [allowedEscolas, isDemoMode]);
+  }, [selectedEscolaId, isDemoMode]);
 
   // Load turmas when selected school changes
   useEffect(() => {
@@ -995,6 +976,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
         setPlans([payload, ...plans]);
         showNotification('success', 'Guia de Aprendizagem cadastrada com sucesso no Supabase!');
       }
+      frequenciaGuiasService.invalidateGuiasCache(payload.escolaId, payload.turmaId);
     } else {
       let updatedPlans: LessonPlan[];
       if (editingId) {
@@ -1070,6 +1052,8 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
         return;
       }
       showNotification('success', 'Guia de Aprendizagem removida do Supabase.');
+      const planToDelete = plans.find(p => p.id === id);
+      frequenciaGuiasService.invalidateGuiasCache(planToDelete?.escolaId, planToDelete?.turmaId);
     } else {
       showNotification('success', 'Guia de Aprendizagem removida.');
     }
@@ -1251,6 +1235,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
         showNotification('error', 'Erro ao salvar avaliação no banco de dados.');
         return;
       }
+      frequenciaGuiasService.invalidateGuiasCache(evaluatingPlan.escolaId, evaluatingPlan.turmaId);
     }
 
     const updatedPlans = plans.map(p => p.id === evaluatingPlan.id ? updatedPlan : p);

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Escola, Coordenador } from '../types';
 import { supabase } from '../services/supabase';
+import { frequenciaGuiasService } from '../services/frequenciaGuiasService';
 import { useNotification } from '../context/NotificationContext';
 import { useConfiguracao } from '../context/ConfiguracaoContext';
 import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
@@ -106,7 +107,7 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
       return escolas.filter(e => userSchoolIds.includes(e.id));
     }
     return escolas;
-  }, [escolas, isAdmin, currentUser]);
+  }, [escolas, isAdmin, currentUser?.funcao, currentUser?.escolasIds]);
 
   const componentesRede = useMemo(() => {
     if (configuracao && configuracao.componentes_curriculares && configuracao.componentes_curriculares.length > 0) {
@@ -224,40 +225,25 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
     return username.charAt(0).toUpperCase() + username.slice(1);
   };
 
-  const fetchRealSheets = async () => {
+  const fetchRealSheets = async (targetEscolaId?: string) => {
+    const escolaIdToFetch = targetEscolaId || selectedEscolaId || (allowedEscolas.length > 0 ? allowedEscolas[0].id : undefined);
+    if (!escolaIdToFetch) return;
+
     setIsLoadingSheets(true);
     try {
-      let allSheetsData: any[] = [];
-      let page = 0;
-      const pageSize = 1000;
-      let hasMore = true;
+      // Busca apenas colunas necessárias com filtro por escola_id e cache de 5 minutos (Regras 2, 3 e 4)
+      const allSheetsData = await frequenciaGuiasService.getFrequenciaSheetsList({
+        escolaId: String(escolaIdToFetch),
+        rangeFrom: 0,
+        rangeTo: 999
+      });
 
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from('frequencia_sheets')
-          .select('*')
-          .or('ativo.eq.true,ativo.is.null')
-          .order('data', { ascending: false })
-          .range(page * pageSize, (page + 1) * pageSize - 1);
-
-        if (error) throw error;
-        if (data && data.length > 0) {
-          allSheetsData = allSheetsData.concat(data);
-          if (data.length < pageSize) {
-            hasMore = false;
-          } else {
-            page++;
-          }
-        } else {
-          hasMore = false;
-        }
-      }
-
-      // Also get turmas to map names
+      // Busca turmas da escola atual para mapear nomes
       const { data: allTurmas, error: turmasError } = await supabase
         .from('turmas')
         .select('id, name, year, shift')
-        .range(0, 4999);
+        .eq('school_id', escolaIdToFetch)
+        .range(0, 1999);
       
       const turmaMap = new Map<string, string>();
       const turmaAnoMap = new Map<string, string>();
@@ -336,7 +322,14 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
     }
   };
 
-  // Load from localStorage or Supabase & Set default school
+  // Define escola inicial padrão uma única vez sem disparar loop
+  useEffect(() => {
+    if (allowedEscolas.length > 0 && !selectedEscolaId) {
+      setSelectedEscolaId(allowedEscolas[0].id);
+    }
+  }, [allowedEscolas, selectedEscolaId]);
+
+  // Carrega pautas quando a escola selecionada ou modo alterar
   useEffect(() => {
     if (isDemoMode) {
       const saved = localStorage.getItem('sigar_frequencia_sheets');
@@ -348,17 +341,12 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
         }
       }
     } else {
-      if (allowedEscolas.length > 0) {
-        fetchRealSheets();
+      const targetId = selectedEscolaId || (allowedEscolas.length > 0 ? allowedEscolas[0].id : undefined);
+      if (targetId) {
+        fetchRealSheets(targetId);
       }
     }
-
-    if (allowedEscolas.length > 0) {
-      if (!selectedEscolaId || !allowedEscolas.some(e => e.id === selectedEscolaId)) {
-        setSelectedEscolaId(allowedEscolas[0].id);
-      }
-    }
-  }, [allowedEscolas, isDemoMode]);
+  }, [selectedEscolaId, isDemoMode]);
 
   // Load turmas when selected school changes
   useEffect(() => {
@@ -719,6 +707,7 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
         setSheets([payload, ...sheets]);
         showNotification('success', 'Frequência registrada com sucesso no Supabase!');
       }
+      frequenciaGuiasService.invalidateFrequenciaCache(payload.escolaId, payload.turmaId);
     } else {
       let updatedSheets: AttendanceSheet[];
       if (existingIndex > -1) {
@@ -754,23 +743,53 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
     setEditingSheet(null);
   };
 
-  const handlePrintSheet = (sheet: AttendanceSheet) => {
-    setSelectedSheetForPrint(sheet);
+  const handlePrintSheet = async (sheet: AttendanceSheet) => {
+    let fullSheet = sheet;
+    // Busca a coluna students apenas ao abrir a folha específica (Regra 3)
+    if (!isDemoMode && (!sheet.students || sheet.students.length === 0)) {
+      try {
+        const dbSheet = await frequenciaGuiasService.getFrequenciaSheetById(sheet.id);
+        if (dbSheet) {
+          fullSheet = {
+            ...sheet,
+            students: dbSheet.students || []
+          };
+        }
+      } catch (err) {
+        console.error('Erro ao buscar alunos da folha para impressão:', err);
+      }
+    }
+    setSelectedSheetForPrint(fullSheet);
     setTimeout(() => {
       window.print();
     }, 150);
   };
 
-  const handleEditSheet = (sheet: AttendanceSheet) => {
-    setEditingSheet(sheet);
-    if (sheet.data) setDataFreq(sheet.data);
-    if (sheet.escolaId) setSelectedEscolaId(sheet.escolaId);
-    if (sheet.anoSerie) setSelectedAnoSerie(sheet.anoSerie);
-    if (sheet.turmaId) setSelectedTurmaId(sheet.turmaId);
-    if (sheet.componente) setComponente(sheet.componente);
+  const handleEditSheet = async (sheet: AttendanceSheet) => {
+    let fullSheet = sheet;
+    // Busca a coluna students apenas ao abrir a folha específica (Regra 3)
+    if (!isDemoMode && (!sheet.students || sheet.students.length === 0)) {
+      try {
+        const dbSheet = await frequenciaGuiasService.getFrequenciaSheetById(sheet.id);
+        if (dbSheet) {
+          fullSheet = {
+            ...sheet,
+            students: dbSheet.students || []
+          };
+        }
+      } catch (err) {
+        console.error('Erro ao buscar alunos da folha para edição:', err);
+      }
+    }
+    setEditingSheet(fullSheet);
+    if (fullSheet.data) setDataFreq(fullSheet.data);
+    if (fullSheet.escolaId) setSelectedEscolaId(fullSheet.escolaId);
+    if (fullSheet.anoSerie) setSelectedAnoSerie(fullSheet.anoSerie);
+    if (fullSheet.turmaId) setSelectedTurmaId(fullSheet.turmaId);
+    if (fullSheet.componente) setComponente(fullSheet.componente);
 
     setHasLoadedStudents(true);
-    showNotification('success', `Chamada da turma ${sheet.turmaNome} (${sheet.data}) carregada no formulário para edição.`);
+    showNotification('success', `Chamada da turma ${fullSheet.turmaNome} (${fullSheet.data}) carregada no formulário para edição.`);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -789,6 +808,8 @@ export const Frequencia: React.FC<FrequenciaProps> = ({ escolas, isDemoMode, isA
         return;
       }
       showNotification('success', 'Registro de chamada removido do Supabase.');
+      const sheetToDelete = sheets.find(s => s.id === id);
+      frequenciaGuiasService.invalidateFrequenciaCache(sheetToDelete?.escolaId, sheetToDelete?.turmaId);
     } else {
       showNotification('success', 'Registro de chamada removido.');
     }

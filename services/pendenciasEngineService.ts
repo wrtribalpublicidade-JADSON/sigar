@@ -73,6 +73,8 @@ export interface ScanOptions {
   status?: StatusPendenciaAlerta | 'ALL';
 }
 
+const scanCache = new Map<string, { timestamp: number; data: AlertaPendencia[] }>();
+
 export const pendenciasEngineService = {
   /**
    * Obtém as configurações globais de alertas
@@ -326,6 +328,7 @@ export const pendenciasEngineService = {
         executadoPor
       });
 
+      scanCache.clear();
       return true;
     } catch (e) {
       console.error('Erro ao gerar alerta individual:', e);
@@ -391,6 +394,7 @@ export const pendenciasEngineService = {
         motivo
       });
 
+      scanCache.clear();
       return true;
     } catch (e) {
       console.error('Erro ao resolver pendência:', e);
@@ -416,6 +420,19 @@ export const pendenciasEngineService = {
       const targetTipo = options?.tipoPendencia && options.tipoPendencia !== 'ALL' ? options.tipoPendencia : undefined;
       const targetPeriodo = options?.periodo && options.periodo !== 'ALL' ? options.periodo : undefined;
       const targetUsuarioId = options?.usuarioId && options.usuarioId !== 'ALL' ? options.usuarioId : undefined;
+
+      const cacheKey = JSON.stringify({
+        targetEscolaId,
+        targetTipo,
+        targetPeriodo,
+        targetUsuarioId,
+        status: options?.status,
+        perfil: options?.perfil
+      });
+      const cachedScan = scanCache.get(cacheKey);
+      if (cachedScan && Date.now() - cachedScan.timestamp < 5 * 60 * 1000) {
+        return cachedScan.data;
+      }
 
       // Filtrar escopo de escolas e coordenadores
       const targetEscolas = targetEscolaId ? escolas.filter(e => e.id === targetEscolaId) : escolas;
@@ -1178,7 +1195,7 @@ export const pendenciasEngineService = {
         finalList = finalList.filter(p => p.usuario_id === targetUsuarioId);
       }
 
-      return finalList.sort((a, b) => {
+      const sortedList = finalList.sort((a, b) => {
         const statusScore = (s: StatusPendenciaAlerta) => {
           if (s === 'ESCALONADA') return 5;
           if (s === 'VENCIDA') return 4;
@@ -1193,6 +1210,9 @@ export const pendenciasEngineService = {
         };
         return (statusScore(b.status) - statusScore(a.status)) || (priorScore(b.prioridade) - priorScore(a.prioridade));
       });
+
+      scanCache.set(cacheKey, { timestamp: Date.now(), data: sortedList });
+      return sortedList;
     } catch (e) {
       console.error('Erro na sincronização de pendências:', e);
       return getMockPendencias(escolas, coordenadores);

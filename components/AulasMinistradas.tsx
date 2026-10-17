@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Escola, Coordenador } from '../types';
 import { supabase } from '../services/supabase';
+import { frequenciaGuiasService } from '../services/frequenciaGuiasService';
 import { useNotification } from '../context/NotificationContext';
 import { useConfiguracao } from '../context/ConfiguracaoContext';
 import { SearchableSchoolSelect } from './ui/SearchableSchoolSelect';
@@ -395,40 +396,20 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
     }
   }, [isDemoMode]);
 
-  const fetchRealGuiasAprendizagem = async () => {
+  const fetchRealGuiasAprendizagem = async (targetEscolaId?: string) => {
+    const escolaIdToFetch = targetEscolaId || selectedEscolaId || undefined;
     try {
-      let allGuias: any[] = [];
-      let page = 0;
-      const pageSize = 1000;
-      let hasMore = true;
-
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from('guias_aprendizagem')
-          .select('*')
-          .or('ativo.eq.true,ativo.is.null')
-          .range(page * pageSize, (page + 1) * pageSize - 1);
-
-        if (error) throw error;
-        if (data && data.length > 0) {
-          allGuias = allGuias.concat(data);
-          if (data.length < pageSize) {
-            hasMore = false;
-          } else {
-            page++;
-          }
-        } else {
-          hasMore = false;
-        }
-      }
-
+      // Busca apenas colunas necessárias com cache centralizado de 5 minutos (Regras 2 e 6)
+      const allGuias = await frequenciaGuiasService.getGuiasAprendizagemLight({
+        escolaId: escolaIdToFetch ? String(escolaIdToFetch) : undefined
+      });
       setGuiasAprendizagem(allGuias);
     } catch (err) {
       console.error('Erro ao buscar guias de aprendizagem do Supabase para aulas:', err);
     }
   };
 
-  // Load guias de aprendizagem
+  // Carrega guias de aprendizagem leves associadas à escola
   useEffect(() => {
     if (isDemoMode) {
       const saved = localStorage.getItem('sigar_planos_aula');
@@ -442,9 +423,9 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
         setGuiasAprendizagem([]);
       }
     } else {
-      fetchRealGuiasAprendizagem();
+      fetchRealGuiasAprendizagem(selectedEscolaId);
     }
-  }, [isDemoMode]);
+  }, [isDemoMode, selectedEscolaId]);
 
   // Helper to match a ClassLog to its corresponding Guia de Aprendizagem
   const getMatchingGuia = (log: ClassLog | null) => {

@@ -33,6 +33,7 @@ import { Button } from './ui/Button';
 import { Escola, Visita, DadosEducacionais, ItemAcompanhamento, RecursoHumano, MetaAcao, StatusMeta, Coordenador, Segmento, Aluno } from '../types';
 import { igPlanoAcaoService } from '../services/gestaoConselhoService';
 import { supabase } from '../services/supabase';
+import { frequenciaGuiasService } from '../services/frequenciaGuiasService';
  
 interface SchoolDetailProps {
   escola: Escola;
@@ -265,54 +266,26 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
         turmaMap.set(String(t.id), t);
       });
 
-      // Fetch fundamental sheets for this school (chunked)
+      // Fetch fundamental sheets for this school (cached 5 min) (Regras 2 e 3)
       let allFundSheets: any[] = [];
-      let page = 0;
-      let hasMore = true;
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from('frequencia_sheets')
-          .select('id, data, turma_id, componente, students')
-          .eq('escola_id', escola.id)
-          .or('ativo.eq.true,ativo.is.null')
-          .range(page * 1000, (page + 1) * 1000 - 1);
-
-        if (error) {
-          console.warn('Erro ao carregar pautas fundamental para documentos:', error);
-          break;
-        }
-        if (data && data.length > 0) {
-          allFundSheets = allFundSheets.concat(data);
-          if (data.length < 1000) hasMore = false;
-          else page++;
-        } else {
-          hasMore = false;
-        }
+      try {
+        allFundSheets = await frequenciaGuiasService.getFrequenciaSheetsAggregation({
+          escolaId: escola.id,
+          isInfantil: false
+        });
+      } catch (error) {
+        console.warn('Erro ao carregar pautas fundamental para documentos:', error);
       }
 
-      // Fetch ECE sheets for this school (chunked)
+      // Fetch ECE sheets for this school (cached 5 min) (Regras 2 e 3)
       let allEceSheets: any[] = [];
-      page = 0;
-      hasMore = true;
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from('frequencia_sheets_infantil')
-          .select('id, data, turma_id, ano_serie, students')
-          .eq('escola_id', escola.id)
-          .or('ativo.eq.true,ativo.is.null')
-          .range(page * 1000, (page + 1) * 1000 - 1);
-
-        if (error) {
-          console.warn('Erro ao carregar pautas infantil para documentos:', error);
-          break;
-        }
-        if (data && data.length > 0) {
-          allEceSheets = allEceSheets.concat(data);
-          if (data.length < 1000) hasMore = false;
-          else page++;
-        } else {
-          hasMore = false;
-        }
+      try {
+        allEceSheets = await frequenciaGuiasService.getFrequenciaSheetsAggregation({
+          escolaId: escola.id,
+          isInfantil: true
+        });
+      } catch (error) {
+        console.warn('Erro ao carregar pautas infantil para documentos:', error);
       }
 
       // Initialize stats map for all students
@@ -414,8 +387,12 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
   };
 
   useEffect(() => {
-    if (activeTab === 'documentos' || activeTab === 'matriculas') {
+    if (activeTab === 'documentos') {
       loadStudentsAndAttendance();
+    } else if (activeTab === 'matriculas') {
+      if (students.length === 0) {
+        loadStudentsAndAttendance();
+      }
     }
   }, [activeTab, escola.id, isDemoMode]);
 
