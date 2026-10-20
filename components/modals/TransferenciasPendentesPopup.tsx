@@ -98,10 +98,27 @@ export const TransferenciasPendentesPopup: React.FC<TransferenciasPendentesPopup
 
       if (studentError) throw studentError;
 
+      // 3. Migrate grades (notas_sheets) from origin class to destination class
+      if (transferencia.turma_origem_id && transferencia.turma_destino_id) {
+        try {
+          await migrateStudentGrades(
+            transferencia.aluno_id,
+            transferencia.aluno_nome,
+            transferencia.turma_origem_id,
+            transferencia.turma_destino_id,
+            transferencia.escola_destino_id || ''
+          );
+        } catch (migrateErr) {
+          console.error('Erro ao migrar notas do estudante transferido:', migrateErr);
+          // Don't block the transfer approval if grade migration fails
+        }
+      }
+
       await logAudit('UPDATE', 'TRANSFERENCIA_ESTUDANTE', transferencia.id, {
         acao: 'APROVADO',
         aluno: transferencia.aluno_nome,
-        destino: transferencia.escola_destino_nome
+        destino: transferencia.escola_destino_nome,
+        notas_migradas: !!(transferencia.turma_origem_id && transferencia.turma_destino_id)
       });
 
       loadTransferencias();
@@ -111,6 +128,127 @@ export const TransferenciasPendentesPopup: React.FC<TransferenciasPendentesPopup
     } finally {
       setActionLoading(null);
     }
+  };
+
+  /**
+   * Migrates a student's grades from the origin class's notas_sheets to the destination class's notas_sheets.
+   * For each component/bimestre where the student has grades in the origin, it either:
+   * - Adds the student to the existing destination sheet, or
+   * - Creates a new sheet in the destination with the student's grades.
+   */
+  const migrateStudentGrades = async (
+    alunoId: number,
+    alunoNome: string,
+    turmaOrigemId: string,
+    turmaDestinoId: string,
+    escolaDestinoId: string
+  ) => {
+    // Fetch all grade sheets from the origin class
+    const { data: originSheets, error: originErr } = await supabase
+      .from('notas_sheets')
+      .select('*')
+      .eq('turma_id', turmaOrigemId)
+      .eq('ativo', true);
+
+    if (originErr || !originSheets || originSheets.length === 0) return;
+
+    // Fetch all grade sheets from the destination class
+    const { data: destSheets, error: destErr } = await supabase
+      .from('notas_sheets')
+      .select('*')
+      .eq('turma_id', turmaDestinoId)
+      .eq('ativo', true);
+
+    const existingDestSheets = destSheets || [];
+
+    for (const originSheet of originSheets) {
+      const studentGrade = (originSheet.students || []).find(
+        (s: any) => String(s.id) === String(alunoId)
+      );
+
+      // Only migrate if the student actually has grades in this sheet
+      if (!studentGrade) continue;
+
+      // Check if the student has any actual grade values (not all empty)
+      const hasAnyGrade = 
+        (studentGrade.av1 !== '' && studentGrade.av1 !== null && studentGrade.av1 !== undefined) ||
+        (studentGrade.av2 !== '' && studentGrade.av2 !== null && studentGrade.av2 !== undefined) ||
+        (studentGrade.qualitativa !== '' && studentGrade.qualitativa !== null && studentGrade.qualitativa !== undefined) ||
+        (studentGrade.recuperacao !== '' && studentGrade.recuperacao !== null && studentGrade.recuperacao !== undefined) ||
+        (studentGrade.mediaFinal !== undefined && studentGrade.mediaFinal !== null && studentGrade.mediaFinal !== 0);
+
+      if (!hasAnyGrade) continue;
+
+      // Find matching destination sheet (same component + bimestre)
+      const matchingDestSheet = existingDestSheets.find(
+        (ds: any) => ds.componente === originSheet.componente && ds.bimestre === originSheet.bimestre
+      );
+
+      if (matchingDestSheet) {
+        // Add or update the student in the existing destination sheet
+        const destStudents = [...(matchingDestSheet.students || [])];
+        const existingIdx = destStudents.findIndex(
+          (s: any) => String(s.id) === String(alunoId)
+        );
+
+        if (existingIdx >= 0) {
+          // Student already exists in destination, only update if current values are empty
+          const existingGrade = destStudents[existingIdx];
+          const destHasGrades = 
+            (existingGrade.av1 !== '' && existingGrade.av1 !== null && existingGrade.av1 !== undefined) ||
+            (existingGrade.av2 !== '' && existingGrade.av2 !== null && existingGrade.av2 !== undefined) ||
+            (existingGrade.qualitativa !== '' && existingGrade.qualitativa !== null && existingGrade.qualitativa !== undefined) ||
+            (existingGrade.mediaFinal !== undefined && existingGrade.mediaFinal !== null && existingGrade.mediaFinal !== 0);
+
+          if (!destHasGrades) {
+            destStudents[existingIdx] = { ...studentGrade };
+          }
+        } else {
+          // Add student to the destination sheet
+          destStudents.push({ ...studentGrade });
+        }
+
+        // Recalculate class averages
+        const validMedias = destStudents
+          .map((s: any) => Number(s.mediaFinal))
+          .filter((m: number) => !isNaN(m) && m > 0);
+        const newMediaTurma = validMedias.length > 0
+          ? parseFloat((validMedias.reduce((a: number, b: number) => a + b, 0) / validMedias.length).toFixed(2))
+          : matchingDestSheet.media_turma;
+
+        await supabase
+          .from('notas_sheets')
+          .update({
+            students: destStudents,
+            media_turma: newMediaTurma,
+            updated_at: new Date().toISOString(),
+            updated_by: currentUserName || 'sistema_transferencia'
+          })
+          .eq('id', matchingDestSheet.id);
+      } else {
+        // Create a new sheet in the destination class with only this student
+        const newSheetId = crypto.randomUUID();
+        await supabase
+          .from('notas_sheets')
+          .insert([{
+            id: newSheetId,
+            escola_id: escolaDestinoId,
+            turma_id: turmaDestinoId,
+            componente: originSheet.componente,
+            bimestre: originSheet.bimestre,
+            media_turma: Number(studentGrade.mediaFinal) || 0,
+            taxa_aprovacao: 0,
+            students: [{ ...studentGrade }],
+            ativo: true,
+            created_at: new Date().toISOString(),
+            created_by: currentUserName || 'sistema_transferencia',
+            updated_at: new Date().toISOString(),
+            updated_by: currentUserName || 'sistema_transferencia'
+          }]);
+      }
+    }
+
+    console.log(`Notas migradas com sucesso para o estudante ${alunoNome} (ID: ${alunoId})`);
   };
 
   const handleEmAnalise = async (transferencia: TransferenciaEstudante) => {

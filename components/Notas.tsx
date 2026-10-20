@@ -540,6 +540,75 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
 
     setStudents(classStudents);
 
+    // For transferred students without grades in this class, try to fetch from origin class
+    let transferredGradesMap = new Map<string, any>();
+    if (!isDemoMode) {
+      try {
+        // Find inbound transfers to this class
+        const { data: inboundTransfers } = await supabase
+          .from('transferencias_estudantes')
+          .select('aluno_id, turma_origem_id')
+          .eq('turma_destino_id', selectedTurmaId)
+          .eq('status', 'APROVADO');
+
+        if (inboundTransfers && inboundTransfers.length > 0) {
+          // Get student IDs that don't have grades in this turma's saved sheet
+          const studentsWithoutGrades = inboundTransfers.filter((t: any) => {
+            const hasGrade = savedGradesById.has(String(t.aluno_id));
+            return !hasGrade && t.turma_origem_id;
+          });
+
+          if (studentsWithoutGrades.length > 0) {
+            const originTurmaIds = [...new Set(studentsWithoutGrades.map((t: any) => t.turma_origem_id))];
+            const transferStudentIds = new Set(studentsWithoutGrades.map((t: any) => String(t.aluno_id)));
+
+            for (const originTurmaId of originTurmaIds) {
+              // Check all sheets from all componente/bimestre combinations, but filter for the current one
+              const originSheet = sheets.find(s =>
+                s.turmaId === originTurmaId &&
+                s.componente === componente &&
+                s.bimestre === bimestre
+              );
+
+              if (originSheet && originSheet.students) {
+                originSheet.students.forEach(st => {
+                  if (transferStudentIds.has(String(st.id))) {
+                    transferredGradesMap.set(String(st.id), st);
+                  }
+                });
+              }
+
+              // Also check from database directly if not found in local sheets
+              if (transferredGradesMap.size < transferStudentIds.size) {
+                try {
+                  const { data: originDbSheets } = await supabase
+                    .from('notas_sheets')
+                    .select('students')
+                    .eq('turma_id', originTurmaId)
+                    .eq('componente', componente)
+                    .eq('bimestre', bimestre)
+                    .eq('ativo', true)
+                    .limit(1);
+
+                  if (originDbSheets && originDbSheets.length > 0) {
+                    (originDbSheets[0].students || []).forEach((st: any) => {
+                      if (transferStudentIds.has(String(st.id)) && !transferredGradesMap.has(String(st.id))) {
+                        transferredGradesMap.set(String(st.id), st);
+                      }
+                    });
+                  }
+                } catch (dbErr) {
+                  console.warn('Could not fetch origin grades for transferred student:', dbErr);
+                }
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Could not fetch transfer records for grade migration:', err);
+      }
+    }
+
     // Build grades map for all current class students
     const map: Record<string | number, {
       av1: string;
@@ -560,7 +629,19 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
           mediaFinal: Number(savedGrade.mediaFinal) || 0
         };
       } else {
-        map[s.id] = { av1: '', av2: '', qualitativa: '', recuperacao: '', mediaFinal: 0 };
+        // Check if this student has grades from their origin class (transferred)
+        const transferredGrade = transferredGradesMap.get(String(s.id));
+        if (transferredGrade) {
+          map[s.id] = {
+            av1: formatGradeValue(transferredGrade.av1),
+            av2: formatGradeValue(transferredGrade.av2),
+            qualitativa: formatGradeValue(transferredGrade.qualitativa),
+            recuperacao: formatGradeValue(transferredGrade.recuperacao),
+            mediaFinal: Number(transferredGrade.mediaFinal) || 0
+          };
+        } else {
+          map[s.id] = { av1: '', av2: '', qualitativa: '', recuperacao: '', mediaFinal: 0 };
+        }
       }
     });
 

@@ -273,7 +273,88 @@ export const AtasFinaisTab: React.FC<AtasFinaisTabProps> = ({
                 .eq('turma_id', selectedTurmaId)
                 .eq('ativo', true);
               if (errS) throw errS;
-              setGradesSheets(dbSheets || []);
+              let allGradeSheets = dbSheets || [];
+
+              // 3b. For students transferred INTO this class, also fetch grades from their origin class
+              const inboundTransfers = dbTransf.filter(
+                (t: any) => String(t.turma_destino_id) === String(selectedTurmaId) && t.status === 'APROVADO' && t.turma_origem_id
+              );
+
+              if (inboundTransfers.length > 0) {
+                const originTurmaIds = [...new Set(inboundTransfers.map((t: any) => t.turma_origem_id))];
+                const transferredStudentIds = new Set(inboundTransfers.map((t: any) => String(t.aluno_id)));
+
+                for (const originTurmaId of originTurmaIds) {
+                  try {
+                    const { data: originSheets } = await supabase
+                      .from('notas_sheets')
+                      .select('*')
+                      .eq('turma_id', originTurmaId)
+                      .eq('ativo', true);
+
+                    if (originSheets && originSheets.length > 0) {
+                      for (const originSheet of originSheets) {
+                        // Find transferred students that have grades in this origin sheet but NOT in the destination sheet
+                        const originStudentsWithGrades = (originSheet.students || []).filter(
+                          (s: any) => transferredStudentIds.has(String(s.id))
+                        );
+
+                        if (originStudentsWithGrades.length === 0) continue;
+
+                        // Find matching destination sheet
+                        const matchingDestSheet = allGradeSheets.find(
+                          (ds: any) => ds.componente === originSheet.componente && ds.bimestre === originSheet.bimestre
+                        );
+
+                        if (matchingDestSheet) {
+                          let needsUpdate = false;
+                          const destStudents = [...(matchingDestSheet.students || [])];
+
+                          for (const originStudent of originStudentsWithGrades) {
+                            const existingIdx = destStudents.findIndex(
+                              (s: any) => String(s.id) === String(originStudent.id)
+                            );
+
+                            if (existingIdx >= 0) {
+                              // Check if destination has empty grades for this student
+                              const destGrade = destStudents[existingIdx];
+                              const destHasGrades =
+                                (destGrade.av1 !== '' && destGrade.av1 !== null && destGrade.av1 !== undefined) ||
+                                (destGrade.av2 !== '' && destGrade.av2 !== null && destGrade.av2 !== undefined) ||
+                                (destGrade.qualitativa !== '' && destGrade.qualitativa !== null && destGrade.qualitativa !== undefined) ||
+                                (destGrade.mediaFinal !== undefined && destGrade.mediaFinal !== null && destGrade.mediaFinal !== 0);
+
+                              if (!destHasGrades) {
+                                destStudents[existingIdx] = { ...originStudent };
+                                needsUpdate = true;
+                              }
+                            } else {
+                              destStudents.push({ ...originStudent });
+                              needsUpdate = true;
+                            }
+                          }
+
+                          if (needsUpdate) {
+                            matchingDestSheet.students = destStudents;
+                          }
+                        } else {
+                          // Create a virtual sheet (in-memory only) with origin grades for these students
+                          allGradeSheets.push({
+                            ...originSheet,
+                            id: `merged-${originSheet.id}`,
+                            turma_id: selectedTurmaId,
+                            students: originStudentsWithGrades
+                          });
+                        }
+                      }
+                    }
+                  } catch (originErr) {
+                    console.warn('Could not fetch origin class grades for transferred students:', originErr);
+                  }
+                }
+              }
+
+              setGradesSheets(allGradeSheets);
             } else {
               // Fetch preschool evaluations
               const { data: dbEvals, error: errE } = await supabase
