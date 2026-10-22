@@ -55,14 +55,15 @@ export const RegionalPendenciesOverview: React.FC<RegionalPendenciesOverviewProp
     const loadDbPresence = async () => {
       setIsLoading(true);
 
-      const safeFetchSet = async (table: string, fields = ['escola_id', 'school_id']) => {
+      const safeFetchSet = async (table: string, fields: string[] = ['escola_id']) => {
         try {
           const { data, error } = await supabase.from(table).select(fields.join(', '));
           if (error || !data) return new Set<string>();
           const set = new Set<string>();
           data.forEach((row: any) => {
-            if (row.escola_id) set.add(String(row.escola_id));
-            if (row.school_id) set.add(String(row.school_id));
+            fields.forEach(field => {
+              if (row[field]) set.add(String(row[field]));
+            });
           });
           return set;
         } catch {
@@ -81,10 +82,14 @@ export const RegionalPendenciesOverview: React.FC<RegionalPendenciesOverviewProp
       };
 
       const [
-        planosCurso,
-        planosCursoInfantil,
-        aulasMinistradas,
-        frequencias,
+        planosCursoRaw,
+        planosCursoInfantilRaw,
+        guiasF,
+        guiasI,
+        aulasMinistradasF,
+        aulasMinistradasI,
+        frequenciasF,
+        frequenciasI,
         notas,
         atividadesComp,
         reunioes,
@@ -92,7 +97,8 @@ export const RegionalPendenciesOverview: React.FC<RegionalPendenciesOverviewProp
         ppp,
         acompSala,
         calendario,
-        conselhoClasse,
+        conselhoClasseF,
+        conselhoClasseI,
         reuniaoEstudantil,
         avaliacaoDocente,
         acompanhamentoDocente,
@@ -101,23 +107,28 @@ export const RegionalPendenciesOverview: React.FC<RegionalPendenciesOverviewProp
         dbCoordEscolas,
         dbCoordTurmas
       ] = await Promise.all([
-        safeFetchSet('planos_curso'),
-        safeFetchSet('planos_curso_infantil'),
-        safeFetchSet('aulas_ministradas'),
-        safeFetchSet('frequencias'),
-        safeFetchSet('conselho_classe_notas'),
-        safeFetchSet('atividades_complementares'),
+        safeFetchArray('planos_curso', 'id, created_by, updated_by'),
+        safeFetchArray('planos_curso_infantil', 'id, created_by, updated_by'),
+        safeFetchSet('guias_aprendizagem', ['escola_id']),
+        safeFetchSet('guias_aprendizagem_infantil', ['escola_id']),
+        safeFetchSet('aulas_ministradas', ['escola_id']),
+        safeFetchSet('aulas_ministradas_infantil', ['escola_id']),
+        safeFetchSet('frequencia_sheets', ['escola_id']),
+        safeFetchSet('frequencia_sheets_infantil', ['escola_id']),
+        safeFetchSet('notas_sheets', ['escola_id']),
+        safeFetchSet('atividades_complementares', ['escola_id']),
         safeFetchSet('ig_ciclo_reunioes', ['escola_id']),
         safeFetchSet('ig_plano_formacao', ['escola_id']),
         safeFetchSet('ig_proposta_pedagogica', ['escola_id']),
         safeFetchSet('ig_acompanhamento_sala', ['escola_id']),
         safeFetchSet('ig_calendario_interno', ['escola_id']),
-        safeFetchSet('conselhos_classe'),
-        safeFetchSet('ig_reuniao_estudantil', ['escola_id']),
-        safeFetchSet('avaliacao_docente_infantil', ['escola_id']),
-        safeFetchSet('acompanhamento_docente', ['escola_id']),
-        safeFetchSet('encaminhamentos', ['escola_id']),
-        safeFetchArray('coordenadores', 'id, funcao'),
+        safeFetchSet('cc_f_avaliacao', ['escola_id']),
+        safeFetchSet('cc_i_avaliacoes', ['escola_id']),
+        safeFetchSet('cc_reuniao_estudantil', ['escola_id']),
+        safeFetchSet('cc_avaliacao_docente', ['escola_id']),
+        safeFetchSet('cc_acompanhamento_docente', ['escola_id']),
+        safeFetchSet('cc_encaminhamentos_intervencoes', ['escola_id']),
+        safeFetchArray('coordenadores', 'id, funcao, nome, contato'),
         safeFetchArray('coordenador_escolas', 'coordenador_id, escola_id'),
         safeFetchArray('coordenador_turmas', 'coordenador_id, turma_id')
       ]);
@@ -145,10 +156,19 @@ export const RegionalPendenciesOverview: React.FC<RegionalPendenciesOverviewProp
         }
       });
 
+      // Mapeamento de professor / usuário para escolas associadas
+      const teacherEscolaMap: Record<string, string[]> = {};
+
       dbCoords.forEach((c: any) => {
+        const cid = String(c.id);
+        const schIds = c.escolas_ids || coordEscolaMap[cid] || [];
+        if (schIds.length > 0) {
+          teacherEscolaMap[cid.toLowerCase()] = schIds.map(String);
+          if (c.contato) teacherEscolaMap[String(c.contato).toLowerCase().trim()] = schIds.map(String);
+          if (c.nome) teacherEscolaMap[String(c.nome).toLowerCase().trim()] = schIds.map(String);
+        }
+
         if (c.funcao === 'Professor') {
-          const cid = String(c.id);
-          const schIds = c.escolas_ids || coordEscolaMap[cid] || [];
           const hasTurmas = (c.turmas_ids && c.turmas_ids.length > 0) || (coordTurmaCount[cid] && coordTurmaCount[cid] > 0);
 
           schIds.forEach((sid: any) => {
@@ -161,13 +181,41 @@ export const RegionalPendenciesOverview: React.FC<RegionalPendenciesOverviewProp
         }
       });
 
-      // Merge planos_curso
-      const guiasSet = new Set([...planosCurso, ...planosCursoInfantil]);
+      // Mapeia planos de curso para escolas via autor/professor (relação válida sem coluna escola_id inexistente)
+      const planosEscolasSet = new Set<string>();
+      [...planosCursoRaw, ...planosCursoInfantilRaw].forEach((p: any) => {
+        const creator = (p.created_by || p.updated_by || '').toLowerCase().trim();
+        if (creator && teacherEscolaMap[creator]) {
+          teacherEscolaMap[creator].forEach(sid => planosEscolasSet.add(sid));
+        }
+      });
+
+      // Merge guias de aprendizagem e planos_curso mapeados
+      const guiasSet = new Set([
+        ...guiasF,
+        ...guiasI,
+        ...planosEscolasSet
+      ]);
+
+      const aulasSet = new Set([
+        ...aulasMinistradasF,
+        ...aulasMinistradasI
+      ]);
+
+      const frequenciasSet = new Set([
+        ...frequenciasF,
+        ...frequenciasI
+      ]);
+
+      const conselhoClasseSet = new Set([
+        ...conselhoClasseF,
+        ...conselhoClasseI
+      ]);
 
       setDbData({
         guias: guiasSet,
-        aulas: aulasMinistradas,
-        frequencias,
+        aulas: aulasSet,
+        frequencias: frequenciasSet,
         notas,
         atividadesComp,
         reunioes,
@@ -175,7 +223,7 @@ export const RegionalPendenciesOverview: React.FC<RegionalPendenciesOverviewProp
         ppp,
         acompSala,
         calendario,
-        conselhoClasse,
+        conselhoClasse: conselhoClasseSet,
         reuniaoEstudantil,
         avaliacaoDocente,
         acompanhamentoDocente,
