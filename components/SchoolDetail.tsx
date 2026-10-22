@@ -257,7 +257,7 @@ export const SchoolDetail: React.FC<SchoolDetailProps> = ({ escola, coordenadore
       // Fetch turmas map for this school
       const { data: turmasData } = await supabase
         .from('turmas')
-        .select('id, name, year, shift, anoSerie, stage')
+        .select('id, name, year, shift, stage')
         .eq('school_id', escola.id)
         .range(0, 1999);
 

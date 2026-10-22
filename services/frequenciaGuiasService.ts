@@ -137,9 +137,13 @@ export const frequenciaGuiasService = {
       }
     }
 
+    const selectCols = options.isInfantil
+      ? 'id, data, escola_id, turma_id, ano_serie, periodo, students, ativo'
+      : 'id, data, escola_id, turma_id, componente, students, ativo';
+
     let query = supabase
       .from(table)
-      .select('id, data, escola_id, turma_id, componente, students, ativo')
+      .select(selectCols)
       .or('ativo.eq.true,ativo.is.null');
 
     if (options.turmaId) {

@@ -894,7 +894,7 @@ export const ccEncaminhamentosService = {
 
 // 10. Status de Avaliação por Etapa e Solicitações de Desbloqueio
 export const ccAvaliacaoEtapaService = {
-    async getStatus(escolaId: string, turmaId: string, periodo: string, stage: EducationalStage = 'fundamental', componenteCurricular?: string) {
+    async getStatus(escolaId: string, turmaId: string, periodo: string, stage: EducationalStage = 'fundamental', _componenteCurricular?: string) {
         const table = getTableName('status_etapa', stage);
         const requestsTable = getTableName('solicitacoes', stage);
         
@@ -904,10 +904,6 @@ export const ccAvaliacaoEtapaService = {
             .eq('escola_id', escolaId)
             .eq('turma_id', turmaId)
             .eq('periodo', periodo);
-
-        if (componenteCurricular && stage === 'fundamental') {
-            query = query.eq('componente_curricular', componenteCurricular);
-        }
 
         const { data, error } = await query.maybeSingle();
 
@@ -932,7 +928,7 @@ export const ccAvaliacaoEtapaService = {
         await logAudit('UPDATE', 'CONSELHO_STATUS_ETAPA', data.id, {
             status: data.status,
             periodo: data.periodo,
-            componente: data.componente_curricular
+            turma_id: data.turma_id
         });
         return data;
     },

@@ -178,13 +178,13 @@ export const AulasMinistradasInfantil: React.FC<AulasMinistradasInfantilProps> =
       // Also get turmas to map names
       const { data: allTurmas, error: turmasError } = await supabase
         .from('turmas')
-        .select('id, name, year, shift, anoSerie')
+        .select('id, name, year, shift')
         .range(0, 4999);
       
       const turmaMap = new Map<string, string>();
       if (!turmasError && allTurmas) {
         allTurmas.forEach((t: any) => {
-          turmaMap.set(String(t.id), `${t.name || t.anoSerie || t.year} • ${t.shift || t.turno || ''}`);
+          turmaMap.set(String(t.id), `${t.name || t.year} • ${t.shift || t.turno || ''}`);
         });
       }
 

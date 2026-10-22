@@ -22,18 +22,24 @@ export const logAccess = async (
         let uname = userName;
         let uid = userId;
         let uemail = userEmail;
+        let authUserId: string | null = null;
 
-        if (!uid || !uemail || !uname) {
+        try {
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
-                uid = uid || session.user.id;
+                authUserId = session.user.id;
                 uemail = uemail || session.user.email;
                 uname = uname || session.user.user_metadata?.full_name || session.user.email?.split('@')[0];
             }
+        } catch {
+            // sessao nao disponivel
         }
 
-        await supabase.from('access_logs').insert({
-            user_id: isValidUUID(uid) ? uid : null,
+        // Prioriza o auth.users(id) da sessão; se não houver, tenta o uid se for UUID válido
+        const targetUserId = authUserId || (isValidUUID(uid) ? uid : null);
+
+        const { error: insertError } = await supabase.from('access_logs').insert({
+            user_id: targetUserId,
             user_email: uemail,
             user_name: uname,
             action,
@@ -41,6 +47,20 @@ export const logAccess = async (
             user_agent: userAgent,
             ip_address: ipAddress
         });
+
+        // Se falhar por foreign key (23503), retenta com user_id null para garantir que o log nunca seja descartado
+        if (insertError) {
+            console.warn('Erro ao inserir access_logs com user_id. Retentando com user_id null:', insertError.message);
+            await supabase.from('access_logs').insert({
+                user_id: null,
+                user_email: uemail,
+                user_name: uname,
+                action,
+                status,
+                user_agent: userAgent,
+                ip_address: ipAddress
+            });
+        }
     } catch (error) {
         console.error('Error logging access:', error);
     }
@@ -56,29 +76,63 @@ export const logAudit = async (
     userName?: string
 ) => {
     try {
-        // If user info not passed, try to get from current session
         let uid = userId;
         let uemail = userEmail;
         let uname = userName;
+        let authUserId: string | null = null;
 
-        if (!uid || !uemail || !uname) {
+        try {
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
-                uid = uid || session.user.id;
+                authUserId = session.user.id;
                 uemail = uemail || session.user.email;
                 uname = uname || session.user.user_metadata?.full_name || session.user.email?.split('@')[0];
             }
+        } catch {
+            // sessao nao disponivel
         }
 
-        await supabase.from('audit_logs').insert({
-            user_id: isValidUUID(uid) ? uid : null,
+        // Prioriza auth.users(id) real da sessão; se não houver sessão ativa, usa uid se UUID válido
+        const targetUserId = authUserId || (isValidUUID(uid) ? uid : null);
+
+        // Se uid for diferente do authUserId (ex.: ID da tabela coordenadores), preserva em details
+        let auditDetails = details;
+        if (uid && uid !== authUserId) {
+            if (typeof details === 'object' && details !== null) {
+                auditDetails = { ...details, coordenador_id: uid };
+            } else {
+                auditDetails = { valor: details, coordenador_id: uid };
+            }
+        }
+
+        const { error: insertError } = await supabase.from('audit_logs').insert({
+            user_id: targetUserId,
             user_email: uemail,
             user_name: uname,
             action,
             module,
             record_id: recordId ? String(recordId) : null,
-            details,
+            details: auditDetails,
         });
+
+        // Se falhar por foreign key (23503) ou usuário sem registro em auth.users, retenta com user_id null
+        // Nenhum registro de auditoria é descartado!
+        if (insertError) {
+            console.warn('Erro ao inserir audit_logs com user_id. Retentando com user_id null:', insertError.message);
+            const fallbackDetails = typeof auditDetails === 'object' && auditDetails !== null
+                ? { ...auditDetails, tentativa_user_id: uid }
+                : { original_details: auditDetails, tentativa_user_id: uid };
+
+            await supabase.from('audit_logs').insert({
+                user_id: null,
+                user_email: uemail,
+                user_name: uname,
+                action,
+                module,
+                record_id: recordId ? String(recordId) : null,
+                details: fallbackDetails,
+            });
+        }
     } catch (error) {
         console.error('Error logging audit:', error);
     }
