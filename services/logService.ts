@@ -76,32 +76,43 @@ export const logAudit = async (
     userName?: string
 ) => {
     try {
-        let uid = userId;
+        const uid = userId;
         let uemail = userEmail;
         let uname = userName;
         let authUserId: string | null = null;
 
         try {
+            // Obtém usuário autenticado exclusivamente do Supabase Auth
             const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
+            if (session?.user) {
                 authUserId = session.user.id;
                 uemail = uemail || session.user.email;
                 uname = uname || session.user.user_metadata?.full_name || session.user.email?.split('@')[0];
+            } else {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    authUserId = user.id;
+                    uemail = uemail || user.email;
+                    uname = uname || user.user_metadata?.full_name || user.email?.split('@')[0];
+                }
             }
         } catch {
-            // sessao nao disponivel
+            // Sessão / Auth não disponível
         }
 
-        // Prioriza auth.users(id) real da sessão; se não houver sessão ativa, usa uid se UUID válido
-        const targetUserId = authUserId || (isValidUUID(uid) ? uid : null);
+        // 1 & 3: Para audit_logs.user_id usa SOMENTE o id do Supabase Auth.
+        // Nunca usa o uid (id de coordenador). Se não houver autenticado, grava null na primeira tentativa.
+        const targetUserId: string | null = authUserId || null;
 
-        // Se uid for diferente do authUserId (ex.: ID da tabela coordenadores), preserva em details
+        // 2: Se o parâmetro uid (id de coordenador) for informado, grava-o em details.coordenador_id
         let auditDetails = details;
-        if (uid && uid !== authUserId) {
-            if (typeof details === 'object' && details !== null) {
+        if (uid) {
+            if (typeof details === 'object' && details !== null && !Array.isArray(details)) {
                 auditDetails = { ...details, coordenador_id: uid };
-            } else {
+            } else if (details !== undefined && details !== null) {
                 auditDetails = { valor: details, coordenador_id: uid };
+            } else {
+                auditDetails = { coordenador_id: uid };
             }
         }
 
@@ -115,13 +126,13 @@ export const logAudit = async (
             details: auditDetails,
         });
 
-        // Se falhar por foreign key (23503) ou usuário sem registro em auth.users, retenta com user_id null
-        // Nenhum registro de auditoria é descartado!
+        // 4: Fallback apenas como proteção final, registrando em details.tentativa_user_id o id que falhou
         if (insertError) {
             console.warn('Erro ao inserir audit_logs com user_id. Retentando com user_id null:', insertError.message);
-            const fallbackDetails = typeof auditDetails === 'object' && auditDetails !== null
-                ? { ...auditDetails, tentativa_user_id: uid }
-                : { original_details: auditDetails, tentativa_user_id: uid };
+            const failedUserId = targetUserId || uid;
+            const fallbackDetails = typeof auditDetails === 'object' && auditDetails !== null && !Array.isArray(auditDetails)
+                ? { ...auditDetails, tentativa_user_id: failedUserId }
+                : { original_details: auditDetails, tentativa_user_id: failedUserId };
 
             await supabase.from('audit_logs').insert({
                 user_id: null,
