@@ -83,24 +83,45 @@ export const PrintableAlertasPendenciasReport: React.FC<PrintableAlertasPendenci
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm overflow-y-auto flex items-start justify-center p-2 md:p-6 animate-fade-in">
+    <div className="printable-modal-overlay fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm overflow-y-auto flex items-start justify-center p-2 md:p-6 animate-fade-in print:p-0 print:m-0 print:bg-white print:static print:overflow-visible print:block">
       <style>
         {`
           @media print {
+            html, body {
+              height: auto !important;
+              overflow: visible !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              background: white !important;
+            }
             body * {
               visibility: hidden !important;
+            }
+            .printable-modal-overlay {
+              position: static !important;
+              display: block !important;
+              width: 100% !important;
+              height: auto !important;
+              overflow: visible !important;
+              padding: 0 !important;
+              margin: 0 !important;
+              background: transparent !important;
+              visibility: visible !important;
             }
             .printable-notificacoes-container, .printable-notificacoes-container * {
               visibility: visible !important;
             }
             .printable-notificacoes-container {
-              position: absolute !important;
-              left: 0 !important;
-              top: 0 !important;
+              position: static !important;
+              display: block !important;
               width: 100% !important;
+              max-width: 100% !important;
               margin: 0 !important;
               padding: 0 !important;
+              border: none !important;
+              border-radius: 0 !important;
               box-shadow: none !important;
+              overflow: visible !important;
               background: white !important;
             }
             .no-print {
@@ -108,11 +129,15 @@ export const PrintableAlertasPendenciasReport: React.FC<PrintableAlertasPendenci
             }
             @page {
               size: A4 ${orientacao};
-              margin: ${orientacao === 'landscape' ? '1cm' : '1.5cm'};
+              margin: ${orientacao === 'landscape' ? '8mm' : '8mm'};
             }
             .page-break {
               page-break-after: always !important;
               break-after: page !important;
+            }
+            .print-avoid-break {
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
             }
             tr {
               page-break-inside: avoid !important;
@@ -121,7 +146,7 @@ export const PrintableAlertasPendenciasReport: React.FC<PrintableAlertasPendenci
         `}
       </style>
 
-      <div className="printable-notificacoes-container bg-white text-slate-900 w-full max-w-6xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200 my-4 flex flex-col">
+      <div className="printable-notificacoes-container bg-white text-slate-900 w-full max-w-6xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200 my-4 flex flex-col print:m-0 print:p-0 print:max-w-none print:shadow-none print:border-none print:rounded-none print:overflow-visible">
         
         {/* ====== ACTIONS TOOLBAR (NO PRINT) ====== */}
         <div className="no-print bg-slate-900 text-white px-5 py-3.5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-800">
@@ -420,7 +445,7 @@ export const PrintableAlertasPendenciasReport: React.FC<PrintableAlertasPendenci
             /* =============================================================== */
             /* MODO 2: NOTIFICAÇÃO FORMAL INDIVIDUAL / EM LOTE (OFÍCIO FORMAL) */
             /* =============================================================== */
-            <div className="space-y-12">
+            <div className="space-y-12 print:space-y-0">
               {items.map((item, idx) => {
                 const { days, isOverdue } = getDaysDifference(item.prazo);
                 const color = getStatusColor(item.status);
@@ -429,50 +454,50 @@ export const PrintableAlertasPendenciasReport: React.FC<PrintableAlertasPendenci
                 return (
                   <div 
                     key={item.id} 
-                    className={`bg-white rounded-xl border border-slate-300 p-8 md:p-12 text-slate-900 space-y-6 ${
-                      idx < items.length - 1 ? 'page-break mb-8' : ''
+                    className={`bg-white rounded-xl border border-slate-300 p-6 md:p-8 text-slate-900 space-y-3.5 print:p-5 print:space-y-2.5 print:border-slate-300 print:rounded-lg ${
+                      idx < items.length - 1 ? 'page-break mb-8 print:mb-0' : ''
                     }`}
                   >
                     {/* Header */}
-                    <div className="text-center pb-5 border-b-2 border-slate-900">
-                      <p className="text-[8.5px] font-bold tracking-[0.25em] text-slate-500 uppercase mb-0.5">
+                    <div className="text-center pb-3 border-b-2 border-slate-900 print:pb-2">
+                      <p className="text-[8px] font-bold tracking-[0.25em] text-slate-500 uppercase mb-0.5">
                         ESTADO DO MARANHÃO
                       </p>
-                      <p className="text-xs font-black tracking-[0.15em] text-slate-900 uppercase mb-0.5">
+                      <p className="text-[11px] font-black tracking-[0.15em] text-slate-900 uppercase mb-0.5">
                         PREFEITURA MUNICIPAL DE HUMBERTO DE CAMPOS
                       </p>
-                      <p className="text-[9.5px] font-bold tracking-[0.2em] text-slate-600 uppercase mb-4">
+                      <p className="text-[8.5px] font-bold tracking-[0.2em] text-slate-600 uppercase mb-2 print:mb-1.5">
                         SECRETARIA MUNICIPAL DE EDUCAÇÃO • SISTEMA INTEGRADO DE GESTÃO (SIGAR)
                       </p>
-                      <div className="w-16 h-0.5 bg-orange-500 mx-auto mb-3" />
-                      <h2 className="text-base md:text-lg font-black uppercase tracking-tight text-slate-900">
+                      <div className="w-16 h-0.5 bg-orange-500 mx-auto mb-2 print:mb-1.5" />
+                      <h2 className="text-sm md:text-base font-black uppercase tracking-tight text-slate-900 print:text-sm">
                         Notificação Formal de Pendência Operacional
                       </h2>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">
+                      <p className="text-[9.5px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">
                         Protocolo Oficial: <strong>{protocolo}</strong>
                       </p>
                     </div>
 
                     {/* Meta Banner */}
-                    <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-3 p-2.5 bg-slate-50 rounded-lg border border-slate-200 text-xs print:p-2 print:text-[11px]">
                       <div>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase block">Data de Identificação</span>
+                        <span className="text-[8.5px] font-bold text-slate-400 uppercase block">Data de Identificação</span>
                         <span className="font-bold text-slate-800">
                           {new Date(item.data_identificacao).toLocaleDateString('pt-BR')}
                         </span>
                       </div>
                       <div>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase block">Módulo do Sistema</span>
+                        <span className="text-[8.5px] font-bold text-slate-400 uppercase block">Módulo do Sistema</span>
                         <span className="font-bold text-slate-800">{item.modulo}</span>
                       </div>
                       <div>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase block">Prioridade</span>
+                        <span className="text-[8.5px] font-bold text-slate-400 uppercase block">Prioridade</span>
                         <span className="font-bold text-rose-700">Prioridade {item.prioridade}</span>
                       </div>
                       <div>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase block">Situação</span>
+                        <span className="text-[8.5px] font-bold text-slate-400 uppercase block">Situação</span>
                         <span 
-                          className="px-2 py-0.5 rounded text-[9px] font-black uppercase inline-block border"
+                          className="px-2 py-0.5 rounded text-[8.5px] font-black uppercase inline-block border"
                           style={{ backgroundColor: color.bg, color: color.text, borderColor: color.border }}
                         >
                           {getStatusBadgeText(item.status)}
@@ -481,27 +506,27 @@ export const PrintableAlertasPendenciasReport: React.FC<PrintableAlertasPendenci
                     </div>
 
                     {/* Notified Person Box */}
-                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2 text-xs">
-                      <h3 className="font-black text-slate-900 uppercase text-[11px] tracking-wider border-b border-slate-200 pb-1 flex items-center justify-between">
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-1.5 text-xs print:p-2.5 print:space-y-1">
+                      <h3 className="font-black text-slate-900 uppercase text-[10.5px] tracking-wider border-b border-slate-200 pb-1 flex items-center justify-between">
                         <span>1. Dados do(a) Servidor(a) Notificado(a)</span>
-                        <span className="text-[9px] font-semibold text-slate-500 normal-case">Destinatário Principal</span>
+                        <span className="text-[8.5px] font-semibold text-slate-500 normal-case">Destinatário Principal</span>
                       </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-0.5 print:gap-1.5">
                         <div>
-                          <span className="text-[9px] font-bold text-slate-400 uppercase block">Nome do Servidor</span>
-                          <strong className="text-slate-900 text-sm">{item.usuario_nome || 'Não especificado'}</strong>
+                          <span className="text-[8.5px] font-bold text-slate-400 uppercase block">Nome do Servidor</span>
+                          <strong className="text-slate-900 text-xs print:text-[11px]">{item.usuario_nome || 'Não especificado'}</strong>
                         </div>
                         <div>
-                          <span className="text-[9px] font-bold text-slate-400 uppercase block">Função / Perfil</span>
-                          <span className="font-semibold text-slate-800">{item.usuario_perfil || 'Servidor da Educação'}</span>
+                          <span className="text-[8.5px] font-bold text-slate-400 uppercase block">Função / Perfil</span>
+                          <span className="font-semibold text-slate-800 text-[11px]">{item.usuario_perfil || 'Servidor da Educação'}</span>
                         </div>
                         <div>
-                          <span className="text-[9px] font-bold text-slate-400 uppercase block">Unidade Escolar</span>
-                          <span className="font-semibold text-slate-800">{item.escola_nome}</span>
+                          <span className="text-[8.5px] font-bold text-slate-400 uppercase block">Unidade Escolar</span>
+                          <span className="font-semibold text-slate-800 text-[11px]">{item.escola_nome}</span>
                         </div>
                         <div>
-                          <span className="text-[9px] font-bold text-slate-400 uppercase block">Turma & Componente Curricular</span>
-                          <span className="font-semibold text-slate-800">
+                          <span className="text-[8.5px] font-bold text-slate-400 uppercase block">Turma & Componente Curricular</span>
+                          <span className="font-semibold text-slate-800 text-[11px]">
                             {item.turma_nome || 'Geral'} {item.componente ? `• ${item.componente}` : ''}
                           </span>
                         </div>
@@ -509,26 +534,26 @@ export const PrintableAlertasPendenciasReport: React.FC<PrintableAlertasPendenci
                     </div>
 
                     {/* Pending Details Box */}
-                    <div className="p-4 bg-orange-50/40 rounded-xl border border-orange-200/80 space-y-2 text-xs">
-                      <h3 className="font-black text-slate-900 uppercase text-[11px] tracking-wider border-b border-orange-200 pb-1 flex items-center justify-between">
+                    <div className="p-3 bg-orange-50/40 rounded-lg border border-orange-200/80 space-y-1.5 text-xs print:p-2.5 print:space-y-1">
+                      <h3 className="font-black text-slate-900 uppercase text-[10.5px] tracking-wider border-b border-orange-200 pb-1 flex items-center justify-between">
                         <span>2. Discriminação da Pendência Operacional</span>
-                        <span className="text-[9px] font-bold text-orange-700 uppercase">{item.periodo || 'Período Letivo'}</span>
+                        <span className="text-[8.5px] font-bold text-orange-700 uppercase">{item.periodo || 'Período Letivo'}</span>
                       </h3>
-                      <div className="space-y-2 pt-1">
+                      <div className="space-y-1.5 pt-0.5 print:space-y-1">
                         <div>
-                          <span className="text-[9px] font-bold text-slate-500 uppercase block">Assunto / Demanda</span>
-                          <strong className="text-slate-900 text-sm">{item.titulo}</strong>
+                          <span className="text-[8.5px] font-bold text-slate-500 uppercase block">Assunto / Demanda</span>
+                          <strong className="text-slate-900 text-xs print:text-[11px]">{item.titulo}</strong>
                         </div>
                         <div>
-                          <span className="text-[9px] font-bold text-slate-500 uppercase block">Descrição e Ocorrência Verificada</span>
-                          <p className="text-slate-700 leading-relaxed font-medium bg-white p-3 rounded-lg border border-orange-100">
+                          <span className="text-[8.5px] font-bold text-slate-500 uppercase block">Descrição e Ocorrência Verificada</span>
+                          <p className="text-slate-700 leading-relaxed font-medium bg-white p-2.5 rounded border border-orange-100 text-[11px] print:p-2 print:text-[10px]">
                             {item.descricao}
                           </p>
                         </div>
                         {item.observacao_alerta && (
                           <div>
-                            <span className="text-[9px] font-bold text-slate-500 uppercase block">Orientações Complementares da Coordenação</span>
-                            <p className="text-slate-800 italic bg-amber-50 p-2.5 rounded-lg border border-amber-200">
+                            <span className="text-[8.5px] font-bold text-slate-500 uppercase block">Orientações Complementares da Coordenação</span>
+                            <p className="text-slate-800 italic bg-amber-50 p-2 rounded border border-amber-200 text-[10.5px] print:p-1.5 print:text-[9.5px]">
                               "{item.observacao_alerta}"
                             </p>
                           </div>
@@ -537,31 +562,31 @@ export const PrintableAlertasPendenciasReport: React.FC<PrintableAlertasPendenci
                     </div>
 
                     {/* Deadline and Administrative Instructions */}
-                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2 text-xs">
-                      <h3 className="font-black text-slate-900 uppercase text-[11px] tracking-wider border-b border-slate-200 pb-1">
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2 text-xs print:p-2.5 print:space-y-1.5">
+                      <h3 className="font-black text-slate-900 uppercase text-[10.5px] tracking-wider border-b border-slate-200 pb-1">
                         3. Prazo e Determinações Administrativas
                       </h3>
-                      <div className="space-y-3 pt-1">
-                        <div className="flex items-center justify-between bg-white p-3 rounded-lg border border-slate-200">
+                      <div className="space-y-2 pt-0.5 print:space-y-1.5">
+                        <div className="flex items-center justify-between bg-white p-2.5 rounded border border-slate-200 print:p-2">
                           <div>
-                            <span className="text-[9px] font-bold text-slate-400 uppercase block">Prazo Impreterível para Regularização</span>
-                            <span className="text-base font-black text-slate-900">
+                            <span className="text-[8.5px] font-bold text-slate-400 uppercase block">Prazo Impreterível para Regularização</span>
+                            <span className="text-sm font-black text-slate-900 print:text-xs">
                               {item.prazo ? new Date(item.prazo + 'T00:00:00').toLocaleDateString('pt-BR') : 'Imediato (em até 48 horas)'}
                             </span>
                           </div>
                           {item.prazo && (
-                            <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full ${isOverdue ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'}`}>
+                            <span className={`text-[9.5px] font-black uppercase px-2 py-0.5 rounded-full ${isOverdue ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'}`}>
                               {isOverdue ? `Atraso de ${days} dias` : `${days} dias restantes`}
                             </span>
                           )}
                         </div>
 
-                        <p className="text-[11px] text-slate-600 leading-relaxed text-justify">
+                        <p className="text-[10.5px] text-slate-600 leading-relaxed text-justify print:text-[9.5px]">
                           Fica o(a) servidor(a) formalmente <strong>NOTIFICADO(A)</strong> a regularizar os lançamentos e registros escolares devidos no sistema informatizado dentro do prazo estipulado. O não atendimento implicará no encaminhamento do relatório de pendências à Direção Escolar e à Secretaria Municipal de Educação para as providências administrativas e regimentais cabíveis.
                         </p>
 
                         {item.co_responsaveis_nomes && (
-                          <div className="text-[10px] text-slate-500 bg-white p-2 rounded-lg border border-slate-100">
+                          <div className="text-[9.5px] text-slate-500 bg-white p-2 rounded border border-slate-100 print:text-[8.5px] print:p-1.5">
                             <strong>Em Cópia / Co-responsáveis Institucionais:</strong> {item.co_responsaveis_nomes}
                           </div>
                         )}
@@ -569,40 +594,40 @@ export const PrintableAlertasPendenciasReport: React.FC<PrintableAlertasPendenci
                     </div>
 
                     {/* Term of Acknowledgment & Signatures */}
-                    <div className="pt-6 space-y-8">
-                      <div className="p-4 bg-slate-50 rounded-xl border border-slate-300 text-xs">
-                        <p className="font-bold text-slate-800 uppercase text-[10px] tracking-wide mb-1">
+                    <div className="pt-2 space-y-4 print:pt-1.5 print:space-y-3 print-avoid-break">
+                      <div className="p-3 bg-slate-50 rounded-lg border border-slate-300 text-xs print:p-2.5">
+                        <p className="font-bold text-slate-800 uppercase text-[9.5px] tracking-wide mb-1">
                           Termo de Ciência e Recebimento
                         </p>
-                        <p className="text-[10.5px] text-slate-600 leading-relaxed text-justify mb-4">
+                        <p className="text-[9.5px] text-slate-600 leading-relaxed text-justify mb-3 print:text-[9px] print:mb-2">
                           Declaro que recebi e tomei ciência dos termos da presente Notificação de Pendência Operacional, comprometendo-me a adotar as providências necessárias para sua regularização dentro do prazo concedido.
                         </p>
-                        <div className="grid grid-cols-2 gap-8 pt-4">
+                        <div className="grid grid-cols-2 gap-6 pt-2 print:gap-4 print:pt-1">
                           <div>
-                            <div className="border-b border-slate-400 pb-1 text-slate-400 text-[10px]">
+                            <div className="border-b border-slate-400 pb-1 text-slate-400 text-[9px]">
                               Data: _____ / _____ / {currentYear}
                             </div>
                           </div>
                           <div>
-                            <div className="border-b border-slate-400 pb-1 text-center font-bold text-slate-700 text-[10px]">
+                            <div className="border-b border-slate-400 pb-1 text-center font-bold text-slate-700 text-[9px]">
                               Assinatura do(a) Servidor(a) Notificado(a)
                             </div>
                           </div>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-8 text-center pt-2">
+                      <div className="grid grid-cols-2 gap-6 text-center pt-1 print:gap-4 print:pt-0.5">
                         <div>
-                          <div className="border-t border-slate-800 mx-auto w-4/5 pt-1.5 font-bold uppercase text-slate-800 text-[10px]">
+                          <div className="border-t border-slate-800 mx-auto w-4/5 pt-1 font-bold uppercase text-slate-800 text-[9.5px] print:text-[9px]">
                             Coordenação Pedagógica / Direção
                           </div>
-                          <span className="text-[9px] text-slate-500">Notificante</span>
+                          <span className="text-[8.5px] text-slate-500">Notificante</span>
                         </div>
                         <div>
-                          <div className="border-t border-slate-800 mx-auto w-4/5 pt-1.5 font-bold uppercase text-slate-800 text-[10px]">
+                          <div className="border-t border-slate-800 mx-auto w-4/5 pt-1 font-bold uppercase text-slate-800 text-[9.5px] print:text-[9px]">
                             Secretaria Municipal de Educação
                           </div>
-                          <span className="text-[9px] text-slate-500">Monitoramento Regional • SIGAR</span>
+                          <span className="text-[8.5px] text-slate-500">Monitoramento Regional • SIGAR</span>
                         </div>
                       </div>
                     </div>

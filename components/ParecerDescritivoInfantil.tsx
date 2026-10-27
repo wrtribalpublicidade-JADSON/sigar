@@ -826,101 +826,255 @@ export const ParecerDescritivoInfantil: React.FC<ParecerDescritivoInfantilProps>
 
       {/* Printable Area - Hidden on Screen */}
       {printEntry && createPortal(
-        <div id="print-report" className="hidden print:block bg-white p-8 text-black text-xs font-sans text-left">
-          <div className="text-center border-b pb-4 mb-6">
-            <h1 className="text-lg font-black tracking-tight">SISTEMA INTEGRADO DE GESTÃO DE APRENDIZAGEM (SIGAR)</h1>
-            <p className="text-[10px] text-gray-500 uppercase font-bold mt-1">Parecer Descritivo do Desenvolvimento Individual - Educação Infantil</p>
+        <div id="print-report" className="hidden print:block bg-white text-slate-900" style={{ fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif" }}>
+
+          {/* ====== INSTITUTIONAL HEADER ====== */}
+          <div className="text-center mb-3 pb-3" style={{ borderBottom: '2pt solid #0f172a' }}>
+            <p style={{ fontSize: '8pt', fontWeight: 700, letterSpacing: '0.25em', textTransform: 'uppercase', color: '#64748b', marginBottom: '2pt' }}>
+              ESTADO DO MARANHÃO
+            </p>
+            <p style={{ fontSize: '10pt', fontWeight: 900, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#0f172a', marginBottom: '2pt' }}>
+              PREFEITURA MUNICIPAL DE HUMBERTO DE CAMPOS
+            </p>
+            <p style={{ fontSize: '8pt', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#64748b', marginBottom: '10pt' }}>
+              SECRETARIA MUNICIPAL DE EDUCAÇÃO
+            </p>
+            <div style={{ width: '60pt', height: '1.5pt', background: '#f97316', margin: '0 auto 6pt' }} />
+            <h1 style={{ fontSize: '14pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#0f172a', margin: '0 0 4pt' }}>
+              Parecer Descritivo do Desenvolvimento Individual
+            </h1>
+            <p style={{ fontSize: '8pt', fontWeight: 700, color: '#64748b', letterSpacing: '0.15em', textTransform: 'uppercase' }}>
+              Educação Infantil — Avaliação e Acompanhamento Pedagógico
+            </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mb-6 border p-4 rounded-lg bg-gray-50 text-[11px]">
+          {/* ====== PROTOCOL & EMISSION ====== */}
+          <div className="print-avoid-break" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6pt 10pt', background: '#f8fafc', border: '0.5pt solid #e2e8f0', marginBottom: '10pt' }}>
             <div>
-              <p><strong>Unidade Escolar:</strong> {printEntry.escolaNome}</p>
-              <p><strong>Grupo/Faixa Etária:</strong> {printEntry.anoSerie}</p>
-              <p><strong>Turma:</strong> {printEntry.turmaNome}</p>
-            </div>
-            <div>
-              <p><strong>Estudante:</strong> <strong className="text-slate-800 uppercase">{printEntry.alunoNome}</strong></p>
-              <p><strong>Período Avaliativo:</strong> {printEntry.periodo}</p>
-              <p><strong>Status:</strong> {printEntry.aspectos.status || 'Finalizado'}</p>
-              <p><strong>Data de Emissão:</strong> {new Date().toLocaleDateString('pt-BR')}</p>
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            {/* Areas of Development */}
-            <div className="grid grid-cols-1 gap-4">
-              <div>
-                <h3 className="font-bold text-xs border-b pb-1 mb-2 uppercase text-slate-800">Desenvolvimento Cognitivo</h3>
-                <p className="whitespace-pre-wrap leading-relaxed text-[11px] text-slate-700 bg-slate-50/50 p-2.5 rounded border border-slate-100 min-h-[40px]">
-                  {printEntry.aspectos.cognitivo || 'Nenhum registro.'}
-                </p>
-              </div>
-
-              <div>
-                <h3 className="font-bold text-xs border-b pb-1 mb-2 uppercase text-slate-800">Desenvolvimento Socioemocional</h3>
-                <p className="whitespace-pre-wrap leading-relaxed text-[11px] text-slate-700 bg-slate-50/50 p-2.5 rounded border border-slate-100 min-h-[40px]">
-                  {printEntry.aspectos.socioemocional || 'Nenhum registro.'}
-                </p>
-              </div>
-
-              <div>
-                <h3 className="font-bold text-xs border-b pb-1 mb-2 uppercase text-slate-800">Desenvolvimento Motor</h3>
-                <p className="whitespace-pre-wrap leading-relaxed text-[11px] text-slate-700 bg-slate-50/50 p-2.5 rounded border border-slate-100 min-h-[40px]">
-                  {printEntry.aspectos.motor || 'Nenhum registro.'}
-                </p>
-              </div>
-
-              <div>
-                <h3 className="font-bold text-xs border-b pb-1 mb-2 uppercase text-slate-800">Desenvolvimento de Linguagem</h3>
-                <p className="whitespace-pre-wrap leading-relaxed text-[11px] text-slate-700 bg-slate-50/50 p-2.5 rounded border border-slate-100 min-h-[40px]">
-                  {printEntry.aspectos.linguagem || 'Nenhum registro.'}
-                </p>
-              </div>
-            </div>
-
-            {/* Strengths & Areas to Develop */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <h3 className="font-bold text-xs border-b pb-1 mb-2 uppercase text-slate-800">Pontos Fortes</h3>
-                <p className="whitespace-pre-wrap leading-relaxed text-[11px] text-slate-700 bg-slate-50/50 p-2.5 rounded border border-slate-100 min-h-[40px]">
-                  {printEntry.aspectos.pontosFortes || 'Nenhum registro.'}
-                </p>
-              </div>
-
-              <div>
-                <h3 className="font-bold text-xs border-b pb-1 mb-2 uppercase text-slate-800">Áreas a Desenvolver</h3>
-                <p className="whitespace-pre-wrap leading-relaxed text-[11px] text-slate-700 bg-slate-50/50 p-2.5 rounded border border-slate-100 min-h-[40px]">
-                  {printEntry.aspectos.areasDesenvolver || 'Nenhum registro.'}
-                </p>
-              </div>
-            </div>
-
-            {/* Recommendations for family */}
-            <div>
-              <h3 className="font-bold text-xs border-b pb-1 mb-2 uppercase text-slate-800">Recomendações para a Família</h3>
-              <p className="whitespace-pre-wrap leading-relaxed text-[11px] text-slate-700 bg-slate-50/50 p-2.5 rounded border border-slate-100 min-h-[40px]">
-                {printEntry.aspectos.recomendacoesFamilia || 'Nenhum registro.'}
+              <p style={{ fontSize: '7pt', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: '2pt' }}>
+                Identificação do Documento
+              </p>
+              <p style={{ fontSize: '12pt', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.01em' }}>
+                REG. Nº {printEntry.id ? String(printEntry.id).split('-')[0].toUpperCase() : 'REF'}/{new Date().getFullYear()}
               </p>
             </div>
-
-            {/* General Report */}
-            <div>
-              <h3 className="font-bold text-xs border-b pb-1 mb-2 uppercase text-slate-800">Parecer Geral</h3>
-              <p className="whitespace-pre-wrap leading-relaxed text-[11px] text-slate-700 bg-slate-50/50 p-2.5 rounded border border-slate-100 min-h-[40px]">
-                {printEntry.parecer || 'Nenhum registro.'}
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ fontSize: '7pt', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: '2pt' }}>
+                Situação do Registro
+              </p>
+              <span style={{
+                display: 'inline-block',
+                padding: '2pt 8pt',
+                borderRadius: '10pt',
+                fontSize: '7.5pt',
+                fontWeight: 900,
+                letterSpacing: '0.05em',
+                textTransform: 'uppercase',
+                backgroundColor: (printEntry.aspectos?.status === 'Finalizado' || !printEntry.aspectos?.status) ? '#dcfce7' : '#fef3c7',
+                color: (printEntry.aspectos?.status === 'Finalizado' || !printEntry.aspectos?.status) ? '#166534' : '#92400e',
+                border: (printEntry.aspectos?.status === 'Finalizado' || !printEntry.aspectos?.status) ? '0.5pt solid #bbf7d0' : '0.5pt solid #fde68a'
+              }}>
+                {printEntry.aspectos?.status || 'FINALIZADO'}
+              </span>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{ fontSize: '7pt', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: '2pt' }}>
+                Emissão do Sistema
+              </p>
+              <p style={{ fontSize: '9pt', fontWeight: 600, color: '#475569', fontFamily: "'JetBrains Mono', monospace" }}>
+                {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
               </p>
             </div>
           </div>
 
-          <div className="mt-16 grid grid-cols-2 gap-8 text-center pt-8 border-t text-[10px]">
-            <div>
-              <div className="border-t border-black w-48 mx-auto mt-6"></div>
-              <p className="font-bold mt-1">Professor(a) Responsável</p>
+          {/* ====== IDENTIFICATION BLOCK ====== */}
+          <div className="print-avoid-break" style={{ marginBottom: '12pt' }}>
+            <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', background: '#0f172a', color: '#fff', padding: '5pt 10pt', marginBottom: '0' }}>
+              Dados de Identificação
             </div>
-            <div>
-              <div className="border-t border-black w-48 mx-auto mt-6"></div>
-              <p className="font-bold mt-1">Equipe Pedagógica / Direção</p>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <tbody>
+                {printEntry.escolaNome && (
+                  <tr>
+                    <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', width: '22%', background: '#f8fafc' }}>
+                      Unidade Escolar
+                    </td>
+                    <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9.5pt', fontWeight: 700, color: '#0f172a' }} colSpan={3}>
+                      {printEntry.escolaNome}
+                    </td>
+                  </tr>
+                )}
+                <tr>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', width: '22%', background: '#f8fafc' }}>
+                    Criança / Estudante
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '10pt', fontWeight: 700, color: '#0f172a' }} colSpan={3}>
+                    {printEntry.alunoNome || '—'}
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc', width: '22%' }}>
+                    Grupo / Faixa Etária
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 600, color: '#0f172a', width: '28%' }}>
+                    {printEntry.anoSerie || '—'}
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc', width: '22%' }}>
+                    Turma / Turno
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 600, color: '#334155', width: '28%' }}>
+                    {printEntry.turmaNome || '—'}
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc' }}>
+                    Período Avaliativo
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 600, color: '#334155' }}>
+                    {printEntry.periodo || '—'}
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontWeight: 800, fontSize: '7pt', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', background: '#f8fafc' }}>
+                    Data do Registro
+                  </td>
+                  <td style={{ padding: '6pt 10pt', border: '0.5pt solid #e2e8f0', fontSize: '9pt', fontWeight: 600, color: '#334155' }}>
+                    {printEntry.criadoEm ? new Date(printEntry.criadoEm).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR')}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* ====== AREAS OF DEVELOPMENT ====== */}
+          <div className="space-y-3">
+            {/* Desenvolvimento Cognitivo */}
+            <div className="print-avoid-break">
+              <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', background: '#0f172a', color: '#fff', padding: '5pt 10pt' }}>
+                Desenvolvimento Cognitivo
+              </div>
+              <div style={{ padding: '8pt 12pt', border: '0.5pt solid #e2e8f0', borderTop: 'none', fontSize: '9pt', color: '#334155', lineHeight: '1.6', minHeight: '30pt', textAlign: 'justify' }}>
+                <p className="whitespace-pre-wrap" style={{ margin: 0 }}>
+                  {printEntry.aspectos?.cognitivo || 'Nenhum registro informado.'}
+                </p>
+              </div>
             </div>
+
+            {/* Desenvolvimento Socioemocional */}
+            <div className="print-avoid-break">
+              <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', background: '#0f172a', color: '#fff', padding: '5pt 10pt' }}>
+                Desenvolvimento Socioemocional
+              </div>
+              <div style={{ padding: '8pt 12pt', border: '0.5pt solid #e2e8f0', borderTop: 'none', fontSize: '9pt', color: '#334155', lineHeight: '1.6', minHeight: '30pt', textAlign: 'justify' }}>
+                <p className="whitespace-pre-wrap" style={{ margin: 0 }}>
+                  {printEntry.aspectos?.socioemocional || 'Nenhum registro informado.'}
+                </p>
+              </div>
+            </div>
+
+            {/* Desenvolvimento Motor */}
+            <div className="print-avoid-break">
+              <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', background: '#0f172a', color: '#fff', padding: '5pt 10pt' }}>
+                Desenvolvimento Motor
+              </div>
+              <div style={{ padding: '8pt 12pt', border: '0.5pt solid #e2e8f0', borderTop: 'none', fontSize: '9pt', color: '#334155', lineHeight: '1.6', minHeight: '30pt', textAlign: 'justify' }}>
+                <p className="whitespace-pre-wrap" style={{ margin: 0 }}>
+                  {printEntry.aspectos?.motor || 'Nenhum registro informado.'}
+                </p>
+              </div>
+            </div>
+
+            {/* Desenvolvimento de Linguagem */}
+            <div className="print-avoid-break">
+              <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', background: '#0f172a', color: '#fff', padding: '5pt 10pt' }}>
+                Desenvolvimento de Linguagem
+              </div>
+              <div style={{ padding: '8pt 12pt', border: '0.5pt solid #e2e8f0', borderTop: 'none', fontSize: '9pt', color: '#334155', lineHeight: '1.6', minHeight: '30pt', textAlign: 'justify' }}>
+                <p className="whitespace-pre-wrap" style={{ margin: 0 }}>
+                  {printEntry.aspectos?.linguagem || 'Nenhum registro informado.'}
+                </p>
+              </div>
+            </div>
+
+            {/* Pontos Fortes e Áreas a Desenvolver */}
+            <div className="print-avoid-break" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10pt' }}>
+              <div>
+                <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', background: '#0f172a', color: '#fff', padding: '5pt 10pt' }}>
+                  Pontos Fortes
+                </div>
+                <div style={{ padding: '8pt 12pt', border: '0.5pt solid #e2e8f0', borderTop: 'none', fontSize: '9pt', color: '#334155', lineHeight: '1.6', minHeight: '30pt', textAlign: 'justify' }}>
+                  <p className="whitespace-pre-wrap" style={{ margin: 0 }}>
+                    {printEntry.aspectos?.pontosFortes || 'Nenhum registro informado.'}
+                  </p>
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', background: '#0f172a', color: '#fff', padding: '5pt 10pt' }}>
+                  Áreas a Desenvolver
+                </div>
+                <div style={{ padding: '8pt 12pt', border: '0.5pt solid #e2e8f0', borderTop: 'none', fontSize: '9pt', color: '#334155', lineHeight: '1.6', minHeight: '30pt', textAlign: 'justify' }}>
+                  <p className="whitespace-pre-wrap" style={{ margin: 0 }}>
+                    {printEntry.aspectos?.areasDesenvolver || 'Nenhum registro informado.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Recomendações para a Família */}
+            <div className="print-avoid-break">
+              <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', background: '#0f172a', color: '#fff', padding: '5pt 10pt' }}>
+                Recomendações para a Família
+              </div>
+              <div style={{ padding: '8pt 12pt', border: '0.5pt solid #e2e8f0', borderTop: 'none', fontSize: '9pt', color: '#334155', lineHeight: '1.6', minHeight: '30pt', textAlign: 'justify' }}>
+                <p className="whitespace-pre-wrap" style={{ margin: 0 }}>
+                  {printEntry.aspectos?.recomendacoesFamilia || 'Nenhum registro informado.'}
+                </p>
+              </div>
+            </div>
+
+            {/* Parecer Geral */}
+            <div className="print-avoid-break">
+              <div style={{ fontSize: '8pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', background: '#0f172a', color: '#fff', padding: '5pt 10pt' }}>
+                Parecer Geral Conclusivo
+              </div>
+              <div style={{ padding: '8pt 12pt', border: '0.5pt solid #e2e8f0', borderTop: 'none', fontSize: '9pt', color: '#334155', lineHeight: '1.6', minHeight: '35pt', textAlign: 'justify' }}>
+                <p className="whitespace-pre-wrap" style={{ margin: 0 }}>
+                  {printEntry.parecer || 'Nenhum parecer geral registrado.'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* ====== SIGNATURES ====== */}
+          <div className="print-signatures" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40pt', paddingTop: '24pt', marginTop: '16pt' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ borderTop: '1.5pt solid #0f172a', width: '100%', marginBottom: '6pt' }} />
+              <p style={{ fontSize: '9pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#0f172a', marginBottom: '2pt' }}>
+                Professor(a) Responsável
+              </p>
+              <p style={{ fontSize: '7pt', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#64748b', fontFamily: "'JetBrains Mono', monospace", marginBottom: '2pt' }}>
+                DOCENTE DA EDUCAÇÃO INFANTIL
+              </p>
+              <p style={{ fontSize: '7pt', color: '#94a3b8', fontStyle: 'italic' }}>
+                Assinatura e Carimbo
+              </p>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ borderTop: '1.5pt solid #0f172a', width: '100%', marginBottom: '6pt' }} />
+              <p style={{ fontSize: '9pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#0f172a', marginBottom: '2pt' }}>
+                Coordenação Pedagógica / Direção
+              </p>
+              <p style={{ fontSize: '7pt', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#64748b', fontFamily: "'JetBrains Mono', monospace", marginBottom: '2pt' }}>
+                EQUIPE GESTORA / VISTO
+              </p>
+              <p style={{ fontSize: '7pt', color: '#94a3b8', fontStyle: 'italic' }}>
+                Assinatura e Carimbo
+              </p>
+            </div>
+          </div>
+
+          {/* ====== FOOTER ====== */}
+          <div className="print-footer" style={{ marginTop: '24pt', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '6.5pt', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.3em', borderTop: '0.5pt solid #e2e8f0', paddingTop: '6pt' }}>
+            <span>SIGAR • Sistema Integrado de Gestão de Aprendizagem</span>
+            <span>Secretaria Municipal de Educação • Humberto de Campos/MA</span>
           </div>
         </div>,
         document.body
