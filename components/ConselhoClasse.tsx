@@ -5263,7 +5263,7 @@ export const ConselhoClasse: React.FC<ConselhoClasseProps> = ({
             {printingAcomp && (
                 <PrintableAcompanhamentoDocente
                     acompanhamento={printingAcomp}
-                    escolaNome={escolas.find(e => e.id === printingAcomp.escola_id)?.nome || selectedEscola?.nome}
+                    escolaNome={escolas.find(e => e.id === printingAcomp.escola_id)?.nome || currentEscola?.nome}
                     onClose={() => setPrintingAcomp(null)}
                 />
             )}
