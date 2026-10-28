@@ -1099,9 +1099,9 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
           <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight">Filtros de Lançamento</h2>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-6 gap-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Escola *</label>
+        <div className="grid gap-4 items-end [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
+          <div className="col-span-1 sm:col-span-2 min-w-0 w-full">
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Escola">Escola *</label>
             <SearchableSchoolSelect
               escolas={allowedEscolas}
               selectedId={selectedEscolaId}
@@ -1110,8 +1110,8 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Ano/Série *</label>
+          <div className="col-span-1 min-w-0 w-full">
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Ano/Série">Ano/Série *</label>
             <select 
               value={selectedAnoSerie}
               onChange={e => setSelectedAnoSerie(e.target.value)}
@@ -1126,8 +1126,8 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
             </select>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Turma *</label>
+          <div className="col-span-1 min-w-0 w-full">
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Turma">Turma *</label>
             <select 
               value={selectedTurmaId}
               onChange={e => setSelectedTurmaId(e.target.value)}
@@ -1144,8 +1144,8 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
             </select>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Componente Curricular *</label>
+          <div className="col-span-1 sm:col-span-2 min-w-0 w-full">
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Componente Curricular">Componente Curricular *</label>
             <select 
               value={componente}
               onChange={e => setComponente(e.target.value)}
@@ -1158,8 +1158,8 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
             </select>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Bimestre *</label>
+          <div className="col-span-1 min-w-0 w-full">
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Bimestre">Bimestre *</label>
             <select 
               value={bimestre}
               onChange={e => setBimestre(e.target.value)}
@@ -1172,7 +1172,7 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
             </select>
           </div>
 
-          <div className="flex items-end">
+          <div className="col-span-1 min-w-0 w-full flex items-end">
             <Button 
               onClick={() => fetchStudentsAndGrades()}
               disabled={!canLoadStudents || isLoadingStudents}
@@ -1410,10 +1410,10 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
             {/* Escola */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Escola</label>
+            <div className="col-span-1 sm:col-span-2 min-w-0 w-full">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Escola">Escola</label>
               <select
                 value={historyFilterEscola}
                 onChange={e => setHistoryFilterEscola(e.target.value)}
@@ -1427,8 +1427,8 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
             </div>
 
             {/* Ano/Série */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Ano/Série</label>
+            <div className="col-span-1 min-w-0 w-full">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Ano/Série">Ano/Série</label>
               <select
                 value={historyFilterAnoSerie}
                 onChange={e => setHistoryFilterAnoSerie(e.target.value)}
@@ -1442,8 +1442,8 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
             </div>
 
             {/* Turma */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Turma</label>
+            <div className="col-span-1 min-w-0 w-full">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Turma">Turma</label>
               <select
                 value={historyFilterTurma}
                 onChange={e => setHistoryFilterTurma(e.target.value)}
@@ -1457,8 +1457,8 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
             </div>
 
             {/* Componente Curricular */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Componente</label>
+            <div className="col-span-1 sm:col-span-2 min-w-0 w-full">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Componente">Componente</label>
               <select
                 value={historyFilterComponente}
                 onChange={e => setHistoryFilterComponente(e.target.value)}
@@ -1472,8 +1472,8 @@ export const Notas: React.FC<NotasProps> = ({ escolas, isDemoMode, isAdmin, user
             </div>
 
             {/* Bimestre */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Bimestre</label>
+            <div className="col-span-1 min-w-0 w-full">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Bimestre">Bimestre</label>
               <select
                 value={historyFilterBimestre}
                 onChange={e => setHistoryFilterBimestre(e.target.value)}

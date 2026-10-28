@@ -1022,20 +1022,20 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
         </div>
 
         <form onSubmit={handleSave} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-slate-50/50 p-4 rounded-xl border border-slate-100">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Data *</label>
+          <div className="grid gap-4 bg-slate-50/50 p-4 rounded-xl border border-slate-100 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
+            <div className="col-span-1 min-w-0 w-full">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Data">Data *</label>
               <input 
                 type="date" 
                 value={dataEntry}
                 onChange={e => setDataEntry(e.target.value)}
                 required
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white min-w-[130px]"
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Unidade Escolar *</label>
+            <div className="col-span-1 sm:col-span-2 min-w-0 w-full">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Unidade Escolar">Unidade Escolar *</label>
               <SearchableSchoolSelect
                 escolas={escolasInfantil}
                 selectedId={selectedEscolaId}
@@ -1045,8 +1045,8 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Grupo/Faixa Etária *</label>
+            <div className="col-span-1 min-w-0 w-full">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Grupo/Faixa Etária">Grupo/Faixa Etária *</label>
               <select 
                 value={anoSerie}
                 onChange={e => setAnoSerie(e.target.value)}
@@ -1063,8 +1063,8 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
               </select>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Turma *</label>
+            <div className="col-span-1 min-w-0 w-full">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Turma">Turma *</label>
               <select 
                 value={selectedTurmaId}
                 onChange={e => setSelectedTurmaId(e.target.value)}
@@ -1081,8 +1081,8 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
               </select>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Estudante *</label>
+            <div className="col-span-1 sm:col-span-2 min-w-0 w-full">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Estudante">Estudante *</label>
               <select 
                 value={selectedAlunoId}
                 onChange={e => setSelectedAlunoId(e.target.value)}
@@ -1240,10 +1240,10 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
             {/* Unidade Escolar */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Unidade Escolar</label>
+            <div className="col-span-1 sm:col-span-2 min-w-0 w-full">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Unidade Escolar">Unidade Escolar</label>
               <select
                 value={historyFilterEscola}
                 onChange={e => setHistoryFilterEscola(e.target.value)}
@@ -1257,8 +1257,8 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
             </div>
 
             {/* Faixa Etária / Ano */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Faixa Etária / Ano</label>
+            <div className="col-span-1 min-w-0 w-full">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Faixa Etária / Ano">Faixa Etária / Ano</label>
               <select
                 value={historyFilterAnoSerie}
                 onChange={e => setHistoryFilterAnoSerie(e.target.value)}
@@ -1272,8 +1272,8 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
             </div>
 
             {/* Turma */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Turma</label>
+            <div className="col-span-1 min-w-0 w-full">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Turma">Turma</label>
               <select
                 value={historyFilterTurma}
                 onChange={e => setHistoryFilterTurma(e.target.value)}
@@ -1287,8 +1287,8 @@ export const PortfolioVisualInfantil: React.FC<PortfolioVisualInfantilProps> = (
             </div>
 
             {/* Campo de Experiência */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Campo de Experiência</label>
+            <div className="col-span-1 sm:col-span-2 min-w-0 w-full">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Campo de Experiência">Campo de Experiência</label>
               <select
                 value={historyFilterCampoExperiencia}
                 onChange={e => setHistoryFilterCampoExperiencia(e.target.value)}

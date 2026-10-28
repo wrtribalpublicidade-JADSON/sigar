@@ -893,23 +893,23 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
           <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight">Seleção de Turma e Período</h2>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Data da Chamada *</label>
+        <div className="grid gap-4 items-end [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
+          <div className="col-span-1 min-w-0 w-full">
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Data da Chamada">Data da Chamada *</label>
             <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
               <input 
                 type="date" 
                 value={dataFreq}
                 onChange={e => setDataFreq(e.target.value)}
                 required
-                className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
+                className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all min-w-[130px]"
               />
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Escola *</label>
+          <div className="col-span-1 sm:col-span-2 min-w-0 w-full">
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Escola">Escola *</label>
             <SearchableSchoolSelect
               escolas={escolasInfantil}
               selectedId={selectedEscolaId}
@@ -919,8 +919,8 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Grupo/Faixa Etária *</label>
+          <div className="col-span-1 min-w-0 w-full">
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Grupo/Faixa Etária">Grupo/Faixa Etária *</label>
             <select 
               value={anoSerie}
               onChange={e => setAnoSerie(e.target.value)}
@@ -935,8 +935,8 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
             </select>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Turma *</label>
+          <div className="col-span-1 min-w-0 w-full">
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Turma">Turma *</label>
             <select 
               value={selectedTurmaId}
               onChange={e => setSelectedTurmaId(e.target.value)}
@@ -953,8 +953,8 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
             </select>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Período Letivo *</label>
+          <div className="col-span-1 min-w-0 w-full">
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Período Letivo">Período Letivo *</label>
             <select 
               value={periodo}
               onChange={e => setPeriodo(e.target.value)}
@@ -1253,10 +1253,10 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
             {/* Escola */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Escola</label>
+            <div className="col-span-1 sm:col-span-2 min-w-0 w-full">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Escola">Escola</label>
               <select
                 value={historyFilterEscola}
                 onChange={e => setHistoryFilterEscola(e.target.value)}
@@ -1270,8 +1270,8 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
             </div>
 
             {/* Grupo/Faixa Etária */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Grupo/Faixa Etária</label>
+            <div className="col-span-1 min-w-0 w-full">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Grupo/Faixa Etária">Grupo/Faixa Etária</label>
               <select
                 value={historyFilterAnoSerie}
                 onChange={e => setHistoryFilterAnoSerie(e.target.value)}
@@ -1285,8 +1285,8 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
             </div>
 
             {/* Turma */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Turma</label>
+            <div className="col-span-1 min-w-0 w-full">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Turma">Turma</label>
               <select
                 value={historyFilterTurma}
                 onChange={e => setHistoryFilterTurma(e.target.value)}
@@ -1300,8 +1300,8 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
             </div>
 
             {/* Período Letivo */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Período Letivo</label>
+            <div className="col-span-1 min-w-0 w-full">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Período Letivo">Período Letivo</label>
               <select
                 value={historyFilterPeriodo}
                 onChange={e => setHistoryFilterPeriodo(e.target.value)}
@@ -1315,8 +1315,8 @@ export const FrequenciaInfantil: React.FC<FrequenciaInfantilProps> = ({
             </div>
 
             {/* Professor */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Professor</label>
+            <div className="col-span-1 min-w-0 w-full">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Professor">Professor</label>
               <select
                 value={historyFilterProfessor}
                 onChange={e => setHistoryFilterProfessor(e.target.value)}

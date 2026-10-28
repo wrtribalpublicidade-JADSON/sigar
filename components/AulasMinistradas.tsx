@@ -1644,23 +1644,23 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
               </div>
             </div>
           )}
-          <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Data *</label>
+          <div className="grid gap-4 items-end [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
+            <div className="col-span-1 min-w-0 w-full">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Data">Data *</label>
               <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
                 <input 
                   type="date" 
                   value={dataAula}
                   onChange={e => setDataAula(e.target.value)}
                   required
-                  className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
+                  className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all min-w-[130px]"
                 />
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Escola *</label>
+            <div className="col-span-1 sm:col-span-2 min-w-0 w-full">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Escola">Escola *</label>
               <SearchableSchoolSelect
                 escolas={allowedEscolas}
                 selectedId={selectedEscolaId}
@@ -1669,8 +1669,8 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Ano/Série *</label>
+            <div className="col-span-1 min-w-0 w-full">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Ano/Série">Ano/Série *</label>
               <select 
                 value={anoSerie}
                 onChange={e => setAnoSerie(e.target.value)}
@@ -1683,8 +1683,8 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
               </select>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Turma *</label>
+            <div className="col-span-1 min-w-0 w-full">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Turma">Turma *</label>
               <select 
                 value={selectedTurmaId}
                 onChange={e => setSelectedTurmaId(e.target.value)}
@@ -1701,8 +1701,8 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
               </select>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Componente Curricular *</label>
+            <div className="col-span-1 sm:col-span-2 min-w-0 w-full">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Componente Curricular">Componente Curricular *</label>
               <select 
                 value={componente}
                 onChange={e => setComponente(e.target.value)}
@@ -1715,8 +1715,8 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
               </select>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Período *</label>
+            <div className="col-span-1 min-w-0 w-full">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Período">Período *</label>
               <select 
                 value={periodo}
                 onChange={e => setPeriodo(e.target.value)}
@@ -1729,8 +1729,8 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
               </select>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Qtd. Aulas *</label>
+            <div className="col-span-1 min-w-0 w-full">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Qtd. Aulas">Qtd. Aulas *</label>
               <select 
                 value={aulas}
                 onChange={e => setAulas(Number(e.target.value))}
@@ -1999,10 +1999,10 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
             {/* Escola */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Escola</label>
+            <div className="col-span-1 sm:col-span-2 min-w-0 w-full">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Escola">Escola</label>
               <select
                 value={historyFilterEscola}
                 onChange={e => setHistoryFilterEscola(e.target.value)}
@@ -2016,8 +2016,8 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
             </div>
 
             {/* Ano/Série */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Ano/Série</label>
+            <div className="col-span-1 min-w-0 w-full">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Ano/Série">Ano/Série</label>
               <select
                 value={historyFilterAnoSerie}
                 onChange={e => setHistoryFilterAnoSerie(e.target.value)}
@@ -2031,8 +2031,8 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
             </div>
 
             {/* Turma */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Turma</label>
+            <div className="col-span-1 min-w-0 w-full">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Turma">Turma</label>
               <select
                 value={historyFilterTurma}
                 onChange={e => setHistoryFilterTurma(e.target.value)}
@@ -2046,8 +2046,8 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
             </div>
 
             {/* Componente */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Componente</label>
+            <div className="col-span-1 sm:col-span-2 min-w-0 w-full">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Componente">Componente</label>
               <select
                 value={historyFilterComponente}
                 onChange={e => setHistoryFilterComponente(e.target.value)}
@@ -2061,8 +2061,8 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
             </div>
 
             {/* Bimestre */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Bimestre</label>
+            <div className="col-span-1 min-w-0 w-full">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Bimestre">Bimestre</label>
               <select
                 value={historyFilterBimestre}
                 onChange={e => setHistoryFilterBimestre(e.target.value)}
@@ -2076,8 +2076,8 @@ export const AulasMinistradas: React.FC<AulasMinistradasProps> = ({ escolas, isD
             </div>
 
             {/* Professor */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Professor</label>
+            <div className="col-span-1 min-w-0 w-full">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Professor">Professor</label>
               <select
                 value={historyFilterProfessor}
                 onChange={e => setHistoryFilterProfessor(e.target.value)}

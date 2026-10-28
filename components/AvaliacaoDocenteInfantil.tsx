@@ -516,9 +516,9 @@ export const AvaliacaoDocenteInfantil: React.FC<AvaliacaoDocenteInfantilProps> =
 
       {/* Selectors and Filters Card */}
       <Card className="bg-white border-slate-200 shadow-sm p-6 rounded-2xl">
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Unidade Escolar *</label>
+        <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
+          <div className="col-span-1 sm:col-span-2 min-w-0">
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 whitespace-normal leading-tight">Unidade Escolar *</label>
             <SearchableSchoolSelect
               escolas={escolasInfantil}
               selectedId={selectedEscolaId}
@@ -530,12 +530,12 @@ export const AvaliacaoDocenteInfantil: React.FC<AvaliacaoDocenteInfantilProps> =
                 setSelectedCampo('');
               }}
               placeholder="Selecione a Unidade"
-              inputClassName="pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all"
+              inputClassName="pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all w-full"
             />
           </div>
 
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Grupo/Faixa Etária *</label>
+          <div className="col-span-1 min-w-0">
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 whitespace-normal leading-tight">Grupo/Faixa Etária *</label>
             <select 
               value={selectedGrupo}
               disabled={!selectedEscolaId}
@@ -556,8 +556,8 @@ export const AvaliacaoDocenteInfantil: React.FC<AvaliacaoDocenteInfantilProps> =
             </select>
           </div>
 
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Turma *</label>
+          <div className="col-span-1 min-w-0">
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 whitespace-normal leading-tight">Turma *</label>
             <select 
               value={selectedTurmaId}
               disabled={!selectedEscolaId || !selectedGrupo}
@@ -585,8 +585,8 @@ export const AvaliacaoDocenteInfantil: React.FC<AvaliacaoDocenteInfantilProps> =
             </select>
           </div>
 
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Período Avaliativo *</label>
+          <div className="col-span-1 min-w-0">
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 whitespace-normal leading-tight">Período Avaliativo *</label>
             <select 
               value={selectedBimestre}
               disabled={!selectedEscolaId || !selectedGrupo || !selectedTurmaId}
@@ -608,8 +608,8 @@ export const AvaliacaoDocenteInfantil: React.FC<AvaliacaoDocenteInfantilProps> =
             </select>
           </div>
 
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Campo de Experiência *</label>
+          <div className="col-span-1 min-w-0">
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 whitespace-normal leading-tight">Campo de Experiência *</label>
             <select 
               value={selectedCampo}
               disabled={!selectedEscolaId || !selectedGrupo || !selectedTurmaId || !selectedBimestre}

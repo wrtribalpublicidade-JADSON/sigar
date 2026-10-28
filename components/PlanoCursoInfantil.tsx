@@ -1550,24 +1550,24 @@ export const PlanoCursoInfantil: React.FC<PlanoCursoInfantilProps> = ({
         </div>
 
         <form onSubmit={handleSave} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50/50 p-4 rounded-xl border border-slate-100">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Ano *</label>
+          <div className="grid gap-4 bg-slate-50/50 p-4 rounded-xl border border-slate-100 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
+            <div className="col-span-1 min-w-0 w-full">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Ano">Ano *</label>
               <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
                 <input 
                   type="number" 
                   value={anoReferencia}
                   onChange={e => setAnoReferencia(e.target.value)}
                   required
                   placeholder="Ex: 2026"
-                  className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white"
+                  className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white min-w-[120px]"
                 />
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Grupo/Faixa Etária *</label>
+            <div className="col-span-1 min-w-0 w-full">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Grupo/Faixa Etária">Grupo/Faixa Etária *</label>
               <select 
                 value={anoSerie}
                 onChange={e => setAnoSerie(e.target.value)}
@@ -1580,8 +1580,8 @@ export const PlanoCursoInfantil: React.FC<PlanoCursoInfantilProps> = ({
               </select>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Campo de experiência *</label>
+            <div className="col-span-1 sm:col-span-2 min-w-0 w-full">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Campo de experiência">Campo de experiência *</label>
               <select 
                 value={componente}
                 onChange={e => setComponente(e.target.value)}
@@ -1597,8 +1597,8 @@ export const PlanoCursoInfantil: React.FC<PlanoCursoInfantilProps> = ({
               </select>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Período *</label>
+            <div className="col-span-1 min-w-0 w-full">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Período">Período *</label>
               <select 
                 value={bimestre}
                 onChange={e => setBimestre(e.target.value)}

@@ -1620,62 +1620,62 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
               </div>
             </div>
           )}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-12 gap-3 items-end">
+          <div className="grid gap-4 items-end [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
             {/* 1. DATA DE CRIAÇÃO (Automática e Travada) */}
-            <div className="col-span-12 sm:col-span-2 md:col-span-1 lg:col-span-1 min-w-[130px]">
+            <div className="col-span-1 min-w-0 w-full">
               <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Data de Criação">
                 Data de Criação
               </label>
               <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
                 <input 
                   type="date" 
                   value={dataPlan}
                   disabled
                   readOnly
                   title="A data de criação é registrada automaticamente pelo sistema e não pode ser retroativa ou futura."
-                  className="w-full pl-9 pr-2 py-2 border border-slate-200 bg-slate-50/80 text-slate-600 font-bold rounded-xl outline-none text-xs cursor-not-allowed"
+                  className="w-full pl-9 pr-2 py-2 border border-slate-200 bg-slate-50/80 text-slate-600 font-bold rounded-xl outline-none text-xs cursor-not-allowed min-w-[130px]"
                 />
               </div>
             </div>
 
             {/* 2. INÍCIO DO GUIA */}
-            <div className="col-span-12 sm:col-span-2 md:col-span-1 lg:col-span-1 min-w-[140px]">
+            <div className="col-span-1 min-w-0 w-full">
               <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 truncate" title="Início do Guia">
                 Início do Guia *
               </label>
               <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-orange w-4 h-4" />
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-orange w-4 h-4 pointer-events-none" />
                 <input 
                   type="date" 
                   value={dataInicio}
                   onChange={e => setDataInicio(e.target.value)}
                   required
-                  className="w-full pl-9 pr-2 py-2 border border-slate-200 bg-white rounded-xl outline-none text-xs font-semibold focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all"
+                  className="w-full pl-9 pr-2 py-2 border border-slate-200 bg-white rounded-xl outline-none text-xs font-semibold focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all min-w-[130px]"
                 />
               </div>
             </div>
 
             {/* 3. TÉRMINO DO GUIA */}
-            <div className="col-span-12 sm:col-span-2 md:col-span-1 lg:col-span-1 min-w-[140px]">
+            <div className="col-span-1 min-w-0 w-full">
               <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 truncate" title="Término do Guia">
                 Término do Guia *
               </label>
               <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-orange w-4 h-4" />
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-orange w-4 h-4 pointer-events-none" />
                 <input 
                   type="date" 
                   value={dataTermino}
                   min={dataInicio}
                   onChange={e => setDataTermino(e.target.value)}
                   required
-                  className="w-full pl-9 pr-2 py-2 border border-slate-200 bg-white rounded-xl outline-none text-xs font-semibold focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all"
+                  className="w-full pl-9 pr-2 py-2 border border-slate-200 bg-white rounded-xl outline-none text-xs font-semibold focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all min-w-[130px]"
                 />
               </div>
             </div>
 
             {/* 4. BIMESTRE / ETAPA */}
-            <div className="col-span-12 sm:col-span-2 md:col-span-1 lg:col-span-1 min-w-[130px]">
+            <div className="col-span-1 min-w-0 w-full">
               <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Bimestre / Etapa">
                 Bimestre / Etapa *
               </label>
@@ -1692,7 +1692,7 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
             </div>
 
             {/* 5. UNIDADE ESCOLAR */}
-            <div className="col-span-12 sm:col-span-4 md:col-span-3 lg:col-span-3 min-w-[220px]">
+            <div className="col-span-1 sm:col-span-2 min-w-0 w-full">
               <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Unidade Escolar">
                 Unidade Escolar *
               </label>
@@ -1706,7 +1706,7 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
             </div>
 
             {/* 6. GRUPO/FAIXA ETÁRIA */}
-            <div className="col-span-12 sm:col-span-2 md:col-span-1 lg:col-span-1 min-w-[120px]">
+            <div className="col-span-1 min-w-0 w-full">
               <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Grupo/Faixa Etária">
                 Grupo/Faixa Etária *
               </label>
@@ -1723,7 +1723,7 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
             </div>
 
             {/* 7. TURMA */}
-            <div className="col-span-12 sm:col-span-3 md:col-span-2 lg:col-span-2 min-w-[150px]">
+            <div className="col-span-1 min-w-0 w-full">
               <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Turma">
                 Turma *
               </label>
@@ -1744,7 +1744,7 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
             </div>
 
             {/* 8. CAMPO DE EXPERIÊNCIA */}
-            <div className="col-span-12 sm:col-span-3 md:col-span-2 lg:col-span-2 min-w-[170px]">
+            <div className="col-span-1 sm:col-span-2 min-w-0 w-full">
               <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Campo de Experiência">
                 Campo de Experiência *
               </label>
@@ -1991,10 +1991,10 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+          <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
             {/* Unidade Escolar */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Unidade Escolar</label>
+            <div className="col-span-1 sm:col-span-2 min-w-0 w-full">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Unidade Escolar">Unidade Escolar</label>
               <select
                 value={historyFilterEscola}
                 onChange={e => setHistoryFilterEscola(e.target.value)}
@@ -2008,8 +2008,8 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
             </div>
 
             {/* Faixa Etária / Ano */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Faixa Etária / Ano</label>
+            <div className="col-span-1 min-w-0 w-full">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Faixa Etária / Ano">Faixa Etária / Ano</label>
               <select
                 value={historyFilterFaixaEtaria}
                 onChange={e => setHistoryFilterFaixaEtaria(e.target.value)}
@@ -2023,8 +2023,8 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
             </div>
 
             {/* Turma */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Turma</label>
+            <div className="col-span-1 min-w-0 w-full">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Turma">Turma</label>
               <select
                 value={historyFilterTurma}
                 onChange={e => setHistoryFilterTurma(e.target.value)}
@@ -2038,8 +2038,8 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
             </div>
 
             {/* Campo de Experiência */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Campo de Experiência</label>
+            <div className="col-span-1 sm:col-span-2 min-w-0 w-full">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Campo de Experiência">Campo de Experiência</label>
               <select
                 value={historyFilterCampoExperiencia}
                 onChange={e => setHistoryFilterCampoExperiencia(e.target.value)}
@@ -2053,8 +2053,8 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
             </div>
 
             {/* Bimestre */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Bimestre</label>
+            <div className="col-span-1 min-w-0 w-full">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Bimestre">Bimestre</label>
               <select
                 value={historyFilterBimestre}
                 onChange={e => setHistoryFilterBimestre(e.target.value)}
@@ -2068,8 +2068,8 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
             </div>
 
             {/* Professor */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Professor</label>
+            <div className="col-span-1 min-w-0 w-full">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Professor">Professor</label>
               <select
                 value={historyFilterProfessor}
                 onChange={e => setHistoryFilterProfessor(e.target.value)}
@@ -2083,8 +2083,8 @@ export const PlanoAulaInfantil: React.FC<PlanoAulaInfantilProps> = ({
             </div>
 
             {/* Status */}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Status de Avaliação</label>
+            <div className="col-span-1 min-w-0 w-full">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Status de Avaliação">Status de Avaliação</label>
               <select
                 value={historyFilterStatus}
                 onChange={e => setHistoryFilterStatus(e.target.value)}

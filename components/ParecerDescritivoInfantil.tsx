@@ -1091,9 +1091,9 @@ export const ParecerDescritivoInfantil: React.FC<ParecerDescritivoInfantilProps>
 
         <form onSubmit={handleSave} className="space-y-6">
           {/* Seletor de Unidade, Grupo/Faixa Etária e Turma */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50/50 p-4 rounded-xl border border-slate-100 mb-6">
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Unidade Escolar *</label>
+          <div className="grid gap-4 bg-slate-50/50 p-4 rounded-xl border border-slate-100 mb-6 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
+            <div className="min-w-0 w-full">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Unidade Escolar">Unidade Escolar *</label>
               <SearchableSchoolSelect
                 escolas={escolasInfantil}
                 selectedId={selectedEscolaId}
@@ -1103,8 +1103,8 @@ export const ParecerDescritivoInfantil: React.FC<ParecerDescritivoInfantilProps>
               />
             </div>
 
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Grupo/Faixa Etária *</label>
+            <div className="min-w-0 w-full">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Grupo/Faixa Etária">Grupo/Faixa Etária *</label>
               <select 
                 value={selectedGrupo}
                 onChange={e => setSelectedGrupo(e.target.value)}
@@ -1122,8 +1122,8 @@ export const ParecerDescritivoInfantil: React.FC<ParecerDescritivoInfantilProps>
               </select>
             </div>
 
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Turma *</label>
+            <div className="min-w-0 w-full">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Turma">Turma *</label>
               <select 
                 value={selectedTurmaId}
                 onChange={e => setSelectedTurmaId(e.target.value)}
@@ -1142,9 +1142,9 @@ export const ParecerDescritivoInfantil: React.FC<ParecerDescritivoInfantilProps>
           </div>
 
           {/* Top Row: Aluno, Período, Status */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
-            <div className="lg:col-span-6 text-left">
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Aluno *</label>
+          <div className="grid gap-4 items-end [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
+            <div className="col-span-1 sm:col-span-2 text-left min-w-0 w-full">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5 truncate" title="Aluno">Aluno *</label>
               <select 
                 value={selectedAlunoId}
                 onChange={e => setSelectedAlunoId(e.target.value)}
@@ -1156,8 +1156,8 @@ export const ParecerDescritivoInfantil: React.FC<ParecerDescritivoInfantilProps>
               </select>
             </div>
 
-            <div className="lg:col-span-4 text-left">
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Período</label>
+            <div className="col-span-1 text-left min-w-0 w-full">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5 truncate" title="Período">Período</label>
               <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200/50">
                 {PERIODOS.map(p => {
                   const label = p.replace("estre", ""); // "1º Bimestre" -> "1º Bim"
@@ -1180,8 +1180,8 @@ export const ParecerDescritivoInfantil: React.FC<ParecerDescritivoInfantilProps>
               </div>
             </div>
 
-            <div className="lg:col-span-2 text-left">
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Status</label>
+            <div className="col-span-1 text-left min-w-0 w-full">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5 truncate" title="Status">Status</label>
               <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200/50">
                 {(['Rascunho', 'Finalizado'] as const).map(status => {
                   const isSelected = statusValue === status;
