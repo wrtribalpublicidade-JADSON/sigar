@@ -229,10 +229,10 @@ export const DiarioAtividadeModal: React.FC<{
             const newAttendance = { ...attendance, [studentId]: presente };
             setAttendance(newAttendance);
             
-            // Prepare all records for this date
+            // Prepare all records for this date (default to present if not explicitly set)
             const records = students.map(s => ({
                 aluno_id: s.id,
-                presente: newAttendance[s.id] ?? false
+                presente: newAttendance[s.id] ?? true
             }));
             
             if (!atividade?.id) return;
@@ -326,6 +326,15 @@ export const DiarioAtividadeModal: React.FC<{
                 }
             });
 
+            // Se for um dia com registro na turma mas este estudante não possui registro explícito,
+            // aplica o padrão institucional (Presente), garantindo que a aula da turma não seja
+            // computada como "aula ministrada apenas para 1 aluno".
+            registeredDates.forEach(d => {
+                if (daysMap[d] === undefined) {
+                    daysMap[d] = true;
+                }
+            });
+
             let presences = 0;
             let absences = 0;
             let totalClasses = 0;
@@ -341,7 +350,8 @@ export const DiarioAtividadeModal: React.FC<{
                 }
             });
 
-            const rate = totalClasses > 0 ? Math.round((presences / totalClasses) * 100) : 100;
+            // Se o estudante não tiver aulas computadas no período, a taxa é 0 (ou — na UI), nunca 100%
+            const rate = totalClasses > 0 ? Math.round((presences / totalClasses) * 100) : 0;
 
             return {
                 id: student.id,
@@ -390,7 +400,7 @@ export const DiarioAtividadeModal: React.FC<{
         });
 
         const totalEntries = totalPresences + totalAbsences;
-        const avgRate = totalEntries > 0 ? Math.round((totalPresences / totalEntries) * 100) : 100;
+        const avgRate = totalEntries > 0 ? Math.round((totalPresences / totalEntries) * 100) : 0;
         const alertStudents = studentsMonthlyRows.filter(s => s.rate < 75 && s.totalClasses > 0).length;
         const perfectStudents = studentsMonthlyRows.filter(s => s.rate === 100 && s.totalClasses > 0).length;
 
@@ -406,25 +416,37 @@ export const DiarioAtividadeModal: React.FC<{
     }, [registeredDates, students, studentsMonthlyRows]);
 
     const handleToggleCell = async (studentId: number, dateStr: string) => {
-        if (!atividade?.id) return;
+        if (!atividade?.id || students.length === 0) return;
         const cellKey = `${studentId}_${dateStr}`;
         setSavingCellKey(cellKey);
 
         const currentRecord = monthlyRecords.find(r => r.aluno_id === studentId && r.data === dateStr);
-        const newStatus = currentRecord ? !currentRecord.presente : true;
+        // Se já existia registro, inverte; se estava como undefined (padrão presente), muda para falta (false)
+        const currentPresent = currentRecord !== undefined ? currentRecord.presente : true;
+        const newStatus = !currentPresent;
+
+        // Constrói os registros de todos os alunos da turma para essa data,
+        // garantindo que a aula ministrada pertence a todos e evitando alunos órfãos
+        const recordsToSave = students.map(s => {
+            if (s.id === studentId) {
+                return { aluno_id: s.id, presente: newStatus };
+            }
+            const existing = monthlyRecords.find(r => r.aluno_id === s.id && r.data === dateStr);
+            return {
+                aluno_id: s.id,
+                presente: existing !== undefined ? existing.presente : true
+            };
+        });
 
         // Optimistic UI update
         setMonthlyRecords(prev => {
-            const exists = prev.some(r => r.aluno_id === studentId && r.data === dateStr);
-            if (exists) {
-                return prev.map(r => (r.aluno_id === studentId && r.data === dateStr) ? { ...r, presente: newStatus } : r);
-            } else {
-                return [...prev, { aluno_id: studentId, data: dateStr, presente: newStatus }];
-            }
+            const others = prev.filter(r => r.data !== dateStr);
+            const updatedForDate = recordsToSave.map(r => ({ ...r, data: dateStr }));
+            return [...others, ...updatedForDate];
         });
 
         try {
-            await activitiesService.toggleStudentAttendance(atividade.id, dateStr, studentId, newStatus);
+            await activitiesService.saveAttendance(atividade.id, dateStr, recordsToSave);
             const stats = await activitiesService.getAttendanceStats(atividade.id);
             setStudentFrequency(stats);
         } catch (err) {
@@ -1482,15 +1504,21 @@ export const DiarioAtividadeModal: React.FC<{
                                                                 {/* Monthly Rate */}
                                                                 <td className="p-3 text-center">
                                                                     <div className="inline-flex items-center gap-1">
-                                                                        <span className={`px-2 py-0.5 rounded-full text-xs font-black ${
-                                                                            student.rate >= 75
-                                                                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                                                                : student.rate >= 50
-                                                                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                                                                : 'bg-rose-50 text-rose-700 border border-rose-200'
-                                                                        }`}>
-                                                                            {student.rate}%
-                                                                        </span>
+                                                                        {student.totalClasses === 0 ? (
+                                                                            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-400 border border-slate-200" title="Sem aulas computadas para este estudante no período">
+                                                                                —
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span className={`px-2 py-0.5 rounded-full text-xs font-black ${
+                                                                                student.rate >= 75
+                                                                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                                                    : student.rate >= 50
+                                                                                    ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                                                                    : 'bg-rose-50 text-rose-700 border border-rose-200'
+                                                                            }`}>
+                                                                                {student.rate}%
+                                                                            </span>
+                                                                        )}
                                                                     </div>
                                                                 </td>
                                                             </tr>
@@ -1597,9 +1625,15 @@ export const DiarioAtividadeModal: React.FC<{
                                         </div>
                                         <div className="flex justify-between items-center pt-4 border-t border-slate-50">
                                             <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Frequência Real</span>
-                                            <span className={`${(studentFrequency[student.id] || 0) < 75 ? 'text-rose-600' : 'text-emerald-600'} font-black text-xs`}>
-                                                {studentFrequency[student.id] || 0}% freq.
-                                            </span>
+                                            {studentFrequency[student.id] !== undefined ? (
+                                                <span className={`${studentFrequency[student.id] < 75 ? 'text-rose-600' : 'text-emerald-600'} font-black text-xs`}>
+                                                    {studentFrequency[student.id]}% freq.
+                                                </span>
+                                            ) : (
+                                                <span className="text-slate-400 font-bold text-xs">
+                                                    Sem registros
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                 ))}

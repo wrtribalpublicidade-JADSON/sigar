@@ -260,7 +260,7 @@ export const FrequenciaAlunosTab: React.FC<FrequenciaAlunosTabProps> = ({
           const summaries: StudentAttendanceSummary[] = Array.from(studentStatsMap.entries()).map(([id, data]) => {
             const rate = data.totalClasses > 0 
               ? Math.round((data.presences / data.totalClasses) * 100)
-              : 100;
+              : 0;
             return {
               id,
               name: data.name,
@@ -680,15 +680,21 @@ export const FrequenciaAlunosTab: React.FC<FrequenciaAlunosTabProps> = ({
                           {st.justifiedCount || 0}
                         </td>
                         <td className="px-6 py-3 text-center">
-                          <span className={`inline-block font-black px-2.5 py-0.5 rounded-full text-[10px]
-                            ${st.rate >= 90 
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
-                              : st.rate >= 75 
-                                ? 'bg-amber-50 text-amber-700 border border-amber-100' 
-                                : 'bg-red-50 text-red-600 border border-red-100'}`}
-                          >
-                            {st.rate}%
-                          </span>
+                          {st.totalClasses === 0 ? (
+                            <span className="inline-block font-bold px-2.5 py-0.5 rounded-full text-[10px] bg-slate-100 text-slate-400 border border-slate-200" title="Sem aulas no período">
+                              —
+                            </span>
+                          ) : (
+                            <span className={`inline-block font-black px-2.5 py-0.5 rounded-full text-[10px]
+                              ${st.rate >= 90 
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
+                                : st.rate >= 75 
+                                  ? 'bg-amber-50 text-amber-700 border border-amber-100' 
+                                  : 'bg-red-50 text-red-600 border border-red-100'}`}
+                            >
+                              {st.rate}%
+                            </span>
+                          )}
                         </td>
                         <td className="px-6 py-3 text-center">
                           {st.isAlert ? (

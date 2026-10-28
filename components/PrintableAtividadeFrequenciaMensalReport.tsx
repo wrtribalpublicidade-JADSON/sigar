@@ -244,7 +244,7 @@ export const PrintableAtividadeFrequenciaMensalReport: React.FC<PrintableAtivida
                                             color: isAlert ? '#b91c1c' : '#0f172a',
                                             background: isAlert ? '#fee2e2' : '#f8fafc'
                                         }}>
-                                            {s.rate}%
+                                            {s.totalClasses === 0 ? '—' : `${s.rate}%`}
                                         </td>
                                     </tr>
                                 );

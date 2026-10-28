@@ -268,7 +268,7 @@ export const activitiesService = {
         const result: Record<number, number> = {};
         Object.keys(stats).forEach(id => {
             const s = stats[Number(id)];
-            result[Number(id)] = Math.round((s.present / s.total) * 100);
+            result[Number(id)] = s.total > 0 ? Math.round((s.present / s.total) * 100) : 0;
         });
 
         return result;
