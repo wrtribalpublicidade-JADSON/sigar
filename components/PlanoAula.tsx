@@ -48,6 +48,8 @@ interface LessonPlan {
   anoSerie: string;
   periodo: string;
   professor?: string;
+  createdBy?: string;
+  updatedBy?: string;
   status?: 'Em Análise' | 'Aprovado' | 'Devolvido para Correção';
   observacaoCoordenacao?: string;
   avaliadoPor?: string;
@@ -521,9 +523,74 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       lower === 'docente responsável' ||
       lower === 'docente responsavel' ||
       lower === 'docente' ||
+      lower === 'sem professor vinculado' ||
       lower === '---' ||
       lower === 'user'
     );
+  };
+
+  const isCoordOrGestor = (identifier?: string | null): boolean => {
+    if (!identifier) return false;
+    const clean = identifier.trim().toLowerCase();
+    
+    // Verifica contra o usuário atualmente autenticado
+    if (currentUser) {
+      const uEmail = ((currentUser as any).email || '').toLowerCase().trim();
+      const uContato = (currentUser.contato || '').toLowerCase().trim();
+      const uNome = (currentUser.nome || '').toLowerCase().trim();
+      if (clean === uEmail || clean === uContato || clean === uNome) {
+        const f = (currentUser.funcao || '').toLowerCase();
+        if (
+          f.includes('coordenador') ||
+          f.includes('gestor') ||
+          f.includes('diretor') ||
+          f.includes('administrador') ||
+          f.includes('técnico') ||
+          f.includes('tecnico') ||
+          f.includes('monitor')
+        ) {
+          return true;
+        }
+      }
+    }
+
+    const coord = coordenadoresList.find(c => 
+      (c.contato && c.contato.trim().toLowerCase() === clean) ||
+      (c.nome && c.nome.trim().toLowerCase() === clean)
+    );
+    if (!coord) return false;
+    const funcao = (coord.funcao || '').toLowerCase();
+    return (
+      funcao.includes('coordenador') ||
+      funcao.includes('gestor') ||
+      funcao.includes('diretor') ||
+      funcao.includes('administrador') ||
+      funcao.includes('técnico') ||
+      funcao.includes('tecnico') ||
+      funcao.includes('monitor')
+    );
+  };
+
+  const isProfessorUser = (identifier?: string | null): boolean => {
+    if (!identifier) return false;
+    const clean = identifier.trim().toLowerCase();
+    if (isCoordOrGestor(clean)) return false;
+
+    if (currentUser) {
+      const uEmail = ((currentUser as any).email || '').toLowerCase().trim();
+      const uContato = (currentUser.contato || '').toLowerCase().trim();
+      const uNome = (currentUser.nome || '').toLowerCase().trim();
+      if (clean === uEmail || clean === uContato || clean === uNome) {
+        return currentUser.funcao === 'Professor' || !currentUser.funcao;
+      }
+    }
+
+    const coord = coordenadoresList.find(c => 
+      (c.contato && c.contato.trim().toLowerCase() === clean) ||
+      (c.nome && c.nome.trim().toLowerCase() === clean)
+    );
+    if (!coord) return false;
+    return coord.funcao === 'Professor' || !coord.funcao;
   };
 
   const getTeacherName = (emailOrName: string | undefined): string => {
@@ -547,43 +614,91 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
         t.turmaComponentes[tid] && 
         t.turmaComponentes[tid].some(c => normalizeSubjectName(c) === normComp)
       );
-      if (specificTeacher && specificTeacher.nome) return specificTeacher.nome.trim();
+      if (specificTeacher && specificTeacher.nome && !isCoordOrGestor(specificTeacher.nome)) {
+        return specificTeacher.nome.trim();
+      }
     }
 
     const turmaTeacher = teachersAssignments.find(t => t.turmasIds.includes(tid));
-    if (turmaTeacher && turmaTeacher.nome) return turmaTeacher.nome.trim();
+    if (turmaTeacher && turmaTeacher.nome && !isCoordOrGestor(turmaTeacher.nome)) {
+      return turmaTeacher.nome.trim();
+    }
 
     return null;
   };
 
-  const getDisplayTeacher = (prof?: string, turmaId?: string, compName?: string): string => {
-    const cleanProf = (prof || '').trim();
-    // 1. Se prof já é um nome real (não é e-mail e não é genérico), utiliza diretamente
-    if (cleanProf && !isEmail(cleanProf) && !isGenericTeacher(cleanProf)) {
-      return cleanProf;
-    }
-    // 2. Se prof é um e-mail, tenta resolver via coordMap
-    if (cleanProf && isEmail(cleanProf)) {
-      const resolved = getTeacherName(cleanProf);
-      if (resolved && !isEmail(resolved) && !isGenericTeacher(resolved)) {
-        return resolved.trim();
-      }
-    }
-    // 3. Tenta obter o professor vinculado à turma e componente
-    if (turmaId) {
-      const fromTurma = findTeacherForTurmaAndComponente(turmaId, compName);
-      if (fromTurma) return fromTurma.trim();
-    }
-    // 4. Se prof não for genérico, retorna formatado ou o próprio texto
+  // Ordem de resolução de professor:
+  // (1) campo professor da guia;
+  // (2) created_by;
+  // (3) docente atribuído à turma e componente em coordenador_turmas (findTeacherForTurmaAndComponente);
+  // (4) updated_by SOMENTE se esse usuário tiver função de Professor.
+  // Usuários com função de coordenação ou gestão nunca são considerados autores da guia.
+  const resolvePlanProfessor = (
+    rawProf?: string | null,
+    createdBy?: string | null,
+    turmaId?: string | null,
+    componente?: string | null,
+    updatedBy?: string | null,
+    avaliadoPor?: string | null
+  ): string => {
+    const avaliadorLower = (avaliadoPor || '').trim().toLowerCase();
+
+    // (1) Campo professor da guia
+    const cleanProf = (rawProf || '').trim();
     if (cleanProf && !isGenericTeacher(cleanProf)) {
-      if (isEmail(cleanProf)) {
-        const resolved = getTeacherName(cleanProf);
-        if (resolved && !isEmail(resolved)) return resolved.trim();
-      } else {
-        return cleanProf;
+      const resolvedProfName = isEmail(cleanProf) ? getTeacherName(cleanProf) : cleanProf;
+      const profLower = resolvedProfName.trim().toLowerCase();
+      if ((!avaliadorLower || profLower !== avaliadorLower) && !isCoordOrGestor(resolvedProfName) && !isCoordOrGestor(cleanProf)) {
+        return resolvedProfName.trim();
       }
     }
+
+    // (2) created_by
+    const cleanCreated = (createdBy || '').trim();
+    if (cleanCreated && !isGenericTeacher(cleanCreated)) {
+      const resolvedCreatedName = isEmail(cleanCreated) ? getTeacherName(cleanCreated) : cleanCreated;
+      const createdLower = resolvedCreatedName.trim().toLowerCase();
+      if ((!avaliadorLower || createdLower !== avaliadorLower) && !isCoordOrGestor(resolvedCreatedName) && !isCoordOrGestor(cleanCreated)) {
+        return resolvedCreatedName.trim();
+      }
+    }
+
+    // (3) Docente atribuído à turma e componente em coordenador_turmas (findTeacherForTurmaAndComponente)
+    if (turmaId) {
+      const teacherFromTurma = findTeacherForTurmaAndComponente(String(turmaId), componente || undefined);
+      if (teacherFromTurma && !isGenericTeacher(teacherFromTurma)) {
+        const teacherLower = teacherFromTurma.trim().toLowerCase();
+        if ((!avaliadorLower || teacherLower !== avaliadorLower) && !isCoordOrGestor(teacherFromTurma)) {
+          return teacherFromTurma.trim();
+        }
+      }
+    }
+
+    // (4) updated_by SOMENTE se esse usuário tiver função de Professor
+    const cleanUpdated = (updatedBy || '').trim();
+    if (cleanUpdated && !isGenericTeacher(cleanUpdated)) {
+      if (isProfessorUser(cleanUpdated) && !isCoordOrGestor(cleanUpdated)) {
+        const resolvedUpdatedName = isEmail(cleanUpdated) ? getTeacherName(cleanUpdated) : cleanUpdated;
+        const updatedLower = resolvedUpdatedName.trim().toLowerCase();
+        if ((!avaliadorLower || updatedLower !== avaliadorLower) && !isCoordOrGestor(resolvedUpdatedName)) {
+          return resolvedUpdatedName.trim();
+        }
+      }
+    }
+
+    // Fallback padrão
     return 'Docente Responsável';
+  };
+
+  const getDisplayTeacher = (
+    prof?: string,
+    turmaId?: string,
+    compName?: string,
+    createdBy?: string,
+    updatedBy?: string,
+    avaliadoPor?: string
+  ): string => {
+    return resolvePlanProfessor(prof, createdBy, turmaId, compName, updatedBy, avaliadoPor);
   };
 
   const fetchRealPlans = async (targetEscolaId?: string) => {
@@ -644,59 +759,16 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
         const criacaoData = p.data_criacao || (p.created_at ? p.created_at.split('T')[0] : (p.data || new Date().toISOString().split('T')[0]));
         const criadorRaw = (p.created_by || '').trim();
         const avaliadorRaw = (p.avaliado_por || p.avaliadoPor || '').trim();
-        const avaliadorLower = avaliadorRaw.toLowerCase();
-        const rawProf = (p.professor || '').trim();
 
-        let resolvedProfessor = '';
-
-        // 1. Prioriza p.professor se já contiver o nome real do docente
-        if (rawProf && !isEmail(rawProf) && !isGenericTeacher(rawProf)) {
-          if (!avaliadorLower || rawProf.toLowerCase() !== avaliadorLower) {
-            resolvedProfessor = rawProf;
-          }
-        }
-
-        // 2. Se p.professor for e-mail, tenta resolver via getTeacherName
-        if (!resolvedProfessor && rawProf && isEmail(rawProf)) {
-          const fromProf = getTeacherName(rawProf);
-          if (fromProf && !isEmail(fromProf) && !isGenericTeacher(fromProf) && fromProf.toLowerCase().trim() !== avaliadorLower) {
-            resolvedProfessor = fromProf.trim();
-          }
-        }
-
-        // 3. Tenta resolver o criador (p.created_by)
-        if (!resolvedProfessor && criadorRaw) {
-          if (!isEmail(criadorRaw) && !isGenericTeacher(criadorRaw) && criadorRaw.toLowerCase() !== avaliadorLower) {
-            resolvedProfessor = criadorRaw;
-          } else {
-            const fromCreated = getTeacherName(criadorRaw);
-            if (fromCreated && !isEmail(fromCreated) && !isGenericTeacher(fromCreated) && fromCreated.toLowerCase().trim() !== avaliadorLower) {
-              resolvedProfessor = fromCreated.trim();
-            }
-          }
-        }
-
-        // 4. Tenta resolver updated_by
-        if (!resolvedProfessor && p.updated_by) {
-          const cleanUpdated = String(p.updated_by).trim();
-          const fromUpdated = getTeacherName(cleanUpdated);
-          if (fromUpdated && !isEmail(fromUpdated) && !isGenericTeacher(fromUpdated) && fromUpdated.toLowerCase().trim() !== avaliadorLower) {
-            resolvedProfessor = fromUpdated.trim();
-          }
-        }
-
-        // 5. Tenta professor vinculado à turma e componente
-        if (!resolvedProfessor) {
-          const teacherFromTurma = findTeacherForTurmaAndComponente(String(p.turma_id), p.componente);
-          if (teacherFromTurma && teacherFromTurma.toLowerCase().trim() !== avaliadorLower) {
-            resolvedProfessor = teacherFromTurma.trim();
-          }
-        }
-
-        // 6. Fallback final
-        if (!resolvedProfessor) {
-          resolvedProfessor = (rawProf && !isEmail(rawProf)) ? rawProf : 'Docente Responsável';
-        }
+        // Resolução do professor em conformidade com as regras de prioridade
+        const resolvedProfessor = resolvePlanProfessor(
+          p.professor,
+          criadorRaw,
+          p.turma_id,
+          p.componente,
+          p.updated_by,
+          avaliadorRaw
+        );
 
         return {
           id: p.id,
@@ -719,6 +791,8 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
           periodo: p.periodo,
           criadoEm: p.created_at,
           professor: resolvedProfessor,
+          createdBy: criadorRaw,
+          updatedBy: (p.updated_by || '').trim(),
           status: p.status || 'Em Análise',
           observacaoCoordenacao: p.observacao_coordenacao || p.observacaoCoordenacao || '',
           avaliadoPor: p.avaliado_por || p.avaliadoPor || '',
@@ -758,7 +832,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
         fetchRealPlans(targetId);
       }
     }
-  }, [selectedEscolaId, isDemoMode]);
+  }, [selectedEscolaId, isDemoMode, teachersAssignments.length, coordenadoresList.length]);
 
   // Load turmas when selected school changes
   useEffect(() => {
@@ -830,18 +904,19 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
     return false;
   };
 
-  // Compute available Anos/Séries for the selected school
+  // Compute available Anos/Séries for the selected school (Ensino Fundamental apenas)
   const availableAnosSeries = useMemo(() => {
-    if (turmas.length === 0) return ANOS_SERIES;
-    const filtered = ANOS_SERIES.filter(ano => 
-      turmas.some(t => isTurmaInAnoSerie(t, ano))
+    const fundamentalAnos = ANOS_SERIES.filter(ano => !isEducaInfantilYear(ano));
+    if (turmas.length === 0) return fundamentalAnos;
+    const filtered = fundamentalAnos.filter(ano => 
+      turmas.some(t => !isEducaInfantilYear(t.year) && isTurmaInAnoSerie(t, ano))
     );
-    return filtered.length > 0 ? filtered : ANOS_SERIES;
+    return filtered.length > 0 ? filtered : fundamentalAnos;
   }, [turmas]);
 
-  // Compute available Turmas for the selected school and Ano/Série
+  // Compute available Turmas for the selected school and Ano/Série (Ensino Fundamental apenas)
   const availableTurmas = useMemo(() => {
-    return turmas.filter(t => isTurmaInAnoSerie(t, anoSerie));
+    return turmas.filter(t => !isEducaInfantilYear(t.year) && isTurmaInAnoSerie(t, anoSerie));
   }, [turmas, anoSerie]);
 
   // Sync anoSerie selection when availableAnosSeries changes
@@ -893,14 +968,55 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       return;
     }
 
-    const escolaNome = escolas.find(e => e.id === selectedEscolaId)?.nome || 'Unidade';
     const turmaObj = turmas.find(t => t.id === selectedTurmaId);
-    const turmaNome = turmaObj ? `${turmaObj.name || turmaObj.year} • ${turmaObj.shift || ''}` : 'Turma';
+    if (!turmaObj) {
+      showNotification('error', 'Selecione uma turma válida.');
+      return;
+    }
+
+    // Validação estrita: Bloqueia salvamento de turmas/anos de Educação Infantil no Ensino Fundamental
+    if (isEducaInfantilYear(anoSerie) || isEducaInfantilYear(turmaObj.year || '') || isCampoExperienciaInfantil(componente)) {
+      showNotification('error', 'Não é permitido registrar guias de Educação Infantil (Creche/Pré-Escola) nesta tela do Ensino Fundamental.');
+      return;
+    }
+
+    // Deriva estritamente escola_id da turma selecionada para evitar qualquer inconsistência
+    const realEscolaId = turmaObj.school_id || selectedEscolaId;
+    const escolaObj = escolas.find(e => e.id === realEscolaId);
+    const escolaNome = escolaObj ? escolaObj.nome : (escolas.find(e => e.id === selectedEscolaId)?.nome || 'Unidade');
+    const turmaNome = `${turmaObj.name || turmaObj.year} • ${turmaObj.shift || ''}`;
 
     const existingPlan = editingId ? plans.find(p => p.id === editingId) : null;
     const criacaoDate = existingPlan
       ? (existingPlan.dataCriacao || (existingPlan.criadoEm ? existingPlan.criadoEm.split('T')[0] : existingPlan.data))
       : new Date().toISOString().split('T')[0];
+
+    const userIdentifier = userEmail || currentUser?.contato || (currentUser as any)?.email || currentUser?.nome || 'user';
+
+    // Garante gravação obrigatória de created_by (preserva na edição ou grava usuário atual na criação)
+    const finalCreatedBy = editingId
+      ? (existingPlan?.createdBy || plans.find(p => p.id === editingId)?.createdBy || userIdentifier)
+      : userIdentifier;
+
+    // Resolução de professor para gravação:
+    // Se o usuário atual for professor, grava o nome dele.
+    // Se for coordenação ou gestão, obtém o docente da turma/componente (nunca grava o coordenador como autor).
+    let finalProfessor = '';
+    if (currentUser && currentUser.funcao === 'Professor' && currentUser.nome) {
+      finalProfessor = currentUser.nome.trim();
+    } else {
+      const existingProf = existingPlan?.professor || plans.find(p => p.id === editingId)?.professor;
+      if (existingProf && !isGenericTeacher(existingProf) && !isCoordOrGestor(existingProf)) {
+        finalProfessor = existingProf.trim();
+      } else {
+        const teacherFromTurma = findTeacherForTurmaAndComponente(selectedTurmaId, componente);
+        if (teacherFromTurma && !isGenericTeacher(teacherFromTurma) && !isCoordOrGestor(teacherFromTurma)) {
+          finalProfessor = teacherFromTurma.trim();
+        } else {
+          finalProfessor = 'Docente Responsável';
+        }
+      }
+    }
 
     const payload: LessonPlan = {
       id: editingId || crypto.randomUUID(),
@@ -908,7 +1024,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       dataCriacao: criacaoDate,
       dataInicio,
       dataTermino,
-      escolaId: selectedEscolaId,
+      escolaId: realEscolaId,
       escolaNome,
       turmaId: selectedTurmaId,
       turmaNome,
@@ -922,6 +1038,9 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       anoSerie,
       periodo,
       criadoEm: new Date().toISOString(),
+      professor: finalProfessor,
+      createdBy: finalCreatedBy,
+      updatedBy: userIdentifier,
       status: 'Em Análise',
       observacaoCoordenacao: editingId ? (plans.find(p => p.id === editingId)?.observacaoCoordenacao || '') : ''
     };
@@ -933,7 +1052,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
         data_criacao: payload.dataCriacao || payload.data,
         data_inicio: payload.dataInicio || null,
         data_termino: payload.dataTermino || null,
-        escola_id: payload.escolaId,
+        escola_id: realEscolaId,
         turma_id: payload.turmaId,
         componente: payload.componente,
         titulo: payload.titulo,
@@ -949,14 +1068,10 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
         avaliado_por: payload.avaliadoPor || null,
         avaliado_em: payload.avaliadoEm || null,
         ativo: true,
-        created_by: editingId 
-          ? (plans.find(p => p.id === editingId)?.professor || userEmail || currentUser?.contato || 'user') 
-          : (userEmail || currentUser?.contato || 'user'),
-        professor: (payload.professor && !isEmail(payload.professor) && !isGenericTeacher(payload.professor))
-          ? payload.professor
-          : (getDisplayTeacher(payload.professor, payload.turmaId, payload.componente) || currentUser?.nome || 'Professor'),
+        created_by: finalCreatedBy,
+        professor: finalProfessor,
         updated_at: new Date().toISOString(),
-        updated_by: userEmail || currentUser?.contato || 'user'
+        updated_by: userIdentifier
       };
 
       const { error } = await supabase
@@ -1002,7 +1117,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
         componente: payload.componente,
         periodo: payload.periodo,
         titulo: payload.titulo,
-        professor: getDisplayTeacher(payload.professor, payload.turmaId, payload.componente) || currentUser?.nome || 'Professor'
+        professor: payload.professor || 'Docente Responsável'
       }
     );
 
@@ -1107,12 +1222,12 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       if (plan.componente && isCampoExperienciaInfantil(plan.componente)) return;
 
       const normComp = normalizeSubjectName(plan.componente);
-      const profName = getDisplayTeacher(plan.professor, plan.turmaId, plan.componente).trim();
+      const profName = getDisplayTeacher(plan.professor, plan.turmaId, plan.componente, plan.createdBy, plan.updatedBy, plan.avaliadoPor).trim();
 
       const rawProf = plan.professor?.trim();
-      const resolvedProf = (profName && profName !== 'Docente Responsável' && !isGenericTeacher(profName)) 
+      const resolvedProf = (profName && profName !== 'Docente Responsável' && !isGenericTeacher(profName) && !isCoordOrGestor(profName)) 
         ? profName 
-        : (rawProf && !isGenericTeacher(rawProf) && !isEmail(rawProf) ? rawProf : null);
+        : null;
 
       const matchEscola = !historyFilterEscola || String(plan.escolaId) === String(historyFilterEscola);
       const matchAno = !historyFilterAnoSerie || plan.anoSerie === historyFilterAnoSerie;
@@ -1120,15 +1235,20 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       const matchComp = !historyFilterComponente || normComp === historyFilterComponente;
       const matchBimestre = !historyFilterBimestre || plan.periodo === historyFilterBimestre;
 
-      const filterProfNorm = (historyFilterProfessor || '').trim().toLowerCase();
-      const profNameNorm = (profName || '').trim().toLowerCase();
-      const rawProfNorm = (rawProf || '').trim().toLowerCase();
-      const resolvedProfNorm = (resolvedProf || '').trim().toLowerCase();
-
-      const matchProf = !filterProfNorm || 
-        profNameNorm === filterProfNorm || 
-        rawProfNorm === filterProfNorm || 
-        resolvedProfNorm === filterProfNorm;
+      let matchProf = false;
+      if (!historyFilterProfessor) {
+        matchProf = true;
+      } else if (historyFilterProfessor === 'Sem professor vinculado') {
+        matchProf = profName === 'Docente Responsável' || isGenericTeacher(profName) || isGenericTeacher(plan.professor);
+      } else {
+        const filterProfNorm = historyFilterProfessor.trim().toLowerCase();
+        const profNameNorm = (profName || '').trim().toLowerCase();
+        const rawProfNorm = (rawProf || '').trim().toLowerCase();
+        const resolvedProfNorm = (resolvedProf || '').trim().toLowerCase();
+        matchProf = profNameNorm === filterProfNorm || 
+          rawProfNorm === filterProfNorm || 
+          resolvedProfNorm === filterProfNorm;
+      }
 
       // Escolas
       if (plan.escolaId && plan.escolaNome) {
@@ -1165,8 +1285,8 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
         }
       }
 
-      // Professores
-      if (resolvedProf && resolvedProf.trim()) {
+      // Professores (somente docentes, nunca coordenadores/gestores)
+      if (resolvedProf && resolvedProf.trim() && !isCoordOrGestor(resolvedProf)) {
         if (matchEscola && matchAno && matchTurma && matchComp && matchBimestre) {
           professoresSet.add(resolvedProf.trim());
         }
@@ -1207,7 +1327,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
     const avaliadorNome = currentUser?.nome || userEmail || 'Coordenador';
     const nowIso = new Date().toISOString();
 
-    const resolvedDocente = getDisplayTeacher(evaluatingPlan.professor, evaluatingPlan.turmaId, evaluatingPlan.componente);
+    const resolvedDocente = getDisplayTeacher(evaluatingPlan.professor, evaluatingPlan.turmaId, evaluatingPlan.componente, evaluatingPlan.createdBy, evaluatingPlan.updatedBy, evaluatingPlan.avaliadoPor);
 
     const updatedPlan: LessonPlan = {
       ...evaluatingPlan,
@@ -1305,7 +1425,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       if (plan.componente && isCampoExperienciaInfantil(plan.componente)) return false;
 
       const normComp = normalizeSubjectName(plan.componente);
-      const profName = getDisplayTeacher(plan.professor, plan.turmaId, plan.componente).trim();
+      const profName = getDisplayTeacher(plan.professor, plan.turmaId, plan.componente, plan.createdBy, plan.updatedBy, plan.avaliadoPor).trim();
 
       if (historyFilterEscola && String(plan.escolaId) !== String(historyFilterEscola)) return false;
       if (historyFilterAnoSerie && plan.anoSerie !== historyFilterAnoSerie) return false;
@@ -1313,11 +1433,16 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
       if (historyFilterComponente && normComp !== historyFilterComponente) return false;
       if (historyFilterBimestre && plan.periodo !== historyFilterBimestre) return false;
       if (historyFilterProfessor) {
-        const filterProfNorm = historyFilterProfessor.trim().toLowerCase();
-        const profNameNorm = (profName || '').trim().toLowerCase();
-        const planProfNorm = (plan.professor || '').trim().toLowerCase();
-        if (profNameNorm !== filterProfNorm && planProfNorm !== filterProfNorm) {
-          return false;
+        if (historyFilterProfessor === 'Sem professor vinculado') {
+          const isSemProf = profName === 'Docente Responsável' || isGenericTeacher(profName) || isGenericTeacher(plan.professor);
+          if (!isSemProf) return false;
+        } else {
+          const filterProfNorm = historyFilterProfessor.trim().toLowerCase();
+          const profNameNorm = (profName || '').trim().toLowerCase();
+          const planProfNorm = (plan.professor || '').trim().toLowerCase();
+          if (profNameNorm !== filterProfNorm && planProfNorm !== filterProfNorm) {
+            return false;
+          }
         }
       }
       if (historyFilterStatus && (plan.status || 'Em Análise') !== historyFilterStatus) return false;
@@ -1343,7 +1468,11 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
 
   // Auto-reset professor filter if selected professor is not in available options
   useEffect(() => {
-    if (historyFilterProfessor && !historyOptions.professores.includes(historyFilterProfessor)) {
+    if (
+      historyFilterProfessor &&
+      historyFilterProfessor !== 'Sem professor vinculado' &&
+      !historyOptions.professores.includes(historyFilterProfessor)
+    ) {
       setHistoryFilterProfessor('');
     }
   }, [historyOptions.professores, historyFilterProfessor]);
@@ -1669,7 +1798,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
             <div style={{ textAlign: 'center' }}>
               <div style={{ borderTop: '1.5pt solid #0f172a', width: '100%', marginBottom: '6pt' }} />
               <p style={{ fontSize: '9pt', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#0f172a', marginBottom: '2pt' }}>
-                {getDisplayTeacher(printPlan.professor, printPlan.turmaId, printPlan.componente)}
+                {getDisplayTeacher(printPlan.professor, printPlan.turmaId, printPlan.componente, printPlan.createdBy, printPlan.updatedBy, printPlan.avaliadoPor)}
               </p>
               <p style={{ fontSize: '7pt', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#64748b', fontFamily: "'JetBrains Mono', monospace", marginBottom: '2pt' }}>
                 ASSINATURA DO(A) PROFESSOR(A)
@@ -2252,6 +2381,7 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
                 className="w-full px-3 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold focus:border-brand-orange transition-all bg-white text-slate-700"
               >
                 <option value="">Todos os Professores</option>
+                <option value="Sem professor vinculado">Sem professor vinculado</option>
                 {historyOptions.professores.map(p => (
                   <option key={p} value={p}>{p}</option>
                 ))}
@@ -2317,11 +2447,11 @@ export const PlanoAula: React.FC<PlanoAulaProps> = ({ escolas, isDemoMode, isAdm
                         <div className="text-[10px] text-brand-orange font-bold uppercase mt-0.5">
                           {normalizeSubjectName(plan.componente)}
                         </div>
-                        {getDisplayTeacher(plan.professor, plan.turmaId, plan.componente) !== 'Docente Responsável' && (
+                        {getDisplayTeacher(plan.professor, plan.turmaId, plan.componente, plan.createdBy, plan.updatedBy, plan.avaliadoPor) !== 'Docente Responsável' && (
                           <div className="text-[10px] text-slate-500 font-medium mt-1 flex items-center gap-1">
                             <User className="w-3 h-3 text-slate-400 shrink-0" />
-                            <span className="truncate max-w-[200px]" title={getDisplayTeacher(plan.professor, plan.turmaId, plan.componente)}>
-                              Prof: {getDisplayTeacher(plan.professor, plan.turmaId, plan.componente)}
+                            <span className="truncate max-w-[200px]" title={getDisplayTeacher(plan.professor, plan.turmaId, plan.componente, plan.createdBy, plan.updatedBy, plan.avaliadoPor)}>
+                              Prof: {getDisplayTeacher(plan.professor, plan.turmaId, plan.componente, plan.createdBy, plan.updatedBy, plan.avaliadoPor)}
                             </span>
                           </div>
                         )}
